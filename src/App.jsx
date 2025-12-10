@@ -1,24 +1,27 @@
-function App() {
-  const backendURL = "http://localhost:5000/upload";
+import { useEffect, useState } from "react";
 
-  const handleUpload = async (event) => {
-    const file = event.target.files[0];
-    const form = new FormData();
-    form.append("video", file);
+export default function VideoPlayer({ messageId, channelId }) {
+  const [url, setUrl] = useState(null);
 
-    const res = await fetch(backendURL, {
-      method: "POST",
-      body: form,
-    });
+  useEffect(() => {
+    async function fetchVideo() {
+      const res = await fetch(
+        `https://telegram-video-backend.onrender.com/video?message_id=${messageId}&chat_id=${channelId}`
+      );
+      const data = await res.json();
+      setUrl(data.url);
+    }
 
-    const data = await res.json();
-    console.log("Uploaded video:", data.url);
-  };
+    fetchVideo();
+  }, [messageId, channelId]);
+
+  if (!url) return <p>Loading video...</p>;
 
   return (
-    <div>
-      <h1>Upload Video</h1>
-      <input type="file" accept="video/*" onChange={handleUpload} />
-    </div>
+    <video 
+      controls 
+      style={{ width: "100%", borderRadius: 12 }}
+      src={url}
+    />
   );
 }
