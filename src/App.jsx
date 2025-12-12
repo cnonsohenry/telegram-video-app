@@ -1,27 +1,11 @@
-import { useEffect, useState } from "react";
+import VideoGallery from "./components/VideoGallery";
+import "./index.css";
 
-export default function VideoPlayer({ messageId, channelId }) {
-  const [url, setUrl] = useState(null);
-
-  useEffect(() => {
-    async function fetchVideo() {
-      const res = await fetch(
-        `https://telegram-video-backend.onrender.com/video?message_id=${messageId}&chat_id=${channelId}`
-      );
-      const data = await res.json();
-      setUrl(data.url);
-    }
-
-    fetchVideo();
-  }, [messageId, channelId]);
-
-  if (!url) return <p>Loading video...</p>;
-
+export default function App() {
   return (
-    <video 
-      controls 
-      style={{ width: "100%", borderRadius: 12 }}
-      src={url}
-    />
+    <div className="min-h-screen bg-black text-white">
+      <h1 className="text-center text-2xl font-bold py-4">Video Library</h1>
+      <VideoGallery />
+    </div>
   );
 }
