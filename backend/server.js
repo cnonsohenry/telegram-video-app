@@ -41,33 +41,39 @@ app.post("/webhook", (req, res) => {
   const update = req.body;
   const message = update.message || update.channel_post || update.edited_message;
 
-  if (!message || !message.video) {
-    return res.sendStatus(200);
-  }
+  if (!message) return res.sendStatus(200);
+
+  const media =
+    message.video ||
+    (message.document && message.document.mime_type?.startsWith("video/")) ||
+    message.video_note ||
+    message.animation;
+
+  if (!media) return res.sendStatus(200);
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO videos (chat_id, message_id, file_id)
     VALUES (?, ?, ?)
   `);
 
-  // Forwarded video from channel
   if (message.forward_from_chat && message.forward_from_message_id) {
     insert.run(
       message.forward_from_chat.id.toString(),
       message.forward_from_message_id.toString(),
-      message.video.file_id
+      media.file_id
     );
   } else {
-    // Normal video sent directly to bot
     insert.run(
       message.chat.id.toString(),
       message.message_id.toString(),
-      message.video.file_id
+      media.file_id
     );
   }
 
+  console.log("Saved media:", media.file_id);
   res.sendStatus(200);
 });
+
 
 // =====================
 // Get single video URL
