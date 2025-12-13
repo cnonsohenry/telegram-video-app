@@ -1,111 +1,133 @@
 import express from "express";
 import axios from "axios";
 import cors from "cors";
-import fs from "fs";
-import path from "path";
+import Database from "better-sqlite3";
 
+// =====================
+// Database setup
+// =====================
+const db = new Database("videos.db");
+
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS videos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id TEXT NOT NULL,
+    message_id TEXT NOT NULL,
+    file_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(chat_id, message_id)
+  )
+`).run();
+
+// =====================
+// App setup
+// =====================
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const BOT_TOKEN = process.env.BOT_TOKEN; 
+const BOT_TOKEN = process.env.BOT_TOKEN;
+if (!BOT_TOKEN) {
+  throw new Error("BOT_TOKEN is not set");
+}
+
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const TELEGRAM_FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
 
-const videosFile = path.join(process.cwd(), "saved_videos.json");
-
-// Load saved videos from file into memory
-let videos = {};
-if (fs.existsSync(videosFile)) {
-  try {
-    const data = fs.readFileSync(videosFile, "utf8");
-    videos = JSON.parse(data);
-  } catch (e) {
-    console.error("Failed to load saved videos:", e);
-  }
-}
-
-// Helper to save videos to file
-function saveVideosToFile() {
-  fs.writeFileSync(videosFile, JSON.stringify(videos, null, 2));
-}
-
-// 1️⃣ Webhook route: receives messages from Telegram
+// =====================
+// Webhook endpoint
+// =====================
 app.post("/webhook", (req, res) => {
   const update = req.body;
-
-  // Support message, channel_post, or edited_message
   const message = update.message || update.channel_post || update.edited_message;
 
-  if (message && message.video) {
-    const key = `${message.chat.id}_${message.message_id}`;
-    videos[key] = message.video.file_id;
-    console.log("Saved video:", key, message.video.file_id);
+  if (!message || !message.video) {
+    return res.sendStatus(200);
   }
 
-  // Handle forwarded videos from channels
-  if (message && message.forward_from_chat && message.forward_from_message_id && message.video) {
-    const key = `${message.forward_from_chat.id}_${message.forward_from_message_id}`;
-    videos[key] = message.video.file_id;
-    console.log("Saved forwarded video:", key, message.video.file_id);
-  }
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO videos (chat_id, message_id, file_id)
+    VALUES (?, ?, ?)
+  `);
 
-  // Persist all videos
-  saveVideosToFile();
+  // Forwarded video from channel
+  if (message.forward_from_chat && message.forward_from_message_id) {
+    insert.run(
+      message.forward_from_chat.id.toString(),
+      message.forward_from_message_id.toString(),
+      message.video.file_id
+    );
+  } else {
+    // Normal video sent directly to bot
+    insert.run(
+      message.chat.id.toString(),
+      message.message_id.toString(),
+      message.video.file_id
+    );
+  }
 
   res.sendStatus(200);
 });
 
-// 2️⃣ Endpoint to fetch a single video URL
+// =====================
+// Get single video URL
+// =====================
 app.get("/video", async (req, res) => {
   try {
-    const { message_id, chat_id } = req.query;
-    if (!message_id || !chat_id) {
-      return res.status(400).json({ error: "message_id and chat_id are required" });
+    const { chat_id, message_id } = req.query;
+
+    if (!chat_id || !message_id) {
+      return res.status(400).json({ error: "chat_id and message_id are required" });
     }
 
-    const key = `${chat_id}_${message_id}`;
-    const fileId = videos[key];
+    const row = db.prepare(`
+      SELECT file_id FROM videos
+      WHERE chat_id = ? AND message_id = ?
+    `).get(chat_id, message_id);
 
-    if (!fileId) {
-      return res.status(404).json({ error: "Video not found. Make sure the bot received this message." });
+    if (!row) {
+      return res.status(404).json({ error: "Video not found" });
     }
 
-    const fileRes = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
+    const fileRes = await axios.get(
+      `${TELEGRAM_API}/getFile?file_id=${row.file_id}`
+    );
+
     const filePath = fileRes.data.result.file_path;
     const playableUrl = `${TELEGRAM_FILE_API}/${filePath}`;
 
-    return res.json({ url: playableUrl });
+    res.json({ url: playableUrl });
   } catch (err) {
     console.error(err?.response?.data || err);
-    return res.status(500).json({ error: "Unable to get video" });
+    res.status(500).json({ error: "Unable to get video" });
   }
 });
 
-// 3️⃣ Endpoint to list all saved videos with pagination/search
+// =====================
+// List videos (pagination)
+// =====================
 app.get("/videos", (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "" } = req.query;
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 10);
+    const offset = (page - 1) * limit;
 
-    const allVideos = Object.entries(videos).map(([key, file_id]) => {
-      const [chat_id, message_id] = key.split("_");
-      return { chat_id, message_id, file_id };
-    });
+    const rows = db.prepare(`
+      SELECT chat_id, message_id, file_id, created_at
+      FROM videos
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
 
-    // Optional search filter
-    const filtered = search
-      ? allVideos.filter(v => v.chat_id.includes(search) || v.message_id.includes(search))
-      : allVideos;
-
-    // Pagination
-    const start = (page - 1) * limit;
-    const paginated = filtered.slice(start, start + Number(limit));
+    const total = db.prepare(`
+      SELECT COUNT(*) as count FROM videos
+    `).get().count;
 
     res.json({
-      page: Number(page),
-      limit: Number(limit),
-      total: filtered.length,
-      videos: paginated,
+      page,
+      limit,
+      total,
+      videos: rows
     });
   } catch (error) {
     console.error("Error fetching /videos:", error);
@@ -113,5 +135,10 @@ app.get("/videos", (req, res) => {
   }
 });
 
+// =====================
+// Start server
+// =====================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on PORT ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on PORT ${PORT}`);
+});
