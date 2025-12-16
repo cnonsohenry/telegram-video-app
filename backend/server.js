@@ -105,38 +105,50 @@ app.post("/webhook", async (req, res) => {
 });
 
 // =====================
-// Get single video
+// Get single video (Telegram mini app friendly)
 // =====================
 app.get("/video", async (req, res) => {
   try {
     const { chat_id, message_id } = req.query;
-    if (!chat_id || !message_id) return res.status(400).json({ error: "chat_id and message_id required" });
+    if (!chat_id || !message_id)
+      return res.status(400).json({ error: "chat_id and message_id required" });
 
     // Get file_id from DB
-    const fileId = await getFileId(chat_id, message_id);
+    const result = await pool.query(
+      `SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2 LIMIT 1`,
+      [chat_id, message_id]
+    );
+    const fileId = result.rows[0]?.file_id;
     if (!fileId) return res.status(404).json({ error: "Video not found" });
 
-    // Get file path from Telegram using IPv4
-    const fileRes = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`, { httpsAgent: agent });
+    // Get file path from Telegram API
+    const fileRes = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
     const filePath = fileRes.data.result.file_path;
-
-    // Stream the video
     const videoUrl = `${TELEGRAM_FILE_API}/${filePath}`;
-    const videoResponse = await axios.get(videoUrl, { responseType: "stream", httpsAgent: agent });
 
+    // Fetch video stream from Telegram
+    const videoResponse = await axios.get(videoUrl, { responseType: "stream" });
+
+    // Set headers for Telegram WebView / mini app
     res.setHeader("Content-Type", "video/mp4");
     res.setHeader("Content-Disposition", "inline");
+    res.setHeader("Access-Control-Allow-Origin", "*"); // required for mini app
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    // Pipe the video to client
     videoResponse.data.pipe(res);
 
   } catch (err) {
-    console.error("🔥 STREAM ERROR:", err?.response?.data || err);
+    console.error("🔥 STREAM ERROR:", err?.response?.data || err.message || err);
     res.status(500).json({ error: "Failed to stream video" });
   }
 });
 
 
+
 // =====================
-// List videos
+// List videos (Telegram mini app friendly)
 // =====================
 app.get("/videos", async (req, res) => {
   try {
@@ -144,7 +156,8 @@ app.get("/videos", async (req, res) => {
     const limit = Number(req.query.limit || 10);
     const offset = (page - 1) * limit;
 
-    const videos = await pool.query(
+    // Get videos from DB
+    const videosResult = await pool.query(
       `
       SELECT chat_id, message_id, file_id, created_at
       FROM videos
@@ -154,21 +167,31 @@ app.get("/videos", async (req, res) => {
       [limit, offset]
     );
 
-    const total = await pool.query(
-      `SELECT COUNT(*) FROM videos`
-    );
+    // Total count
+    const totalResult = await pool.query(`SELECT COUNT(*) FROM videos`);
+    const total = Number(totalResult.rows[0].count);
+
+    // Build mini-app-friendly URLs
+    const videos = videosResult.rows.map(video => ({
+      chat_id: video.chat_id,
+      message_id: video.message_id,
+      created_at: video.created_at,
+      url: `${process.env.BACKEND_URL}/video?chat_id=${video.chat_id}&message_id=${video.message_id}`
+    }));
 
     res.json({
       page,
       limit,
-      total: Number(total.rows[0].count),
-      videos: videos.rows
+      total,
+      videos
     });
+
   } catch (err) {
-    console.error(err);
+    console.error("Failed to load videos:", err);
     res.status(500).json({ error: "Failed to load videos" });
   }
 });
+
 
 // =====================
 // Start server

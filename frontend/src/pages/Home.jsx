@@ -1,33 +1,45 @@
-import { useEffect, useState } from "react";
-import VideoCard from "../components/VideoCard";
+import React, { useEffect, useState } from "react";
 
 export default function Home() {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch videos from backend
   useEffect(() => {
-    fetch("https://telegram-video-backend.onrender.com/videos?page=1&limit=10")
-      .then(res => res.json())
-      .then(data => {
-        setVideos(data.videos); // ✅ important
+    const fetchVideos = async () => {
+      try {
+        const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/videos`);
+        const data = await res.json();
+        setVideos(data.videos || []);
+      } catch (err) {
+        console.error("Failed to fetch videos:", err);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchVideos();
   }, []);
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <div>Loading videos...</div>;
+  if (!videos.length) return <div>No videos found</div>;
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Videos</h1>
-
-      <div className="grid gap-4">
-        {videos.map(video => (
-          <VideoCard
-            key={`${video.chat_id}_${video.message_id}`}
-            video={video}
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "16px" }}>
+      {videos.map((video) => (
+        <div key={video.message_id}>
+          <video
+            src={video.url}
+            controls
+            playsInline
+            webkit-playsinline="true"
+            style={{ width: "100%", borderRadius: "8px", backgroundColor: "#000" }}
           />
-        ))}
-      </div>
+          <p style={{ fontSize: "12px", color: "#555", marginTop: "4px" }}>
+            Uploaded: {new Date(video.created_at).toLocaleString()}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
