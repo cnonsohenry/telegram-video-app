@@ -1,11 +1,12 @@
-import VideoGallery from "./components/VideoGallery";
-import "./index.css";
+import Header from "./components/Header";
+import Home from "./pages/Home";
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-black text-white">
-      <h1 className="text-center text-2xl font-bold py-4">Video Library</h1>
-      <VideoGallery />
+    <div className="min-h-screen bg-gray-100">
+      <Header />
+      <Home />
     </div>
   );
 }
+

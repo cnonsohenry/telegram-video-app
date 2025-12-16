@@ -3,6 +3,12 @@ import express from "express";
 import axios from "axios";
 import cors from "cors";
 import pkg from "pg";
+import fs from "fs";
+import path from "path";
+import https from "https";
+
+// create an HTTPS agent forcing IPv4
+const agent = new https.Agent({ family: 4 });
 
 const { Pool } = pkg;
 
@@ -29,6 +35,19 @@ await pool.query(`
     UNIQUE(chat_id, message_id)
   )
 `);
+
+// =====================
+// Helper: get file_id from DB
+// =====================
+async function getFileId(chat_id, message_id) {
+  const result = await pool.query(
+    `SELECT file_id FROM videos WHERE chat_id = $1 AND message_id = $2 LIMIT 1`,
+    [chat_id, message_id]
+  );
+  if (result.rows.length === 0) return null;
+  return result.rows[0].file_id;
+}
+
 
 // =====================
 // App setup
@@ -91,37 +110,30 @@ app.post("/webhook", async (req, res) => {
 app.get("/video", async (req, res) => {
   try {
     const { chat_id, message_id } = req.query;
-    if (!chat_id || !message_id) {
-      return res.status(400).json({ error: "chat_id and message_id required" });
-    }
+    if (!chat_id || !message_id) return res.status(400).json({ error: "chat_id and message_id required" });
 
-    const result = await pool.query(
-      `
-      SELECT file_id FROM videos
-      WHERE chat_id = $1 AND message_id = $2
-      `,
-      [chat_id, message_id]
-    );
+    // Get file_id from DB
+    const fileId = await getFileId(chat_id, message_id);
+    if (!fileId) return res.status(404).json({ error: "Video not found" });
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Video not found" });
-    }
-
-    const fileId = result.rows[0].file_id;
-
-    const fileRes = await axios.get(
-      `${TELEGRAM_API}/getFile?file_id=${fileId}`
-    );
-
+    // Get file path from Telegram using IPv4
+    const fileRes = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`, { httpsAgent: agent });
     const filePath = fileRes.data.result.file_path;
-    const url = `${TELEGRAM_FILE_API}/${filePath}`;
 
-    res.json({ url });
+    // Stream the video
+    const videoUrl = `${TELEGRAM_FILE_API}/${filePath}`;
+    const videoResponse = await axios.get(videoUrl, { responseType: "stream", httpsAgent: agent });
+
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Disposition", "inline");
+    videoResponse.data.pipe(res);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Unable to fetch video" });
+    console.error("🔥 STREAM ERROR:", err?.response?.data || err);
+    res.status(500).json({ error: "Failed to stream video" });
   }
 });
+
 
 // =====================
 // List videos
