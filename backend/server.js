@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import axios from "axios";
 import cors from "cors";
@@ -8,12 +9,14 @@ const { Pool } = pkg;
 // =====================
 // Database setup
 // =====================
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production"
-    ? { rejectUnauthorized: false }
-    : false
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
+
 
 // Create table on startup
 await pool.query(`
