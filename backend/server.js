@@ -110,11 +110,11 @@ app.post("/webhook", async (req, res) => {
 app.get("/video", async (req, res) => {
   try {
     const { chat_id, message_id } = req.query;
+
     if (!chat_id || !message_id) {
       return res.status(400).json({ error: "chat_id and message_id required" });
     }
 
-    // 1. Get file_id from DB
     const result = await pool.query(
       "SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2",
       [chat_id, message_id]
@@ -126,7 +126,6 @@ app.get("/video", async (req, res) => {
 
     const file_id = result.rows[0].file_id;
 
-    // 2. Get file path from Telegram
     const fileRes = await axios.get(
       `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getFile`,
       { params: { file_id } }
@@ -135,22 +134,31 @@ app.get("/video", async (req, res) => {
     const filePath = fileRes.data.result.file_path;
     const fileUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${filePath}`;
 
-    // 3. Stream from Telegram WITH RANGE SUPPORT
-    const range = req.headers.range || "bytes=0-";
+    const range = req.headers.range;
 
     const tgStream = await axios.get(fileUrl, {
       responseType: "stream",
-      headers: { Range: range },
+      headers: range ? { Range: range } : {},
     });
 
-    // 4. SET HEADERS FROM TELEGRAM RESPONSE
-    res.status(206);
+    res.status(tgStream.status);
+
     res.set({
       "Content-Type": "video/mp4",
       "Accept-Ranges": "bytes",
-      "Content-Length": tgStream.headers["content-length"],
-      "Content-Range": tgStream.headers["content-range"],
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Range",
+      "Access-Control-Expose-Headers":
+        "Content-Range, Accept-Ranges, Content-Length",
     });
+
+    if (tgStream.headers["content-length"]) {
+      res.set("Content-Length", tgStream.headers["content-length"]);
+    }
+
+    if (tgStream.headers["content-range"]) {
+      res.set("Content-Range", tgStream.headers["content-range"]);
+    }
 
     tgStream.data.pipe(res);
   } catch (err) {
@@ -160,10 +168,6 @@ app.get("/video", async (req, res) => {
     }
   }
 });
-
-
-
-
 
 // =====================
 // List videos (Telegram mini app friendly)
