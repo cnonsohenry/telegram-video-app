@@ -110,40 +110,58 @@ app.post("/webhook", async (req, res) => {
 app.get("/video", async (req, res) => {
   try {
     const { chat_id, message_id } = req.query;
-    if (!chat_id || !message_id)
+    if (!chat_id || !message_id) {
       return res.status(400).json({ error: "chat_id and message_id required" });
+    }
 
-    // Get file_id from DB
+    // 1. Get file_id from DB
     const result = await pool.query(
-      `SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2 LIMIT 1`,
+      "SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2",
       [chat_id, message_id]
     );
-    const fileId = result.rows[0]?.file_id;
-    if (!fileId) return res.status(404).json({ error: "Video not found" });
 
-    // Get file path from Telegram API
-    const fileRes = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Video not found" });
+    }
+
+    const file_id = result.rows[0].file_id;
+
+    // 2. Get file path from Telegram
+    const fileRes = await axios.get(
+      `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getFile`,
+      { params: { file_id } }
+    );
+
     const filePath = fileRes.data.result.file_path;
-    const videoUrl = `${TELEGRAM_FILE_API}/${filePath}`;
+    const fileUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${filePath}`;
 
-    // Fetch video stream from Telegram
-    const videoResponse = await axios.get(videoUrl, { responseType: "stream" });
+    // 3. Stream from Telegram WITH RANGE SUPPORT
+    const range = req.headers.range || "bytes=0-";
 
-    // Set headers for Telegram WebView / mini app
-    res.setHeader("Content-Type", "video/mp4");
-    res.setHeader("Content-Disposition", "inline");
-    res.setHeader("Access-Control-Allow-Origin", "*"); // required for mini app
-    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    const tgStream = await axios.get(fileUrl, {
+      responseType: "stream",
+      headers: { Range: range },
+    });
 
-    // Pipe the video to client
-    videoResponse.data.pipe(res);
+    // 4. SET HEADERS FROM TELEGRAM RESPONSE
+    res.status(206);
+    res.set({
+      "Content-Type": "video/mp4",
+      "Accept-Ranges": "bytes",
+      "Content-Length": tgStream.headers["content-length"],
+      "Content-Range": tgStream.headers["content-range"],
+    });
 
+    tgStream.data.pipe(res);
   } catch (err) {
-    console.error("🔥 STREAM ERROR:", err?.response?.data || err.message || err);
-    res.status(500).json({ error: "Failed to stream video" });
+    console.error("🔥 STREAM ERROR:", err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to stream video" });
+    }
   }
 });
+
+
 
 
 
