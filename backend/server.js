@@ -178,10 +178,9 @@ app.get("/videos", async (req, res) => {
     const limit = Number(req.query.limit || 10);
     const offset = (page - 1) * limit;
 
-    // Get videos from DB
     const videosResult = await pool.query(
       `
-      SELECT chat_id, message_id, file_id, created_at
+      SELECT chat_id, message_id, created_at
       FROM videos
       ORDER BY created_at DESC
       LIMIT $1 OFFSET $2
@@ -189,16 +188,16 @@ app.get("/videos", async (req, res) => {
       [limit, offset]
     );
 
-    // Total count
     const totalResult = await pool.query(`SELECT COUNT(*) FROM videos`);
     const total = Number(totalResult.rows[0].count);
 
-    // Build mini-app-friendly URLs
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
     const videos = videosResult.rows.map(video => ({
       chat_id: video.chat_id,
       message_id: video.message_id,
       created_at: video.created_at,
-      url: `${process.env.BACKEND_URL}/video?chat_id=${video.chat_id}&message_id=${video.message_id}`
+      url: `${baseUrl}/video?chat_id=${video.chat_id}&message_id=${video.message_id}`
     }));
 
     res.json({
@@ -207,7 +206,6 @@ app.get("/videos", async (req, res) => {
       total,
       videos
     });
-
   } catch (err) {
     console.error("Failed to load videos:", err);
     res.status(500).json({ error: "Failed to load videos" });
