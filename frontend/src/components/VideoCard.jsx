@@ -1,25 +1,57 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 
 export default function VideoCard({ video }) {
   const videoRef = useRef(null);
+  const containerRef = useRef(null);
 
   if (!video) return null;
 
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    // Attempt muted autoplay (often works in WebView if playsInline + muted)
+    v.play().catch(() => {
+      // Silent fail — user will tap to play
+    });
+  }, [video.video_url]);
+
+  const handlePlay = (e) => {
+    const img = containerRef.current.querySelector("img");
+    if (img) img.style.display = "none";
+
+    // Hide controls after playback starts (keeps UI clean)
+    e.currentTarget.controls = false;
+  };
+
+  const handleContainerClick = () => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    if (v.paused) {
+      v.muted = false; // Unmute on user gesture
+      v.play().catch((err) => console.error("Play failed:", err));
+    }
+  };
+
   return (
     <div
+      ref={containerRef}
       style={{
         position: "relative",
         width: "100%",
         borderRadius: 12,
         overflow: "hidden",
         background: "#000",
+        cursor: "pointer", // Indicate tappable
       }}
+      onClick={handleContainerClick}
     >
-      {/* Thumbnail overlay */}
+      {/* Thumbnail overlay (hides on play) */}
       <img
         src={video.thumbnail_url || ""}
         onError={(e) => (e.currentTarget.style.display = "none")}
-        alt=""
+        alt="Thumbnail"
         style={{
           position: "absolute",
           inset: 0,
@@ -27,47 +59,27 @@ export default function VideoCard({ video }) {
           height: "100%",
           objectFit: "cover",
           zIndex: 2,
-          cursor: "pointer",
-        }}
-        onClick={() => {
-          const v = videoRef.current;
-          if (!v) return;
-          v.muted = false;
-          v.play().catch(() => {});
         }}
       />
 
-      {/* Video is ALWAYS mounted */}
+      {/* Video element */}
       <video
-  ref={videoRef}
-  src={video.video_url}
-  controls                  // Add this: forces reliable loading/playback in Telegram WebView
-  controlsList="nodownload" // Optional: hides download button if unwanted
-  muted
-  playsInline
-  preload="metadata"        // Or try "auto" if you want more aggressive preloading
-  poster={video.thumbnail_url || undefined}  // Add poster for better reliability (fallback to thumbnail)
-  style={{
-    width: "100%",
-    display: "block",
-    background: "#000",     // Ensures no flash of black
-  }}
-  onPlay={(e) => {
-    const img = e.currentTarget.previousSibling;
-    if (img) img.style.display = "none";
-
-    // Optional: Hide controls after playback starts (for cleaner look)
-    e.currentTarget.controls = false;
-  }}
-  onClick={(e) => {
-    // If you want to keep thumbnail click behavior
-    const v = videoRef.current;
-    if (v) {
-      v.muted = false;
-      v.play().catch(() => {});
-    }
-  }}
-/>
+        ref={videoRef}
+        src={video.video_url}
+        controls                  // Essential for reliable playback in Telegram WebView
+        muted                     // Start muted for potential autoplay
+        playsInline               // Required for inline playback in WebView
+        preload="metadata"        // Or try "auto" for more aggressive loading
+        poster={video.thumbnail_url || undefined}  // Prevents initial black screen
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "block",
+          background: "#000",
+        }}
+        onPlay={handlePlay}
+        onError={(e) => console.error("Video error:", e)}
+      />
     </div>
   );
 }
