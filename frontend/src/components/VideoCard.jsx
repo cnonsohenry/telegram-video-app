@@ -64,14 +64,17 @@ export default function VideoCard({ video }) {
 
       {/* Video */}
       <video
-  ref={videoRef}
-  src={video.video_url}
-  playsInline
-  muted
-  preload="metadata"
-  controls
-/>
-
+        ref={videoRef}
+        src={video.video_url}
+        controls={playing}
+        playsInline
+        muted
+        preload="metadata"
+        style={{
+          width: "100%",
+          display: playing ? "block" : "none",
+        }}
+      />
     </div>
   );
 }
