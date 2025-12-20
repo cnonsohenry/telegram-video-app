@@ -39,22 +39,35 @@ export default function VideoCard({ video }) {
 
       {/* Video is ALWAYS mounted */}
       <video
-        ref={videoRef}
-        src={video.video_url}
-        controls
-        muted
-        playsInline
-        preload="metadata"
-        style={{
-          width: "100%",
-          display: "block",
-        }}
-        onPlay={(e) => {
-          // hide thumbnail when video starts
-          const img = e.currentTarget.previousSibling;
-          if (img) img.style.display = "none";
-        }}
-      />
+  ref={videoRef}
+  src={video.video_url}
+  controls                  // Add this: forces reliable loading/playback in Telegram WebView
+  controlsList="nodownload" // Optional: hides download button if unwanted
+  muted
+  playsInline
+  preload="metadata"        // Or try "auto" if you want more aggressive preloading
+  poster={video.thumbnail_url || undefined}  // Add poster for better reliability (fallback to thumbnail)
+  style={{
+    width: "100%",
+    display: "block",
+    background: "#000",     // Ensures no flash of black
+  }}
+  onPlay={(e) => {
+    const img = e.currentTarget.previousSibling;
+    if (img) img.style.display = "none";
+
+    // Optional: Hide controls after playback starts (for cleaner look)
+    e.currentTarget.controls = false;
+  }}
+  onClick={(e) => {
+    // If you want to keep thumbnail click behavior
+    const v = videoRef.current;
+    if (v) {
+      v.muted = false;
+      v.play().catch(() => {});
+    }
+  }}
+/>
     </div>
   );
 }
