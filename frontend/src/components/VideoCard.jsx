@@ -8,11 +8,13 @@ export default function VideoCard({ video }) {
   const [thumbError, setThumbError] = useState(false);
 
   const play = () => {
-    setPlaying(true);
-    requestAnimationFrame(() => {
-      videoRef.current?.play();
-    });
-  };
+  if (!videoRef.current) return;
+
+  videoRef.current.muted = false; // unmute AFTER user click
+  videoRef.current.play().catch(() => {});
+  setPlaying(true);
+};
+
 
   return (
     <div
@@ -62,16 +64,14 @@ export default function VideoCard({ video }) {
 
       {/* Video */}
       <video
-        ref={videoRef}
-        src={video.video_url}
-        controls={playing}
-        playsInline
-        preload="none"
-        style={{
-          width: "100%",
-          display: playing ? "block" : "none",
-        }}
-      />
+  ref={videoRef}
+  src={video.video_url}
+  playsInline
+  muted
+  preload="metadata"
+  controls
+/>
+
     </div>
   );
 }
