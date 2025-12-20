@@ -7,70 +7,64 @@ export default function Home() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // Initial load
   useEffect(() => {
     expandApp();
-    loadVideos(1);
+    loadVideos();
   }, []);
 
-  const loadVideos = async (pageToLoad) => {
+  const loadVideos = async () => {
     if (loading) return;
     setLoading(true);
 
     try {
       const res = await fetch(
-        `https://telegram-video-backend.onrender.com/videos?page=${pageToLoad}&limit=10`
+        `https://telegram-video-backend.onrender.com/videos?page=${page}&limit=10`
       );
-
       const data = await res.json();
 
-      setVideos((prev) => [...prev, ...data.videos]);
-      setPage(pageToLoad + 1);
-      hapticLight();
-    } catch (err) {
-      console.error("Failed to load videos", err);
+      if (data?.videos?.length) {
+        setVideos((prev) => [...prev, ...data.videos]);
+        setPage((p) => p + 1);
+        hapticLight();
+      }
+    } catch (e) {
+      console.error("Failed to load videos:", e);
     } finally {
       setLoading(false);
     }
   };
 
-  // Infinite scroll
-  useEffect(() => {
-    const onScroll = () => {
-      if (
-        window.innerHeight + window.scrollY >=
-        document.body.offsetHeight - 200
-      ) {
-        loadVideos(page);
-      }
-    };
-
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [page, loading]);
-
   return (
     <div style={{ padding: 12 }}>
-      {videos.map((video) => (
-        <div
-          key={`${video.chat_id}-${video.message_id}`}
-          style={{ marginBottom: 16 }}
-        >
-          <VideoCard
-            src={video.url}
-            thumbnail={video.thumbnail_url}
-          />
-
-          <div style={{ fontSize: 12, opacity: 0.6 }}>
-            {new Date(video.created_at).toLocaleString()}
+      {videos.map((video) =>
+        video ? (
+          <div
+            key={`${video.chat_id}-${video.message_id}`}
+            style={{ marginBottom: 16 }}
+          >
+            <VideoCard video={video} />
+            <div style={{ fontSize: 12, opacity: 0.6 }}>
+              {video.created_at
+                ? new Date(video.created_at).toLocaleString()
+                : ""}
+            </div>
           </div>
-        </div>
-      ))}
+        ) : null
+      )}
 
-      {loading && (
-        <div style={{ textAlign: "center", opacity: 0.6 }}>
-          Loading…
-        </div>
+      {/* Load more button for testing */}
+      {!loading && (
+        <button
+          onClick={loadVideos}
+          style={{
+            padding: "8px 16px",
+            marginTop: 12,
+            borderRadius: 6,
+            cursor: "pointer",
+          }}
+        >
+          Load More
+        </button>
       )}
     </div>
   );
