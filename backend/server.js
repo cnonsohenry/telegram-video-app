@@ -18,6 +18,7 @@ const agent = new https.Agent({ family: 4 });
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.set("trust proxy", 1);
 
 /* =====================
    Env & Telegram config
@@ -191,14 +192,14 @@ app.get("/videos", async (req, res) => {
     const totalRes = await pool.query(`SELECT COUNT(*) FROM videos`);
     const total = Number(totalRes.rows[0].count);
 
-    const baseUrl = `https://${req.get("host")}`;
+    const baseUrl = `${req.get("host")}`;
 
     const videos = videosRes.rows.map(v => ({
       chat_id: v.chat_id,
       message_id: v.message_id,
       created_at: v.created_at,
-      video_url: `${baseUrl}/video?chat_id=${v.chat_id}&message_id=${v.message_id}`,
-      thumbnail_url: `${baseUrl}/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
+      video_url: `https://${baseUrl}/video?chat_id=${v.chat_id}&message_id=${v.message_id}`,
+      thumbnail_url: `https://${baseUrl}/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
     }));
 
     res.json({ page, limit, total, videos });
