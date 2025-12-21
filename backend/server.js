@@ -51,13 +51,6 @@ await pool.query(`
   )
 `);
 
-const dbCheck = await pool.query(`
-  SELECT column_name
-  FROM information_schema.columns
-  WHERE table_name = 'videos'
-`);
-console.log("VIDEOS TABLE COLUMNS:", dbCheck.rows);
-
 
 
 
@@ -243,9 +236,23 @@ app.get("/thumbnail", async (req, res) => {
 
     // 🔎 STEP 3: check thumbnail existence
     if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) {
-      console.log("❌ No thumb_file_id for this video");
-      return res.status(404).end();
-    }
+  // SAFE PLACEHOLDER IMAGE (1x1 transparent PNG)
+  const emptyPixel = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/6Xn2WcAAAAASUVORK5CYII=",
+    "base64"
+  );
+
+  res.set({
+    "Content-Type": "image/png",
+    "Content-Length": emptyPixel.length,
+    "Access-Control-Allow-Origin": "*",
+    "Cross-Origin-Resource-Policy": "cross-origin",
+    "Cache-Control": "public, max-age=3600"
+  });
+
+  return res.send(emptyPixel);
+}
+
 
     // 🔎 STEP 4: ask Telegram for thumbnail file
     const fileRes = await axios.get(
@@ -264,17 +271,6 @@ app.get("/thumbnail", async (req, res) => {
     });
 
     const buffer = Buffer.from(imageRes.data);
-
-    // 🔐 REQUIRED HEADERS (THIS FIXES ORB)
-    res.set({
-      "Content-Type": "image/jpeg",
-      "Content-Length": buffer.length,
-      "Access-Control-Allow-Origin": "*",
-      "Cross-Origin-Resource-Policy": "cross-origin",
-      "Cache-Control": "public, max-age=86400"
-    });
-
-    res.send(buffer);
 
   } catch (err) {
     console.error("🔥 Thumbnail error:", err);
