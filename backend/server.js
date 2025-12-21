@@ -18,7 +18,7 @@ const agent = new https.Agent({ family: 4 });
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.set("trust proxy", 1);
+
 
 /* =====================
    Env & Telegram config
