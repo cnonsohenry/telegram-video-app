@@ -51,6 +51,14 @@ await pool.query(`
   )
 `);
 
+const dbCheck = await pool.query(`
+  SELECT column_name
+  FROM information_schema.columns
+  WHERE table_name = 'videos'
+`);
+console.log("VIDEOS TABLE COLUMNS:", dbCheck.rows);
+
+
 
 
 /* =====================
@@ -91,13 +99,15 @@ app.post("/webhook", async (req, res) => {
       null;
 
     await pool.query(
-      `
-      INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (chat_id, message_id) DO NOTHING
-      `,
-      [chatId, messageId, media.file_id, thumb?.file_id || null]
-    );
+  `
+  INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id)
+  VALUES ($1, $2, $3, $4)
+  ON CONFLICT (chat_id, message_id)
+  DO UPDATE SET thumb_file_id = EXCLUDED.thumb_file_id
+  `,
+  [chatId, messageId, media.file_id, thumb?.file_id || null]
+);
+
 
     console.log("Saved video:", media.file_id);
     res.sendStatus(200);
