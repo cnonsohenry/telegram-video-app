@@ -248,14 +248,30 @@ app.get("/thumbnail", async (req, res) => {
     const filePath = fileRes.data.result.file_path;
     const fileUrl = `${TELEGRAM_FILE_API}/${filePath}`;
 
-    // ✅ STEP 5: redirect to Telegram CDN
-    res.redirect(fileUrl);
+    // ✅ STEP 5: FETCH IMAGE + STREAM IT (NO REDIRECT)
+    const imageRes = await axios.get(fileUrl, {
+      responseType: "arraybuffer"
+    });
+
+    const buffer = Buffer.from(imageRes.data);
+
+    // 🔐 REQUIRED HEADERS (THIS FIXES ORB)
+    res.set({
+      "Content-Type": "image/jpeg",
+      "Content-Length": buffer.length,
+      "Access-Control-Allow-Origin": "*",
+      "Cross-Origin-Resource-Policy": "cross-origin",
+      "Cache-Control": "public, max-age=86400"
+    });
+
+    res.send(buffer);
 
   } catch (err) {
     console.error("🔥 Thumbnail error:", err);
     res.status(500).end();
   }
 });
+
 
 
 /* =====================
