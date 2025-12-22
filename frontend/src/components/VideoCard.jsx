@@ -9,17 +9,24 @@ export default function VideoCard({ video }) {
     <div
       style={{
         width: "100%",
+        background: "#000",
         borderRadius: 12,
         overflow: "hidden",
-        background: "#000",
+        aspectRatio: "16 / 9", // 🔒 CRITICAL
+        position: "relative",
       }}
     >
       {!play ? (
         <img
           src={video.thumbnail_url}
           alt="video thumbnail"
-          style={{ width: "100%", display: "block", cursor: "pointer" }}
           onClick={() => setPlay(true)}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            cursor: "pointer",
+          }}
         />
       ) : (
         <video
@@ -28,8 +35,12 @@ export default function VideoCard({ video }) {
           autoPlay
           playsInline
           muted
-          preload="none"   // 🔥 IMPORTANT
-          style={{ width: "100%", display: "block" }}
+          preload="none"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+          }}
         />
       )}
     </div>
