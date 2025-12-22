@@ -19,7 +19,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-
 /* =====================
    Env & Telegram config
 ===================== */
@@ -46,13 +45,11 @@ await pool.query(`
     chat_id TEXT NOT NULL,
     message_id TEXT NOT NULL,
     file_id TEXT NOT NULL,
+    thumb_file_id TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(chat_id, message_id)
   )
 `);
-
-
-
 
 /* =====================
    Webhook
@@ -92,17 +89,15 @@ app.post("/webhook", async (req, res) => {
       null;
 
     await pool.query(
-  `
-  INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id)
-  VALUES ($1, $2, $3, $4)
-  ON CONFLICT (chat_id, message_id)
-  DO UPDATE SET thumb_file_id = EXCLUDED.thumb_file_id
-  `,
-  [chatId, messageId, media.file_id, thumb?.file_id || null]
-);
+      `
+      INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (chat_id, message_id)
+      DO UPDATE SET thumb_file_id = EXCLUDED.thumb_file_id
+      `,
+      [chatId, messageId, media.file_id, thumb?.file_id || null]
+    );
 
-
-    console.log("Saved video:", media.file_id);
     res.sendStatus(200);
   } catch (err) {
     console.error("Webhook error:", err.message);
@@ -111,7 +106,7 @@ app.post("/webhook", async (req, res) => {
 });
 
 /* =====================
-   Stream video
+   Stream video (CORB FIXED)
 ===================== */
 app.get("/video", async (req, res) => {
   try {
@@ -148,13 +143,20 @@ app.get("/video", async (req, res) => {
     });
 
     res.status(tgStream.status);
+
+    // 🔒 FORCE SAFE VIDEO HEADERS (CORB FIX)
     res.set({
-      "Content-Type": tgStream.headers["content-type"] || "video/mp4",
+      "Content-Type": "video/mp4",
       "Accept-Ranges": "bytes",
+
       "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, HEAD",
       "Access-Control-Allow-Headers": "Range",
       "Access-Control-Expose-Headers":
-        "Content-Range, Accept-Ranges, Content-Length"
+        "Content-Range, Accept-Ranges, Content-Length",
+
+      "Cross-Origin-Resource-Policy": "cross-origin",
+      "Cross-Origin-Opener-Policy": "same-origin"
     });
 
     if (tgStream.headers["content-length"]) {
@@ -195,7 +197,7 @@ app.get("/videos", async (req, res) => {
     const totalRes = await pool.query(`SELECT COUNT(*) FROM videos`);
     const total = Number(totalRes.rows[0].count);
 
-    const baseUrl = `${req.get("host")}`;
+    const baseUrl = req.get("host");
 
     const videos = videosRes.rows.map(v => ({
       chat_id: v.chat_id,
@@ -213,72 +215,47 @@ app.get("/videos", async (req, res) => {
 });
 
 /* =====================
-   Thumbnail (Telegram CDN)
+   Thumbnail (FIXED)
 ===================== */
 app.get("/thumbnail", async (req, res) => {
   try {
-    // 🔎 STEP 1: log raw query params
-    console.log("THUMBNAIL REQ QUERY:", req.query);
-
     const { chat_id, message_id } = req.query;
-    if (!chat_id || !message_id) {
-      console.log("❌ Missing params");
-      return res.status(400).end();
-    }
+    if (!chat_id || !message_id) return res.status(400).end();
 
-    // 🔎 STEP 2: query DB
     const dbRes = await pool.query(
       "SELECT thumb_file_id FROM videos WHERE chat_id=$1 AND message_id=$2",
       [chat_id, message_id]
     );
 
-    console.log("DB RESULT:", dbRes.rows);
-
-    // 🔎 STEP 3: check thumbnail existence
     if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) {
-  // SAFE PLACEHOLDER IMAGE (1x1 transparent PNG)
-  const emptyPixel = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/6Xn2WcAAAAASUVORK5CYII=",
-    "base64"
-  );
+      return res.status(204).end();
+    }
 
-  res.set({
-    "Content-Type": "image/png",
-    "Content-Length": emptyPixel.length,
-    "Access-Control-Allow-Origin": "*",
-    "Cross-Origin-Resource-Policy": "cross-origin",
-    "Cache-Control": "public, max-age=3600"
-  });
-
-  return res.send(emptyPixel);
-}
-
-
-    // 🔎 STEP 4: ask Telegram for thumbnail file
     const fileRes = await axios.get(
       `${TELEGRAM_API}/getFile`,
       { params: { file_id: dbRes.rows[0].thumb_file_id } }
     );
 
-    console.log("Telegram file_path:", fileRes.data.result.file_path);
-
     const filePath = fileRes.data.result.file_path;
     const fileUrl = `${TELEGRAM_FILE_API}/${filePath}`;
 
-    // ✅ STEP 5: FETCH IMAGE + STREAM IT (NO REDIRECT)
     const imageRes = await axios.get(fileUrl, {
       responseType: "arraybuffer"
     });
 
-    const buffer = Buffer.from(imageRes.data);
+    res.set({
+      "Content-Type": "image/jpeg",
+      "Access-Control-Allow-Origin": "*",
+      "Cross-Origin-Resource-Policy": "cross-origin",
+      "Cache-Control": "public, max-age=3600"
+    });
 
+    res.send(Buffer.from(imageRes.data));
   } catch (err) {
-    console.error("🔥 Thumbnail error:", err);
+    console.error("Thumbnail error:", err.message);
     res.status(500).end();
   }
 });
-
-
 
 /* =====================
    Start server

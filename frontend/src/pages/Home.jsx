@@ -7,10 +7,14 @@ export default function Home() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    expandApp();
-    loadVideos();
-  }, []);
+useEffect(() => {
+  expandApp();
+}, []);
+
+useEffect(() => {
+  loadVideos();
+}, []);
+
 
   const loadVideos = async () => {
     if (loading) return;
