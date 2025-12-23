@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import VideoCard from "../components/VideoCard";
 import { expandApp, hapticLight } from "../utils/telegram";
 
@@ -6,15 +6,12 @@ export default function Home() {
   const [videos, setVideos] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const observerRef = useRef(null);
 
-useEffect(() => {
-  expandApp();
-}, []);
-
-useEffect(() => {
-  loadVideos();
-}, []);
-
+  useEffect(() => {
+    expandApp();
+    loadVideos();
+  }, []);
 
   const loadVideos = async () => {
     if (loading) return;
@@ -38,38 +35,43 @@ useEffect(() => {
     }
   };
 
-  return (
-    <div style={{ padding: 12 }}>
-      {videos.map((video) =>
-        video ? (
-          <div
-            key={`${video.chat_id}-${video.message_id}`}
-            style={{ marginBottom: 16 }}
-          >
-            <VideoCard video={video} />
-            <div style={{ fontSize: 12, opacity: 0.6 }}>
-              {video.created_at
-                ? new Date(video.created_at).toLocaleString()
-                : ""}
-            </div>
-          </div>
-        ) : null
-      )}
+  // 🔁 Infinite scroll observer
+  useEffect(() => {
+    if (!observerRef.current) return;
 
-      {/* Load more button for testing */}
-      {!loading && (
-        <button
-          onClick={loadVideos}
-          style={{
-            padding: "8px 16px",
-            marginTop: 12,
-            borderRadius: 6,
-            cursor: "pointer",
-          }}
-        >
-          Load More
-        </button>
-      )}
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadVideos();
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    observer.observe(observerRef.current);
+    return () => observer.disconnect();
+  }, [observerRef.current, loading]);
+
+  return (
+    <div
+      style={{
+        padding: 8,
+        display: "grid",
+        gridTemplateColumns: "repeat(2, 1fr)",
+        gap: 8,
+        background: "#0f0f0f", // 🟦 dark grey telegram style
+        minHeight: "100vh",
+      }}
+    >
+      {videos.map((video) => (
+        <VideoCard
+          key={`${video.chat_id}-${video.message_id}`}
+          video={video}
+        />
+      ))}
+
+      <div ref={observerRef} style={{ height: 1 }} />
     </div>
   );
 }
+
