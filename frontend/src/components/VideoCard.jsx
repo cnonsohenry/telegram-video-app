@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 
 export default function VideoCard({ video }) {
-  const [play, setPlay] = useState(false);
   const videoRef = useRef(null);
   const cardRef = useRef(null);
+  const [showVideo, setShowVideo] = useState(false);
 
   /* =====================
      Pause when off-screen
@@ -13,32 +13,16 @@ export default function VideoCard({ video }) {
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (!entry.isIntersecting && videoRef.current) {
-          videoRef.current.pause();
+        if (!entry.isIntersecting) {
+          videoRef.current?.pause();
         }
       },
       { threshold: 0.4 }
     );
 
     observer.observe(cardRef.current);
-
     return () => observer.disconnect();
   }, []);
-
-  /* =====================
-     Telegram fullscreen
-  ===================== */
-  const handleFullscreen = () => {
-    const tg = window.Telegram?.WebApp;
-
-    if (tg?.isExpanded === false) {
-      tg.expand();
-    }
-
-    if (videoRef.current?.requestFullscreen) {
-      videoRef.current.requestFullscreen().catch(() => {});
-    }
-  };
 
   if (!video) return null;
 
@@ -54,13 +38,13 @@ export default function VideoCard({ video }) {
         position: "relative",
       }}
     >
-      {!play ? (
+      {!showVideo ? (
         <>
           {/* Thumbnail */}
           <img
             src={video.thumbnail_url}
             alt=""
-            onClick={() => setPlay(true)}
+            onClick={() => setShowVideo(true)}
             style={{
               width: "100%",
               height: "100%",
@@ -69,9 +53,9 @@ export default function VideoCard({ video }) {
             }}
           />
 
-          {/* ▶ Play overlay */}
+          {/* Play button */}
           <div
-            onClick={() => setPlay(true)}
+            onClick={() => setShowVideo(true)}
             style={{
               position: "absolute",
               inset: 0,
@@ -79,6 +63,7 @@ export default function VideoCard({ video }) {
               alignItems: "center",
               justifyContent: "center",
               background: "rgba(0,0,0,0.25)",
+              cursor: "pointer",
             }}
           >
             <div
@@ -109,12 +94,10 @@ export default function VideoCard({ video }) {
         <video
           ref={videoRef}
           src={video.video_url}
-          autoPlay
           controls
+          autoPlay
           playsInline
-          muted
-          preload="none"
-          onClick={handleFullscreen}
+          preload="metadata"
           style={{
             width: "100%",
             height: "100%",
