@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
@@ -14,15 +14,6 @@ export default function Home() {
     loadVideos();
   }, []);
 
-  // 🔒 Lock scroll when fullscreen is open (CRITICAL)
-  useEffect(() => {
-    if (activeVideo) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-  }, [activeVideo]);
-
   const loadVideos = async () => {
     if (loading) return;
     setLoading(true);
@@ -37,8 +28,8 @@ export default function Home() {
         setVideos((prev) => [...prev, ...data.videos]);
         setPage((p) => p + 1);
       }
-    } catch (e) {
-      console.error("Failed to load videos:", e);
+    } catch (err) {
+      console.error("Failed to load videos", err);
     } finally {
       setLoading(false);
     }
@@ -47,12 +38,12 @@ export default function Home() {
   return (
     <div
       style={{
-        background: "#1c1c1e",
+        background: "#1c1c1e", // Telegram dark gray
         minHeight: "100vh",
         padding: 8,
       }}
     >
-      {/* VIDEO GRID */}
+      {/* GRID */}
       <div
         style={{
           display: "grid",
@@ -69,7 +60,26 @@ export default function Home() {
         ))}
       </div>
 
-      {/* FULLSCREEN OVERLAY */}
+      {/* LOAD MORE (safe fallback for Telegram) */}
+      {!loading && (
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <button
+            onClick={loadVideos}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "#2c2c2e",
+              color: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            Load more
+          </button>
+        </div>
+      )}
+
+      {/* FULLSCREEN PLAYER */}
       {activeVideo && (
         <FullscreenPlayer
           video={activeVideo}
