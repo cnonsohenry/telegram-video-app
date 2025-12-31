@@ -37,7 +37,7 @@ const pool = new Pool({
 });
 
 /* =====================
-   DB migrations (safe)
+   Create Table
 ===================== */
 await pool.query(`
   CREATE TABLE IF NOT EXISTS videos (

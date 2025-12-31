@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
@@ -14,21 +14,34 @@ export default function Home() {
     loadVideos();
   }, []);
 
+  // 🔒 Lock scroll when fullscreen is open (CRITICAL)
+  useEffect(() => {
+    if (activeVideo) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+  }, [activeVideo]);
+
   const loadVideos = async () => {
     if (loading) return;
     setLoading(true);
 
-    const res = await fetch(
-      `https://telegram-video-backend.onrender.com/videos?page=${page}&limit=10`
-    );
-    const data = await res.json();
+    try {
+      const res = await fetch(
+        `https://telegram-video-backend.onrender.com/videos?page=${page}&limit=10`
+      );
+      const data = await res.json();
 
-    if (data?.videos?.length) {
-      setVideos((prev) => [...prev, ...data.videos]);
-      setPage((p) => p + 1);
+      if (data?.videos?.length) {
+        setVideos((prev) => [...prev, ...data.videos]);
+        setPage((p) => p + 1);
+      }
+    } catch (e) {
+      console.error("Failed to load videos:", e);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -39,6 +52,7 @@ export default function Home() {
         padding: 8,
       }}
     >
+      {/* VIDEO GRID */}
       <div
         style={{
           display: "grid",
@@ -55,6 +69,7 @@ export default function Home() {
         ))}
       </div>
 
+      {/* FULLSCREEN OVERLAY */}
       {activeVideo && (
         <FullscreenPlayer
           video={activeVideo}
