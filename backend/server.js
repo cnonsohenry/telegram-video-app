@@ -106,7 +106,7 @@ app.post("/webhook", async (req, res) => {
 });
 
 /* =====================
-   Stream video (CORB FIXED)
+   Stream video (CACHED + CORB SAFE)
 ===================== */
 app.get("/video", async (req, res) => {
   try {
@@ -143,20 +143,19 @@ app.get("/video", async (req, res) => {
     });
 
     res.status(tgStream.status);
-
-    // 🔒 FORCE SAFE VIDEO HEADERS (CORB FIX)
     res.set({
       "Content-Type": "video/mp4",
       "Accept-Ranges": "bytes",
 
+      // 🔥 RANGE-SAFE CACHE
+      "Cache-Control": "public, max-age=86400",
+
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, HEAD",
       "Access-Control-Allow-Headers": "Range",
       "Access-Control-Expose-Headers":
         "Content-Range, Accept-Ranges, Content-Length",
 
-      "Cross-Origin-Resource-Policy": "cross-origin",
-      "Cross-Origin-Opener-Policy": "same-origin"
+      "Cross-Origin-Resource-Policy": "cross-origin"
     });
 
     if (tgStream.headers["content-length"]) {
@@ -176,7 +175,7 @@ app.get("/video", async (req, res) => {
 });
 
 /* =====================
-   List videos
+   List videos (CACHED)
 ===================== */
 app.get("/videos", async (req, res) => {
   try {
@@ -199,6 +198,10 @@ app.get("/videos", async (req, res) => {
 
     const baseUrl = req.get("host");
 
+    res.set({
+      "Cache-Control": "public, max-age=60"
+    });
+
     const videos = videosRes.rows.map(v => ({
       chat_id: v.chat_id,
       message_id: v.message_id,
@@ -215,7 +218,7 @@ app.get("/videos", async (req, res) => {
 });
 
 /* =====================
-   Thumbnail (FIXED)
+   Thumbnail (STRONG CACHE)
 ===================== */
 app.get("/thumbnail", async (req, res) => {
   try {
@@ -243,14 +246,20 @@ app.get("/thumbnail", async (req, res) => {
       responseType: "arraybuffer"
     });
 
+    const buffer = Buffer.from(imageRes.data);
+
     res.set({
       "Content-Type": "image/jpeg",
+      "Content-Length": buffer.length,
       "Access-Control-Allow-Origin": "*",
       "Cross-Origin-Resource-Policy": "cross-origin",
-      "Cache-Control": "public, max-age=3600"
+
+      // 🔥 STRONG CACHE
+      "Cache-Control": "public, max-age=604800, immutable",
+      "ETag": `"thumb-${chat_id}-${message_id}"`
     });
 
-    res.send(Buffer.from(imageRes.data));
+    res.send(buffer);
   } catch (err) {
     console.error("Thumbnail error:", err.message);
     res.status(500).end();
