@@ -20,7 +20,7 @@ export default function Home() {
 
     try {
       const res = await fetch(
-        `https://telegram-video-backend.onrender.com/videos?page=${page}&limit=10`
+        `http://94.72.109.109/videos?page=${page}&limit=10`
       );
       const data = await res.json();
 
