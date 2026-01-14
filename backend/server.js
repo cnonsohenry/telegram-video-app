@@ -108,7 +108,7 @@ app.post("/webhook", async (req, res) => {
 /* =====================
    Stream video (CACHED + CORB SAFE)
 ===================== */
-app.get("/video", async (req, res) => {
+app.get("/app/video", async (req, res) => {
   try {
     const { chat_id, message_id } = req.query;
     if (!chat_id || !message_id) {
@@ -177,7 +177,7 @@ app.get("/video", async (req, res) => {
 /* =====================
    List videos (CACHED)
 ===================== */
-app.get("/videos", async (req, res) => {
+app.get("/app/videos", async (req, res) => {
   try {
     const page = Number(req.query.page || 1);
     const limit = Number(req.query.limit || 10);
@@ -220,7 +220,7 @@ app.get("/videos", async (req, res) => {
 /* =====================
    Thumbnail (STRONG CACHE)
 ===================== */
-app.get("/thumbnail", async (req, res) => {
+app.get("/app/thumbnail", async (req, res) => {
   try {
     const { chat_id, message_id } = req.query;
     if (!chat_id || !message_id) return res.status(400).end();

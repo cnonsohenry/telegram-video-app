@@ -1,0 +1,41 @@
+name: Auto Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+
+            cd /home/appuser/apps/telegram-video-app
+            git pull origin main
+
+            # Backend
+            cd backend
+            npm install
+            pm2 reload telegram-backend --update-env || pm2 start server.js --name telegram-backend
+            pm2 save
+
+            # Frontend
+            cd ../frontend
+            npm install
+            npm run build
+
+            # If serving frontend via nginx
+            rm -rf /var/www/videos/*
+            cp -r dist/* /var/www/videos/
