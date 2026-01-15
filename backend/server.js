@@ -267,7 +267,7 @@ app.get("/api/thumbnail", async (req, res) => {
 });
 
 /* =====================
-   Start server
+   Start server Listen
 ===================== */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
