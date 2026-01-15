@@ -144,7 +144,7 @@ app.get("/api/video", async (req, res) => {
 
     res.status(tgStream.status);
     res.set({
-      "Content-Type": "api/video/mp4",
+      "Content-Type": "video/mp4",
       "Accept-Ranges": "bytes",
 
       // 🔥 RANGE-SAFE CACHE
