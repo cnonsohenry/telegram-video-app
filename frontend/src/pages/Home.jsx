@@ -20,7 +20,7 @@ export default function Home() {
 
     try {
       const res = await fetch(
-        `https://videos.naijahomemade.com/videos?page=${page}&limit=10`
+        `https://videos.naijahomemade.com/api/videos?page=${page}&limit=10`
       );
       const data = await res.json();
 

@@ -144,7 +144,7 @@ app.get("/api/video", async (req, res) => {
 
     res.status(tgStream.status);
     res.set({
-      "Content-Type": "video/mp4",
+      "Content-Type": "api/video/mp4",
       "Accept-Ranges": "bytes",
 
       // 🔥 RANGE-SAFE CACHE
@@ -206,8 +206,8 @@ app.get("/api/videos", async (req, res) => {
       chat_id: v.chat_id,
       message_id: v.message_id,
       created_at: v.created_at,
-      video_url: `https://${baseUrl}/video?chat_id=${v.chat_id}&message_id=${v.message_id}`,
-      thumbnail_url: `https://${baseUrl}/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
+      video_url: `https://${baseUrl}/api/video?chat_id=${v.chat_id}&message_id=${v.message_id}`,
+      thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
     }));
 
     res.json({ page, limit, total, videos });
