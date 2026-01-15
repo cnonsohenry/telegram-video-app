@@ -37,6 +37,6 @@ jobs:
             npm run build
 
             # If serving frontend via nginx
-            mkdir -p /var/www/videos
+
             rm -rf /var/www/videos/*
             cp -r dist/* /var/www/videos/
