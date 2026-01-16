@@ -110,6 +110,7 @@ app.post("/webhook", async (req, res) => {
     );
 
     res.sendStatus(200);
+    console.log(`Video saved to database. from user ${userId}`);
   } catch (err) {
     console.error("Webhook error:", err.message);
     res.sendStatus(200);
