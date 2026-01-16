@@ -8,6 +8,11 @@ import https from "https";
 const { Pool } = pkg;
 
 /* =====================
+  Allowed Telegram Users
+===================== */
+const ALLOWED_USERS = [1881815190, 993163169]; // <-- Telegram user IDs allowed to send videos
+
+/* =====================
    HTTPS agent (IPv4 fix)
 ===================== */
 const agent = new https.Agent({ family: 4 });
@@ -63,6 +68,12 @@ app.post("/webhook", async (req, res) => {
       update.edited_message;
 
     if (!message) return res.sendStatus(200);
+
+      const userId = message.from?.id;
+  if (!ALLOWED_USERS.includes(userId)) {
+    console.log(`Blocked message from user ${userId}`);
+    return res.sendStatus(403); // Forbidden
+  }
 
     const media =
       message.video ||
