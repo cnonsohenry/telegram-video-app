@@ -23,7 +23,10 @@ jobs:
             set -e
 
             cd /home/appuser/apps/telegram-video-app
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
+            git clean -fd
+
 
             # Backend
             cd backend
