@@ -1,6 +1,6 @@
 import createAdHandler from "monetag-tg-sdk";
 
-const ZONE_ID = "YOUR_MONETAG_ZONE_ID";
+const ZONE_ID = "Y10479652";
 
 let adHandler = null;
 
