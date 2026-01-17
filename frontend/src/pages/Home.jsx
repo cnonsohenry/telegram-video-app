@@ -2,12 +2,22 @@ import React, { useEffect, useState } from "react";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
+import { useRewardedAd } from "../hooks/useRewardedAd";
 
 export default function Home() {
   const [videos, setVideos] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
+
+  // Telegram user ID (used for ymid tracking)
+  const telegramUserId =
+    window.Telegram?.WebApp?.initDataUnsafe?.user?.id || "guest";
+
+  // Rewarded Ad hook
+  const { ready: adReady, showAd } = useRewardedAd(
+    `home:${telegramUserId}`
+  );
 
   useEffect(() => {
     expandApp();
@@ -35,10 +45,26 @@ export default function Home() {
     }
   };
 
+  // 🔐 Ad-gated open
+  const handleOpenVideo = async (video) => {
+    // If ad not ready, allow fallback (or block if you prefer)
+    if (!adReady) {
+      setActiveVideo(video);
+      return;
+    }
+
+    try {
+      await showAd(video.message_id);
+      setActiveVideo(video);
+    } catch {
+      alert("Ad unavailable. Please try again.");
+    }
+  };
+
   return (
     <div
       style={{
-        background: "#1c1c1e", // Telegram dark gray
+        background: "#1c1c1e",
         minHeight: "100vh",
         padding: 8,
       }}
@@ -55,12 +81,12 @@ export default function Home() {
           <VideoCard
             key={`${video.chat_id}-${video.message_id}`}
             video={video}
-            onOpen={setActiveVideo}
+            onOpen={handleOpenVideo}
           />
         ))}
       </div>
 
-      {/* LOAD MORE (safe fallback for Telegram) */}
+      {/* LOAD MORE */}
       {!loading && (
         <div style={{ textAlign: "center", marginTop: 16 }}>
           <button
