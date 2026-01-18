@@ -3,6 +3,7 @@ import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
 import { useRewardedAd } from "../hooks/useRewardedAd";
+import { showRewardedAdDirect } from "../utils/rewardedAd";
 
 export default function Home() {
   const [videos, setVideos] = useState([]);
@@ -10,7 +11,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
 
-  // Telegram user ID (used for ymid tracking)
+  // 🔓 Track unlocked videos (reward result)
+  const [unlockedVideos, setUnlockedVideos] = useState(() => new Set());
+
+  // Telegram user ID (used for reward tracking)
   const telegramUserId =
     window.Telegram?.WebApp?.initDataUnsafe?.user?.id || "guest";
 
@@ -45,21 +49,25 @@ export default function Home() {
     }
   };
 
-  // 🔐 Ad-gated open
+  // 🔐 Ad-gated open (reward = play video)
   const handleOpenVideo = async (video) => {
-    // If ad not ready, allow fallback (or block if you prefer)
-    if (!adReady) {
-      setActiveVideo(video);
-      return;
-    }
+  const videoKey = `${video.chat_id}:${video.message_id}`;
 
-    try {
-      await showAd(video.message_id);
-      setActiveVideo(video);
-    } catch {
-      alert("Ad unavailable. Please try again.");
-    }
-  };
+  if (unlockedVideos.has(videoKey)) {
+    setActiveVideo(video);
+    return;
+  }
+
+  try {
+    await showRewardedAdDirect();
+
+    setUnlockedVideos((prev) => new Set(prev).add(videoKey));
+    setActiveVideo(video);
+  } catch {
+    alert("Ad not completed. Video remains locked.");
+  }
+};
+
 
   return (
     <div
@@ -69,7 +77,7 @@ export default function Home() {
         padding: 8,
       }}
     >
-      {/* GRID */}
+      {/* VIDEO GRID */}
       <div
         style={{
           display: "grid",
@@ -77,13 +85,19 @@ export default function Home() {
           gap: 8,
         }}
       >
-        {videos.map((video) => (
-          <VideoCard
-            key={`${video.chat_id}-${video.message_id}`}
-            video={video}
-            onOpen={handleOpenVideo}
-          />
-        ))}
+        {videos.map((video) => {
+          const videoKey = `${video.chat_id}:${video.message_id}`;
+          const unlocked = unlockedVideos.has(videoKey);
+
+          return (
+            <VideoCard
+              key={videoKey}
+              video={video}
+              locked={!unlocked}
+              onOpen={() => handleOpenVideo(video)}
+            />
+          );
+        })}
       </div>
 
       {/* LOAD MORE */}
