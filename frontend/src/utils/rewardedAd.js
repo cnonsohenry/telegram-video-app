@@ -1,16 +1,22 @@
-// src/utils/rewardedAd.js
-
 export function showRewardedAdDirect() {
   return new Promise((resolve) => {
-    const adUrl = "https://otieu.com/4/9659492";
+    if (!window.Telegram?.WebApp) {
+      window.open("https://otieu.com/4/9659492", "_blank");
+      resolve();
+      return;
+    }
 
-    // Open ad in new tab / Telegram in-app browser
-    window.open(adUrl, "_blank");
+    window.Telegram.WebApp.openLink(
+      "https://otieu.com/4/9659492",
+      { try_instant_view: false }
+    );
 
-    // ⏳ Simple reward confirmation
-    // User usually returns within a few seconds
-    setTimeout(() => {
+    // Reward when user returns
+    const onFocus = () => {
+      window.removeEventListener("focus", onFocus);
       resolve(true);
-    }, 4000); // adjust if needed
+    };
+
+    window.addEventListener("focus", onFocus);
   });
 }
