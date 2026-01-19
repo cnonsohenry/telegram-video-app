@@ -14,45 +14,46 @@ export default function FullscreenPlayer({ video, onClose }) {
     <div
       style={{
         position: "fixed",
-        inset: 0,
-        background: "#000",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "#000",
         zIndex: 9999,
         display: "flex",
-        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
       }}
     >
-      {/* 🔙 TOP BAR */}
-      <div
+      {/* Close button */}
+      <button
+        onClick={onClose}
         style={{
-          height: 48,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 12px",
+          position: "absolute",
+          top: "12px",
+          left: "12px",
+          zIndex: 10000,
           background: "rgba(0,0,0,0.6)",
-          zIndex: 2,
+          color: "#fff",
+          border: "none",
+          borderRadius: "8px",
+          padding: "8px 12px",
+          fontSize: "14px",
+          cursor: "pointer",
         }}
       >
-        <button
-          onClick={onClose}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#fff",
-            fontSize: 18,
-            cursor: "pointer",
-          }}
-        >
-          ← Back
-        </button>
-      </div>
+        ← Back
+      </button>
 
-      {/* 🎥 VIDEO */}
+      {/* Video wrapper */}
       <div
         style={{
-          flex: 1,
+          width: "100%",
+          height: "100%",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          padding: "40px 0", // prevents cut-off on mobile
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -62,8 +63,8 @@ export default function FullscreenPlayer({ video, onClose }) {
           autoPlay
           playsInline
           style={{
-            width: "100%",
-            height: "100%",
+            maxWidth: "100%",
+            maxHeight: "100%",
             objectFit: "contain",
           }}
         />
