@@ -118,17 +118,19 @@ app.post("/webhook", async (req, res) => {
 });
 
 /* =====================
-   Stream video (CACHED + CORB SAFE)
+   REDIRECT VIDEO
 ===================== */
 app.get("/api/video", async (req, res) => {
   try {
     const { chat_id, message_id } = req.query;
+
     if (!chat_id || !message_id) {
       return res.status(400).json({ error: "chat_id and message_id required" });
     }
 
+    // 1. Get file_id from DB
     const dbRes = await pool.query(
-      "SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2",
+      "SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2 LIMIT 1",
       [chat_id, message_id]
     );
 
@@ -136,53 +138,28 @@ app.get("/api/video", async (req, res) => {
       return res.status(404).json({ error: "Video not found" });
     }
 
-    const file_id = dbRes.rows[0].file_id;
+    const { file_id } = dbRes.rows[0];
 
+    // 2. Ask Telegram for file_path
     const fileRes = await axios.get(
       `${TELEGRAM_API}/getFile`,
       { params: { file_id } }
     );
 
+    if (!fileRes.data.ok) {
+      return res.status(500).json({ error: "Telegram getFile failed" });
+    }
+
     const filePath = fileRes.data.result.file_path;
+
+    // 3. Build Telegram CDN URL
     const fileUrl = `${TELEGRAM_FILE_API}/${filePath}`;
 
-    const range = req.headers.range;
-
-    const tgStream = await axios.get(fileUrl, {
-      responseType: "stream",
-      headers: range ? { Range: range } : {},
-      httpsAgent: agent
-    });
-
-    res.status(tgStream.status);
-    res.set({
-      "Content-Type": "video/mp4",
-      "Accept-Ranges": "bytes",
-
-      // 🔥 RANGE-SAFE CACHE
-      "Cache-Control": "public, max-age=86400",
-
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Range",
-      "Access-Control-Expose-Headers":
-        "Content-Range, Accept-Ranges, Content-Length",
-
-      "Cross-Origin-Resource-Policy": "cross-origin"
-    });
-
-    if (tgStream.headers["content-length"]) {
-      res.set("Content-Length", tgStream.headers["content-length"]);
-    }
-    if (tgStream.headers["content-range"]) {
-      res.set("Content-Range", tgStream.headers["content-range"]);
-    }
-
-    tgStream.data.pipe(res);
+    // 4. Redirect client (NO STREAMING)
+    return res.redirect(302, fileUrl);
   } catch (err) {
-    console.error("STREAM ERROR:", err.message);
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Failed to stream video" });
-    }
+    console.error("VIDEO REDIRECT ERROR:", err.message);
+    return res.status(500).json({ error: "Failed to load video" });
   }
 });
 
