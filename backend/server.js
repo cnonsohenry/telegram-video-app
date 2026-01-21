@@ -4,6 +4,7 @@ import axios from "axios";
 import cors from "cors";
 import pkg from "pg";
 import https from "https";
+import crypto from "crypto";
 
 const { Pool } = pkg;
 
@@ -54,6 +55,19 @@ await pool.query(`
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(chat_id, message_id)
   )
+`);
+
+/* =====================
+   Create Video Token Table
+===================== */
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS video_play_tokens (
+  token TEXT PRIMARY KEY,
+  chat_id BIGINT NOT NULL,
+  message_id BIGINT NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  used BOOLEAN DEFAULT FALSE
+  );
 `);
 
 /* =====================
@@ -122,13 +136,38 @@ app.post("/webhook", async (req, res) => {
 ===================== */
 app.get("/api/video", async (req, res) => {
   try {
-    const { chat_id, message_id } = req.query;
+    const { token } = req.query;
 
-    if (!chat_id || !message_id) {
-      return res.status(400).json({ error: "chat_id and message_id required" });
+    if (!token) {
+      return res.status(403).json({ error: "Ad required" });
     }
 
-    // 1. Get file_id from DB
+    // 1. Validate token
+    const tokenRes = await pool.query(
+      `
+      SELECT chat_id, message_id
+      FROM video_play_tokens
+      WHERE token=$1
+        AND used=false
+        AND expires_at > NOW()
+      LIMIT 1
+      `,
+      [token]
+    );
+
+    if (!tokenRes.rows.length) {
+      return res.status(403).json({ error: "Invalid or expired token" });
+    }
+
+    const { chat_id, message_id } = tokenRes.rows[0];
+
+    // 2. Mark token as used
+    await pool.query(
+      "UPDATE video_play_tokens SET used=true WHERE token=$1",
+      [token]
+    );
+
+    // 3. Get Telegram file_id
     const dbRes = await pool.query(
       "SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2 LIMIT 1",
       [chat_id, message_id]
@@ -140,28 +179,27 @@ app.get("/api/video", async (req, res) => {
 
     const { file_id } = dbRes.rows[0];
 
-    // 2. Ask Telegram for file_path
+    // 4. Telegram getFile
     const fileRes = await axios.get(
       `${TELEGRAM_API}/getFile`,
       { params: { file_id } }
     );
 
     if (!fileRes.data.ok) {
-      return res.status(500).json({ error: "Telegram getFile failed" });
+      return res.status(500).json({ error: "Telegram error" });
     }
 
     const filePath = fileRes.data.result.file_path;
-
-    // 3. Build Telegram CDN URL
     const fileUrl = `${TELEGRAM_FILE_API}/${filePath}`;
 
-    // 4. Redirect client (NO STREAMING)
+    // 5. Redirect (NO STREAMING)
     return res.redirect(302, fileUrl);
   } catch (err) {
-    console.error("VIDEO REDIRECT ERROR:", err.message);
-    return res.status(500).json({ error: "Failed to load video" });
+    console.error("VIDEO ACCESS ERROR:", err.message);
+    res.status(500).json({ error: "Access denied" });
   }
 });
+
 
 /* =====================
    List videos (CACHED)
@@ -195,7 +233,6 @@ app.get("/api/videos", async (req, res) => {
       chat_id: v.chat_id,
       message_id: v.message_id,
       created_at: v.created_at,
-      video_url: `https://${baseUrl}/api/video?chat_id=${v.chat_id}&message_id=${v.message_id}`,
       thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
     }));
 
@@ -252,6 +289,34 @@ app.get("/api/thumbnail", async (req, res) => {
   } catch (err) {
     console.error("Thumbnail error:", err.message);
     res.status(500).end();
+  }
+});
+
+/* =====================
+   TOKEN
+===================== */
+app.post("/api/ad/confirm", async (req, res) => {
+  try {
+    const { chat_id, message_id } = req.body;
+
+    if (!chat_id || !message_id) {
+      return res.status(400).json({ error: "chat_id and message_id required" });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+
+    await pool.query(
+      `
+      INSERT INTO video_play_tokens (token, chat_id, message_id, expires_at)
+      VALUES ($1, $2, $3, NOW() + INTERVAL '2 minutes')
+      `,
+      [token, chat_id, message_id]
+    );
+
+    res.json({ token });
+  } catch (err) {
+    console.error("TOKEN ERROR:", err.message);
+    res.status(500).json({ error: "Failed to issue play token" });
   }
 });
 

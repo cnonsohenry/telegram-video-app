@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
-import { useRewardedAd } from "../hooks/useRewardedAd";
 import { showRewardedAdDirect } from "../utils/rewardedAd";
 
 export default function Home() {
@@ -10,18 +9,6 @@ export default function Home() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
-
-  // 🔓 Track unlocked videos (reward result)
-  const [unlockedVideos, setUnlockedVideos] = useState(() => new Set());
-
-  // Telegram user ID (used for reward tracking)
-  const telegramUserId =
-    window.Telegram?.WebApp?.initDataUnsafe?.user?.id || "guest";
-
-  // Rewarded Ad hook
-  const { ready: adReady, showAd } = useRewardedAd(
-    `home:${telegramUserId}`
-  );
 
   useEffect(() => {
     expandApp();
@@ -49,25 +36,34 @@ export default function Home() {
     }
   };
 
-  // 🔐 Ad-gated open (reward = play video)
+  // 🔐 SECURE AD-GATED OPEN
   const handleOpenVideo = async (video) => {
-  const videoKey = `${video.chat_id}:${video.message_id}`;
+    try {
+      // 1️⃣ Show ad (direct link for now)
+      await showRewardedAdDirect();
 
-  if (unlockedVideos.has(videoKey)) {
-    setActiveVideo(video);
-    return;
-  }
+      // 2️⃣ Request play token from backend
+      const res = await fetch("/api/ad/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: video.chat_id,
+          message_id: video.message_id,
+        }),
+      });
 
-  try {
-    await showRewardedAdDirect();
+      const data = await res.json();
+      if (!data.token) throw new Error("No token");
 
-    setUnlockedVideos((prev) => new Set(prev).add(videoKey));
-    setActiveVideo(video);
-  } catch {
-    alert("Ad not completed. Video remains locked.");
-  }
-};
-
+      // 3️⃣ Open fullscreen using protected URL
+      setActiveVideo({
+        ...video,
+        video_url: `/api/video?token=${data.token}`,
+      });
+    } catch (err) {
+      alert("You must watch the ad to play this video.");
+    }
+  };
 
   return (
     <div
@@ -85,19 +81,14 @@ export default function Home() {
           gap: 8,
         }}
       >
-        {videos.map((video) => {
-          const videoKey = `${video.chat_id}:${video.message_id}`;
-          const unlocked = unlockedVideos.has(videoKey);
-
-          return (
-            <VideoCard
-              key={videoKey}
-              video={video}
-              locked={!unlocked}
-              onOpen={() => handleOpenVideo(video)}
-            />
-          );
-        })}
+        {videos.map((video) => (
+          <VideoCard
+            key={`${video.chat_id}:${video.message_id}`}
+            video={video}
+            locked
+            onOpen={() => handleOpenVideo(video)}
+          />
+        ))}
       </div>
 
       {/* LOAD MORE */}
