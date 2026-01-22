@@ -43,44 +43,58 @@ export default function Home() {
 
   // 🔐 Ad-gated open
   const handleOpenVideo = async (video) => {
-    const videoKey = `${video.chat_id}:${video.message_id}`;
+  const videoKey = `${video.chat_id}:${video.message_id}`;
 
-    // If already unlocked, just play
-    if (unlockedVideos.has(videoKey)) {
-      setActiveVideo(video);
-      return;
-    }
+  // Already unlocked
+  if (unlockedVideos.has(videoKey)) {
+    setActiveVideo(video);
+    return;
+  }
 
-    try {
-      // 1️⃣ Open rewarded ad (direct link)
-      openRewardedAd();
+  let adCompleted = false;
 
-      // 2️⃣ Wait until user returns
-      await adReturnWatcher();
+  try {
+    // 1️⃣ Show ad and wait for user to return
+    openRewardedAd();
+    await adReturnWatcher();
+    adCompleted = true; // ✅ mark as completed
+  } catch (err) {
+    console.warn("Ad was not completed", err);
+    adCompleted = false;
+  }
 
-      // 3️⃣ Request play token from backend
-      const res = await fetch("/api/ad/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: video.chat_id,
-          message_id: video.message_id,
-        }),
-      });
+  if (!adCompleted) {
+    // Only alert if ad failed/skipped
+    alert("You must watch the ad to play this video.");
+    return;
+  }
 
-      const data = await res.json();
-      if (!data.token) throw new Error("No token returned");
+  try {
+    // 2️⃣ Request play token from backend
+    const res = await fetch("/api/ad/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: video.chat_id,
+        message_id: video.message_id,
+      }),
+    });
 
-      // 4️⃣ Mark video as unlocked and open fullscreen
-      setUnlockedVideos((prev) => new Set(prev).add(videoKey));
-      setActiveVideo({
-        ...video,
-        video_url: `/api/video?token=${data.token}`,
-      });
-    } catch (err) {
-      alert("You must watch the ad to play this video.");
-    }
-  };
+    const data = await res.json();
+    if (!data.token) throw new Error("No token returned");
+
+    // 3️⃣ Unlock video & play
+    setUnlockedVideos((prev) => new Set(prev).add(videoKey));
+    setActiveVideo({
+      ...video,
+      video_url: `/api/video?token=${data.token}`,
+    });
+  } catch (err) {
+    console.error("Failed to get play token:", err);
+    alert("Something went wrong. Please try again.");
+  }
+};
+
 
   return (
     <div
