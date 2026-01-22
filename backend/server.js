@@ -250,6 +250,7 @@ app.get("/api/videos", async (req, res) => {
       chat_id: v.chat_id,
       message_id: v.message_id,
       created_at: v.created_at,
+      video_url: `https://${baseUrl}/api/video?chat_id=${v.chat_id}&message_id=${v.message_id}`
       thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
     }));
 

@@ -150,7 +150,7 @@ export default function Home() {
       {activeVideo && (
         <FullscreenPlayer
           video={activeVideo}
-          onClose={() => setActiveVideo()}
+          onClose={() => setActiveVideo(null)}
         />
       )}
     </div>
