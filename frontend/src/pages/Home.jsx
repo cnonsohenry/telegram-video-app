@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
@@ -11,15 +11,27 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
 
-  // 🔓 Track unlocked videos (reward result)
+  // 🔓 Track unlocked videos (per session)
   const [unlockedVideos, setUnlockedVideos] = useState(() => new Set());
+
+  // 🔑 Stable session ID (lives until tab/app is closed)
+  const sessionIdRef = useRef(
+    sessionStorage.getItem("session_id") ||
+      (() => {
+        const id = crypto.randomUUID();
+        sessionStorage.setItem("session_id", id);
+        return id;
+      })()
+  );
 
   useEffect(() => {
     expandApp();
     loadVideos();
   }, []);
 
-  // Fetch paginated videos
+  /* =====================
+     Load videos
+  ===================== */
   const loadVideos = async () => {
     if (loading) return;
     setLoading(true);
@@ -31,8 +43,8 @@ export default function Home() {
       const data = await res.json();
 
       if (data?.videos?.length) {
-        setVideos((prev) => [...prev, ...data.videos]);
-        setPage((p) => p + 1);
+        setVideos(prev => [...prev, ...data.videos]);
+        setPage(p => p + 1);
       }
     } catch (err) {
       console.error("Failed to load videos", err);
@@ -41,67 +53,82 @@ export default function Home() {
     }
   };
 
-  // 🔐 Ad-gated open
+  /* =====================
+     Ad-gated open
+  ===================== */
   const handleOpenVideo = async (video) => {
-  const videoKey = `${video.chat_id}:${video.message_id}`;
+    const videoKey = `${video.chat_id}:${video.message_id}`;
 
-  // Already unlocked
-  if (unlockedVideos.has(videoKey)) {
-    setActiveVideo(video);
-    return;
-  }
+    // 🔓 Already unlocked → play instantly
+    if (unlockedVideos.has(videoKey)) {
+      setActiveVideo({
+        ...video,
+        video_url: buildVideoUrl(video)
+      });
+      return;
+    }
 
-  let adCompleted = false;
+    // 🔐 Require ad
+    try {
+      openRewardedAd();
+      await adReturnWatcher();
+    } catch {
+      alert("You must watch the ad to play this video.");
+      return;
+    }
 
-  try {
-    // 1️⃣ Show ad and wait for user to return
-    openRewardedAd();
-    await adReturnWatcher();
-    adCompleted = true; // ✅ mark as completed
-  } catch (err) {
-    console.warn("Ad was not completed", err);
-    adCompleted = false;
-  }
+    try {
+      // ✅ Confirm ad → grant session access for THIS video
+      const res = await fetch(
+        "https://videos.naijahomemade.com/api/ad/confirm",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: video.chat_id,
+            message_id: video.message_id,
+            session_id: sessionIdRef.current
+          })
+        }
+      );
 
-  if (!adCompleted) {
-    // Only alert if ad failed/skipped
-    alert("You must watch the ad to play this video.");
-    return;
-  }
+      if (!res.ok) throw new Error("Ad confirm failed");
 
-  try {
-    // 2️⃣ Request play token from backend
-    const res = await fetch("https://videos.naijahomemade.com/api/ad/confirm", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: video.chat_id,
-        message_id: video.message_id,
-      }),
-    });
+      // 🔓 Unlock video locally
+      setUnlockedVideos(prev => {
+        const next = new Set(prev);
+        next.add(videoKey);
+        return next;
+      });
 
-    const data = await res.json();
-    if (!data.token) throw new Error("No token returned");
+      setActiveVideo({
+        ...video,
+        video_url: buildVideoUrl(video)
+      });
+    } catch (err) {
+      console.error("Unlock failed:", err);
+      alert("Something went wrong. Please try again.");
+    }
+  };
 
-    // 3️⃣ Unlock video & play
-    setUnlockedVideos((prev) => new Set(prev).add(videoKey));
-    setActiveVideo({
-      ...video,
-      video_url: `https://videos.naijahomemade.com/api/video?token=${data.token}`,
-    });
-  } catch (err) {
-    console.error("Failed to get play token:", err);
-    alert("Something went wrong. Please try again.");
-  }
-};
+  /* =====================
+     Helpers
+  ===================== */
+  const buildVideoUrl = (video) =>
+    `https://videos.naijahomemade.com/api/video` +
+    `?chat_id=${video.chat_id}` +
+    `&message_id=${video.message_id}` +
+    `&session_id=${sessionIdRef.current}`;
 
-
+  /* =====================
+     Render
+  ===================== */
   return (
     <div
       style={{
         background: "#1c1c1e",
         minHeight: "100vh",
-        padding: 8,
+        padding: 8
       }}
     >
       {/* VIDEO GRID */}
@@ -109,10 +136,10 @@ export default function Home() {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 8,
+          gap: 8
         }}
       >
-        {videos.map((video) => {
+        {videos.map(video => {
           const videoKey = `${video.chat_id}:${video.message_id}`;
           const unlocked = unlockedVideos.has(videoKey);
 
@@ -138,7 +165,7 @@ export default function Home() {
               border: "none",
               background: "#2c2c2e",
               color: "#fff",
-              cursor: "pointer",
+              cursor: "pointer"
             }}
           >
             Load more

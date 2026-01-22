@@ -63,12 +63,12 @@ async function initDatabase() {
       `);
 
       await pool.query(`
-        CREATE TABLE IF NOT EXISTS video_play_tokens (
-          token TEXT PRIMARY KEY,
-          chat_id BIGINT NOT NULL,
-          message_id BIGINT NOT NULL,
-          expires_at TIMESTAMP NOT NULL,
-          used BOOLEAN DEFAULT FALSE
+        CREATE TABLE IF NOT EXISTS video_play_grants (
+          session_id TEXT NOT NULL,
+          chat_id TEXT NOT NULL,
+          message_id TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (session_id, chat_id, message_id)
         )
       `);
 
@@ -85,6 +85,7 @@ async function initDatabase() {
     throw new Error("Database initialization failed");
   }
 }
+
 
 
 /* =====================
@@ -153,38 +154,27 @@ app.post("/webhook", async (req, res) => {
 ===================== */
 app.get("/api/video", async (req, res) => {
   try {
-    const { token } = req.query;
+    const { chat_id, message_id, session_id } = req.query;
 
-    if (!token) {
+    if (!chat_id || !message_id || !session_id) {
       return res.status(403).json({ error: "Ad required" });
     }
 
-    // 1. Validate token
-    const tokenRes = await pool.query(
+    // 1. Check grant
+    const grantRes = await pool.query(
       `
-      SELECT chat_id, message_id
-      FROM video_play_tokens
-      WHERE token=$1
-        AND used=false
-        AND expires_at > NOW()
+      SELECT 1 FROM video_play_grants
+      WHERE session_id=$1 AND chat_id=$2 AND message_id=$3
       LIMIT 1
       `,
-      [token]
+      [session_id, chat_id, message_id]
     );
 
-    if (!tokenRes.rows.length) {
-      return res.status(403).json({ error: "Invalid or expired token" });
+    if (!grantRes.rows.length) {
+      return res.status(403).json({ error: "Ad required" });
     }
 
-    const { chat_id, message_id } = tokenRes.rows[0];
-
-    // 2. Mark token as used
-    await pool.query(
-      "UPDATE video_play_tokens SET used=true WHERE token=$1",
-      [token]
-    );
-
-    // 3. Get Telegram file_id
+    // 2. Get Telegram file_id
     const dbRes = await pool.query(
       "SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2 LIMIT 1",
       [chat_id, message_id]
@@ -196,7 +186,7 @@ app.get("/api/video", async (req, res) => {
 
     const { file_id } = dbRes.rows[0];
 
-    // 4. Telegram getFile
+    // 3. Telegram getFile
     const fileRes = await axios.get(
       `${TELEGRAM_API}/getFile`,
       { params: { file_id } }
@@ -209,7 +199,7 @@ app.get("/api/video", async (req, res) => {
     const filePath = fileRes.data.result.file_path;
     const fileUrl = `${TELEGRAM_FILE_API}/${filePath}`;
 
-    // 5. Redirect (NO STREAMING)
+    // 4. Redirect
     return res.redirect(302, fileUrl);
   } catch (err) {
     console.error("VIDEO ACCESS ERROR:", err.message);
@@ -250,7 +240,6 @@ app.get("/api/videos", async (req, res) => {
       chat_id: v.chat_id,
       message_id: v.message_id,
       created_at: v.created_at,
-      video_url: `https://${baseUrl}/api/video?chat_id=${v.chat_id}&message_id=${v.message_id}`
       thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
     }));
 
@@ -311,30 +300,29 @@ app.get("/api/thumbnail", async (req, res) => {
 });
 
 /* =====================
-   TOKEN
+   GRANT SESSION
 ===================== */
 app.post("/api/ad/confirm", async (req, res) => {
   try {
-    const { chat_id, message_id } = req.body;
+    const { chat_id, message_id, session_id } = req.body;
 
-    if (!chat_id || !message_id) {
-      return res.status(400).json({ error: "chat_id and message_id required" });
+    if (!chat_id || !message_id || !session_id) {
+      return res.status(400).json({ error: "chat_id, message_id, session_id required" });
     }
-
-    const token = crypto.randomBytes(32).toString("hex");
 
     await pool.query(
       `
-      INSERT INTO video_play_tokens (token, chat_id, message_id, expires_at)
-      VALUES ($1, $2, $3, NOW() + INTERVAL '2 minutes')
+      INSERT INTO video_play_grants (session_id, chat_id, message_id)
+      VALUES ($1, $2, $3)
+      ON CONFLICT DO NOTHING
       `,
-      [token, chat_id, message_id]
+      [session_id, chat_id, message_id]
     );
 
-    res.json({ token });
+    res.json({ ok: true });
   } catch (err) {
-    console.error("TOKEN ERROR:", err.message);
-    res.status(500).json({ error: "Failed to issue play token" });
+    console.error("AD CONFIRM ERROR:", err.message);
+    res.status(500).json({ error: "Failed to confirm ad" });
   }
 });
 
