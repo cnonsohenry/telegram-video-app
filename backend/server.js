@@ -45,30 +45,47 @@ const pool = new Pool({
 /* =====================
    Create Table
 ===================== */
-await pool.query(`
-  CREATE TABLE IF NOT EXISTS videos (
-    id SERIAL PRIMARY KEY,
-    chat_id TEXT NOT NULL,
-    message_id TEXT NOT NULL,
-    file_id TEXT NOT NULL,
-    thumb_file_id TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(chat_id, message_id)
-  )
-`);
+async function initDatabase() {
+  let retries = 5;
 
-/* =====================
-   Create Video Token Table
-===================== */
-await pool.query(`
-  CREATE TABLE IF NOT EXISTS video_play_tokens (
-  token TEXT PRIMARY KEY,
-  chat_id BIGINT NOT NULL,
-  message_id BIGINT NOT NULL,
-  expires_at TIMESTAMP NOT NULL,
-  used BOOLEAN DEFAULT FALSE
-  );
-`);
+  while (retries) {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS videos (
+          id SERIAL PRIMARY KEY,
+          chat_id TEXT NOT NULL,
+          message_id TEXT NOT NULL,
+          file_id TEXT NOT NULL,
+          thumb_file_id TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(chat_id, message_id)
+        )
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS video_play_tokens (
+          token TEXT PRIMARY KEY,
+          chat_id BIGINT NOT NULL,
+          message_id BIGINT NOT NULL,
+          expires_at TIMESTAMP NOT NULL,
+          used BOOLEAN DEFAULT FALSE
+        )
+      `);
+
+      console.log("✅ Database initialized");
+      break;
+    } catch (err) {
+      retries--;
+      console.error("❌ DB init failed, retrying...", err.message);
+      await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+
+  if (!retries) {
+    throw new Error("Database initialization failed");
+  }
+}
+
 
 /* =====================
    Webhook
@@ -324,6 +341,9 @@ app.post("/api/ad/confirm", async (req, res) => {
    Start server
 ===================== */
 const PORT = process.env.PORT || 3000;
+await initDatabase();
+
 app.listen(PORT, () => {
-  console.log(`Server running on PORT ${PORT}`);
+  console.log(`🚀 Server running on PORT ${PORT}`);
 });
+

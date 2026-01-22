@@ -1,43 +1,28 @@
-export function showRewardedAdDirect({
-  minWatchTime = 5000, // 5 seconds minimum
-  timeout = 30000      // 30s safety timeout
-} = {}) {
-  return new Promise((resolve, reject) => {
-    let resolved = false;
-    const startTime = Date.now();
+export function showRewardedAdDirect() {
+  return new Promise((resolve) => {
+    const adUrl = "https://otieu.com/4/9659492";
 
-    const finish = (success) => {
-      if (resolved) return;
-      resolved = true;
-      window.removeEventListener("focus", onFocus);
-      clearTimeout(timeoutId);
-      success ? resolve(true) : reject();
-    };
+    if (window.Telegram?.WebApp?.platform === "ios") {
+      // iOS: use window.open (less Telegram prompt issues)
+      const win = window.open(adUrl, "_blank");
 
-    const onFocus = () => {
-      const watchedTime = Date.now() - startTime;
-      if (watchedTime >= minWatchTime) {
-        finish(true);
-      } else {
-        finish(false);
-      }
-    };
+      const onFocus = () => {
+        window.removeEventListener("focus", onFocus);
+        resolve(true);
+      };
 
-    // Open ad
-    if (window.Telegram?.WebApp) {
-      window.Telegram.WebApp.openLink(
-        "https://otieu.com/4/9659492",
-        { try_instant_view: false }
-      );
-    } else {
-      window.open("https://otieu.com/4/9659492", "_blank");
+      window.addEventListener("focus", onFocus);
+      return;
     }
 
-    window.addEventListener("focus", onFocus);
+    // Android / Desktop
+    window.Telegram.WebApp.openLink(adUrl);
 
-    // Safety timeout
-    const timeoutId = setTimeout(() => {
-      finish(false);
-    }, timeout);
+    const onFocus = () => {
+      window.removeEventListener("focus", onFocus);
+      resolve(true);
+    };
+
+    window.addEventListener("focus", onFocus);
   });
 }
