@@ -71,7 +71,7 @@ export default function Home() {
 
   try {
     // 2️⃣ Request play token from backend
-    const res = await fetch("/api/ad/confirm", {
+    const res = await fetch("https://videos.naijahomemade.com/api/ad/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -87,7 +87,7 @@ export default function Home() {
     setUnlockedVideos((prev) => new Set(prev).add(videoKey));
     setActiveVideo({
       ...video,
-      video_url: `/api/video?token=${data.token}`,
+      video_url: `https://videos.naijahomemade.com/api/video?token=${data.token}`,
     });
   } catch (err) {
     console.error("Failed to get play token:", err);
