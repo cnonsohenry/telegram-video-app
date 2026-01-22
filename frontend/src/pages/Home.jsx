@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
-import { showRewardedAdDirect } from "../utils/rewardedAd";
+import { openRewardedAd } from "../utils/rewardedAd";
+import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function Home() {
   const [videos, setVideos] = useState([]);
@@ -10,11 +11,15 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
 
+  // 🔓 Track unlocked videos (reward result)
+  const [unlockedVideos, setUnlockedVideos] = useState(() => new Set());
+
   useEffect(() => {
     expandApp();
     loadVideos();
   }, []);
 
+  // Fetch paginated videos
   const loadVideos = async () => {
     if (loading) return;
     setLoading(true);
@@ -36,13 +41,24 @@ export default function Home() {
     }
   };
 
-  // 🔐 SECURE AD-GATED OPEN
+  // 🔐 Ad-gated open
   const handleOpenVideo = async (video) => {
-    try {
-      // 1️⃣ Show ad (direct link for now)
-      await showRewardedAdDirect();
+    const videoKey = `${video.chat_id}:${video.message_id}`;
 
-      // 2️⃣ Request play token from backend
+    // If already unlocked, just play
+    if (unlockedVideos.has(videoKey)) {
+      setActiveVideo(video);
+      return;
+    }
+
+    try {
+      // 1️⃣ Open rewarded ad (direct link)
+      openRewardedAd();
+
+      // 2️⃣ Wait until user returns
+      await adReturnWatcher();
+
+      // 3️⃣ Request play token from backend
       const res = await fetch("/api/ad/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,9 +69,10 @@ export default function Home() {
       });
 
       const data = await res.json();
-      if (!data.token) throw new Error("No token");
+      if (!data.token) throw new Error("No token returned");
 
-      // 3️⃣ Open fullscreen using protected URL
+      // 4️⃣ Mark video as unlocked and open fullscreen
+      setUnlockedVideos((prev) => new Set(prev).add(videoKey));
       setActiveVideo({
         ...video,
         video_url: `/api/video?token=${data.token}`,
@@ -81,14 +98,19 @@ export default function Home() {
           gap: 8,
         }}
       >
-        {videos.map((video) => (
-          <VideoCard
-            key={`${video.chat_id}:${video.message_id}`}
-            video={video}
-            locked
-            onOpen={() => handleOpenVideo(video)}
-          />
-        ))}
+        {videos.map((video) => {
+          const videoKey = `${video.chat_id}:${video.message_id}`;
+          const unlocked = unlockedVideos.has(videoKey);
+
+          return (
+            <VideoCard
+              key={videoKey}
+              video={video}
+              locked={!unlocked}
+              onOpen={() => handleOpenVideo(video)}
+            />
+          );
+        })}
       </div>
 
       {/* LOAD MORE */}
