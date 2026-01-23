@@ -57,6 +57,7 @@ async function initDatabase() {
           message_id TEXT NOT NULL,
           file_id TEXT NOT NULL,
           thumb_file_id TEXT,
+          views BIGINT DEFAULT 0,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(chat_id, message_id)
         )
@@ -199,6 +200,17 @@ app.get("/api/video", async (req, res) => {
     const filePath = fileRes.data.result.file_path;
     const fileUrl = `${TELEGRAM_FILE_API}/${filePath}`;
 
+    // increment views
+await pool.query(
+  `
+  UPDATE videos
+  SET views = views + 1
+  WHERE chat_id = $1 AND message_id = $2
+  `,
+  [chat_id, message_id]
+);
+
+
     // 4. Redirect
     return res.redirect(302, fileUrl);
   } catch (err) {
@@ -219,13 +231,14 @@ app.get("/api/videos", async (req, res) => {
 
     const videosRes = await pool.query(
       `
-      SELECT chat_id, message_id, created_at
+      SELECT chat_id, message_id, created_at, views
       FROM videos
       ORDER BY created_at DESC
       LIMIT $1 OFFSET $2
       `,
       [limit, offset]
     );
+    
 
     const totalRes = await pool.query(`SELECT COUNT(*) FROM videos`);
     const total = Number(totalRes.rows[0].count);
@@ -239,6 +252,7 @@ app.get("/api/videos", async (req, res) => {
     const videos = videosRes.rows.map(v => ({
       chat_id: v.chat_id,
       message_id: v.message_id,
+      views: v.views,
       created_at: v.created_at,
       thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
     }));

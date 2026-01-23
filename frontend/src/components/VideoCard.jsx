@@ -73,6 +73,26 @@ export default function VideoCard({ video, onOpen }) {
           ▶
         </div>
       </div>
+
+      {/* 👁 View count (bottom-left) */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 6,
+          left: 6,
+          background: "rgba(0,0,0,0.6)",
+          color: "#fff",
+          fontSize: 12,
+          padding: "3px 6px",
+          borderRadius: 6,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          pointerEvents: "none",
+        }}
+      >
+        👁 {video.views ? video.views.toLocaleString() : 0}
+      </div>
     </div>
   );
 }
