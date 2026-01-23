@@ -1,6 +1,6 @@
 // utils/rewardedAd.js
 export function openRewardedAd() {
-  const adUrl = "https://otieu.com/4/9659492";
+  const adUrl = "https://www.effectivegatecpm.com/wmmi5uv2w5?key=23fa23a9f5a389595c81f702d570419b";
 
   if (window.Telegram?.WebApp) {
     // MUST be sync inside user click
