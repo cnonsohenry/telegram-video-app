@@ -161,7 +161,7 @@ app.get("/api/video", async (req, res) => {
       return res.status(403).json({ error: "Ad required" });
     }
 
-    // 1. Validate session grant
+    // 1. Validate grant
     const grantRes = await pool.query(
       `
       SELECT 1 FROM video_play_grants
@@ -175,7 +175,7 @@ app.get("/api/video", async (req, res) => {
       return res.status(403).json({ error: "Ad required" });
     }
 
-    // 2. Get Telegram file_id
+    // 2. Get file_id
     const dbRes = await pool.query(
       "SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2 LIMIT 1",
       [chat_id, message_id]
@@ -195,18 +195,18 @@ app.get("/api/video", async (req, res) => {
 
     const filePath = tgRes.data.result.file_path;
 
-    // 4. Redirect → Cloudflare Worker (🔥 THIS IS THE FIX)
+    // 4. Return Worker URL (NO REDIRECT)
     const workerUrl =
       "https://tg-video-cache.cnonsohenry.workers.dev" +
       `/?file_path=${encodeURIComponent(filePath)}`;
 
-    return res.redirect(302, workerUrl);
-
+    res.json({ video_url: workerUrl });
   } catch (err) {
     console.error("VIDEO ACCESS ERROR:", err.message);
     res.status(500).json({ error: "Access denied" });
   }
 });
+
 
 
 

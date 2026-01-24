@@ -65,70 +65,70 @@ export default function Home() {
   };
 
   /* =====================
+     Fetch playable URL (NO redirect)
+  ===================== */
+  const fetchPlayableUrl = async (video) => {
+    const res = await fetch(
+      `https://videos.naijahomemade.com/api/video` +
+        `?chat_id=${video.chat_id}` +
+        `&message_id=${video.message_id}` +
+        `&session_id=${sessionIdRef.current}`
+    );
+
+    if (!res.ok) throw new Error("Video access denied");
+
+    const data = await res.json();
+    if (!data.video_url) throw new Error("Missing video_url");
+
+    return data.video_url;
+  };
+
+  /* =====================
      Open video (ad gated)
   ===================== */
   const handleOpenVideo = async (video) => {
     const videoKey = `${video.chat_id}:${video.message_id}`;
 
-    // 🔓 already unlocked
-    if (unlockedVideos.has(videoKey)) {
-      setActiveVideo({
-        ...video,
-        video_url: buildVideoUrl(video)
-      });
-      return;
-    }
-
-    // 🔐 MUST be user-gesture bound
     try {
-      openRewardedAd();          // ← sync, click-bound
-      await adReturnWatcher();   // ← resolves when user returns
-    } catch {
-      alert("You must watch the ad to play this video.");
-      return;
-    }
+      // 🔓 Already unlocked
+      if (!unlockedVideos.has(videoKey)) {
+        openRewardedAd();        // MUST be click-bound
+        await adReturnWatcher();
 
-    try {
-      const res = await fetch(
-        "https://videos.naijahomemade.com/api/ad/confirm",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: video.chat_id,
-            message_id: video.message_id,
-            session_id: sessionIdRef.current
-          })
-        }
-      );
+        const confirm = await fetch(
+          "https://videos.naijahomemade.com/api/ad/confirm",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: video.chat_id,
+              message_id: video.message_id,
+              session_id: sessionIdRef.current
+            })
+          }
+        );
 
-      if (!res.ok) throw new Error("Ad confirm failed");
+        if (!confirm.ok) throw new Error("Ad confirm failed");
 
-      // 🔓 unlock locally
-      setUnlockedVideos(prev => {
-        const next = new Set(prev);
-        next.add(videoKey);
-        return next;
-      });
+        setUnlockedVideos(prev => {
+          const next = new Set(prev);
+          next.add(videoKey);
+          return next;
+        });
+      }
+
+      // 🎯 Fetch FINAL Worker URL
+      const playableUrl = await fetchPlayableUrl(video);
 
       setActiveVideo({
         ...video,
-        video_url: buildVideoUrl(video)
+        video_url: playableUrl
       });
     } catch (err) {
-      console.error("Unlock failed:", err);
-      alert("Something went wrong. Please try again.");
+      console.error("Playback error:", err);
+      alert("You must watch the ad to play this video.");
     }
   };
-
-  /* =====================
-     Build video URL
-  ===================== */
-  const buildVideoUrl = (video) =>
-    `https://videos.naijahomemade.com/api/video` +
-    `?chat_id=${video.chat_id}` +
-    `&message_id=${video.message_id}` +
-    `&session_id=${sessionIdRef.current}`;
 
   /* =====================
      Render
