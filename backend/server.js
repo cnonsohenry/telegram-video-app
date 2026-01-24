@@ -161,13 +161,10 @@ app.get("/api/video", async (req, res) => {
       return res.status(403).json({ error: "Ad required" });
     }
 
-    /* =====================
-       1. Validate session grant
-    ===================== */
+    // 1. Validate session grant
     const grantRes = await pool.query(
       `
-      SELECT 1
-      FROM video_play_grants
+      SELECT 1 FROM video_play_grants
       WHERE session_id=$1 AND chat_id=$2 AND message_id=$3
       LIMIT 1
       `,
@@ -178,16 +175,9 @@ app.get("/api/video", async (req, res) => {
       return res.status(403).json({ error: "Ad required" });
     }
 
-    /* =====================
-       2. Get file_id
-    ===================== */
+    // 2. Get Telegram file_id
     const dbRes = await pool.query(
-      `
-      SELECT file_id
-      FROM videos
-      WHERE chat_id=$1 AND message_id=$2
-      LIMIT 1
-      `,
+      "SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2 LIMIT 1",
       [chat_id, message_id]
     );
 
@@ -197,78 +187,27 @@ app.get("/api/video", async (req, res) => {
 
     const { file_id } = dbRes.rows[0];
 
-    /* =====================
-       3. Telegram getFile
-    ===================== */
-    const fileRes = await axios.get(
+    // 3. Telegram getFile
+    const tgRes = await axios.get(
       `${TELEGRAM_API}/getFile`,
       { params: { file_id } }
     );
 
-    if (!fileRes.data.ok) {
-      return res.status(500).json({ error: "Telegram error" });
-    }
+    const filePath = tgRes.data.result.file_path;
 
-    const filePath = fileRes.data.result.file_path;
-    const fileUrl = `${TELEGRAM_FILE_API}/${filePath}`;
+    // 4. Redirect → Cloudflare Worker (🔥 THIS IS THE FIX)
+    const workerUrl =
+      "https://tg-video-cache.cnonsohenry.workers.dev" +
+      `/?file_path=${encodeURIComponent(filePath)}`;
 
-    /* =====================
-       4. Proxy stream (RANGE SAFE)
-    ===================== */
-    const range = req.headers.range;
+    return res.redirect(302, workerUrl);
 
-    const tgStream = await axios.get(fileUrl, {
-      responseType: "stream",
-      headers: range ? { Range: range } : {},
-      httpsAgent: agent
-    });
-
-    res.status(tgStream.status);
-    res.set({
-      "Content-Type": "video/mp4",
-      "Accept-Ranges": "bytes",
-      "Cache-Control": "public, max-age=86400",
-
-      // CORS / iOS safety
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Range",
-      "Access-Control-Expose-Headers":
-        "Content-Range, Accept-Ranges, Content-Length",
-
-      "Cross-Origin-Resource-Policy": "cross-origin"
-    });
-
-    if (tgStream.headers["content-length"]) {
-      res.set("Content-Length", tgStream.headers["content-length"]);
-    }
-
-    if (tgStream.headers["content-range"]) {
-      res.set("Content-Range", tgStream.headers["content-range"]);
-    }
-
-    /* =====================
-       5. Pipe bytes (no buffering)
-    ===================== */
-    tgStream.data.pipe(res);
-
-    /* =====================
-       6. Increment views (async, non-blocking)
-    ===================== */
-    pool.query(
-      `
-      UPDATE videos
-      SET views = COALESCE(views, 0) + 1
-      WHERE chat_id=$1 AND message_id=$2
-      `,
-      [chat_id, message_id]
-    ).catch(() => {});
   } catch (err) {
     console.error("VIDEO ACCESS ERROR:", err.message);
-    if (!res.headersSent) {
-      res.status(500).json({ error: "Access denied" });
-    }
+    res.status(500).json({ error: "Access denied" });
   }
 });
+
 
 
 
