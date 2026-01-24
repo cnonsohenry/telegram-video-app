@@ -5,24 +5,35 @@ import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
+/* =====================
+   UUID fallback (iOS safe)
+===================== */
+function generateSessionId() {
+  return (
+    Date.now().toString(36) +
+    Math.random().toString(36).substring(2, 10)
+  );
+}
+
 export default function Home() {
   const [videos, setVideos] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
 
-  // 🔓 Track unlocked videos (per session)
+  // 🔓 unlocked videos per session
   const [unlockedVideos, setUnlockedVideos] = useState(() => new Set());
 
-  // 🔑 Stable session ID (lives until tab/app is closed)
-  const sessionIdRef = useRef(
-    sessionStorage.getItem("session_id") ||
-      (() => {
-        const id = crypto.randomUUID();
-        sessionStorage.setItem("session_id", id);
-        return id;
-      })()
-  );
+  // 🔑 stable session id
+  const sessionIdRef = useRef(null);
+  if (!sessionIdRef.current) {
+    let sid = sessionStorage.getItem("session_id");
+    if (!sid) {
+      sid = generateSessionId();
+      sessionStorage.setItem("session_id", sid);
+    }
+    sessionIdRef.current = sid;
+  }
 
   useEffect(() => {
     expandApp();
@@ -54,12 +65,12 @@ export default function Home() {
   };
 
   /* =====================
-     Ad-gated open
+     Open video (ad gated)
   ===================== */
   const handleOpenVideo = async (video) => {
     const videoKey = `${video.chat_id}:${video.message_id}`;
 
-    // 🔓 Already unlocked → play instantly
+    // 🔓 already unlocked
     if (unlockedVideos.has(videoKey)) {
       setActiveVideo({
         ...video,
@@ -68,17 +79,16 @@ export default function Home() {
       return;
     }
 
-    // 🔐 Require ad
+    // 🔐 MUST be user-gesture bound
     try {
-      openRewardedAd();
-      await adReturnWatcher();
+      openRewardedAd();          // ← sync, click-bound
+      await adReturnWatcher();   // ← resolves when user returns
     } catch {
       alert("You must watch the ad to play this video.");
       return;
     }
 
     try {
-      // ✅ Confirm ad → grant session access for THIS video
       const res = await fetch(
         "https://videos.naijahomemade.com/api/ad/confirm",
         {
@@ -94,7 +104,7 @@ export default function Home() {
 
       if (!res.ok) throw new Error("Ad confirm failed");
 
-      // 🔓 Unlock video locally
+      // 🔓 unlock locally
       setUnlockedVideos(prev => {
         const next = new Set(prev);
         next.add(videoKey);
@@ -112,7 +122,7 @@ export default function Home() {
   };
 
   /* =====================
-     Helpers
+     Build video URL
   ===================== */
   const buildVideoUrl = (video) =>
     `https://videos.naijahomemade.com/api/video` +

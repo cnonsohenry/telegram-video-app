@@ -62,6 +62,7 @@ export default function FullscreenPlayer({ video, onClose }) {
           controls
           autoPlay
           playsInline
+          preload="metadata"
           style={{
             maxWidth: "100%",
             maxHeight: "100%",
