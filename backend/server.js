@@ -197,7 +197,7 @@ app.get("/api/video", async (req, res) => {
 
     // 4. Return Worker URL (NO REDIRECT)
     const workerUrl =
-      "https://tg-video-cache.cnonsohenry.workers.dev" +
+      "https://media.naijahomemade.com" +
       `/?file_path=${encodeURIComponent(filePath)}`;
 
     res.json({ video_url: workerUrl });
