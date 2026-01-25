@@ -80,7 +80,7 @@ export default function VideoCard({ video, onOpen }) {
           position: "absolute",
           bottom: 6,
           left: 6,
-          background: "rgba(0,0,0,0.6)",
+          background: "none",
           color: "#fff",
           fontSize: 12,
           padding: "3px 6px",
