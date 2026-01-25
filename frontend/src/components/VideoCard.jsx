@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from "react";
+// Import the Eye icon from lucide-react
+import { Eye } from "lucide-react";
 
 export default function VideoCard({ video, onOpen }) {
   const videoRef = useRef(null);
@@ -91,7 +93,9 @@ export default function VideoCard({ video, onOpen }) {
           pointerEvents: "none",
         }}
       >
-        👁 {video.views ? video.views.toLocaleString() : 0}
+        {/* Replaced the emoji with the Lucide Eye component */}
+        <Eye size={14} strokeWidth={2.5} /> 
+        {video.views ? video.views.toLocaleString() : 0}
       </div>
     </div>
   );

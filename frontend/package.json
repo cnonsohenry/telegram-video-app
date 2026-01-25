@@ -14,6 +14,7 @@
     "@tma.js/sdk-react": "^3.0.11",
     "@tma.js/transformers": "^1.1.1",
     "@tma.js/types": "^1.0.2",
+    "lucide-react": "^0.563.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
