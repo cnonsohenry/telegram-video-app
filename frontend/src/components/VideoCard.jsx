@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 // Import the Eye icon from lucide-react
 import { Eye } from "lucide-react";
+import { Play } from 'lucide-react';
 
 export default function VideoCard({ video, onOpen }) {
   const videoRef = useRef(null);
@@ -28,7 +29,7 @@ export default function VideoCard({ video, onOpen }) {
         width: "100%",
         aspectRatio: "9 / 16",
         background: "#000",
-        borderRadius: 12,
+        borderRadius: 0,
         overflow: "hidden",
         cursor: "pointer",
       }}
@@ -48,7 +49,7 @@ export default function VideoCard({ video, onOpen }) {
         }}
       />
 
-      {/* ▶ play icon overlay */}
+      {/* ▶ play icon overlay 
       <div
         style={{
           position: "absolute",
@@ -72,9 +73,10 @@ export default function VideoCard({ video, onOpen }) {
             fontSize: 20,
           }}
         >
-          ▶
+         <Play /> 
         </div>
       </div>
+      */}
 
       {/* 👁 View count (bottom-left) */}
       <div

@@ -4,6 +4,7 @@ import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
+import { Minus } from 'lucide-react';
 
 /* =====================
    UUID fallback (iOS safe)
@@ -164,24 +165,37 @@ export default function Home() {
         })}
       </div>
 
-      {/* LOAD MORE */}
-      {!loading && (
-        <div style={{ textAlign: "center", marginTop: 16 }}>
-          <button
-            onClick={loadVideos}
-            style={{
-              padding: "8px 16px",
-              borderRadius: 8,
-              border: "none",
-              background: "#2c2c2e",
-              color: "#fff",
-              cursor: "pointer"
-            }}
-          >
-            Load more
-          </button>
-        </div>
-      )}
+{/* LOAD MORE */}
+{!loading && (
+  <div style={{ textAlign: "center", marginTop: 16, padding: "0 10px" }}>
+    <button
+      onClick={loadVideos}
+      style={{
+        display: "flex",       // Puts items on the same line
+        alignItems: "center",  // Centers items vertically
+        width: "100%",         // Extends button to ends of container
+        gap: 12,               // Space between lines and text
+        padding: "8px 16px",
+        borderRadius: 8,
+        border: "none",
+        background: "transparent", // Optional: looks better for a full-width divider
+        color: "#fff",
+        cursor: "pointer"
+      }}
+    >
+      {/* Left Line */}
+      <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />
+      
+      <span style={{ fontSize: 12, fontWeight: "bold", letterSpacing: 1 }}>
+        VIEW MORE
+      </span>
+
+      {/* Right Line */}
+      <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />
+    </button>
+  </div>
+)}
+
 
       {/* FULLSCREEN PLAYER */}
       {activeVideo && (
