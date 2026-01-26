@@ -4,7 +4,7 @@ import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
-import { Minus } from 'lucide-react';
+import { Minus } from "lucide-react";
 
 /* =====================
    UUID fallback (iOS safe)
@@ -22,8 +22,15 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
 
-  // 🔓 unlocked videos per session
-  const [unlockedVideos, setUnlockedVideos] = useState(() => new Set());
+  // 🔓 unlocked videos (rehydrated)
+  const [unlockedVideos, setUnlockedVideos] = useState(() => {
+    try {
+      const saved = localStorage.getItem("unlockedVideos");
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   // 🔑 stable session id
   const sessionIdRef = useRef(null);
@@ -35,6 +42,16 @@ export default function Home() {
     }
     sessionIdRef.current = sid;
   }
+
+  /* =====================
+     Persist unlocks (CRITICAL)
+  ===================== */
+  useEffect(() => {
+    localStorage.setItem(
+      "unlockedVideos",
+      JSON.stringify([...unlockedVideos])
+    );
+  }, [unlockedVideos]);
 
   useEffect(() => {
     expandApp();
@@ -88,55 +105,53 @@ export default function Home() {
      Open video (ad gated)
   ===================== */
   const handleOpenVideo = async (video) => {
-  const videoKey = `${video.chat_id}:${video.message_id}`;
+    const videoKey = `${video.chat_id}:${video.message_id}`;
 
-  try {
-    // 🔐 First tap → unlock only
-    if (!unlockedVideos.has(videoKey)) {
-      openRewardedAd(); // click-bound
+    try {
+      // 🔐 First tap → unlock only
+      if (!unlockedVideos.has(videoKey)) {
+        openRewardedAd(); // MUST be click-bound
 
-      await adReturnWatcher(); // just for confirmation
+        await adReturnWatcher(); // confirmation only
 
-      const confirm = await fetch(
-        "https://videos.naijahomemade.com/api/ad/confirm",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: video.chat_id,
-            message_id: video.message_id,
-            session_id: sessionIdRef.current
-          })
-        }
-      );
+        const confirm = await fetch(
+          "https://videos.naijahomemade.com/api/ad/confirm",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: video.chat_id,
+              message_id: video.message_id,
+              session_id: sessionIdRef.current
+            })
+          }
+        );
 
-      if (!confirm.ok) throw new Error("Ad confirm failed");
+        if (!confirm.ok) throw new Error("Ad confirm failed");
 
-      setUnlockedVideos(prev => {
-        const next = new Set(prev);
-        next.add(videoKey);
-        return next;
+        setUnlockedVideos(prev => {
+          const next = new Set(prev);
+          next.add(videoKey);
+          return next;
+        });
+
+        // ⛔ DO NOT autoplay
+        return;
+      }
+
+      // ▶️ Second tap → play (gesture-safe)
+      const playableUrl = await fetchPlayableUrl(video);
+
+      setActiveVideo({
+        ...video,
+        video_url: playableUrl
       });
 
-      // ❗ STOP HERE
-      // Do NOT play yet
-      return;
+    } catch (err) {
+      console.error("Playback error:", err);
+      alert("You must watch the ad to play this video.");
     }
-
-    // ▶️ Second tap → play (gesture-safe)
-    const playableUrl = await fetchPlayableUrl(video);
-
-    setActiveVideo({
-      ...video,
-      video_url: playableUrl
-    });
-
-  } catch (err) {
-    console.error("Playback error:", err);
-    alert("You must watch the ad to play this video.");
-  }
-};
-
+  };
 
   /* =====================
      Render
@@ -172,37 +187,32 @@ export default function Home() {
         })}
       </div>
 
-{/* LOAD MORE */}
-{!loading && (
-  <div style={{ textAlign: "center", marginTop: 16, padding: "0 10px" }}>
-    <button
-      onClick={loadVideos}
-      style={{
-        display: "flex",       // Puts items on the same line
-        alignItems: "center",  // Centers items vertically
-        width: "100%",         // Extends button to ends of container
-        gap: 12,               // Space between lines and text
-        padding: "8px 16px",
-        borderRadius: 8,
-        border: "none",
-        background: "transparent", // Optional: looks better for a full-width divider
-        color: "#fff",
-        cursor: "pointer"
-      }}
-    >
-      {/* Left Line */}
-      <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />
-      
-      <span style={{ fontSize: 12, fontWeight: "bold", letterSpacing: 1 }}>
-        VIEW MORE
-      </span>
-
-      {/* Right Line */}
-      <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />
-    </button>
-  </div>
-)}
-
+      {/* LOAD MORE */}
+      {!loading && (
+        <div style={{ textAlign: "center", marginTop: 16, padding: "0 10px" }}>
+          <button
+            onClick={loadVideos}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              gap: 12,
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "transparent",
+              color: "#fff",
+              cursor: "pointer"
+            }}
+          >
+            <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />
+            <span style={{ fontSize: 12, fontWeight: "bold", letterSpacing: 1 }}>
+              VIEW MORE
+            </span>
+            <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />
+          </button>
+        </div>
+      )}
 
       {/* FULLSCREEN PLAYER */}
       {activeVideo && (
