@@ -2,15 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self'; 
+        script-src 'self' https://telegram.org 'unsafe-inline' 'unsafe-eval'; 
+        connect-src 'self' https://media.naijahomemade.com https://*.telegram.org; 
+        media-src 'self' https://media.naijahomemade.com blob:;
+        img-src 'self' data: https://*.telegram.org;
+        style-src 'self' 'unsafe-inline';
+    ">
 
-    <!-- ✅ Telegram WebApp SDK (MUST be early) -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>telegram-video-app</title>
-
-  </head>
+</head>
   <body>
     <div id="root"></div>
 
