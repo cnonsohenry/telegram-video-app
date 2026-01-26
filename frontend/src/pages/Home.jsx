@@ -88,48 +88,55 @@ export default function Home() {
      Open video (ad gated)
   ===================== */
   const handleOpenVideo = async (video) => {
-    const videoKey = `${video.chat_id}:${video.message_id}`;
+  const videoKey = `${video.chat_id}:${video.message_id}`;
 
-    try {
-      // 🔓 Already unlocked
-      if (!unlockedVideos.has(videoKey)) {
-        openRewardedAd();        // MUST be click-bound
-        await adReturnWatcher();
+  try {
+    // 🔐 First tap → unlock only
+    if (!unlockedVideos.has(videoKey)) {
+      openRewardedAd(); // click-bound
 
-        const confirm = await fetch(
-          "https://videos.naijahomemade.com/api/ad/confirm",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: video.chat_id,
-              message_id: video.message_id,
-              session_id: sessionIdRef.current
-            })
-          }
-        );
+      await adReturnWatcher(); // just for confirmation
 
-        if (!confirm.ok) throw new Error("Ad confirm failed");
+      const confirm = await fetch(
+        "https://videos.naijahomemade.com/api/ad/confirm",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: video.chat_id,
+            message_id: video.message_id,
+            session_id: sessionIdRef.current
+          })
+        }
+      );
 
-        setUnlockedVideos(prev => {
-          const next = new Set(prev);
-          next.add(videoKey);
-          return next;
-        });
-      }
+      if (!confirm.ok) throw new Error("Ad confirm failed");
 
-      // 🎯 Fetch FINAL Worker URL
-      const playableUrl = await fetchPlayableUrl(video);
-
-      setActiveVideo({
-        ...video,
-        video_url: playableUrl
+      setUnlockedVideos(prev => {
+        const next = new Set(prev);
+        next.add(videoKey);
+        return next;
       });
-    } catch (err) {
-      console.error("Playback error:", err);
-      alert("You must watch the ad to play this video.");
+
+      // ❗ STOP HERE
+      // Do NOT play yet
+      return;
     }
-  };
+
+    // ▶️ Second tap → play (gesture-safe)
+    const playableUrl = await fetchPlayableUrl(video);
+
+    setActiveVideo({
+      ...video,
+      video_url: playableUrl
+    });
+
+  } catch (err) {
+    console.error("Playback error:", err);
+    alert("You must watch the ad to play this video.");
+  }
+};
+
 
   /* =====================
      Render
