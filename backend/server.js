@@ -88,6 +88,23 @@ async function initDatabase() {
 }
 
 
+function signWorkerUrl(filePath) {
+  const exp = Math.floor(Date.now() / 1000) + 60 * 10; // 10 minutes
+
+  const payload = `${filePath}:${exp}`;
+
+  const sig = crypto
+    .createHmac("sha256", process.env.SIGNING_SECRET)
+    .update(payload)
+    .digest("hex");
+
+  return {
+    exp,
+    sig,
+  };
+}
+
+
 
 /* =====================
    Webhook
@@ -150,8 +167,9 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+
 /* =====================
-   REDIRECT VIDEO
+   api/videos
 ===================== */
 app.get("/api/video", async (req, res) => {
   try {
@@ -161,7 +179,7 @@ app.get("/api/video", async (req, res) => {
       return res.status(403).json({ error: "Ad required" });
     }
 
-    // 1. Validate grant
+    // 1. Validate ad grant
     const grantRes = await pool.query(
       `
       SELECT 1 FROM video_play_grants
@@ -177,7 +195,11 @@ app.get("/api/video", async (req, res) => {
 
     // 2. Get file_id
     const dbRes = await pool.query(
-      "SELECT file_id FROM videos WHERE chat_id=$1 AND message_id=$2 LIMIT 1",
+      `
+      SELECT file_id FROM videos
+      WHERE chat_id=$1 AND message_id=$2
+      LIMIT 1
+      `,
       [chat_id, message_id]
     );
 
@@ -188,27 +210,27 @@ app.get("/api/video", async (req, res) => {
     const { file_id } = dbRes.rows[0];
 
     // 3. Telegram getFile
-    const tgRes = await axios.get(
-      `${TELEGRAM_API}/getFile`,
-      { params: { file_id } }
-    );
+    const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, {
+      params: { file_id },
+    });
 
     const filePath = tgRes.data.result.file_path;
 
-    // 4. Return Worker URL (NO REDIRECT)
+    // 4. SIGN URL
+    const { exp, sig } = signWorkerUrl(filePath);
+
     const workerUrl =
       "https://media.naijahomemade.com" +
-      `/?file_path=${encodeURIComponent(filePath)}`;
+      `/?file_path=${encodeURIComponent(filePath)}` +
+      `&exp=${exp}` +
+      `&sig=${sig}`;
 
     res.json({ video_url: workerUrl });
   } catch (err) {
-    console.error("VIDEO ACCESS ERROR:", err.message);
+    console.error("VIDEO ACCESS ERROR:", err);
     res.status(500).json({ error: "Access denied" });
   }
 });
-
-
-
 
 
 /* =====================
