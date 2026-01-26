@@ -1,57 +1,15 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
-import { Minus } from "lucide-react";
-
-/* =====================
-   UUID fallback (iOS safe)
-===================== */
-function generateSessionId() {
-  return (
-    Date.now().toString(36) +
-    Math.random().toString(36).substring(2, 10)
-  );
-}
 
 export default function Home() {
   const [videos, setVideos] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
-
-  // 🔓 unlocked videos (rehydrated)
-  const [unlockedVideos, setUnlockedVideos] = useState(() => {
-    try {
-      const saved = localStorage.getItem("unlockedVideos");
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
-
-  // 🔑 stable session id
-  const sessionIdRef = useRef(null);
-  if (!sessionIdRef.current) {
-    let sid = sessionStorage.getItem("session_id");
-    if (!sid) {
-      sid = generateSessionId();
-      sessionStorage.setItem("session_id", sid);
-    }
-    sessionIdRef.current = sid;
-  }
-
-  /* =====================
-     Persist unlocks (CRITICAL)
-  ===================== */
-  useEffect(() => {
-    localStorage.setItem(
-      "unlockedVideos",
-      JSON.stringify([...unlockedVideos])
-    );
-  }, [unlockedVideos]);
 
   useEffect(() => {
     expandApp();
@@ -83,17 +41,16 @@ export default function Home() {
   };
 
   /* =====================
-     Fetch playable URL (NO redirect)
+     Fetch signed playable URL
   ===================== */
   const fetchPlayableUrl = async (video) => {
     const res = await fetch(
       `https://videos.naijahomemade.com/api/video` +
         `?chat_id=${video.chat_id}` +
-        `&message_id=${video.message_id}` +
-        `&session_id=${sessionIdRef.current}`
+        `&message_id=${video.message_id}`
     );
 
-    if (!res.ok) throw new Error("Video access denied");
+    if (!res.ok) throw new Error("Access denied");
 
     const data = await res.json();
     if (!data.video_url) throw new Error("Missing video_url");
@@ -102,51 +59,24 @@ export default function Home() {
   };
 
   /* =====================
-     Open video (ad gated)
+     Open video (ad → signed URL → play)
   ===================== */
   const handleOpenVideo = async (video) => {
-    const videoKey = `${video.chat_id}:${video.message_id}`;
-
     try {
-      // 🔐 First tap → unlock only
-      if (!unlockedVideos.has(videoKey)) {
-        openRewardedAd(); // MUST be click-bound
+      // 1️⃣ Must be click-bound
+      openRewardedAd();
 
-        await adReturnWatcher(); // confirmation only
+      // 2️⃣ Wait until user returns
+      await adReturnWatcher();
 
-        const confirm = await fetch(
-          "https://videos.naijahomemade.com/api/ad/confirm",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: video.chat_id,
-              message_id: video.message_id,
-              session_id: sessionIdRef.current
-            })
-          }
-        );
-
-        if (!confirm.ok) throw new Error("Ad confirm failed");
-
-        setUnlockedVideos(prev => {
-          const next = new Set(prev);
-          next.add(videoKey);
-          return next;
-        });
-
-        // ⛔ DO NOT autoplay
-        return;
-      }
-
-      // ▶️ Second tap → play (gesture-safe)
+      // 3️⃣ Fetch fresh signed URL
       const playableUrl = await fetchPlayableUrl(video);
 
+      // 4️⃣ Play
       setActiveVideo({
         ...video,
-        video_url: playableUrl
+        video_url: playableUrl,
       });
-
     } catch (err) {
       console.error("Playback error:", err);
       alert("You must watch the ad to play this video.");
@@ -161,7 +91,7 @@ export default function Home() {
       style={{
         background: "#1c1c1e",
         minHeight: "100vh",
-        padding: 8
+        padding: 8,
       }}
     >
       {/* VIDEO GRID */}
@@ -169,22 +99,17 @@ export default function Home() {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 8
+          gap: 8,
         }}
       >
-        {videos.map(video => {
-          const videoKey = `${video.chat_id}:${video.message_id}`;
-          const unlocked = unlockedVideos.has(videoKey);
-
-          return (
-            <VideoCard
-              key={videoKey}
-              video={video}
-              locked={!unlocked}
-              onOpen={() => handleOpenVideo(video)}
-            />
-          );
-        })}
+        {videos.map(video => (
+          <VideoCard
+            key={`${video.chat_id}:${video.message_id}`}
+            video={video}
+            locked={true} // UI only
+            onOpen={() => handleOpenVideo(video)}
+          />
+        ))}
       </div>
 
       {/* LOAD MORE */}
@@ -202,7 +127,7 @@ export default function Home() {
               border: "none",
               background: "transparent",
               color: "#fff",
-              cursor: "pointer"
+              cursor: "pointer",
             }}
           >
             <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />

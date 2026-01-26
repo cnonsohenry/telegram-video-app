@@ -63,16 +63,6 @@ async function initDatabase() {
         )
       `);
 
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS video_play_grants (
-          session_id TEXT NOT NULL,
-          chat_id TEXT NOT NULL,
-          message_id TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (session_id, chat_id, message_id)
-        )
-      `);
-
       console.log("✅ Database initialized");
       break;
     } catch (err) {
@@ -169,31 +159,17 @@ app.post("/webhook", async (req, res) => {
 
 
 /* =====================
-   api/videos
+   api/video
 ===================== */
 app.get("/api/video", async (req, res) => {
   try {
-    const { chat_id, message_id, session_id } = req.query;
+    const { chat_id, message_id } = req.query;
 
-    if (!chat_id || !message_id || !session_id) {
-      return res.status(403).json({ error: "Ad required" });
+    if (!chat_id || !message_id) {
+      return res.status(400).json({ error: "Missing parameters" });
     }
 
-    // 1. Validate ad grant
-    const grantRes = await pool.query(
-      `
-      SELECT 1 FROM video_play_grants
-      WHERE session_id=$1 AND chat_id=$2 AND message_id=$3
-      LIMIT 1
-      `,
-      [session_id, chat_id, message_id]
-    );
-
-    if (!grantRes.rows.length) {
-      return res.status(403).json({ error: "Ad required" });
-    }
-
-    // 2. Get file_id
+    // 1. Get file_id
     const dbRes = await pool.query(
       `
       SELECT file_id FROM videos
@@ -209,14 +185,14 @@ app.get("/api/video", async (req, res) => {
 
     const { file_id } = dbRes.rows[0];
 
-    // 3. Telegram getFile
+    // 2. Telegram getFile
     const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, {
       params: { file_id },
     });
 
     const filePath = tgRes.data.result.file_path;
 
-    // 4. SIGN URL
+    // 3. Sign URL (short-lived)
     const { exp, sig } = signWorkerUrl(filePath);
 
     const workerUrl =
@@ -231,6 +207,7 @@ app.get("/api/video", async (req, res) => {
     res.status(500).json({ error: "Access denied" });
   }
 });
+
 
 
 /* =====================
@@ -323,33 +300,6 @@ app.get("/api/thumbnail", async (req, res) => {
   } catch (err) {
     console.error("Thumbnail error:", err.message);
     res.status(500).end();
-  }
-});
-
-/* =====================
-   GRANT SESSION
-===================== */
-app.post("/api/ad/confirm", async (req, res) => {
-  try {
-    const { chat_id, message_id, session_id } = req.body;
-
-    if (!chat_id || !message_id || !session_id) {
-      return res.status(400).json({ error: "chat_id, message_id, session_id required" });
-    }
-
-    await pool.query(
-      `
-      INSERT INTO video_play_grants (session_id, chat_id, message_id)
-      VALUES ($1, $2, $3)
-      ON CONFLICT DO NOTHING
-      `,
-      [session_id, chat_id, message_id]
-    );
-
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("AD CONFIRM ERROR:", err.message);
-    res.status(500).json({ error: "Failed to confirm ad" });
   }
 });
 
