@@ -159,7 +159,7 @@ app.post("/webhook", async (req, res) => {
 
 
 /* =====================
-   api/video
+   api/video (NOW WITH VIEW COUNTING)
 ===================== */
 app.get("/api/video", async (req, res) => {
   try {
@@ -169,12 +169,13 @@ app.get("/api/video", async (req, res) => {
       return res.status(400).json({ error: "Missing parameters" });
     }
 
-    // 1. Get file_id
+    // 1. Increment view count AND get file_id in one query
     const dbRes = await pool.query(
       `
-      SELECT file_id FROM videos
-      WHERE chat_id=$1 AND message_id=$2
-      LIMIT 1
+      UPDATE videos 
+      SET views = views + 1 
+      WHERE chat_id=$1 AND message_id=$2 
+      RETURNING file_id
       `,
       [chat_id, message_id]
     );
@@ -192,7 +193,7 @@ app.get("/api/video", async (req, res) => {
 
     const filePath = tgRes.data.result.file_path;
 
-    // 3. Sign URL (short-lived)
+    // 3. Sign URL
     const { exp, sig } = signWorkerUrl(filePath);
 
     const workerUrl =
@@ -236,7 +237,7 @@ app.get("/api/videos", async (req, res) => {
     const baseUrl = req.get("host");
 
     res.set({
-      "Cache-Control": "public, max-age=60"
+      "Cache-Control": "public, max-age=5"
     });
 
     const videos = videosRes.rows.map(v => ({
