@@ -82,8 +82,8 @@ export default function VideoCard({ video, onOpen }) {
 <div
   style={{
     position: "absolute",
-    bottom: 6,
-    left: 6,
+    bottom: 0,
+    left: 0,
     background: "none",
     color: "#fff",
     fontSize: 12,
