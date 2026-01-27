@@ -11,6 +11,28 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
 
+  /* =====================
+     UNLOCK STATE (CRITICAL)
+  ===================== */
+  const [unlockedVideos, setUnlockedVideos] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("unlockedVideos");
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  /* =====================
+     Persist unlocks
+  ===================== */
+  useEffect(() => {
+    sessionStorage.setItem(
+      "unlockedVideos",
+      JSON.stringify([...unlockedVideos])
+    );
+  }, [unlockedVideos]);
+
   useEffect(() => {
     expandApp();
     loadVideos();
@@ -41,69 +63,58 @@ export default function Home() {
   };
 
   /* =====================
-     Fetch signed playable URL
+     Fetch signed URL
   ===================== */
   const fetchPlayableUrl = async (video) => {
-  const res = await fetch(
-    `https://videos.naijahomemade.com/api/video` +
-      `?chat_id=${video.chat_id}` +
-      `&message_id=${video.message_id}`
-  );
+    const res = await fetch(
+      `https://videos.naijahomemade.com/api/video` +
+        `?chat_id=${video.chat_id}` +
+        `&message_id=${video.message_id}`
+    );
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || "Failed to fetch video");
-  }
-
-  const data = await res.json();
-
-  if (!data.video_url) {
-    throw new Error("Missing video_url");
-  }
-
-  return data.video_url;
-};
-
-
-  /* =====================
-     Open video (ad → signed URL → play)
-  ===================== */
-
-  const signedUrlCacheRef = useRef(new Map());
-
-  const handleOpenVideo = async (video) => {
-  const videoKey = `${video.chat_id}:${video.message_id}`;
-
-  try {
-    // 🔐 If not unlocked, show ad
-    if (!unlockedVideos.has(videoKey)) {
-      openRewardedAd(); // MUST be click-bound
-
-      // Wait for ad to close (Android tolerates this)
-      await adReturnWatcher();
-
-      setUnlockedVideos(prev => {
-        const next = new Set(prev);
-        next.add(videoKey);
-        return next;
-      });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Failed to fetch video");
     }
 
-    // ▶️ ALWAYS play immediately after
-    const playableUrl = await fetchPlayableUrl(video);
+    const data = await res.json();
+    if (!data.video_url) throw new Error("Missing video_url");
 
-    setActiveVideo({
-      ...video,
-      video_url: playableUrl
-    });
+    return data.video_url;
+  };
 
-  } catch (err) {
-    console.error("Playback error:", err);
-    alert("Playback failed. Please try again.");
-  }
-};
+  /* =====================
+     Open video (Android-safe)
+  ===================== */
+  const handleOpenVideo = async (video) => {
+    const videoKey = `${video.chat_id}:${video.message_id}`;
 
+    try {
+      // 🔐 First interaction → show ad
+      if (!unlockedVideos.has(videoKey)) {
+        openRewardedAd();          // MUST be click-bound
+        await adReturnWatcher();   // wait for close
 
+        setUnlockedVideos(prev => {
+          const next = new Set(prev);
+          next.add(videoKey);
+          return next;
+        });
+      }
+
+      // ▶️ Always play immediately after
+      const playableUrl = await fetchPlayableUrl(video);
+
+      setActiveVideo({
+        ...video,
+        video_url: playableUrl,
+      });
+
+    } catch (err) {
+      console.error("Playback error:", err);
+      alert("Playback failed. Please try again.");
+    }
+  };
 
   /* =====================
      Render
@@ -124,14 +135,19 @@ export default function Home() {
           gap: 8,
         }}
       >
-        {videos.map(video => (
-          <VideoCard
-            key={`${video.chat_id}:${video.message_id}`}
-            video={video}
-            locked={true} // UI only
-            onOpen={() => handleOpenVideo(video)}
-          />
-        ))}
+        {videos.map(video => {
+          const videoKey = `${video.chat_id}:${video.message_id}`;
+          const unlocked = unlockedVideos.has(videoKey);
+
+          return (
+            <VideoCard
+              key={videoKey}
+              video={video}
+              locked={!unlocked}
+              onOpen={() => handleOpenVideo(video)}
+            />
+          );
+        })}
       </div>
 
       {/* LOAD MORE */}
