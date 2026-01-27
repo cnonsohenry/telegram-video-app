@@ -95,8 +95,22 @@ export default function Home() {
         `https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`
       );
       const data = await res.json();
-      setActiveVideo({ ...video, video_url: data.video_url });
+      
+      if (data.video_url) {
+        // 🟢 INSTANT FRONTEND UPDATE
+        // We find the video in our state array and increment its views locally
+        setVideos(prevVideos => 
+          prevVideos.map(v => 
+            (v.chat_id === video.chat_id && v.message_id === video.message_id)
+              ? { ...v, views: Number(v.views || 0) + 1 }
+              : v
+          )
+        );
+
+        setActiveVideo({ ...video, video_url: data.video_url });
+      }
     } catch (e) {
+      console.error("Playback error:", e);
       alert("Error fetching video link.");
     }
   };
