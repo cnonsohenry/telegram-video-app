@@ -5,6 +5,10 @@ import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
+// 🔐 cache signed URLs per session
+const signedUrlCacheRef = useRef(new Map());
+
+
 export default function Home() {
   const [videos, setVideos] = useState([]);
   const [page, setPage] = useState(1);
@@ -62,26 +66,40 @@ export default function Home() {
      Open video (ad → signed URL → play)
   ===================== */
   const handleOpenVideo = async (video) => {
-    try {
-      // 1️⃣ Must be click-bound
-      openRewardedAd();
+  const videoKey = `${video.chat_id}:${video.message_id}`;
 
-      // 2️⃣ Wait until user returns
-      await adReturnWatcher();
+  try {
+    // ✅ Reuse signed URL if we already have one
+    if (signedUrlCacheRef.current.has(videoKey)) {
+      const cached = signedUrlCacheRef.current.get(videoKey);
 
-      // 3️⃣ Fetch fresh signed URL
-      const playableUrl = await fetchPlayableUrl(video);
-
-      // 4️⃣ Play
       setActiveVideo({
         ...video,
-        video_url: playableUrl,
+        video_url: cached,
       });
-    } catch (err) {
-      console.error("Playback error:", err);
-      alert("You must watch the ad to play this video.");
+      return;
     }
-  };
+
+    // 🔒 First time only → ad
+    openRewardedAd();
+    await adReturnWatcher();
+
+    // 🔑 Fetch fresh signed URL
+    const playableUrl = await fetchPlayableUrl(video);
+
+    // 🧠 Cache it
+    signedUrlCacheRef.current.set(videoKey, playableUrl);
+
+    // ▶️ Play
+    setActiveVideo({
+      ...video,
+      video_url: playableUrl,
+    });
+  } catch (err) {
+    console.error("Playback error:", err);
+    alert("You must watch the ad to play this video.");
+  }
+};
 
   /* =====================
      Render
