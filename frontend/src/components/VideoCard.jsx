@@ -79,26 +79,31 @@ export default function VideoCard({ video, onOpen }) {
       */}
 
       {/* 👁 View count (bottom-left) */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 6,
-          left: 6,
-          background: "none",
-          color: "#fff",
-          fontSize: 12,
-          padding: "3px 6px",
-          borderRadius: 10,
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          pointerEvents: "none",
-        }}
-      >
-        {/* Replaced the emoji with the Lucide Eye component */}
-        <Play size={14} strokeWidth={2.5} /> 
-        {video.views ? video.views.toLocaleString() : 0}
-      </div>
+<div
+  style={{
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    background: "none",
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",                
+    padding: "3px 6px",
+    borderRadius: 0,                  
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    pointerEvents: "none",
+    textTransform: "uppercase",       
+  }}
+>
+  {/* Play icon with increased stroke for a bolder look */}
+  <Play size={14} strokeWidth={3} fill="none" /> 
+  
+  <span>
+    {video.views ? video.views.toLocaleString() : 0}
+  </span>
+</div>
     </div>
   );
 }
