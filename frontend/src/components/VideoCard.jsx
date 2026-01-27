@@ -88,7 +88,7 @@ export default function VideoCard({ video, onOpen }) {
           color: "#fff",
           fontSize: 12,
           padding: "3px 6px",
-          borderRadius: 6,
+          borderRadius: 10,
           display: "flex",
           alignItems: "center",
           gap: 4,
@@ -96,7 +96,7 @@ export default function VideoCard({ video, onOpen }) {
         }}
       >
         {/* Replaced the emoji with the Lucide Eye component */}
-        <Eye size={14} strokeWidth={2.5} /> 
+        <Play size={14} strokeWidth={2.5} /> 
         {video.views ? video.views.toLocaleString() : 0}
       </div>
     </div>

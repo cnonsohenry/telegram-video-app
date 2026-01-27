@@ -132,7 +132,7 @@ export default function Home() {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 8,
+          gap: 2,
         }}
       >
         {videos.map(video => {
