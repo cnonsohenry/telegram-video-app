@@ -12,27 +12,16 @@ export default function Home() {
   const [activeVideo, setActiveVideo] = useState(null);
 
   /* =====================
-     UNLOCK STATE (localStorage for Android)
+     STORAGE LOGIC (Android Persistence)
   ===================== */
   const [unlockedVideos, setUnlockedVideos] = useState(() => {
     try {
-      // 🟢 Using localStorage instead of sessionStorage
       const saved = localStorage.getItem("unlockedVideos");
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch {
       return new Set();
     }
   });
-
-  /* =====================
-     Persist unlocks immediately
-  ===================== */
-  useEffect(() => {
-    localStorage.setItem(
-      "unlockedVideos",
-      JSON.stringify([...unlockedVideos])
-    );
-  }, [unlockedVideos]);
 
   useEffect(() => {
     expandApp();
@@ -70,43 +59,52 @@ export default function Home() {
   };
 
   /* =====================
-     Optimized handleOpenVideo
+     REVISED: iOS & Android Compatible Flow
   ===================== */
   const handleOpenVideo = async (video) => {
     const videoKey = `${video.chat_id}:${video.message_id}`;
 
-    try {
-      // 🔐 If not unlocked, trigger ad flow
-      if (!unlockedVideos.has(videoKey)) {
-        
-        // 🟢 OPTIMISTIC UPDATE: Mark as unlocked BEFORE the ad
-        // This ensures that if Android reloads the app, the video stays unlocked.
-        const nextSet = new Set(unlockedVideos);
-        nextSet.add(videoKey);
-        setUnlockedVideos(nextSet);
-        
-        // Immediate save to handle abrupt reloads
-        localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
-
-        // Show ad
-        openRewardedAd();
-        
-        // Wait for return (this might fail on Android reloads, 
-        // but the code above already secured the unlock for the next attempt)
-        await adReturnWatcher();
+    // 1. If already unlocked, play immediately
+    if (unlockedVideos.has(videoKey)) {
+      try {
+        const playableUrl = await fetchPlayableUrl(video);
+        setActiveVideo({ ...video, video_url: playableUrl });
+        return;
+      } catch (e) {
+        alert("Playback error");
+        return;
       }
+    }
 
-      // ▶️ Always attempt to play
+    // 2. If NOT unlocked, trigger AD FLOW
+    try {
+      // 🟢 TRIGGER AD IMMEDIATELY (Crucial for iOS Gesture)
+      // We do this BEFORE state updates to ensure Safari doesn't block the popup.
+      openRewardedAd();
+
+      // 🟢 SAVE TO STORAGE IMMEDIATELY (Crucial for Android Reload)
+      // We use a local variable to update both state and localStorage fast.
+      const nextSet = new Set(unlockedVideos);
+      nextSet.add(videoKey);
+      
+      // Update React State
+      setUnlockedVideos(nextSet);
+      
+      // Update Disk Storage (survives Android reload)
+      localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
+
+      // 3. Wait for ad to finish
+      await adReturnWatcher();
+
+      // 4. Fetch and play
       const playableUrl = await fetchPlayableUrl(video);
-
-      setActiveVideo({
-        ...video,
-        video_url: playableUrl,
-      });
+      setActiveVideo({ ...video, video_url: playableUrl });
 
     } catch (err) {
-      console.error("Playback error:", err);
-      // If adWatcher fails but video is now unlocked, user just taps again to play.
+      console.warn("Ad skip or error detected:", err);
+      // Failsafe: if ad fails but was marked as unlocked, play anyway
+      const playableUrl = await fetchPlayableUrl(video);
+      setActiveVideo({ ...video, video_url: playableUrl });
     }
   };
 
@@ -144,7 +142,7 @@ export default function Home() {
               width: "100%",
               gap: 12,
               padding: "8px 16px",
-              borderRadius: 0, // Sharp edges as requested
+              borderRadius: 0,
               border: "none",
               background: "transparent",
               color: "#fff",
