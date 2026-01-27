@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
@@ -12,11 +12,12 @@ export default function Home() {
   const [activeVideo, setActiveVideo] = useState(null);
 
   /* =====================
-     UNLOCK STATE (CRITICAL)
+     UNLOCK STATE (localStorage for Android)
   ===================== */
   const [unlockedVideos, setUnlockedVideos] = useState(() => {
     try {
-      const saved = sessionStorage.getItem("unlockedVideos");
+      // 🟢 Using localStorage instead of sessionStorage
+      const saved = localStorage.getItem("unlockedVideos");
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch {
       return new Set();
@@ -24,10 +25,10 @@ export default function Home() {
   });
 
   /* =====================
-     Persist unlocks
+     Persist unlocks immediately
   ===================== */
   useEffect(() => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       "unlockedVideos",
       JSON.stringify([...unlockedVideos])
     );
@@ -38,19 +39,14 @@ export default function Home() {
     loadVideos();
   }, []);
 
-  /* =====================
-     Load videos
-  ===================== */
   const loadVideos = async () => {
     if (loading) return;
     setLoading(true);
-
     try {
       const res = await fetch(
         `https://videos.naijahomemade.com/api/videos?page=${page}&limit=12`
       );
       const data = await res.json();
-
       if (data?.videos?.length) {
         setVideos(prev => [...prev, ...data.videos]);
         setPage(p => p + 1);
@@ -62,47 +58,45 @@ export default function Home() {
     }
   };
 
-  /* =====================
-     Fetch signed URL
-  ===================== */
   const fetchPlayableUrl = async (video) => {
     const res = await fetch(
       `https://videos.naijahomemade.com/api/video` +
         `?chat_id=${video.chat_id}` +
         `&message_id=${video.message_id}`
     );
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || "Failed to fetch video");
-    }
-
+    if (!res.ok) throw new Error("Failed to fetch video");
     const data = await res.json();
-    if (!data.video_url) throw new Error("Missing video_url");
-
     return data.video_url;
   };
 
   /* =====================
-     Open video (Android-safe)
+     Optimized handleOpenVideo
   ===================== */
   const handleOpenVideo = async (video) => {
     const videoKey = `${video.chat_id}:${video.message_id}`;
 
     try {
-      // 🔐 First interaction → show ad
+      // 🔐 If not unlocked, trigger ad flow
       if (!unlockedVideos.has(videoKey)) {
-        openRewardedAd();          // MUST be click-bound
-        await adReturnWatcher();   // wait for close
+        
+        // 🟢 OPTIMISTIC UPDATE: Mark as unlocked BEFORE the ad
+        // This ensures that if Android reloads the app, the video stays unlocked.
+        const nextSet = new Set(unlockedVideos);
+        nextSet.add(videoKey);
+        setUnlockedVideos(nextSet);
+        
+        // Immediate save to handle abrupt reloads
+        localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
 
-        setUnlockedVideos(prev => {
-          const next = new Set(prev);
-          next.add(videoKey);
-          return next;
-        });
+        // Show ad
+        openRewardedAd();
+        
+        // Wait for return (this might fail on Android reloads, 
+        // but the code above already secured the unlock for the next attempt)
+        await adReturnWatcher();
       }
 
-      // ▶️ Always play immediately after
+      // ▶️ Always attempt to play
       const playableUrl = await fetchPlayableUrl(video);
 
       setActiveVideo({
@@ -112,22 +106,12 @@ export default function Home() {
 
     } catch (err) {
       console.error("Playback error:", err);
-      alert("Playback failed. Please try again.");
+      // If adWatcher fails but video is now unlocked, user just taps again to play.
     }
   };
 
-  /* =====================
-     Render
-  ===================== */
   return (
-    <div
-      style={{
-        background: "#1c1c1e",
-        minHeight: "100vh",
-        padding: 8,
-      }}
-    >
-      {/* VIDEO GRID */}
+    <div style={{ background: "#1c1c1e", minHeight: "100vh", padding: 8 }}>
       <div
         style={{
           display: "grid",
@@ -150,7 +134,6 @@ export default function Home() {
         })}
       </div>
 
-      {/* LOAD MORE */}
       {!loading && (
         <div style={{ textAlign: "center", marginTop: 16, padding: "0 10px" }}>
           <button
@@ -161,7 +144,7 @@ export default function Home() {
               width: "100%",
               gap: 12,
               padding: "8px 16px",
-              borderRadius: 8,
+              borderRadius: 0, // Sharp edges as requested
               border: "none",
               background: "transparent",
               color: "#fff",
@@ -169,7 +152,7 @@ export default function Home() {
             }}
           >
             <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />
-            <span style={{ fontSize: 12, fontWeight: "bold", letterSpacing: 1 }}>
+            <span style={{ fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>
               VIEW MORE
             </span>
             <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />
@@ -177,7 +160,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* FULLSCREEN PLAYER */}
       {activeVideo && (
         <FullscreenPlayer
           video={activeVideo}
