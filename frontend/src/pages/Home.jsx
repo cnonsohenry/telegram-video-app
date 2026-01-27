@@ -1,13 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
-
-// 🔐 cache signed URLs per session
-const signedUrlCacheRef = useRef(new Map());
-
 
 export default function Home() {
   const [videos, setVideos] = useState([]);
@@ -48,58 +44,64 @@ export default function Home() {
      Fetch signed playable URL
   ===================== */
   const fetchPlayableUrl = async (video) => {
-    const res = await fetch(
-      `https://videos.naijahomemade.com/api/video` +
-        `?chat_id=${video.chat_id}` +
-        `&message_id=${video.message_id}`
-    );
+  const res = await fetch(
+    `https://videos.naijahomemade.com/api/video` +
+      `?chat_id=${video.chat_id}` +
+      `&message_id=${video.message_id}`
+  );
 
-    if (!res.ok) throw new Error("Access denied");
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Failed to fetch video");
+  }
 
-    const data = await res.json();
-    if (!data.video_url) throw new Error("Missing video_url");
+  const data = await res.json();
 
-    return data.video_url;
-  };
+  if (!data.video_url) {
+    throw new Error("Missing video_url");
+  }
+
+  return data.video_url;
+};
+
 
   /* =====================
      Open video (ad → signed URL → play)
   ===================== */
+
+  const signedUrlCacheRef = useRef(new Map());
+
   const handleOpenVideo = async (video) => {
   const videoKey = `${video.chat_id}:${video.message_id}`;
 
   try {
-    // ✅ Reuse signed URL if we already have one
+    // ♻️ reuse signed URL
     if (signedUrlCacheRef.current.has(videoKey)) {
-      const cached = signedUrlCacheRef.current.get(videoKey);
-
       setActiveVideo({
         ...video,
-        video_url: cached,
+        video_url: signedUrlCacheRef.current.get(videoKey),
       });
       return;
     }
 
-    // 🔒 First time only → ad
+    // 🎯 first time → ad
     openRewardedAd();
     await adReturnWatcher();
 
-    // 🔑 Fetch fresh signed URL
     const playableUrl = await fetchPlayableUrl(video);
 
-    // 🧠 Cache it
     signedUrlCacheRef.current.set(videoKey, playableUrl);
 
-    // ▶️ Play
     setActiveVideo({
       ...video,
       video_url: playableUrl,
     });
   } catch (err) {
     console.error("Playback error:", err);
-    alert("You must watch the ad to play this video.");
+    alert("Unable to play video");
   }
 };
+
 
   /* =====================
      Render
