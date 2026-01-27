@@ -75,32 +75,34 @@ export default function Home() {
   const videoKey = `${video.chat_id}:${video.message_id}`;
 
   try {
-    // ♻️ reuse signed URL
-    if (signedUrlCacheRef.current.has(videoKey)) {
-      setActiveVideo({
-        ...video,
-        video_url: signedUrlCacheRef.current.get(videoKey),
+    // 🔐 If not unlocked, show ad
+    if (!unlockedVideos.has(videoKey)) {
+      openRewardedAd(); // MUST be click-bound
+
+      // Wait for ad to close (Android tolerates this)
+      await adReturnWatcher();
+
+      setUnlockedVideos(prev => {
+        const next = new Set(prev);
+        next.add(videoKey);
+        return next;
       });
-      return;
     }
 
-    // 🎯 first time → ad
-    openRewardedAd();
-    await adReturnWatcher();
-
+    // ▶️ ALWAYS play immediately after
     const playableUrl = await fetchPlayableUrl(video);
-
-    signedUrlCacheRef.current.set(videoKey, playableUrl);
 
     setActiveVideo({
       ...video,
-      video_url: playableUrl,
+      video_url: playableUrl
     });
+
   } catch (err) {
     console.error("Playback error:", err);
-    alert("Unable to play video");
+    alert("Playback failed. Please try again.");
   }
 };
+
 
 
   /* =====================
