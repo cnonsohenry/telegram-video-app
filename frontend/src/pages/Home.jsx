@@ -12,120 +12,105 @@ export default function Home() {
   const [activeVideo, setActiveVideo] = useState(null);
 
   /* =====================
-     STORAGE LOGIC (Android Persistence)
+     SESSION-LOCKED STORAGE
   ===================== */
-  const [unlockedVideos, setUnlockedVideos] = useState(() => {
-    try {
-      const saved = localStorage.getItem("unlockedVideos");
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
+  const [unlockedVideos, setUnlockedVideos] = useState(new Set());
 
   useEffect(() => {
     expandApp();
+    
+    // 1. Get unique session hash from Telegram
+    const currentHash = window.Telegram?.WebApp?.initData || "dev-mode";
+    const savedHash = localStorage.getItem("session_hash");
+
+    // 2. If it's a NEW launch (hashes don't match), wipe storage
+    if (currentHash !== savedHash) {
+      localStorage.clear();
+      localStorage.setItem("session_hash", currentHash);
+      setUnlockedVideos(new Set());
+    } else {
+      // 3. If it's a reload (same session), restore the unlocks
+      const saved = localStorage.getItem("unlockedVideos");
+      if (saved) setUnlockedVideos(new Set(JSON.parse(saved)));
+    }
+
     loadVideos();
   }, []);
+
+  /* =====================
+     State Persistence (within current session)
+  ===================== */
+  useEffect(() => {
+    if (unlockedVideos.size > 0) {
+      localStorage.setItem("unlockedVideos", JSON.stringify([...unlockedVideos]));
+    }
+  }, [unlockedVideos]);
 
   const loadVideos = async () => {
     if (loading) return;
     setLoading(true);
     try {
-      const res = await fetch(
-        `https://videos.naijahomemade.com/api/videos?page=${page}&limit=12`
-      );
+      const res = await fetch(`https://videos.naijahomemade.com/api/videos?page=${page}&limit=12`);
       const data = await res.json();
       if (data?.videos?.length) {
         setVideos(prev => [...prev, ...data.videos]);
         setPage(p => p + 1);
       }
     } catch (err) {
-      console.error("Failed to load videos", err);
+      console.error("Load error", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchPlayableUrl = async (video) => {
-    const res = await fetch(
-      `https://videos.naijahomemade.com/api/video` +
-        `?chat_id=${video.chat_id}` +
-        `&message_id=${video.message_id}`
-    );
-    if (!res.ok) throw new Error("Failed to fetch video");
-    const data = await res.json();
-    return data.video_url;
-  };
-
-  /* =====================
-     REVISED: iOS & Android Compatible Flow
-  ===================== */
   const handleOpenVideo = async (video) => {
     const videoKey = `${video.chat_id}:${video.message_id}`;
 
-    // 1. If already unlocked, play immediately
     if (unlockedVideos.has(videoKey)) {
-      try {
-        const playableUrl = await fetchPlayableUrl(video);
-        setActiveVideo({ ...video, video_url: playableUrl });
-        return;
-      } catch (e) {
-        alert("Playback error");
-        return;
-      }
+      playVideo(video);
+      return;
     }
 
-    // 2. If NOT unlocked, trigger AD FLOW
     try {
-      // 🟢 TRIGGER AD IMMEDIATELY (Crucial for iOS Gesture)
-      // We do this BEFORE state updates to ensure Safari doesn't block the popup.
+      // Immediate trigger for iOS
       openRewardedAd();
 
-      // 🟢 SAVE TO STORAGE IMMEDIATELY (Crucial for Android Reload)
-      // We use a local variable to update both state and localStorage fast.
+      // Optimistic unlock for Android persistence
       const nextSet = new Set(unlockedVideos);
       nextSet.add(videoKey);
-      
-      // Update React State
       setUnlockedVideos(nextSet);
-      
-      // Update Disk Storage (survives Android reload)
       localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
 
-      // 3. Wait for ad to finish
       await adReturnWatcher();
-
-      // 4. Fetch and play
-      const playableUrl = await fetchPlayableUrl(video);
-      setActiveVideo({ ...video, video_url: playableUrl });
-
+      playVideo(video);
     } catch (err) {
-      console.warn("Ad skip or error detected:", err);
-      // Failsafe: if ad fails but was marked as unlocked, play anyway
-      const playableUrl = await fetchPlayableUrl(video);
-      setActiveVideo({ ...video, video_url: playableUrl });
+      console.warn("Ad skip/error:", err);
+      playVideo(video); // Failsafe
+    }
+  };
+
+  const playVideo = async (video) => {
+    try {
+      const res = await fetch(
+        `https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`
+      );
+      const data = await res.json();
+      setActiveVideo({ ...video, video_url: data.video_url });
+    } catch (e) {
+      alert("Error fetching video link.");
     }
   };
 
   return (
     <div style={{ background: "#1c1c1e", minHeight: "100vh", padding: 8 }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 2,
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2 }}>
         {videos.map(video => {
           const videoKey = `${video.chat_id}:${video.message_id}`;
-          const unlocked = unlockedVideos.has(videoKey);
-
           return (
             <VideoCard
               key={videoKey}
               video={video}
-              locked={!unlocked}
+              locked={!unlockedVideos.has(videoKey)}
               onOpen={() => handleOpenVideo(video)}
             />
           );
@@ -141,7 +126,7 @@ export default function Home() {
               alignItems: "center",
               width: "100%",
               gap: 12,
-              padding: "8px 16px",
+              padding: "12px 16px",
               borderRadius: 0,
               border: "none",
               background: "transparent",
@@ -149,20 +134,15 @@ export default function Home() {
               cursor: "pointer",
             }}
           >
-            <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />
-            <span style={{ fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>
-              VIEW MORE
-            </span>
-            <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.3 }} />
+            <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.2 }} />
+            <span style={{ fontSize: 11, fontWeight: "900", letterSpacing: 2 }}>VIEW MORE</span>
+            <div style={{ flex: 1, height: 1, background: "currentColor", opacity: 0.2 }} />
           </button>
         </div>
       )}
 
       {activeVideo && (
-        <FullscreenPlayer
-          video={activeVideo}
-          onClose={() => setActiveVideo(null)}
-        />
+        <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} />
       )}
     </div>
   );
