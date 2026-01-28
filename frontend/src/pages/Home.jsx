@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-// 🟢 ADDED: Lucide Icons
 import { Grid3X3, Play, Flame, User } from "lucide-react"; 
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
@@ -7,7 +6,6 @@ import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
-// 🟢 IMPORTANT: Ensure these IDs match your server.js ALLOWED_USERS exactly
 const ALLOWED_USERS = [1881815190, 993163169, 5806906139]; 
 
 export default function Home() {
@@ -33,46 +31,55 @@ export default function Home() {
     }
   }, []);
 
-  // Reset and reload when tab changes
+  // 🟢 Trigger reset and first page load on tab change
   useEffect(() => {
     setVideos([]);
     setPage(1);
-    loadVideos(1, true);
+    loadVideos(true); 
   }, [activeTab]);
 
-  const loadVideos = async (pageToLoad = 1, isNewTab = false) => {
-  if (loading && !isNewTab) return;
-  setLoading(true);
-  
-  try {
-    let url = `https://videos.naijahomemade.com/api/videos?page=${pageToLoad}&limit=12`;
-    if (activeTab === 3) url += `&sort=trending`;
-    else url += `&uploader_id=${ALLOWED_USERS[activeTab]}`;
-
-    const res = await fetch(url);
-    const data = await res.json();
+  // 🟢 Revised loadVideos to handle "View More" correctly
+  const loadVideos = async (isNewTab = false) => {
+    if (loading) return;
+    setLoading(true);
     
-    if (data?.videos) {
-      setVideos(prev => {
-        const newVideos = isNewTab ? data.videos : [...prev, ...data.videos];
-        
-        // 🟢 Remove duplicates by ChatID:MessageID
-        const uniqueVideos = Array.from(new Map(
-          newVideos.map(v => [`${v.chat_id}:${v.message_id}`, v])
-        ).values());
-        
-        return uniqueVideos;
-      });
-      setPage(pageToLoad + 1);
-    }
-  } catch (err) {
-    console.error("Load error", err);
-  } finally {
-    setLoading(false);
-  }
-};
+    // If it's a new tab, we MUST fetch page 1. Otherwise, use the current page state.
+    const pageToFetch = isNewTab ? 1 : page;
 
-  // ... handleOpenVideo and playVideo stay the same as previous logic ...
+    try {
+      let url = `https://videos.naijahomemade.com/api/videos?page=${pageToFetch}&limit=12`;
+      
+      if (activeTab === 3) {
+        url += `&sort=trending`;
+      } else {
+        url += `&uploader_id=${ALLOWED_USERS[activeTab]}`;
+      }
+
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data?.videos) {
+        setVideos(prev => {
+          const combined = isNewTab ? data.videos : [...prev, ...data.videos];
+          
+          // 🟢 Strict Duplicate Removal
+          const uniqueMap = new Map();
+          combined.forEach(v => {
+            uniqueMap.set(`${v.chat_id}:${v.message_id}`, v);
+          });
+          return Array.from(uniqueMap.values());
+        });
+
+        // 🟢 Increment page state for the next "View More" click
+        setPage(pageToFetch + 1);
+      }
+    } catch (err) {
+      console.error("Load error", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleOpenVideo = async (video) => {
     const videoKey = `${video.chat_id}:${video.message_id}`;
     if (unlockedVideos.has(videoKey)) {
@@ -113,7 +120,7 @@ export default function Home() {
   return (
     <div style={{ background: "#000", minHeight: "100vh" }}>
       
-      {/* 🟢 INSTAGRAM TABS WITH LUCIDE ICONS */}
+      {/* 🟢 STICKY TAB BAR */}
       <div style={{ 
         display: "flex", 
         position: "sticky", 
@@ -141,7 +148,8 @@ export default function Home() {
               border: "none",
               color: activeTab === index ? "#fff" : "#8e8e8e",
               borderBottom: activeTab === index ? "2px solid #fff" : "2px solid transparent",
-              transition: "0.2s"
+              transition: "0.2s",
+              cursor: "pointer"
             }}
           >
             {tab.icon}
@@ -150,6 +158,7 @@ export default function Home() {
         ))}
       </div>
 
+      {/* VIDEO GRID */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
         {videos.map(video => (
           <VideoCard
@@ -161,17 +170,38 @@ export default function Home() {
         ))}
       </div>
 
-      {loading && <div style={{ color: "#8e8e8e", textAlign: "center", padding: 20 }}>Loading...</div>}
+      {loading && (
+        <div style={{ color: "#8e8e8e", textAlign: "center", padding: 20, fontSize: 12 }}>
+          Loading...
+        </div>
+      )}
 
+      {/* 🟢 FIXED VIEW MORE BUTTON */}
       {!loading && videos.length > 0 && (
-        <div style={{ textAlign: "center", padding: "20px 10px" }}>
-          <button onClick={() => loadVideos()} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", width: "100%" }}>
-            <span style={{ fontSize: 11, fontWeight: "900", letterSpacing: 2 }}>VIEW MORE</span>
+        <div style={{ textAlign: "center", padding: "30px 10px" }}>
+          <button 
+            onClick={() => loadVideos(false)} 
+            style={{ 
+              background: "none", 
+              border: "none", 
+              color: "#fff", 
+              cursor: "pointer", 
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 10
+            }}
+          >
+            <div style={{ flex: 1, height: 1, background: "#262626" }} />
+            <span style={{ fontSize: 10, fontWeight: "900", letterSpacing: 2 }}>VIEW MORE</span>
+            <div style={{ flex: 1, height: 1, background: "#262626" }} />
           </button>
         </div>
       )}
 
-      {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} />}
+      {activeVideo && (
+        <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} />
+      )}
     </div>
   );
 }
