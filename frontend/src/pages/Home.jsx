@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Grid3X3, Play, Flame, User } from "lucide-react"; 
 import { motion, AnimatePresence } from "framer-motion"; 
 import VideoCard from "../components/VideoCard";
@@ -16,6 +16,9 @@ export default function Home() {
   const [activeVideo, setActiveVideo] = useState(null);
   const [activeTab, setActiveTab] = useState(0); 
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
+  
+  // Use a ref to track direction for a better sliding effect
+  const direction = useRef(0);
 
   useEffect(() => {
     expandApp();
@@ -33,7 +36,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    setVideos([]);
+    // 🟢 REMOVED setVideos([]) here to prevent the "Blank Screen"
+    // Instead, we let the new videos overwrite the old ones when they arrive
     setPage(1);
     loadVideos(true); 
   }, [activeTab]);
@@ -70,8 +74,10 @@ export default function Home() {
   const handleSwipe = (event, info) => {
     const swipeThreshold = 50; 
     if (info.offset.x < -swipeThreshold && activeTab < 3) {
+      direction.current = 1;
       setActiveTab(prev => prev + 1); 
     } else if (info.offset.x > swipeThreshold && activeTab > 0) {
+      direction.current = -1;
       setActiveTab(prev => prev - 1); 
     }
   };
@@ -114,16 +120,17 @@ export default function Home() {
   };
 
   return (
-    <div style={{ background: "#000", minHeight: "100vh", overflowX: "hidden" }}>
+    <div style={{ background: "#000", minHeight: "100vh" }}>
       
-      {/* 🟢 TABS HEADER: Fixed and outside Swipeable Container */}
+      {/* 🟢 TABS HEADER: zIndex and position fixed check */}
       <div style={{ 
         display: "flex", 
         position: "sticky", 
         top: 0, 
-        zIndex: 100, 
+        zIndex: 1000, 
         background: "#000",
-        borderBottom: "1px solid #262626" 
+        borderBottom: "1px solid #262626",
+        width: "100%"
       }}>
         {[
           { icon: <Grid3X3 size={20} />, label: "USER 1" },
@@ -133,7 +140,10 @@ export default function Home() {
         ].map((tab, index) => (
           <button
             key={index}
-            onClick={() => setActiveTab(index)}
+            onClick={() => {
+              direction.current = index > activeTab ? 1 : -1;
+              setActiveTab(index);
+            }}
             style={{
               flex: 1,
               position: "relative",
@@ -145,13 +155,14 @@ export default function Home() {
               border: "none",
               color: activeTab === index ? "#fff" : "#8e8e8e",
               transition: "color 0.3s",
-              cursor: "pointer"
+              cursor: "pointer",
+              outline: "none",
+              WebkitTapHighlightColor: "transparent"
             }}
           >
             {tab.icon}
             <span style={{ fontSize: "8px", marginTop: "4px", fontWeight: "bold" }}>{tab.label}</span>
             
-            {/* 🟢 SLIDING INDICATOR: The line now moves smoothly */}
             {activeTab === index && (
               <motion.div 
                 layoutId="activeTabIndicator"
@@ -163,35 +174,45 @@ export default function Home() {
                   height: "2px",
                   background: "#fff"
                 }}
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
               />
             )}
           </button>
         ))}
       </div>
 
-      {/* 🟢 SWIPEABLE CONTENT CONTAINER */}
-      <AnimatePresence mode="wait">
+      {/* 🟢 REMOVED mode="wait" to eliminate the blank screen between transitions */}
+      <AnimatePresence initial={false} custom={direction.current}>
         <motion.div
           key={activeTab} 
-          initial={{ x: 30, opacity: 0 }}
+          initial={{ x: direction.current > 0 ? 100 : -100, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          exit={{ x: -30, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          exit={{ x: direction.current > 0 ? -100 : 100, opacity: 0 }}
+          transition={{ type: "tween", ease: "easeInOut", duration: 0.3 }}
           drag="x" 
           dragConstraints={{ left: 0, right: 0 }} 
           onDragEnd={handleSwipe}
-          style={{ touchAction: "pan-y", minHeight: "calc(100vh - 60px)" }} 
+          style={{ touchAction: "pan-y", minHeight: "calc(100vh - 60px)", width: "100%" }} 
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
-            {videos.map(video => (
-              <VideoCard
-                key={`${video.chat_id}:${video.message_id}`}
-                video={video}
-                locked={!unlockedVideos.has(`${video.chat_id}:${video.message_id}`)}
-                onOpen={() => handleOpenVideo(video)}
-              />
-            ))}
-          </div>
+          {/* SKELETON LOADING VIEW */}
+          {loading && videos.length === 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
+              {[...Array(9)].map((_, i) => (
+                <div key={i} style={{ aspectRatio: "1/1", background: "#111", animate: "pulse 2s infinite" }} />
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
+              {videos.map(video => (
+                <VideoCard
+                  key={`${video.chat_id}:${video.message_id}`}
+                  video={video}
+                  locked={!unlockedVideos.has(`${video.chat_id}:${video.message_id}`)}
+                  onOpen={() => handleOpenVideo(video)}
+                />
+              ))}
+            </div>
+          )}
 
           {!loading && videos.length === 0 && (
             <div style={{ color: "#333", textAlign: "center", padding: "100px 20px" }}>
@@ -211,8 +232,6 @@ export default function Home() {
           )}
         </motion.div>
       </AnimatePresence>
-
-      {loading && <div style={{ color: "#8e8e8e", textAlign: "center", padding: 20, fontSize: 12 }}>Loading...</div>}
 
       {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} />}
     </div>
