@@ -130,10 +130,10 @@ export default function Home() {
         borderBottom: "1px solid #262626" 
       }}>
         {[
-          { icon: <Grid3X3 size={20} />, label: "USER 1" },
-          { icon: <Play size={20} />, label: "USER 2" },
-          { icon: <User size={20} />, label: "USER 3" },
-          { icon: <Flame size={20} />, label: "TRENDS" }
+          { icon: <Grid3X3 size={20} />},
+          { icon: <Play size={20} />},
+          { icon: <User size={20} />},
+          { icon: <Flame size={20} />}
         ].map((tab, index) => (
           <button
             key={index}
