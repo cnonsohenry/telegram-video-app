@@ -211,9 +211,9 @@ app.get("/api/videos", async (req, res) => {
     const limit = Number(req.query.limit || 12);
     const offset = (page - 1) * limit;
     
-    // Ensure uploader_id is either a valid string or null
+    // Ensure uploader_id is a string or null
     const uploader_id = req.query.uploader_id && req.query.uploader_id !== "undefined" 
-      ? req.query.uploader_id 
+      ? String(req.query.uploader_id) 
       : null;
     
     const sort = req.query.sort;
@@ -222,9 +222,9 @@ app.get("/api/videos", async (req, res) => {
     let whereClause = "";
     let orderBy = "ORDER BY created_at DESC";
 
-    if (uploader_id && uploader_id !== "undefined") {
-      // 🟢 Force cast to BIGINT using ::BIGINT
-      whereClause = "WHERE uploader_id = $3::BIGINT";
+    if (uploader_id) {
+      // 🟢 Type cast here for the main list
+      whereClause = "WHERE uploader_id = $3::bigint";
       queryValues.push(uploader_id);
     }
 
@@ -237,32 +237,33 @@ app.get("/api/videos", async (req, res) => {
        FROM videos ${whereClause} ${orderBy} LIMIT $1 OFFSET $2`,
       queryValues
     );
-    
 
-    // 🟢 FIXED: Accurate total count for pagination
+    // 🟢 THE CRITICAL FIX: Add ::bigint to the count query too
     const totalRes = await pool.query(
-      `SELECT COUNT(*) FROM videos ${whereClause}`,
+      `SELECT COUNT(*) FROM videos ${uploader_id ? 'WHERE uploader_id = $1::bigint' : ''}`,
       uploader_id ? [uploader_id] : []
     );
+    
     const total = Number(totalRes.rows[0].count);
-
     const baseUrl = req.get("host");
 
-    res.set({ "Cache-Control": "public, max-age=5" });
+    res.json({
+      page,
+      limit,
+      total,
+      videos: videosRes.rows.map(v => ({
+        chat_id: v.chat_id,
+        message_id: v.message_id,
+        views: v.views,
+        created_at: v.created_at,
+        uploader_id: v.uploader_id,
+        thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
+      }))
+    });
 
-    const videos = videosRes.rows.map(v => ({
-      chat_id: v.chat_id,
-      message_id: v.message_id,
-      views: v.views,
-      created_at: v.created_at,
-      uploader_id: v.uploader_id,
-      thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
-    }));
-
-    res.json({ page, limit, total, videos });
   } catch (err) {
     console.error("FULL DATABASE ERROR:", err);
-    res.status(500).json({ error: "Failed to load videos" });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
