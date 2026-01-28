@@ -218,20 +218,23 @@ app.get("/api/videos", async (req, res) => {
     const limit = Number(req.query.limit || 12);
     const offset = (page - 1) * limit;
     
-    const uploader_id = req.query.uploader_id; 
-    const sort = req.query.sort; 
+    // Ensure uploader_id is either a valid string or null
+    const uploader_id = req.query.uploader_id && req.query.uploader_id !== "undefined" 
+      ? req.query.uploader_id 
+      : null;
+    
+    const sort = req.query.sort;
 
     let queryValues = [limit, offset];
     let whereClause = "";
     let orderBy = "ORDER BY created_at DESC";
 
-    // Handle Uploader Filtering
     if (uploader_id) {
-      whereClause = "WHERE uploader_id = $3";
+      // 🟢 Force PostgreSQL to treat $3 as a BIGINT to avoid "could not determine type"
+      whereClause = "WHERE uploader_id = $3::BIGINT";
       queryValues.push(uploader_id);
     }
 
-    // Handle Trending Sort
     if (sort === "trending") {
       orderBy = "ORDER BY views DESC";
     }
@@ -241,6 +244,7 @@ app.get("/api/videos", async (req, res) => {
        FROM videos ${whereClause} ${orderBy} LIMIT $1 OFFSET $2`,
       queryValues
     );
+    
 
     // 🟢 FIXED: Accurate total count for pagination
     const totalRes = await pool.query(
