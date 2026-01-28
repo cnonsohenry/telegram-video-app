@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Grid3X3, Play, Flame, User } from "lucide-react"; 
+// 🟢 Framer Motion imports
+import { motion, AnimatePresence } from "framer-motion"; 
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
 import { expandApp } from "../utils/telegram";
@@ -31,29 +33,21 @@ export default function Home() {
     }
   }, []);
 
-  // 🟢 Trigger reset and first page load on tab change
   useEffect(() => {
     setVideos([]);
     setPage(1);
     loadVideos(true); 
   }, [activeTab]);
 
-  // 🟢 Revised loadVideos to handle "View More" correctly
   const loadVideos = async (isNewTab = false) => {
     if (loading) return;
     setLoading(true);
-    
-    // If it's a new tab, we MUST fetch page 1. Otherwise, use the current page state.
     const pageToFetch = isNewTab ? 1 : page;
 
     try {
       let url = `https://videos.naijahomemade.com/api/videos?page=${pageToFetch}&limit=12`;
-      
-      if (activeTab === 3) {
-        url += `&sort=trending`;
-      } else {
-        url += `&uploader_id=${ALLOWED_USERS[activeTab]}`;
-      }
+      if (activeTab === 3) url += `&sort=trending`;
+      else url += `&uploader_id=${ALLOWED_USERS[activeTab]}`;
 
       const res = await fetch(url);
       const data = await res.json();
@@ -61,22 +55,26 @@ export default function Home() {
       if (data?.videos) {
         setVideos(prev => {
           const combined = isNewTab ? data.videos : [...prev, ...data.videos];
-          
-          // 🟢 Strict Duplicate Removal
           const uniqueMap = new Map();
-          combined.forEach(v => {
-            uniqueMap.set(`${v.chat_id}:${v.message_id}`, v);
-          });
+          combined.forEach(v => uniqueMap.set(`${v.chat_id}:${v.message_id}`, v));
           return Array.from(uniqueMap.values());
         });
-
-        // 🟢 Increment page state for the next "View More" click
         setPage(pageToFetch + 1);
       }
     } catch (err) {
       console.error("Load error", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 🟢 Handle Swipe Direction
+  const handleSwipe = (event, info) => {
+    const swipeThreshold = 50; 
+    if (info.offset.x < -swipeThreshold && activeTab < 3) {
+      setActiveTab(prev => prev + 1); // Swipe Left -> Go Right
+    } else if (info.offset.x > swipeThreshold && activeTab > 0) {
+      setActiveTab(prev => prev - 1); // Swipe Right -> Go Left
     }
   };
 
@@ -118,9 +116,9 @@ export default function Home() {
   };
 
   return (
-    <div style={{ background: "#000", minHeight: "100vh" }}>
+    <div style={{ background: "#000", minHeight: "100vh", overflowX: "hidden" }}>
       
-      {/* 🟢 STICKY TAB BAR */}
+      {/* TABS HEADER */}
       <div style={{ 
         display: "flex", 
         position: "sticky", 
@@ -130,10 +128,10 @@ export default function Home() {
         borderBottom: "1px solid #262626" 
       }}>
         {[
-          { icon: <Grid3X3 size={20} />},
-          { icon: <Play size={20} />},
-          { icon: <User size={20} />},
-          { icon: <Flame size={20} />}
+          { icon: <Grid3X3 size={20} />, label: "USER 1" },
+          { icon: <Play size={20} />, label: "USER 2" },
+          { icon: <User size={20} />, label: "USER 3" },
+          { icon: <Flame size={20} />, label: "TRENDS" }
         ].map((tab, index) => (
           <button
             key={index}
@@ -148,8 +146,7 @@ export default function Home() {
               border: "none",
               color: activeTab === index ? "#fff" : "#8e8e8e",
               borderBottom: activeTab === index ? "2px solid #fff" : "2px solid transparent",
-              transition: "0.2s",
-              cursor: "pointer"
+              transition: "0.2s"
             }}
           >
             {tab.icon}
@@ -158,50 +155,52 @@ export default function Home() {
         ))}
       </div>
 
-      {/* VIDEO GRID */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
-        {videos.map(video => (
-          <VideoCard
-            key={`${video.chat_id}:${video.message_id}`}
-            video={video}
-            locked={!unlockedVideos.has(`${video.chat_id}:${video.message_id}`)}
-            onOpen={() => handleOpenVideo(video)}
-          />
-        ))}
-      </div>
+      {/* 🟢 SWIPEABLE CONTENT CONTAINER */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab} // Necessary for AnimatePresence to know when to swap
+          initial={{ x: 10, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: -10, opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          drag="x" // Enable horizontal dragging
+          dragConstraints={{ left: 0, right: 0 }} // Snap back to center
+          onDragEnd={handleSwipe}
+          style={{ touchAction: "pan-y" }} // 🟢 IMPORTANT: Allows vertical scroll while dragging horizontal
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
+            {videos.map(video => (
+              <VideoCard
+                key={`${video.chat_id}:${video.message_id}`}
+                video={video}
+                locked={!unlockedVideos.has(`${video.chat_id}:${video.message_id}`)}
+                onOpen={() => handleOpenVideo(video)}
+              />
+            ))}
+          </div>
 
-      {loading && (
-        <div style={{ color: "#8e8e8e", textAlign: "center", padding: 20, fontSize: 12 }}>
-          Loading...
-        </div>
-      )}
+          {!loading && videos.length === 0 && (
+            <div style={{ color: "#333", textAlign: "center", padding: "100px 20px" }}>
+              <Grid3X3 size={48} style={{ marginBottom: 10, opacity: 0.2 }} />
+              <p style={{ fontSize: 14, fontWeight: "bold" }}>No Posts Yet</p>
+            </div>
+          )}
 
-      {/* 🟢 FIXED VIEW MORE BUTTON */}
-      {!loading && videos.length > 0 && (
-        <div style={{ textAlign: "center", padding: "30px 10px" }}>
-          <button 
-            onClick={() => loadVideos(false)} 
-            style={{ 
-              background: "none", 
-              border: "none", 
-              color: "#fff", 
-              cursor: "pointer", 
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              gap: 10
-            }}
-          >
-            <div style={{ flex: 1, height: 3, background: "#262626" }} />
-            <span style={{ fontSize: 10, fontWeight: "900", letterSpacing: 2 }}>VIEW MORE</span>
-            <div style={{ flex: 1, height: 3, background: "#262626" }} />
-          </button>
-        </div>
-      )}
+          {!loading && videos.length > 0 && (
+            <div style={{ textAlign: "center", padding: "30px 10px" }}>
+              <button onClick={() => loadVideos(false)} style={{ background: "none", border: "none", color: "#fff", width: "100%", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ flex: 1, height: 1, background: "#262626" }} />
+                <span style={{ fontSize: 10, fontWeight: "900", letterSpacing: 2 }}>VIEW MORE</span>
+                <div style={{ flex: 1, height: 1, background: "#262626" }} />
+              </button>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
 
-      {activeVideo && (
-        <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} />
-      )}
+      {loading && <div style={{ color: "#8e8e8e", textAlign: "center", padding: 20, fontSize: 12 }}>Loading...</div>}
+
+      {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} />}
     </div>
   );
 }
