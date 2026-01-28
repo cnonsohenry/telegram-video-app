@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { Grid3X3, Play, Flame, User } from "lucide-react"; 
-// 🟢 Framer Motion imports
 import { motion, AnimatePresence } from "framer-motion"; 
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
@@ -68,13 +67,12 @@ export default function Home() {
     }
   };
 
-  // 🟢 Handle Swipe Direction
   const handleSwipe = (event, info) => {
     const swipeThreshold = 50; 
     if (info.offset.x < -swipeThreshold && activeTab < 3) {
-      setActiveTab(prev => prev + 1); // Swipe Left -> Go Right
+      setActiveTab(prev => prev + 1); 
     } else if (info.offset.x > swipeThreshold && activeTab > 0) {
-      setActiveTab(prev => prev - 1); // Swipe Right -> Go Left
+      setActiveTab(prev => prev - 1); 
     }
   };
 
@@ -118,12 +116,12 @@ export default function Home() {
   return (
     <div style={{ background: "#000", minHeight: "100vh", overflowX: "hidden" }}>
       
-      {/* TABS HEADER */}
+      {/* 🟢 TABS HEADER: Fixed and outside Swipeable Container */}
       <div style={{ 
         display: "flex", 
         position: "sticky", 
         top: 0, 
-        zIndex: 10, 
+        zIndex: 100, 
         background: "#000",
         borderBottom: "1px solid #262626" 
       }}>
@@ -138,6 +136,7 @@ export default function Home() {
             onClick={() => setActiveTab(index)}
             style={{
               flex: 1,
+              position: "relative",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -145,12 +144,27 @@ export default function Home() {
               background: "none",
               border: "none",
               color: activeTab === index ? "#fff" : "#8e8e8e",
-              borderBottom: activeTab === index ? "2px solid #fff" : "2px solid transparent",
-              transition: "0.2s"
+              transition: "color 0.3s",
+              cursor: "pointer"
             }}
           >
             {tab.icon}
             <span style={{ fontSize: "8px", marginTop: "4px", fontWeight: "bold" }}>{tab.label}</span>
+            
+            {/* 🟢 SLIDING INDICATOR: The line now moves smoothly */}
+            {activeTab === index && (
+              <motion.div 
+                layoutId="activeTabIndicator"
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: "2px",
+                  background: "#fff"
+                }}
+              />
+            )}
           </button>
         ))}
       </div>
@@ -158,15 +172,15 @@ export default function Home() {
       {/* 🟢 SWIPEABLE CONTENT CONTAINER */}
       <AnimatePresence mode="wait">
         <motion.div
-          key={activeTab} // Necessary for AnimatePresence to know when to swap
-          initial={{ x: 10, opacity: 0 }}
+          key={activeTab} 
+          initial={{ x: 30, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          exit={{ x: -10, opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          drag="x" // Enable horizontal dragging
-          dragConstraints={{ left: 0, right: 0 }} // Snap back to center
+          exit={{ x: -30, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          drag="x" 
+          dragConstraints={{ left: 0, right: 0 }} 
           onDragEnd={handleSwipe}
-          style={{ touchAction: "pan-y" }} // 🟢 IMPORTANT: Allows vertical scroll while dragging horizontal
+          style={{ touchAction: "pan-y", minHeight: "calc(100vh - 60px)" }} 
         >
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
             {videos.map(video => (
