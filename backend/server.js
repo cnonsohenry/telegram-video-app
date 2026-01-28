@@ -11,7 +11,7 @@ const { Pool } = pkg;
 /* =====================
   Allowed Telegram Users
 ===================== */
-const ALLOWED_USERS = [1881815190, 993163169]; // <-- Telegram user IDs allowed to send videos
+const ALLOWED_USERS = [1881815190, 993163169, 5806906139]; // <-- Telegram user IDs allowed to send videos
 
 /* =====================
    HTTPS agent (IPv4 fix)
@@ -57,6 +57,7 @@ async function initDatabase() {
           message_id TEXT NOT NULL,
           file_id TEXT NOT NULL,
           thumb_file_id TEXT,
+          uploader_id BIGINT,
           views BIGINT DEFAULT 0,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(chat_id, message_id)
@@ -140,14 +141,11 @@ app.post("/webhook", async (req, res) => {
       null;
 
     await pool.query(
-      `
-      INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (chat_id, message_id)
-      DO UPDATE SET thumb_file_id = EXCLUDED.thumb_file_id
-      `,
-      [chatId, messageId, media.file_id, thumb?.file_id || null]
-    );
+    `INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id, uploader_id)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (chat_id, message_id) DO UPDATE SET thumb_file_id = EXCLUDED.thumb_file_id`,
+    [chatId, messageId, media.file_id, thumb?.file_id || null, userId]
+  );
 
     res.sendStatus(200);
     console.log(`Video saved to database. from user ${userId}`);
@@ -212,39 +210,55 @@ app.get("/api/video", async (req, res) => {
 
 
 /* =====================
-   List videos (CACHED)
+   List videos (Filtered & Sorted for Tabs)
 ===================== */
 app.get("/api/videos", async (req, res) => {
   try {
     const page = Number(req.query.page || 1);
     const limit = Number(req.query.limit || 12);
     const offset = (page - 1) * limit;
+    
+    const uploader_id = req.query.uploader_id; 
+    const sort = req.query.sort; 
+
+    let queryValues = [limit, offset];
+    let whereClause = "";
+    let orderBy = "ORDER BY created_at DESC";
+
+    // Handle Uploader Filtering
+    if (uploader_id) {
+      whereClause = "WHERE uploader_id = $3";
+      queryValues.push(uploader_id);
+    }
+
+    // Handle Trending Sort
+    if (sort === "trending") {
+      orderBy = "ORDER BY views DESC";
+    }
 
     const videosRes = await pool.query(
-      `
-      SELECT chat_id, message_id, created_at, views
-      FROM videos
-      ORDER BY created_at DESC
-      LIMIT $1 OFFSET $2
-      `,
-      [limit, offset]
+      `SELECT chat_id, message_id, created_at, views, uploader_id
+       FROM videos ${whereClause} ${orderBy} LIMIT $1 OFFSET $2`,
+      queryValues
     );
-    
 
-    const totalRes = await pool.query(`SELECT COUNT(*) FROM videos`);
+    // 🟢 FIXED: Accurate total count for pagination
+    const totalRes = await pool.query(
+      `SELECT COUNT(*) FROM videos ${whereClause}`,
+      uploader_id ? [uploader_id] : []
+    );
     const total = Number(totalRes.rows[0].count);
 
     const baseUrl = req.get("host");
 
-    res.set({
-      "Cache-Control": "public, max-age=5"
-    });
+    res.set({ "Cache-Control": "public, max-age=5" });
 
     const videos = videosRes.rows.map(v => ({
       chat_id: v.chat_id,
       message_id: v.message_id,
       views: v.views,
       created_at: v.created_at,
+      uploader_id: v.uploader_id,
       thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
     }));
 
