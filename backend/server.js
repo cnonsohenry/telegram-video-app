@@ -222,8 +222,8 @@ app.get("/api/videos", async (req, res) => {
     let whereClause = "";
     let orderBy = "ORDER BY created_at DESC";
 
-    if (uploader_id) {
-      // 🟢 Force PostgreSQL to treat $3 as a BIGINT to avoid "could not determine type"
+    if (uploader_id && uploader_id !== "undefined") {
+      // 🟢 Force cast to BIGINT using ::BIGINT
       whereClause = "WHERE uploader_id = $3::BIGINT";
       queryValues.push(uploader_id);
     }
@@ -261,7 +261,7 @@ app.get("/api/videos", async (req, res) => {
 
     res.json({ page, limit, total, videos });
   } catch (err) {
-    console.error("List error:", err.message);
+    console.error("FULL DATABASE ERROR:", err);
     res.status(500).json({ error: "Failed to load videos" });
   }
 });

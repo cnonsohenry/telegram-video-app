@@ -192,9 +192,9 @@ export default function Home() {
               gap: 10
             }}
           >
-            <div style={{ flex: 1, height: 1, background: "#262626" }} />
+            <div style={{ flex: 1, height: 3, background: "#262626" }} />
             <span style={{ fontSize: 10, fontWeight: "900", letterSpacing: 2 }}>VIEW MORE</span>
-            <div style={{ flex: 1, height: 1, background: "#262626" }} />
+            <div style={{ flex: 1, height: 3, background: "#262626" }} />
           </button>
         </div>
       )}
