@@ -103,54 +103,47 @@ function signWorkerUrl(filePath) {
 app.post("/webhook", async (req, res) => {
   try {
     const update = req.body;
-    const message =
-      update.message ||
-      update.channel_post ||
-      update.edited_message;
+    // Handle standard messages or channel posts
+    const message = update.message || update.channel_post || update.edited_message;
 
     if (!message) return res.sendStatus(200);
 
-      const userId = message.from?.id;
-  if (!ALLOWED_USERS.includes(userId)) {
-    console.log(`Blocked message from user ${userId}`);
-    return res.sendStatus(403); // Forbidden
-  }
+    // 1. Identify who sent it
+    const userId = message.from?.id;
+    
+    // 2. Security Check (Silent Filtering)
+    if (!ALLOWED_USERS.includes(userId)) {
+      // We log it for your eyes only, then tell Telegram "OK" 
+      // so it doesn't clog the queue with a 403 error.
+      console.log(`Ignoring unauthorized message from: ${userId}`);
+      return res.sendStatus(200); 
+    }
 
-    const media =
-      message.video ||
-      (message.document && message.document.mime_type?.startsWith("video/")) ||
-      message.video_note ||
-      message.animation;
+    // 3. Extract Media
+    const media = message.video || 
+                  (message.document && message.document.mime_type?.startsWith("video/")) || 
+                  message.video_note || 
+                  message.animation;
 
     if (!media) return res.sendStatus(200);
 
-    const chatId = (
-      message.forward_from_chat?.id ??
-      message.chat.id
-    ).toString();
+    const chatId = (message.forward_from_chat?.id ?? message.chat.id).toString();
+    const messageId = (message.forward_from_message_id ?? message.message_id).toString();
+    const thumb = media.thumb || media.thumbs?.[0] || media.thumbnail || null;
 
-    const messageId = (
-      message.forward_from_message_id ??
-      message.message_id
-    ).toString();
-
-    const thumb =
-      media.thumb ||
-      media.thumbs?.[0] ||
-      media.thumbnail ||
-      null;
-
+    // 4. Save to Database
     await pool.query(
-    `INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id, uploader_id)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (chat_id, message_id) DO UPDATE SET thumb_file_id = EXCLUDED.thumb_file_id`,
-    [chatId, messageId, media.file_id, thumb?.file_id || null, userId]
-  );
+      `INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id, uploader_id)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (chat_id, message_id) DO UPDATE SET thumb_file_id = EXCLUDED.thumb_file_id`,
+      [chatId, messageId, media.file_id, thumb?.file_id || null, userId]
+    );
 
+    console.log(`✅ Success: Video from ${userId} saved.`);
     res.sendStatus(200);
-    console.log(`Video saved to database. from user ${userId}`);
   } catch (err) {
-    console.error("Webhook error:", err.message);
+    console.error("Webhook Error:", err.message);
+    // Always send 200 to keep the webhook active
     res.sendStatus(200);
   }
 });
