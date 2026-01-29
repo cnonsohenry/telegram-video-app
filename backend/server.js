@@ -80,7 +80,10 @@ async function initDatabase() {
 
 
 function signWorkerUrl(filePath) {
-  const exp = Math.floor(Date.now() / 1000) + 60 * 10; // 10 minutes
+  // 🟢 STABLE EXPIRY: Set to the very end of today (UTC)
+  // This ensures the URL is identical for the next 24 hours
+  const now = new Date();
+  const exp = Math.floor(now.setUTCHours(23, 59, 59, 999) / 1000);
 
   const payload = `${filePath}:${exp}`;
 

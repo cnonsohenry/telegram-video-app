@@ -22,47 +22,32 @@ export default {
       }
 
       /* ===== VERIFY SIGNATURE ===== */
-      const valid = await verifySignature(
-        filePath,
-        exp,
-        sig,
-        env.SIGNING_SECRET
-      );
-
+      const valid = await verifySignature(filePath, exp, sig, env.SIGNING_SECRET);
       if (!valid) {
-        return corsResponse("Unauthorized", 403);
+        return corsResponse("Unauthorized or Expired Link", 403);
       }
 
-      /* ===== R2 KEY ===== */
       const cacheKey = filePath.replace(/\//g, "_");
 
-      /* ===== TRY R2 (PASS HEADERS DIRECTLY) ===== */
+      /* ===== TRY R2 ===== */
       let object = await env.VIDEOS_BUCKET.get(cacheKey, {
         range: request.headers,
       });
 
       /* ===== COLD FETCH FROM TELEGRAM ===== */
       if (!object) {
-        const telegramUrl =
-          `https://api.telegram.org/file/bot${env.BOT_TOKEN}/${filePath}`;
-
+        const telegramUrl = `https://api.telegram.org/file/bot${env.BOT_TOKEN}/${filePath}`;
         const tgResponse = await fetch(telegramUrl);
-        if (!tgResponse.ok) {
-          return corsResponse("Telegram fetch failed", tgResponse.status);
-        }
+        if (!tgResponse.ok) return corsResponse("Telegram fetch failed", tgResponse.status);
 
         await env.VIDEOS_BUCKET.put(cacheKey, tgResponse.body, {
           httpMetadata: { contentType: "video/mp4" },
         });
 
-        object = await env.VIDEOS_BUCKET.get(cacheKey, {
-          range: request.headers,
-        });
+        object = await env.VIDEOS_BUCKET.get(cacheKey, { range: request.headers });
       }
 
-      if (!object) {
-        return corsResponse("Not found", 404);
-      }
+      if (!object) return corsResponse("Not found", 404);
 
       /* ===== RESPONSE HEADERS ===== */
       const headers = new Headers(corsHeaders());
@@ -71,11 +56,11 @@ export default {
       headers.set("Accept-Ranges", "bytes");
       headers.set("Vary", "Range");
 
-      // 🔒 Signed URLs must never be cached
-      headers.set("Cache-Control", "no-store");
+      // 🟢 CHANGE: Allow the browser to cache this video for 24 hours.
+      // 'private' means the browser caches it, but Cloudflare's public edge doesn't.
+      headers.set("Cache-Control", "private, max-age=86400");
 
       let status = 200;
-
       if (object.range) {
         status = 206;
         headers.set(
@@ -84,12 +69,8 @@ export default {
         );
       }
 
-      return new Response(object.body, {
-        status,
-        headers,
-      });
+      return new Response(object.body, { status, headers });
     } catch (err) {
-      console.error("WORKER ERROR:", err);
       return corsResponse("Internal Error", 500);
     }
   },
