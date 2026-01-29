@@ -1,10 +1,10 @@
-import React, { useEffect, useRef } from "react";
-// Import the Eye icon from lucide-react
-import { Eye } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
 import { Play } from 'lucide-react';
 
 export default function VideoCard({ video, onOpen }) {
   const videoRef = useRef(null);
+  const [isHovered, setIsHovered] = useState(false); // Used for subtle fade-in
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -12,9 +12,14 @@ export default function VideoCard({ video, onOpen }) {
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (!entry.isIntersecting) el.pause();
+        setIsVisible(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          el.play().catch(() => {}); // Autoplay preview
+        } else {
+          el.pause();
+        }
       },
-      { threshold: 0.3 }
+      { threshold: 0.1 } // Trigger as soon as 10% is visible
     );
 
     observer.observe(el);
@@ -28,82 +33,73 @@ export default function VideoCard({ video, onOpen }) {
         position: "relative",
         width: "100%",
         aspectRatio: "9 / 16",
-        background: "#000",
-        borderRadius: 0,
+        background: "#111", // Slightly lighter black for "skeleton" feel
         overflow: "hidden",
         cursor: "pointer",
+        WebkitTapHighlightColor: "transparent"
       }}
     >
-      <video
-        ref={videoRef}
-        src={video.video_url}
-        poster={video.thumbnail_url}
-        muted
-        preload="metadata"
-        playsInline
-        disablePictureInPicture
+      {/* 🟢 The Thumbnail (Poster) */}
+      <img 
+        src={video.thumbnail_url} 
+        alt=""
         style={{
           width: "100%",
           height: "100%",
           objectFit: "cover",
+          position: "absolute",
+          inset: 0,
+          zIndex: 1,
+          opacity: isHovered ? 0 : 1, // Fade out when video starts
+          transition: "opacity 0.4s ease-in-out"
         }}
       />
 
-      {/* ▶ play icon overlay 
+      {/* 🟢 The Video Preview */}
+      {isVisible && (
+        <video
+          ref={videoRef}
+          src={video.video_url}
+          muted
+          loop
+          playsInline
+          disablePictureInPicture
+          onPlaying={() => setIsHovered(true)} // Only hide thumbnail once video actually plays
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            position: "absolute",
+            inset: 0,
+            zIndex: 0
+          }}
+        />
+      )}
+
+      {/* 👁 View count (bottom-left) */}
       <div
         style={{
           position: "absolute",
-          inset: 0,
+          bottom: 0,
+          left: 0,
+          zIndex: 2, // Above video and thumbnail
+          background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent)",
+          color: "#fff",
+          fontSize: "11px",
+          fontWeight: "700",                
+          padding: "8px 6px 4px",
+          width: "100%",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          gap: 4,
           pointerEvents: "none",
         }}
       >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: "50%",
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            fontSize: 20,
-          }}
-        >
-         <Play /> 
-        </div>
+        <Play size={12} strokeWidth={4} fill="#fff" /> 
+        <span style={{ textShadow: "0px 1px 2px rgba(0,0,0,0.8)" }}>
+          {video.views ? video.views.toLocaleString() : 0}
+        </span>
       </div>
-      */}
-
-      {/* 👁 View count (bottom-left) */}
-<div
-  style={{
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    background: "none",
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",                
-    padding: "3px 6px",
-    borderRadius: 0,                  
-    display: "flex",
-    alignItems: "center",
-    gap: 4,
-    pointerEvents: "none",
-    textTransform: "uppercase",       
-  }}
->
-  {/* Play icon with increased stroke for a bolder look */}
-  <Play size={14} strokeWidth={3} fill="none" /> 
-  
-  <span>
-    {video.views ? video.views.toLocaleString() : 0}
-  </span>
-</div>
     </div>
   );
 }
