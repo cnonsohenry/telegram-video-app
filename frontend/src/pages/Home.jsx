@@ -33,17 +33,16 @@ export default function Home() {
 
   // 🟢 Trigger reset and first page load on tab change
   useEffect(() => {
+    // Only clear videos if we are actually switching tabs to reduce "flicker"
     setVideos([]);
     setPage(1);
     loadVideos(true); 
   }, [activeTab]);
 
-  // 🟢 Revised loadVideos to handle "View More" correctly
   const loadVideos = async (isNewTab = false) => {
     if (loading) return;
     setLoading(true);
     
-    // If it's a new tab, we MUST fetch page 1. Otherwise, use the current page state.
     const pageToFetch = isNewTab ? 1 : page;
 
     try {
@@ -61,16 +60,12 @@ export default function Home() {
       if (data?.videos) {
         setVideos(prev => {
           const combined = isNewTab ? data.videos : [...prev, ...data.videos];
-          
-          // 🟢 Strict Duplicate Removal
           const uniqueMap = new Map();
           combined.forEach(v => {
             uniqueMap.set(`${v.chat_id}:${v.message_id}`, v);
           });
           return Array.from(uniqueMap.values());
         });
-
-        // 🟢 Increment page state for the next "View More" click
         setPage(pageToFetch + 1);
       }
     } catch (err) {
@@ -120,12 +115,12 @@ export default function Home() {
   return (
     <div style={{ background: "#000", minHeight: "100vh" }}>
       
-      {/* 🟢 STICKY TAB BAR */}
+      {/* 🟢 STICKY TAB BAR WITH PURE CSS SLIDING LINE */}
       <div style={{ 
         display: "flex", 
         position: "sticky", 
         top: 0, 
-        zIndex: 10, 
+        zIndex: 100, 
         background: "#000",
         borderBottom: "1px solid #262626" 
       }}>
@@ -147,36 +142,61 @@ export default function Home() {
               background: "none",
               border: "none",
               color: activeTab === index ? "#fff" : "#8e8e8e",
-              borderBottom: activeTab === index ? "2px solid #fff" : "2px solid transparent",
-              transition: "0.2s",
-              cursor: "pointer"
+              transition: "color 0.3s ease",
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent"
             }}
           >
             {tab.icon}
             <span style={{ fontSize: "8px", marginTop: "4px", fontWeight: "bold" }}>{tab.label}</span>
           </button>
         ))}
+
+        {/* 🟢 THE SLIDING INDICATOR: Pure CSS hardware-accelerated movement */}
+        <div style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          width: "25%", // 100% / 4 tabs
+          height: "2px",
+          background: "#fff",
+          transform: `translateX(${activeTab * 100}%)`,
+          transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+        }} />
       </div>
 
       {/* VIDEO GRID */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
-        {videos.map(video => (
-          <VideoCard
-            key={`${video.chat_id}:${video.message_id}`}
-            video={video}
-            locked={!unlockedVideos.has(`${video.chat_id}:${video.message_id}`)}
-            onOpen={() => handleOpenVideo(video)}
-          />
-        ))}
+      <div style={{ minHeight: "80vh" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
+          {videos.map(video => (
+            <VideoCard
+              key={`${video.chat_id}:${video.message_id}`}
+              video={video}
+              locked={!unlockedVideos.has(`${video.chat_id}:${video.message_id}`)}
+              onOpen={() => handleOpenVideo(video)}
+            />
+          ))}
+        </div>
+
+        {/* 🟢 LOADING SKELETONS: Prevents the "Empty Black Screen" look */}
+        {loading && videos.length === 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
+            {[...Array(9)].map((_, i) => (
+              <div key={i} style={{ aspectRatio: "1/1", background: "#111" }} />
+            ))}
+          </div>
+        )}
+
+        {/* EMPTY STATE */}
+        {!loading && videos.length === 0 && (
+          <div style={{ color: "#333", textAlign: "center", padding: "100px 20px" }}>
+            <Grid3X3 size={48} style={{ marginBottom: 10, opacity: 0.2 }} />
+            <p style={{ fontSize: 14, fontWeight: "bold" }}>No Posts Yet</p>
+          </div>
+        )}
       </div>
 
-      {loading && (
-        <div style={{ color: "#8e8e8e", textAlign: "center", padding: 20, fontSize: 12 }}>
-          Loading...
-        </div>
-      )}
-
-      {/* 🟢 FIXED VIEW MORE BUTTON */}
+      {/* VIEW MORE BUTTON */}
       {!loading && videos.length > 0 && (
         <div style={{ textAlign: "center", padding: "30px 10px" }}>
           <button 
@@ -192,9 +212,11 @@ export default function Home() {
               gap: 10
             }}
           >
-            <div style={{ flex: 1, height: 3, background: "#262626" }} />
-            <span style={{ fontSize: 10, fontWeight: "900", letterSpacing: 2 }}>VIEW MORE</span>
-            <div style={{ flex: 1, height: 3, background: "#262626" }} />
+            <div style={{ flex: 1, height: 1, background: "#262626" }} />
+            <span style={{ fontSize: 10, fontWeight: "900", letterSpacing: 2 }}>
+              {loading ? "LOADING..." : "VIEW MORE"}
+            </span>
+            <div style={{ flex: 1, height: 1, background: "#262626" }} />
           </button>
         </div>
       )}
