@@ -165,18 +165,32 @@ export default function Home() {
         }} />
       </div>
 
-      {/* VIDEO GRID */}
-      <div style={{ minHeight: "80vh" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
-          {videos.map(video => (
-            <VideoCard
-              key={`${video.chat_id}:${video.message_id}`}
-              video={video}
-              locked={!unlockedVideos.has(`${video.chat_id}:${video.message_id}`)}
-              onOpen={() => handleOpenVideo(video)}
-            />
-          ))}
-        </div>
+{/* VIDEO GRID SECTION */}
+<div style={{ minHeight: "80vh" }}>
+  <div 
+    style={{ 
+      display: "grid", 
+      // 🟢 Dynamic Grid Logic:
+      // Tab 2 (BADDIES) = 2 columns
+      // Tab 3 (TRENDS) = 4 columns
+      // Others = 3 columns
+      gridTemplateColumns: 
+        activeTab === 2 ? "repeat(2, 1fr)" : 
+        activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
+      gap: 1, 
+      padding: "1px" 
+    }}
+  >
+    {videos.map(video => (
+      <VideoCard
+        key={`${video.chat_id}:${video.message_id}`}
+        video={video}
+        // Pass the activeTab or a specific layout prop
+        layoutType={activeTab} 
+        onOpen={() => handleOpenVideo(video)}
+      />
+    ))}
+  </div>
 
         {/* 🟢 LOADING SKELETONS: Prevents the "Empty Black Screen" look */}
         {loading && videos.length === 0 && (
