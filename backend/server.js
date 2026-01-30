@@ -33,7 +33,6 @@ async function initDatabase() {
   let retries = 5;
   while (retries) {
     try {
-      // 🟢 Added 'category' and 'caption' columns
       await pool.query(`
         CREATE TABLE IF NOT EXISTS videos (
           id SERIAL PRIMARY KEY,
@@ -77,7 +76,7 @@ app.post("/webhook", async (req, res) => {
     if (!message) return res.sendStatus(200);
 
     const userId = message.from?.id;
-    if (!ALLOWED_USERS.includes(userId)) return res.sendStatus(200); 
+    if (!userId || !ALLOWED_USERS.includes(userId)) return res.sendStatus(200); 
 
     const media = message.video || 
                   (message.document && message.document.mime_type?.startsWith("video/")) || 
@@ -86,23 +85,20 @@ app.post("/webhook", async (req, res) => {
 
     if (!media) return res.sendStatus(200);
 
-    // 🟢 1. Parse Category & Clean Caption
     const rawCaption = message.caption || "";
-    let category = "hotties"; // Default
+    let category = "hotties"; 
     
     if (rawCaption.toLowerCase().includes("#knacks")) category = "knacks";
     else if (rawCaption.toLowerCase().includes("#baddies")) category = "baddies";
     else if (rawCaption.toLowerCase().includes("#trends")) category = "trends";
     else if (rawCaption.toLowerCase().includes("#hotties")) category = "hotties";
 
-    // Strip out the hashtags to keep the UI clean
     const cleanCaption = rawCaption.replace(/#\w+/g, "").trim();
 
     const chatId = (message.forward_from_chat?.id ?? message.chat.id).toString();
     const messageId = (message.forward_from_message_id ?? message.message_id).toString();
     const thumb = media.thumb || media.thumbs?.[0] || media.thumbnail || null;
 
-    // 🟢 2. Save with Category & Caption
     await pool.query(
       `INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id, uploader_id, category, caption)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -110,7 +106,8 @@ app.post("/webhook", async (req, res) => {
        DO UPDATE SET 
           thumb_file_id = EXCLUDED.thumb_file_id,
           category = EXCLUDED.category,
-          caption = EXCLUDED.caption`,
+          caption = EXCLUDED.caption,
+          uploader_id = EXCLUDED.uploader_id`,
       [chatId, messageId, media.file_id, thumb?.file_id || null, userId, category, cleanCaption]
     );
 
@@ -156,7 +153,6 @@ app.get("/api/videos", async (req, res) => {
     const limit = Number(req.query.limit || 12);
     const offset = (page - 1) * limit;
     
-    // 🟢 New category filtering
     const category = req.query.category || "hotties";
     const sort = req.query.sort;
 
@@ -164,7 +160,7 @@ app.get("/api/videos", async (req, res) => {
     let orderBy = sort === "trending" ? "ORDER BY views DESC" : "ORDER BY created_at DESC";
 
     const videosRes = await pool.query(
-      `SELECT chat_id, message_id, created_at, views, caption, category
+      `SELECT chat_id, message_id, created_at, views, caption, category, uploader_id
        FROM videos 
        WHERE category = $1
        ${orderBy} LIMIT $2 OFFSET $3`,
@@ -183,7 +179,8 @@ app.get("/api/videos", async (req, res) => {
         chat_id: v.chat_id,
         message_id: v.message_id,
         views: v.views,
-        caption: v.caption, // 🟢 Now sending caption to frontend
+        caption: v.caption,
+        uploader_id: v.uploader_id, // 🟢 FIXED: Now passing this to frontend for avatars
         thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
       }))
     });
@@ -209,6 +206,40 @@ app.get("/api/thumbnail", async (req, res) => {
     res.set({
       "Content-Type": "image/jpeg",
       "Cache-Control": "public, max-age=604800, immutable",
+      "Access-Control-Allow-Origin": "*"
+    });
+    res.send(buffer);
+  } catch (err) {
+    res.status(500).end();
+  }
+});
+
+/* =====================
+   User Profile Photo (Avatar Proxy)
+===================== */
+app.get("/api/avatar", async (req, res) => {
+  try {
+    const { user_id } = req.query;
+    if (!user_id) return res.status(400).end();
+
+    const photosRes = await axios.get(`${TELEGRAM_API}/getUserProfilePhotos`, {
+      params: { user_id, limit: 1 }
+    });
+
+    const photos = photosRes.data.result.photos;
+    if (!photos || photos.length === 0) return res.status(204).end();
+
+    // Grab the smallest version (index 0) of the first photo set
+    const fileId = photos[0][0].file_id;
+    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId } });
+    const filePath = fileRes.data.result.file_path;
+
+    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${filePath}`, { responseType: "arraybuffer" });
+    const buffer = Buffer.from(imageRes.data);
+
+    res.set({
+      "Content-Type": "image/jpeg",
+      "Cache-Control": "public, max-age=86400", 
       "Access-Control-Allow-Origin": "*"
     });
     res.send(buffer);

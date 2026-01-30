@@ -14,7 +14,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState(0); 
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
 
-  // 🟢 CATEGORY MAPPING: Matches the tab index and backend tags
+  // 🟢 CATEGORY MAPPING: Matches tab index
   const CATEGORIES = ["hotties", "knacks", "baddies", "trends"];
 
   useEffect(() => {
@@ -32,7 +32,6 @@ export default function Home() {
     }
   }, []);
 
-  // 🟢 Handle Tab Changes
   useEffect(() => {
     setVideos([]);
     setPage(1);
@@ -47,10 +46,8 @@ export default function Home() {
     const currentCategory = CATEGORIES[activeTab];
 
     try {
-      // 🟢 API FETCH: Now filters by Category instead of Uploader ID
       let url = `https://videos.naijahomemade.com/api/videos?page=${pageToFetch}&limit=12&category=${currentCategory}`;
       
-      // Keep trending sort for the Trends tab
       if (currentCategory === "trends") {
         url += `&sort=trending`;
       }
@@ -102,7 +99,6 @@ export default function Home() {
       );
       const data = await res.json();
       if (data.video_url) {
-        // Optimistic view increment
         setVideos(prev => prev.map(v => 
           (v.chat_id === video.chat_id && v.message_id === video.message_id)
             ? { ...v, views: Number(v.views || 0) + 1 } : v
@@ -154,7 +150,6 @@ export default function Home() {
           </button>
         ))}
 
-        {/* INDICATOR LINE */}
         <div style={{
           position: "absolute",
           bottom: 0,
@@ -172,34 +167,40 @@ export default function Home() {
         <div 
           style={{ 
             display: "grid", 
-            // 🟢 VIBE: 2 columns for Baddies (2), 4 columns for Trends (3), 3 for rest.
+            // 🟢 LAYOUT LOGIC
             gridTemplateColumns: 
-              activeTab === 2 ? "repeat(2, 1fr)" : 
+              (activeTab === 1 || activeTab === 2) ? "repeat(2, 1fr)" : 
               activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
-            gap: 1, 
-            padding: "1px" 
+            gap: activeTab === 1 ? 8 : 1,
+            padding: activeTab === 1 ? "8px" : "1px" 
           }}
         >
           {videos.map(video => (
             <VideoCard
               key={`${video.chat_id}:${video.message_id}`}
               video={video}
-              layoutType={activeTab} // Now handles borderRadius and Captions internally
+              layoutType={activeTab} 
               onOpen={() => handleOpenVideo(video)}
             />
           ))}
         </div>
 
-        {/* LOADING SKELETONS */}
+        {/* 🟢 ADAPTIVE LOADING SKELETONS */}
         {loading && videos.length === 0 && (
           <div style={{ 
             display: "grid", 
-            gridTemplateColumns: activeTab === 2 ? "repeat(2, 1fr)" : activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
-            gap: 1, 
-            padding: "1px" 
+            gridTemplateColumns: 
+              (activeTab === 1 || activeTab === 2) ? "repeat(2, 1fr)" : 
+              activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
+            gap: activeTab === 1 ? 8 : 1,
+            padding: activeTab === 1 ? "8px" : "1px" 
           }}>
             {[...Array(12)].map((_, i) => (
-              <div key={i} style={{ aspectRatio: "9/16", background: "#111" }} />
+              <div key={i} style={{ 
+                aspectRatio: activeTab === 1 ? "9/14" : "9/16", 
+                background: "#111",
+                borderRadius: (activeTab === 1 || activeTab === 2) ? "8px" : "0px"
+              }} />
             ))}
           </div>
         )}

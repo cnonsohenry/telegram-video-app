@@ -6,11 +6,11 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
-  // Layout Logic: 0: Hotties, 1: Knacks, 2: Baddies, 3: Trends
-  const isKnacks = layoutType === 1;
-  const isLarge = layoutType === 2;
-  const isCompact = layoutType === 3;
+  const isKnacks = layoutType === 1; // TikTok Explore Vibe
+  const isLarge = layoutType === 2; // Baddies
+  const isCompact = layoutType === 3; // Trends
 
+  // 🟢 Intersection Observer for Autoplay
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -18,11 +18,6 @@ export default function VideoCard({ video, onOpen, layoutType }) {
     const observer = new IntersectionObserver(
       ([entry]) => {
         setIsVisible(entry.isIntersecting);
-        if (entry.isIntersecting) {
-          el.play().catch(() => {});
-        } else {
-          el.pause();
-        }
       },
       { threshold: 0.1 }
     );
@@ -31,110 +26,125 @@ export default function VideoCard({ video, onOpen, layoutType }) {
     return () => observer.disconnect();
   }, []);
 
+  // 🟢 Play/Pause Logic
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    
+    if (isVisible) {
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+      setIsHovered(false); // Reset thumbnail overlay when scrolled away
+    }
+  }, [isVisible]);
+
   return (
     <div
       onClick={() => onOpen(video)}
       style={{
-        position: "relative",
-        width: "100%",
-        aspectRatio: "9 / 16",
-        background: "#111",
+        display: "flex",
+        flexDirection: "column",
+        background: isKnacks ? "#1c1c1e" : "transparent",
+        borderRadius: (isLarge || isKnacks) ? "8px" : "0px",
         overflow: "hidden",
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
-        borderRadius: isLarge ? "12px" : "0px",
-        transform: isLarge ? "scale(0.96)" : "scale(1)", 
-        transition: "transform 0.2s ease"
+        transition: "transform 0.1s active"
       }}
     >
-      <img 
-        src={video.thumbnail_url} 
-        alt=""
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          position: "absolute",
-          inset: 0,
-          zIndex: 1,
-          opacity: isHovered ? 0 : 1,
-          transition: "opacity 0.4s ease-in-out"
-        }}
-      />
-
-      {isVisible && (
+      {/* THUMBNAIL / VIDEO CONTAINER */}
+      <div style={{ 
+        position: "relative", 
+        width: "100%", 
+        aspectRatio: (isKnacks || isLarge) ? "9 / 14" : "9 / 16",
+        background: "#111" 
+      }}>
+        <img 
+          src={video.thumbnail_url} 
+          alt=""
+          style={{
+            width: "100%", height: "100%", objectFit: "cover",
+            position: "absolute", inset: 0, zIndex: 1,
+            opacity: isHovered ? 0 : 1, transition: "opacity 0.4s ease-in-out"
+          }}
+        />
         <video
           ref={videoRef}
           src={video.video_url}
-          muted
-          loop
-          playsInline
-          disablePictureInPicture
+          muted loop playsInline
           onPlaying={() => setIsHovered(true)}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            position: "absolute",
+          style={{ 
+            width: "100%", 
+            height: "100%", 
+            objectFit: "cover", 
+            position: "absolute", 
             inset: 0,
-            zIndex: 0
+            zIndex: 0 
           }}
         />
-      )}
 
-      {/* 🟢 THE OVERLAY LAYER */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          zIndex: 2,
-          // Stronger gradient for Knacks to ensure caption readability
-          background: isKnacks 
-            ? "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 40%, transparent 100%)" 
-            : "linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)",
-          color: "#fff",
-          width: "100%",
-          padding: isLarge ? "12px 10px 8px" : isCompact ? "6px 4px 2px" : "8px 6px 6px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 2,
-          pointerEvents: "none",
-        }}
-      >
-        {/* 🟢 Caption Display (Specific to Knacks) */}
-        {isKnacks && video.caption && (
-          <span style={{
-            fontSize: "10px",
-            fontWeight: "500",
-            lineHeight: "1.2",
-            marginBottom: "4px",
-            display: "-webkit-box",
-            WebkitLineClamp: "2", // Limit to 2 lines
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-            textShadow: "0px 1px 3px rgba(0,0,0,1)"
-          }}>
-            {video.caption}
-          </span>
-        )}
-
-        {/* View Count Row */}
-        <div style={{ display: "flex", alignItems: "center", gap: isCompact ? 2 : 4 }}>
-          <Play 
-            size={isLarge ? 14 : isCompact ? 10 : 12} 
-            strokeWidth={4} 
-            fill="#fff" 
-          /> 
-          <span style={{ 
-            fontSize: isLarge ? "13px" : isCompact ? "9px" : "11px",
-            fontWeight: "700",
-            textShadow: "0px 1px 2px rgba(0,0,0,0.8)" 
-          }}>
-            {video.views ? video.views.toLocaleString() : 0}
-          </span>
+        {/* View Count Overlay */}
+        <div style={{
+          position: "absolute", bottom: 8, left: 8, zIndex: 2,
+          display: "flex", alignItems: "center", gap: 4, color: "#fff",
+          fontSize: "10px", fontWeight: "bold", textShadow: "0 1px 4px rgba(0,0,0,0.8)"
+        }}>
+          <Play size={10} fill="#fff" />
+          {video.views?.toLocaleString() || 0}
         </div>
       </div>
+
+      {/* 🟢 TIKTOK EXPLORE CAPTION SECTION */}
+      {isKnacks && (
+        <div style={{ padding: "10px 8px", background: "#1c1c1e" }}>
+          <p style={{
+            margin: 0,
+            fontSize: "12px",
+            color: "#eee",
+            fontWeight: "400",
+            lineHeight: "1.4",
+            display: "-webkit-box",
+            WebkitLineClamp: "2",
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            minHeight: "34px" // Keeps grid aligned if captions are 1 vs 2 lines
+          }}>
+            {video.caption || "No caption provided..."}
+          </p>
+          
+          <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div style={{ position: "relative", width: 18, height: 18 }}>
+              <img 
+                src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
+                alt=""
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'block';
+                }}
+                style={{ 
+                  width: "100%", 
+                  height: "100%", 
+                  borderRadius: "50%", 
+                  objectFit: "cover",
+                  background: "#333" 
+                }} 
+              />
+              <div style={{ 
+                display: 'none', 
+                width: "100%", 
+                height: "100%", 
+                borderRadius: "50%", 
+                background: "linear-gradient(45deg, #ff0050, #00f2ea)" 
+              }} />
+            </div>
+
+            <span style={{ fontSize: "10px", color: "#8e8e8e", fontWeight: "600" }}>
+              {String(video.uploader_id) === "1881815190" ? "Chief" : "Admin"}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
