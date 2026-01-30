@@ -6,8 +6,6 @@ import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
-const ALLOWED_USERS = [1881815190, 993163169, 5806906139]; 
-
 export default function Home() {
   const [videos, setVideos] = useState([]);
   const [page, setPage] = useState(1);
@@ -15,6 +13,9 @@ export default function Home() {
   const [activeVideo, setActiveVideo] = useState(null);
   const [activeTab, setActiveTab] = useState(0); 
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
+
+  // 🟢 CATEGORY MAPPING: Matches the tab index and backend tags
+  const CATEGORIES = ["hotties", "knacks", "baddies", "trends"];
 
   useEffect(() => {
     expandApp();
@@ -31,9 +32,8 @@ export default function Home() {
     }
   }, []);
 
-  // 🟢 Trigger reset and first page load on tab change
+  // 🟢 Handle Tab Changes
   useEffect(() => {
-    // Only clear videos if we are actually switching tabs to reduce "flicker"
     setVideos([]);
     setPage(1);
     loadVideos(true); 
@@ -44,14 +44,15 @@ export default function Home() {
     setLoading(true);
     
     const pageToFetch = isNewTab ? 1 : page;
+    const currentCategory = CATEGORIES[activeTab];
 
     try {
-      let url = `https://videos.naijahomemade.com/api/videos?page=${pageToFetch}&limit=12`;
+      // 🟢 API FETCH: Now filters by Category instead of Uploader ID
+      let url = `https://videos.naijahomemade.com/api/videos?page=${pageToFetch}&limit=12&category=${currentCategory}`;
       
-      if (activeTab === 3) {
+      // Keep trending sort for the Trends tab
+      if (currentCategory === "trends") {
         url += `&sort=trending`;
-      } else {
-        url += `&uploader_id=${ALLOWED_USERS[activeTab]}`;
       }
 
       const res = await fetch(url);
@@ -101,6 +102,7 @@ export default function Home() {
       );
       const data = await res.json();
       if (data.video_url) {
+        // Optimistic view increment
         setVideos(prev => prev.map(v => 
           (v.chat_id === video.chat_id && v.message_id === video.message_id)
             ? { ...v, views: Number(v.views || 0) + 1 } : v
@@ -115,7 +117,7 @@ export default function Home() {
   return (
     <div style={{ background: "#000", minHeight: "100vh" }}>
       
-      {/* 🟢 STICKY TAB BAR WITH PURE CSS SLIDING LINE */}
+      {/* STICKY TAB BAR */}
       <div style={{ 
         display: "flex", 
         position: "sticky", 
@@ -152,12 +154,12 @@ export default function Home() {
           </button>
         ))}
 
-        {/* 🟢 THE SLIDING INDICATOR: Pure CSS hardware-accelerated movement */}
+        {/* INDICATOR LINE */}
         <div style={{
           position: "absolute",
           bottom: 0,
           left: 0,
-          width: "25%", // 100% / 4 tabs
+          width: "25%",
           height: "2px",
           background: "#fff",
           transform: `translateX(${activeTab * 100}%)`,
@@ -165,38 +167,39 @@ export default function Home() {
         }} />
       </div>
 
-{/* VIDEO GRID SECTION */}
-<div style={{ minHeight: "80vh" }}>
-  <div 
-    style={{ 
-      display: "grid", 
-      // 🟢 Dynamic Grid Logic:
-      // Tab 2 (BADDIES) = 2 columns
-      // Tab 3 (TRENDS) = 4 columns
-      // Others = 3 columns
-      gridTemplateColumns: 
-        activeTab === 2 ? "repeat(2, 1fr)" : 
-        activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
-      gap: 1, 
-      padding: "1px" 
-    }}
-  >
-    {videos.map(video => (
-      <VideoCard
-        key={`${video.chat_id}:${video.message_id}`}
-        video={video}
-        // Pass the activeTab or a specific layout prop
-        layoutType={activeTab} 
-        onOpen={() => handleOpenVideo(video)}
-      />
-    ))}
-  </div>
+      {/* VIDEO GRID SECTION */}
+      <div style={{ minHeight: "80vh" }}>
+        <div 
+          style={{ 
+            display: "grid", 
+            // 🟢 VIBE: 2 columns for Baddies (2), 4 columns for Trends (3), 3 for rest.
+            gridTemplateColumns: 
+              activeTab === 2 ? "repeat(2, 1fr)" : 
+              activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
+            gap: 1, 
+            padding: "1px" 
+          }}
+        >
+          {videos.map(video => (
+            <VideoCard
+              key={`${video.chat_id}:${video.message_id}`}
+              video={video}
+              layoutType={activeTab} // Now handles borderRadius and Captions internally
+              onOpen={() => handleOpenVideo(video)}
+            />
+          ))}
+        </div>
 
-        {/* 🟢 LOADING SKELETONS: Prevents the "Empty Black Screen" look */}
+        {/* LOADING SKELETONS */}
         {loading && videos.length === 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, padding: "1px" }}>
-            {[...Array(9)].map((_, i) => (
-              <div key={i} style={{ aspectRatio: "1/1", background: "#111" }} />
+          <div style={{ 
+            display: "grid", 
+            gridTemplateColumns: activeTab === 2 ? "repeat(2, 1fr)" : activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
+            gap: 1, 
+            padding: "1px" 
+          }}>
+            {[...Array(12)].map((_, i) => (
+              <div key={i} style={{ aspectRatio: "9/16", background: "#111" }} />
             ))}
           </div>
         )}
@@ -205,12 +208,12 @@ export default function Home() {
         {!loading && videos.length === 0 && (
           <div style={{ color: "#333", textAlign: "center", padding: "100px 20px" }}>
             <Grid3X3 size={48} style={{ marginBottom: 10, opacity: 0.2 }} />
-            <p style={{ fontSize: 14, fontWeight: "bold" }}>No Posts Yet</p>
+            <p style={{ fontSize: 14, fontWeight: "bold" }}>No content in this category</p>
           </div>
         )}
       </div>
 
-      {/* VIEW MORE BUTTON */}
+      {/* VIEW MORE */}
       {!loading && videos.length > 0 && (
         <div style={{ textAlign: "center", padding: "30px 10px" }}>
           <button 
