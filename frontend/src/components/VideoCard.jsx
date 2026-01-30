@@ -10,7 +10,12 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   const isLarge = layoutType === 2; // Baddies
   const isCompact = layoutType === 3; // Trends
 
-  // 🟢 Intersection Observer for Autoplay
+  // 🟢 Deterministic height variation for the Masonry look
+  // This uses the message_id to pick a height so it's consistent on every scroll
+  const masonryHeight = isKnacks 
+    ? (parseInt(video.message_id) % 2 === 0 ? "260px" : "320px") 
+    : "auto";
+
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -26,17 +31,14 @@ export default function VideoCard({ video, onOpen, layoutType }) {
     return () => observer.disconnect();
   }, []);
 
-  // 🟢 Play/Pause Logic
   useEffect(() => {
     const el = videoRef.current;
-    if (!el) return;
-    
-    if (isVisible) {
-      el.play().catch(() => {});
-    } else {
+    if (!el || !isVisible) return;
+    el.play().catch(() => {});
+    return () => {
       el.pause();
-      setIsHovered(false); // Reset thumbnail overlay when scrolled away
-    }
+      setIsHovered(false);
+    };
   }, [isVisible]);
 
   return (
@@ -45,19 +47,22 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       style={{
         display: "flex",
         flexDirection: "column",
+        // 🟢 Card background: Caption inherits this color
         background: isKnacks ? "#1c1c1e" : "transparent",
-        borderRadius: (isLarge || isKnacks) ? "8px" : "0px",
+        borderRadius: (isLarge || isKnacks) ? "12px" : "0px",
         overflow: "hidden",
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
-        transition: "transform 0.1s active"
+        marginBottom: isKnacks ? "8px" : "0px", // Gap between staggered cards
       }}
     >
       {/* THUMBNAIL / VIDEO CONTAINER */}
       <div style={{ 
         position: "relative", 
         width: "100%", 
-        aspectRatio: (isKnacks || isLarge) ? "9 / 14" : "9 / 16",
+        // 🟢 Masonry Logic: Knacks uses height, others use AspectRatio
+        height: isKnacks ? masonryHeight : "auto",
+        aspectRatio: isKnacks ? "unset" : (isLarge ? "9 / 14" : "9 / 16"),
         background: "#111" 
       }}>
         <img 
@@ -97,24 +102,23 @@ export default function VideoCard({ video, onOpen, layoutType }) {
 
       {/* 🟢 TIKTOK EXPLORE CAPTION SECTION */}
       {isKnacks && (
-        <div style={{ padding: "10px 8px", background: "#1c1c1e" }}>
+        <div style={{ padding: "10px 10px 12px 10px" }}>
           <p style={{
             margin: 0,
-            fontSize: "12px",
-            color: "#eee",
+            fontSize: "13px",
+            color: "#fff", // TikTok uses bright white for Explore text
             fontWeight: "400",
             lineHeight: "1.4",
             display: "-webkit-box",
             WebkitLineClamp: "2",
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
-            minHeight: "34px" // Keeps grid aligned if captions are 1 vs 2 lines
           }}>
             {video.caption || "No caption provided..."}
           </p>
           
-          <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ position: "relative", width: 18, height: 18 }}>
+          <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ position: "relative", width: 16, height: 16 }}>
               <img 
                 src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
                 alt=""
@@ -126,8 +130,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
                   width: "100%", 
                   height: "100%", 
                   borderRadius: "50%", 
-                  objectFit: "cover",
-                  background: "#333" 
+                  objectFit: "cover"
                 }} 
               />
               <div style={{ 
@@ -135,11 +138,11 @@ export default function VideoCard({ video, onOpen, layoutType }) {
                 width: "100%", 
                 height: "100%", 
                 borderRadius: "50%", 
-                background: "linear-gradient(45deg, #ff0050, #00f2ea)" 
+                background: "#444" 
               }} />
             </div>
 
-            <span style={{ fontSize: "10px", color: "#8e8e8e", fontWeight: "600" }}>
+            <span style={{ fontSize: "11px", color: "#8e8e8e", fontWeight: "500" }}>
               {String(video.uploader_id) === "1881815190" ? "Chief" : "Admin"}
             </span>
           </div>

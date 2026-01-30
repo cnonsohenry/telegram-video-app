@@ -163,27 +163,34 @@ export default function Home() {
       </div>
 
       {/* VIDEO GRID SECTION */}
-      <div style={{ minHeight: "80vh" }}>
-        <div 
-          style={{ 
-            display: "grid", 
-            // 🟢 LAYOUT LOGIC
-            gridTemplateColumns: 
-              (activeTab === 1 || activeTab === 2) ? "repeat(2, 1fr)" : 
-              activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
-            gap: activeTab === 1 ? 8 : 1,
-            padding: activeTab === 1 ? "8px" : "1px" 
-          }}
-        >
-          {videos.map(video => (
-            <VideoCard
-              key={`${video.chat_id}:${video.message_id}`}
-              video={video}
-              layoutType={activeTab} 
-              onOpen={() => handleOpenVideo(video)}
-            />
-          ))}
-        </div>
+<div style={{ minHeight: "80vh", padding: activeTab === 1 ? "8px" : "1px" }}>
+  <div 
+    style={activeTab === 1 ? {
+      /* 🟢 TIKTOK EXPLORE MASONRY LAYOUT */
+      columnCount: 2,
+      columnGap: "8px",
+      width: "100%"
+    } : {
+      /* STANDARD GRID FOR OTHER TABS */
+      display: "grid", 
+      gridTemplateColumns: activeTab === 2 ? "repeat(2, 1fr)" : activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
+      gap: 1
+    }}
+  >
+    {videos.map(video => (
+      <div key={`${video.chat_id}:${video.message_id}`} style={{ 
+        // Prevents cards from breaking across columns
+        breakInside: "avoid", 
+        marginBottom: activeTab === 1 ? "8px" : "0px" 
+      }}>
+        <VideoCard
+          video={video}
+          layoutType={activeTab} 
+          onOpen={() => handleOpenVideo(video)}
+        />
+      </div>
+    ))}
+  </div>
 
         {/* 🟢 ADAPTIVE LOADING SKELETONS */}
         {loading && videos.length === 0 && (
