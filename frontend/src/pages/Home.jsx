@@ -8,7 +8,7 @@ import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function Home() {
   const [videos, setVideos] = useState([]);
-  const [page, setPage] = useState(page);
+  const [page, setPage] = useState(1); // Ensure this is 1, not 'page'
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
   const [activeTab, setActiveTab] = useState(0); 
