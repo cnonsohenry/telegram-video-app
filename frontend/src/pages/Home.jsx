@@ -8,13 +8,12 @@ import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function Home() {
   const [videos, setVideos] = useState([]);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(page);
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
   const [activeTab, setActiveTab] = useState(0); 
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
 
-  // 🟢 CATEGORY MAPPING: Matches tab index
   const CATEGORIES = ["hotties", "knacks", "baddies", "trends"];
 
   useEffect(() => {
@@ -41,27 +40,18 @@ export default function Home() {
   const loadVideos = async (isNewTab = false) => {
     if (loading) return;
     setLoading(true);
-    
     const pageToFetch = isNewTab ? 1 : page;
     const currentCategory = CATEGORIES[activeTab];
-
     try {
       let url = `https://videos.naijahomemade.com/api/videos?page=${pageToFetch}&limit=12&category=${currentCategory}`;
-      
-      if (currentCategory === "trends") {
-        url += `&sort=trending`;
-      }
-
+      if (currentCategory === "trends") url += `&sort=trending`;
       const res = await fetch(url);
       const data = await res.json();
-      
       if (data?.videos) {
         setVideos(prev => {
           const combined = isNewTab ? data.videos : [...prev, ...data.videos];
           const uniqueMap = new Map();
-          combined.forEach(v => {
-            uniqueMap.set(`${v.chat_id}:${v.message_id}`, v);
-          });
+          combined.forEach(v => uniqueMap.set(`${v.chat_id}:${v.message_id}`, v));
           return Array.from(uniqueMap.values());
         });
         setPage(pageToFetch + 1);
@@ -94,15 +84,10 @@ export default function Home() {
 
   const playVideo = async (video) => {
     try {
-      const res = await fetch(
-        `https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`
-      );
+      const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       const data = await res.json();
       if (data.video_url) {
-        setVideos(prev => prev.map(v => 
-          (v.chat_id === video.chat_id && v.message_id === video.message_id)
-            ? { ...v, views: Number(v.views || 0) + 1 } : v
-        ));
+        setVideos(prev => prev.map(v => (v.chat_id === video.chat_id && v.message_id === video.message_id) ? { ...v, views: Number(v.views || 0) + 1 } : v));
         setActiveVideo({ ...video, video_url: data.video_url });
       }
     } catch (e) {
@@ -114,14 +99,7 @@ export default function Home() {
     <div style={{ background: "#000", minHeight: "100vh" }}>
       
       {/* STICKY TAB BAR */}
-      <div style={{ 
-        display: "flex", 
-        position: "sticky", 
-        top: 0, 
-        zIndex: 100, 
-        background: "#000",
-        borderBottom: "1px solid #262626" 
-      }}>
+      <div style={{ display: "flex", position: "sticky", top: 0, zIndex: 100, background: "#000", borderBottom: "1px solid #262626" }}>
         {[
           { icon: <Grid3X3 size={20} />, label: "HOTTIES"},
           { icon: <Play size={20} />, label: "KNACKS"},
@@ -131,77 +109,51 @@ export default function Home() {
           <button
             key={index}
             onClick={() => setActiveTab(index)}
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              padding: "12px 0",
-              background: "none",
-              border: "none",
-              color: activeTab === index ? "#fff" : "#8e8e8e",
-              transition: "color 0.3s ease",
-              cursor: "pointer",
-              WebkitTapHighlightColor: "transparent"
-            }}
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
           >
             {tab.icon}
             <span style={{ fontSize: "8px", marginTop: "4px", fontWeight: "bold" }}>{tab.label}</span>
           </button>
         ))}
-
-        <div style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          width: "25%",
-          height: "2px",
-          background: "#fff",
-          transform: `translateX(${activeTab * 100}%)`,
-          transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-        }} />
+        <div style={{ position: "absolute", bottom: 0, left: 0, width: "25%", height: "2px", background: "#fff", transform: `translateX(${activeTab * 100}%)`, transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }} />
       </div>
 
       {/* VIDEO GRID SECTION */}
-<div style={{ minHeight: "80vh", padding: activeTab === 1 ? "10px" : "1px" }}>
-  <div 
-    style={{ 
-      display: "grid", 
-      // 🟢 Uses 'auto' row sizing to prevent iPhone from squishing the cards
-      gridTemplateColumns: (activeTab === 1 || activeTab === 2) ? "repeat(2, 1fr)" : 
-                           activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
-      gridAutoRows: "min-content",
-      gap: activeTab === 1 ? "12px" : "1px",
-      alignItems: "start" 
-    }}
-  >
-    {videos.map(video => (
-      <VideoCard
-        key={`${video.chat_id}:${video.message_id}`}
-        video={video}
-        layoutType={activeTab} 
-        onOpen={() => handleOpenVideo(video)}
-      />
-    ))}
-  </div>
+      <div style={{ minHeight: "80vh", padding: activeTab === 1 ? "10px" : "1px" }}>
+        
+        {/* THE MAIN GRID */}
+        <div 
+          style={{ 
+            display: "grid", 
+            gridTemplateColumns: (activeTab === 1 || activeTab === 2) ? "repeat(2, 1fr)" : 
+                                 activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
+            gridAutoRows: "min-content",
+            gap: activeTab === 1 ? "12px" : "1px",
+            alignItems: "start" 
+          }}
+        >
+          {videos.map(video => (
+            <VideoCard
+              key={`${video.chat_id}:${video.message_id}`}
+              video={video}
+              layoutType={activeTab} 
+              onOpen={() => handleOpenVideo(video)}
+            />
+          ))}
+        </div> {/* ✅ FIXED: This closing div was missing! */}
 
-
-        {/* 🟢 ADAPTIVE LOADING SKELETONS */}
+        {/* LOADING SKELETONS */}
         {loading && videos.length === 0 && (
           <div style={{ 
             display: "grid", 
-            gridTemplateColumns: 
-              (activeTab === 1 || activeTab === 2) ? "repeat(2, 1fr)" : 
-              activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
+            gridTemplateColumns: (activeTab === 1 || activeTab === 2) ? "repeat(2, 1fr)" : 
+                                 activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
             gap: activeTab === 1 ? 8 : 1,
-            padding: activeTab === 1 ? "8px" : "1px" 
+            padding: activeTab === 1 ? "8px" : "1px",
+            marginTop: "10px"
           }}>
             {[...Array(12)].map((_, i) => (
-              <div key={i} style={{ 
-                aspectRatio: activeTab === 1 ? "9/14" : "9/16", 
-                background: "#111",
-                borderRadius: (activeTab === 1 || activeTab === 2) ? "8px" : "0px"
-              }} />
+              <div key={i} style={{ aspectRatio: activeTab === 1 ? "9/14" : "9/16", background: "#111", borderRadius: (activeTab === 1 || activeTab === 2) ? "8px" : "0px" }} />
             ))}
           </div>
         )}
@@ -220,16 +172,7 @@ export default function Home() {
         <div style={{ textAlign: "center", padding: "30px 10px" }}>
           <button 
             onClick={() => loadVideos(false)} 
-            style={{ 
-              background: "none", 
-              border: "none", 
-              color: "#fff", 
-              cursor: "pointer", 
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              gap: 10
-            }}
+            style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", width: "100%", display: "flex", alignItems: "center", gap: 10 }}
           >
             <div style={{ flex: 1, height: 1, background: "#262626" }} />
             <span style={{ fontSize: 10, fontWeight: "900", letterSpacing: 2 }}>
