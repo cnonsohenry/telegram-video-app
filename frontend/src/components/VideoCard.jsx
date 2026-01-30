@@ -7,10 +7,11 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   const [isVisible, setIsVisible] = useState(false);
 
   const isKnacks = layoutType === 1;
+  const isLarge = layoutType === 2;
 
-  // 🟢 Fixed height for Knacks to ensure Android & iPhone look identical
+  // 🟢 Deterministic heights to keep Android and iPhone consistent
   const cardHeight = isKnacks 
-    ? (parseInt(video.message_id) % 2 === 0 ? "280px" : "320px") 
+    ? (parseInt(video.message_id) % 2 === 0 ? "260px" : "310px") 
     : "auto";
 
   useEffect(() => {
@@ -35,28 +36,27 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         display: "flex",
         flexDirection: "column",
         background: isKnacks ? "#1c1c1e" : "transparent",
-        borderRadius: (layoutType === 1 || layoutType === 2) ? "12px" : "0px",
+        borderRadius: (isKnacks || isLarge) ? "12px" : "0px",
         overflow: "hidden",
         width: "100%",
-        // 🟢 Crucial for iOS: keeps the card as one unit
-        height: "fit-content"
+        height: "fit-content", // Essential for iPhone
       }}
     >
-      {/* MEDIA BOX */}
+      {/* MEDIA CONTAINER */}
       <div style={{ 
         position: "relative", 
         width: "100%", 
         height: isKnacks ? cardHeight : "auto",
-        aspectRatio: isKnacks ? "unset" : (layoutType === 2 ? "9/14" : "9/16"),
-        background: "#000",
-        flexShrink: 0 // Prevents iPhone from squishing the video top
+        aspectRatio: isKnacks ? "unset" : (isLarge ? "9/14" : "9/16"),
+        background: "#111",
+        overflow: "hidden"
       }}>
         <img 
           src={video.thumbnail_url} 
           style={{
-            width: "100%", height: "100%", object_fit: "cover",
-            position: "absolute", zIndex: 1,
-            opacity: isHovered ? 0 : 1, transition: "0.3s"
+            width: "100%", height: "100%", objectFit: "cover",
+            position: "absolute", inset: 0, zIndex: 2, // Layered above video initially
+            opacity: isHovered ? 0 : 1, transition: "opacity 0.4s"
           }}
         />
         <video
@@ -64,31 +64,49 @@ export default function VideoCard({ video, onOpen, layoutType }) {
           src={video.video_url}
           muted loop playsInline
           onPlaying={() => setIsHovered(true)}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          style={{ 
+            width: "100%", height: "100%", objectFit: "cover",
+            position: "absolute", inset: 0, zIndex: 1 
+          }}
         />
+        
+        {/* 🟢 VIEW COUNT OVERLAY - Boosted Z-Index */}
+        <div style={{
+          position: "absolute", 
+          bottom: 10, 
+          left: 10, 
+          zIndex: 10, // Must be higher than the image and video
+          display: "flex", 
+          alignItems: "center", 
+          gap: 4, 
+          color: "#fff",
+          fontSize: "11px", 
+          fontWeight: "800", 
+          textShadow: "0px 1px 8px rgba(0,0,0,1)" // Added heavy shadow for visibility
+        }}>
+          <Play size={12} fill="#fff" strokeWidth={0} />
+          <span>{Number(video.views || 0).toLocaleString()}</span>
+        </div>
       </div>
 
-      {/* CAPTION BOX */}
+      {/* CAPTION SECTION */}
       {isKnacks && (
-        <div style={{ 
-          padding: "10px", 
-          background: "inherit", // Forces inheritance of the #1c1c1e
-          marginTop: "-1px" // Closes tiny browser-rendered gaps
-        }}>
+        <div style={{ padding: "12px 10px", background: "inherit" }}>
           <p style={{
-            margin: 0, fontSize: "12px", color: "#fff",
+            margin: 0, fontSize: "13px", color: "#fff",
             lineHeight: "1.4", display: "-webkit-box",
             WebkitLineClamp: "2", WebkitBoxOrient: "vertical",
-            overflow: "hidden"
+            overflow: "hidden", minHeight: "36px"
           }}>
-            {video.caption || "View more vibes..."}
+            {video.caption || "No caption provided..."}
           </p>
-          <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+          <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
             <img 
               src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
-              style={{ width: 14, height: 14, borderRadius: "50%", objectFit: "cover" }}
+              onError={(e) => { e.target.style.opacity = 0; }}
+              style={{ width: 16, height: 16, borderRadius: "50%", objectFit: "cover", background: "#333" }}
             />
-            <span style={{ fontSize: "10px", color: "#8e8e8e" }}>
+            <span style={{ fontSize: "11px", color: "#8e8e8e", fontWeight: "600" }}>
               {String(video.uploader_id) === "1881815190" ? "Chief" : "Admin"}
             </span>
           </div>
