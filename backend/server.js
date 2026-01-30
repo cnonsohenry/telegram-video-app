@@ -145,7 +145,7 @@ app.get("/api/video", async (req, res) => {
 });
 
 /* =====================
-   List videos (Filtered by Category)
+   List videos (Modified for Trends)
 ===================== */
 app.get("/api/videos", async (req, res) => {
   try {
@@ -156,18 +156,38 @@ app.get("/api/videos", async (req, res) => {
     const category = req.query.category || "hotties";
     const sort = req.query.sort;
 
-    let queryValues = [category, limit, offset];
-    let orderBy = sort === "trending" ? "ORDER BY views DESC" : "ORDER BY created_at DESC";
+    let query;
+    let queryValues;
 
-    const videosRes = await pool.query(
-      `SELECT chat_id, message_id, created_at, views, caption, category, uploader_id
-       FROM videos 
-       WHERE category = $1
-       ${orderBy} LIMIT $2 OFFSET $3`,
-      queryValues
-    );
+    // 🟢 SPECIAL LOGIC FOR TRENDS
+    if (category === "trends") {
+      // Fetch everything, ignore category, sort by views
+      query = `
+        SELECT chat_id, message_id, created_at, views, caption, category, uploader_id
+        FROM videos 
+        ORDER BY views DESC 
+        LIMIT $1 OFFSET $2`;
+      queryValues = [limit, offset];
+    } else {
+      // Standard category filtering
+      query = `
+        SELECT chat_id, message_id, created_at, views, caption, category, uploader_id
+        FROM videos 
+        WHERE category = $1
+        ORDER BY created_at DESC 
+        LIMIT $2 OFFSET $3`;
+      queryValues = [category, limit, offset];
+    }
 
-    const totalRes = await pool.query(`SELECT COUNT(*) FROM videos WHERE category = $1`, [category]);
+    const videosRes = await pool.query(query, queryValues);
+
+    // Count logic needs to match
+    const countQuery = category === "trends" 
+      ? `SELECT COUNT(*) FROM videos` 
+      : `SELECT COUNT(*) FROM videos WHERE category = $1`;
+    const countValues = category === "trends" ? [] : [category];
+    
+    const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
     const baseUrl = req.get("host");
 
@@ -180,7 +200,7 @@ app.get("/api/videos", async (req, res) => {
         message_id: v.message_id,
         views: v.views,
         caption: v.caption,
-        uploader_id: v.uploader_id, // 🟢 FIXED: Now passing this to frontend for avatars
+        uploader_id: v.uploader_id,
         thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
       }))
     });
