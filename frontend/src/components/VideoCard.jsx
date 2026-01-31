@@ -6,11 +6,9 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
-  // Logic uses String names for categories
   const isKnacks = layoutType === 'knacks';
   const isLarge = layoutType === 'baddies';
 
-  // Deterministic heights for the Knacks "Masonry" look
   const cardHeight = isKnacks 
     ? (parseInt(video.message_id) % 2 === 0 ? "260px" : "310px") 
     : "auto";
@@ -37,10 +35,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
     if (!el) return;
 
     if (isVisible) {
-      el.play().catch(() => {
-        // Handle autoplay restrictions (user hasn't interacted with doc yet)
-        console.log("Autoplay blocked");
-      });
+      el.play().catch(() => {});
     } else {
       el.pause();
       setIsHovered(false);
@@ -54,16 +49,27 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         display: "flex",
         flexDirection: "column",
         background: isKnacks ? "#1c1c1e" : "transparent",
-        borderRadius: (isKnacks || isLarge) ? "12px" : "0px",
+        // 🟢 Rounded corners applied to ALL tabs for consistency
+        borderRadius: "12px", 
         overflow: "hidden",
         width: "100%",
         height: "fit-content",
         cursor: "pointer",
-        transition: "transform 0.2s ease-in-out",
+        transition: "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s"
       }}
-      // Simple hover scale effect for desktop
-      onMouseEnter={(e) => { if (window.innerWidth > 1024) e.currentTarget.style.transform = 'scale(1.02)'; }}
-      onMouseLeave={(e) => { if (window.innerWidth > 1024) e.currentTarget.style.transform = 'scale(1)'; }}
+      // 🟢 Consistent Desktop Hover: Slight lift and scale
+      onMouseEnter={(e) => { 
+        if (window.innerWidth > 1024) {
+          e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+          if (!isKnacks) e.currentTarget.style.background = "#0a0a0a";
+        }
+      }}
+      onMouseLeave={(e) => { 
+        if (window.innerWidth > 1024) {
+          e.currentTarget.style.transform = 'translateY(0) scale(1)';
+          if (!isKnacks) e.currentTarget.style.background = "transparent";
+        }
+      }}
     >
       {/* MEDIA CONTAINER */}
       <div style={{ 
@@ -72,6 +78,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         height: isKnacks ? cardHeight : "auto",
         aspectRatio: isKnacks ? "unset" : (isLarge ? "9/14" : "9/16"),
         background: "#111",
+        borderRadius: "12px", // 🟢 Ensure internal rounding matches
         overflow: "hidden"
       }}>
         <img 
