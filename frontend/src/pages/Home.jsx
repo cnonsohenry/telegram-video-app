@@ -111,8 +111,26 @@ export default function Home() {
   return (
     <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
       
-      {/* LEFT NAV SIDEBAR */}
-      <nav style={isDesktop ? { width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 } : { display: "flex", position: "sticky", top: 0, zIndex: 100, background: "#000", borderBottom: "1px solid #262626" }}>
+      {/* LEFT NAV SIDEBAR (Desktop) / STICKY TOP TABS (Mobile) */}
+      <nav style={isDesktop ? { 
+        width: "240px", 
+        height: "100vh", 
+        position: "sticky", 
+        top: 0, 
+        borderRight: "1px solid #262626", 
+        padding: "40px 10px", 
+        display: "flex", 
+        flexDirection: "column", 
+        gap: "10px", 
+        flexShrink: 0 
+      } : { 
+        display: "flex", 
+        position: "sticky", 
+        top: 0, 
+        zIndex: 1000, // 🟢 High Z-Index for Mobile Stability
+        background: "#000", 
+        borderBottom: "1px solid #262626" 
+      }}>
         {TABS.map((tab, index) => (
           <button 
             key={index} 
@@ -123,47 +141,86 @@ export default function Home() {
                 flexDirection: isDesktop ? "row" : "column", 
                 alignItems: "center", 
                 gap: isDesktop ? "15px" : "4px", 
-                padding: "12px 20px", 
+                padding: isDesktop ? "12px 20px" : "12px 0", 
                 background: activeTab === index ? "#1c1c1e" : "transparent", 
-                borderRadius: "10px",
+                borderRadius: isDesktop ? "10px" : "0px",
                 border: "none", 
                 color: activeTab === index ? "#fff" : "#8e8e8e", 
                 cursor: "pointer", 
                 transition: "background 0.2s, color 0.2s" 
             }}
-            onMouseEnter={(e) => { if (isDesktop && activeTab !== index) e.currentTarget.style.background = "#121212"; }}
-            onMouseLeave={(e) => { if (isDesktop && activeTab !== index) e.currentTarget.style.background = "transparent"; }}
           >
             {tab.icon}
             <span style={{ fontSize: isDesktop ? "14px" : "8px", fontWeight: "bold" }}>{tab.label}</span>
           </button>
         ))}
+        {/* Mobile active indicator line */}
+        {!isDesktop && (
+          <div style={{ 
+            position: "absolute", bottom: 0, left: 0, width: "25%", height: "2px", 
+            background: "#fff", transform: `translateX(${activeTab * 100}%)`, transition: "0.3s" 
+          }} />
+        )}
       </nav>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <header style={{ position: "sticky", top: 0, zIndex: 100, height: "70px", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)", borderBottom: "1px solid #262626", padding: isDesktop ? "0 40px" : "0 15px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ userSelect: "none" }}>
-            <h1 style={{ color: "#fff", fontSize: isDesktop ? "24px" : "18px", fontWeight: "900", letterSpacing: "-1px", margin: 0 }}>
-              NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span>
-            </h1>
-          </div>
-          {isDesktop && (
+        
+        {/* 🟢 FIXED: Header is now Desktop-Only to prevent Mobile flickering */}
+        {isDesktop && (
+          <header style={{ 
+            position: "sticky", 
+            top: 0, 
+            zIndex: 100, 
+            height: "70px",
+            background: "rgba(0,0,0,0.85)", 
+            backdropFilter: "blur(20px)", 
+            borderBottom: "1px solid #262626", 
+            padding: "0 40px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }}>
+            <div style={{ userSelect: "none" }}>
+              <h1 style={{ color: "#fff", fontSize: "24px", fontWeight: "900", letterSpacing: "-1px", margin: 0 }}>
+                NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span>
+              </h1>
+            </div>
+
             <div style={{ display: "flex", alignItems: "center", background: "#1c1c1e", borderRadius: "20px", padding: "0 15px", width: "400px", border: "1px solid #333" }}>
               <Search size={18} color="#8e8e8e" />
-              <input type="text" placeholder="Search suggestions..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ background: "none", border: "none", color: "#fff", padding: "10px", width: "100%", outline: "none", fontSize: "14px" }} />
+              <input 
+                type="text" 
+                placeholder="Search suggestions..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                style={{ background: "none", border: "none", color: "#fff", padding: "10px", width: "100%", outline: "none", fontSize: "14px" }} 
+              />
               {searchTerm && <X size={16} color="#8e8e8e" style={{ cursor: "pointer" }} onClick={() => setSearchTerm("")} />}
             </div>
-          )}
-        </header>
+          </header>
+        )}
+
+        {/* 🟢 MOBILE LOGO: Placed above grid content, not sticky, to avoid disrupting tabs */}
+        {!isDesktop && (
+          <div style={{ padding: "15px 10px 5px", textAlign: "center", background: "#000" }}>
+             <h1 style={{ color: "#fff", fontSize: "16px", fontWeight: "900", margin: 0 }}>
+                NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span>
+             </h1>
+          </div>
+        )}
 
         <div style={{ display: "flex", flex: 1 }}>
-          <div style={{ flex: 1, padding: isDesktop ? "40px" : "0px", borderRight: isDesktop ? "1px solid #262626" : "none" }}>
-            <div style={{ minHeight: "80vh", padding: isDesktop ? "0" : (isDetailedLayout ? "10px" : "1px") }}>
+          <div style={{ 
+            flex: 1, 
+            padding: isDesktop ? "40px" : "10px", 
+            borderRight: isDesktop ? "1px solid #262626" : "none" 
+          }}>
+            <div style={{ minHeight: "80vh" }}>
               <div style={{ 
                 display: "grid", 
                 gridTemplateColumns: getGridColumns(), 
                 gridAutoRows: "min-content", 
-                gap: isDesktop ? "20px" : (isDetailedLayout ? "12px" : "1px") // 🟢 Desktop Spacing applied here
+                gap: isDesktop ? "20px" : (isDetailedLayout ? "12px" : "1px") 
               }}>
                 {videos.map(video => (
                   <VideoCard key={`${video.chat_id}:${video.message_id}`} video={video} layoutType={currentCategory} onOpen={() => handleOpenVideo(video)} />
@@ -178,7 +235,19 @@ export default function Home() {
           </div>
 
           {isDesktop && (
-            <aside style={{ width: "380px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", padding: "30px 15px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, overflowY: "auto", borderLeft: "1px solid #262626" }}>
+            <aside style={{ 
+              width: "380px", 
+              height: "calc(100vh - 70px)", 
+              position: "sticky", 
+              top: "70px", 
+              padding: "30px 15px", 
+              display: "flex", 
+              flexDirection: "column", 
+              gap: "10px", 
+              flexShrink: 0, 
+              overflowY: "auto", 
+              borderLeft: "1px solid #262626" 
+            }}>
               <h3 style={{ color: "#fff", fontSize: "16px", fontWeight: "800", margin: "0 0 10px 0" }}>Suggested for you</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {filteredSuggestions.map((v) => (
@@ -186,7 +255,7 @@ export default function Home() {
                     key={`suggested-${v.chat_id}-${v.message_id}`} 
                     onClick={() => handleOpenVideo(v)}
                     style={{ display: "flex", gap: "12px", cursor: "pointer", alignItems: "flex-start", padding: "10px", borderRadius: "10px", transition: "background 0.2s" }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "#1c1c1e"} // 🟢 Sidebar Hover
+                    onMouseEnter={(e) => e.currentTarget.style.background = "#1c1c1e"}
                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                   >
                     <div style={{ width: "80px", height: "100px", borderRadius: "6px", overflow: "hidden", background: "#111", flexShrink: 0 }}>
