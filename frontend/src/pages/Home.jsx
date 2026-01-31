@@ -16,10 +16,20 @@ export default function Home() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [sidebarSuggestions, setSidebarSuggestions] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isMobileSearchVisible, setIsMobileSearchVisible] = useState(false); // 🟢 Toggle for Mobile Search
 
   const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
+
+  // 🟢 Filter Logic: Main grid (Mobile) and Sidebar (Desktop)
+  const filteredVideos = useMemo(() => {
+    if (!searchTerm.trim()) return videos;
+    return videos.filter(v => 
+      v.caption?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      v.uploader_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [videos, searchTerm]);
 
   const filteredSuggestions = useMemo(() => {
     if (!searchTerm.trim()) return sidebarSuggestions;
@@ -111,121 +121,64 @@ export default function Home() {
   return (
     <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
       
-      {/* LEFT NAV SIDEBAR (Desktop) / STICKY TOP TABS (Mobile) */}
-      <nav style={isDesktop ? { 
-        width: "240px", 
-        height: "100vh", 
-        position: "sticky", 
-        top: 0, 
-        borderRight: "1px solid #262626", 
-        padding: "40px 10px", 
-        display: "flex", 
-        flexDirection: "column", 
-        gap: "10px", 
-        flexShrink: 0 
-      } : { 
-        display: "flex", 
-        position: "sticky", 
-        top: 0, 
-        zIndex: 1000, // 🟢 High Z-Index for Mobile Stability
-        background: "#000", 
-        borderBottom: "1px solid #262626" 
-      }}>
+      {/* NAVIGATION */}
+      <nav style={isDesktop ? { width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 } : { display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "#000", borderBottom: "1px solid #262626" }}>
         {TABS.map((tab, index) => (
-          <button 
-            key={index} 
-            onClick={() => setActiveTab(index)} 
-            style={{ 
-                flex: isDesktop ? "none" : 1, 
-                display: "flex", 
-                flexDirection: isDesktop ? "row" : "column", 
-                alignItems: "center", 
-                gap: isDesktop ? "15px" : "4px", 
-                padding: isDesktop ? "12px 20px" : "12px 0", 
-                background: activeTab === index ? "#1c1c1e" : "transparent", 
-                borderRadius: isDesktop ? "10px" : "0px",
-                border: "none", 
-                color: activeTab === index ? "#fff" : "#8e8e8e", 
-                cursor: "pointer", 
-                transition: "background 0.2s, color 0.2s" 
-            }}
-          >
+          <button key={index} onClick={() => setActiveTab(index)} style={{ flex: isDesktop ? "none" : 1, display: "flex", flexDirection: isDesktop ? "row" : "column", alignItems: "center", gap: isDesktop ? "15px" : "4px", padding: isDesktop ? "12px 20px" : "12px 0", background: activeTab === index ? "#1c1c1e" : "transparent", borderRadius: isDesktop ? "10px" : "0px", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", cursor: "pointer", transition: "0.2s" }}>
             {tab.icon}
             <span style={{ fontSize: isDesktop ? "14px" : "8px", fontWeight: "bold" }}>{tab.label}</span>
           </button>
         ))}
-        {/* Mobile active indicator line */}
         {!isDesktop && (
-          <div style={{ 
-            position: "absolute", bottom: 0, left: 0, width: "25%", height: "2px", 
-            background: "#fff", transform: `translateX(${activeTab * 100}%)`, transition: "0.3s" 
-          }} />
+          <div style={{ position: "absolute", bottom: 0, left: 0, width: "25%", height: "2px", background: "#fff", transform: `translateX(${activeTab * 100}%)`, transition: "0.3s" }} />
         )}
       </nav>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         
-        {/* 🟢 FIXED: Header is now Desktop-Only to prevent Mobile flickering */}
+        {/* DESKTOP HEADER */}
         {isDesktop && (
-          <header style={{ 
-            position: "sticky", 
-            top: 0, 
-            zIndex: 100, 
-            height: "70px",
-            background: "rgba(0,0,0,0.85)", 
-            backdropFilter: "blur(20px)", 
-            borderBottom: "1px solid #262626", 
-            padding: "0 40px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between"
-          }}>
-            <div style={{ userSelect: "none" }}>
-              <h1 style={{ color: "#fff", fontSize: "24px", fontWeight: "900", letterSpacing: "-1px", margin: 0 }}>
-                NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span>
-              </h1>
-            </div>
-
+          <header style={{ position: "sticky", top: 0, zIndex: 100, height: "70px", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)", borderBottom: "1px solid #262626", padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ userSelect: "none" }}><h1 style={{ color: "#fff", fontSize: "24px", fontWeight: "900", letterSpacing: "-1px", margin: 0 }}>NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span></h1></div>
             <div style={{ display: "flex", alignItems: "center", background: "#1c1c1e", borderRadius: "20px", padding: "0 15px", width: "400px", border: "1px solid #333" }}>
-              <Search size={18} color="#8e8e8e" />
-              <input 
-                type="text" 
-                placeholder="Search suggestions..." 
-                value={searchTerm} 
-                onChange={(e) => setSearchTerm(e.target.value)} 
-                style={{ background: "none", border: "none", color: "#fff", padding: "10px", width: "100%", outline: "none", fontSize: "14px" }} 
-              />
+              <Search size={18} color="#8e8e8e" /><input type="text" placeholder="Search suggestions..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ background: "none", border: "none", color: "#fff", padding: "10px", width: "100%", outline: "none", fontSize: "14px" }} />
               {searchTerm && <X size={16} color="#8e8e8e" style={{ cursor: "pointer" }} onClick={() => setSearchTerm("")} />}
             </div>
           </header>
         )}
 
-        {/* 🟢 MOBILE LOGO: Placed above grid content, not sticky, to avoid disrupting tabs */}
+        {/* 🟢 MOBILE SEARCH & BRANDING */}
         {!isDesktop && (
-          <div style={{ padding: "15px 10px 5px", textAlign: "center", background: "#000" }}>
-             <h1 style={{ color: "#fff", fontSize: "16px", fontWeight: "900", margin: 0 }}>
-                NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span>
-             </h1>
+          <div style={{ padding: "15px 15px 10px", display: "flex", alignItems: "center", background: "#000", minHeight: "50px", position: "relative" }}>
+            {isMobileSearchVisible ? (
+              <div style={{ display: "flex", alignItems: "center", flex: 1, background: "#1c1c1e", borderRadius: "8px", padding: "0 10px" }}>
+                <Search size={16} color="#8e8e8e" />
+                <input autoFocus type="text" placeholder="Search grid..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ background: "none", border: "none", color: "#fff", padding: "10px", width: "100%", outline: "none", fontSize: "14px" }} />
+                <X size={18} color="#8e8e8e" onClick={() => { setIsMobileSearchVisible(false); setSearchTerm(""); }} />
+              </div>
+            ) : (
+              <>
+                <Search size={20} color="#fff" onClick={() => setIsMobileSearchVisible(true)} style={{ cursor: "pointer", zIndex: 10 }} />
+                <h1 style={{ color: "#fff", fontSize: "16px", fontWeight: "900", margin: 0, position: "absolute", left: "50%", transform: "translateX(-50%)", pointerEvents: "none" }}>
+                  NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span>
+                </h1>
+              </>
+            )}
           </div>
         )}
 
         <div style={{ display: "flex", flex: 1 }}>
-          <div style={{ 
-            flex: 1, 
-            padding: isDesktop ? "40px" : "10px", 
-            borderRight: isDesktop ? "1px solid #262626" : "none" 
-          }}>
+          <div style={{ flex: 1, padding: isDesktop ? "40px" : "10px", borderRight: isDesktop ? "1px solid #262626" : "none" }}>
             <div style={{ minHeight: "80vh" }}>
-              <div style={{ 
-                display: "grid", 
-                gridTemplateColumns: getGridColumns(), 
-                gridAutoRows: "min-content", 
-                gap: isDesktop ? "20px" : (isDetailedLayout ? "12px" : "1px") 
-              }}>
-                {videos.map(video => (
+              <div style={{ display: "grid", gridTemplateColumns: getGridColumns(), gridAutoRows: "min-content", gap: isDesktop ? "20px" : (isDetailedLayout ? "12px" : "1px") }}>
+                {/* 🟢 Mapping filteredVideos here */}
+                {filteredVideos.map(video => (
                   <VideoCard key={`${video.chat_id}:${video.message_id}`} video={video} layoutType={currentCategory} onOpen={() => handleOpenVideo(video)} />
                 ))}
               </div>
+              {filteredVideos.length === 0 && searchTerm && (
+                <div style={{ color: "#8e8e8e", textAlign: "center", marginTop: "40px", fontSize: "14px" }}>No results found for "{searchTerm}"</div>
+              )}
             </div>
             {!loading && videos.length > 0 && (
               <div style={{ textAlign: "center", padding: "40px 10px" }}>
@@ -234,39 +187,17 @@ export default function Home() {
             )}
           </div>
 
+          {/* SIDEBAR */}
           {isDesktop && (
-            <aside style={{ 
-              width: "380px", 
-              height: "calc(100vh - 70px)", 
-              position: "sticky", 
-              top: "70px", 
-              padding: "30px 15px", 
-              display: "flex", 
-              flexDirection: "column", 
-              gap: "10px", 
-              flexShrink: 0, 
-              overflowY: "auto", 
-              borderLeft: "1px solid #262626" 
-            }}>
+            <aside style={{ width: "380px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", padding: "30px 15px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, overflowY: "auto", borderLeft: "1px solid #262626" }}>
               <h3 style={{ color: "#fff", fontSize: "16px", fontWeight: "800", margin: "0 0 10px 0" }}>Suggested for you</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {filteredSuggestions.map((v) => (
-                  <div 
-                    key={`suggested-${v.chat_id}-${v.message_id}`} 
-                    onClick={() => handleOpenVideo(v)}
-                    style={{ display: "flex", gap: "12px", cursor: "pointer", alignItems: "flex-start", padding: "10px", borderRadius: "10px", transition: "background 0.2s" }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "#1c1c1e"}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                  >
-                    <div style={{ width: "80px", height: "100px", borderRadius: "6px", overflow: "hidden", background: "#111", flexShrink: 0 }}>
-                      <img src={v.thumbnail_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" />
-                    </div>
+                  <div key={`suggested-${v.chat_id}-${v.message_id}`} onClick={() => handleOpenVideo(v)} style={{ display: "flex", gap: "12px", cursor: "pointer", alignItems: "flex-start", padding: "10px", borderRadius: "10px", transition: "0.2s" }} onMouseEnter={(e) => e.currentTarget.style.background = "#1c1c1e"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                    <div style={{ width: "80px", height: "100px", borderRadius: "6px", overflow: "hidden", background: "#111", flexShrink: 0 }}><img src={v.thumbnail_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /></div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ color: "#fff", fontSize: "13px", fontWeight: "600", margin: "0 0 4px 0", lineHeight: "1.4", wordWrap: "break-word" }}>{v.caption || "View trending video..."}</p>
-                      <div style={{ color: "#8e8e8e", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <Play size={10} fill="#8e8e8e" strokeWidth={0} />
-                        <span>{Number(v.views).toLocaleString()} views</span>
-                      </div>
+                      <div style={{ color: "#8e8e8e", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}><Play size={10} fill="#8e8e8e" strokeWidth={0} /><span>{Number(v.views).toLocaleString()} views</span></div>
                       <div style={{ color: "#555", fontSize: "11px", fontWeight: "700", marginTop: "4px" }}>@{v.uploader_name || "Member"}</div>
                     </div>
                   </div>
