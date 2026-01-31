@@ -16,13 +16,12 @@ export default function Home() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [sidebarSuggestions, setSidebarSuggestions] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isMobileSearchVisible, setIsMobileSearchVisible] = useState(false); // 🟢 Toggle for Mobile Search
+  const [isMobileSearchVisible, setIsMobileSearchVisible] = useState(false);
 
   const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
 
-  // 🟢 Filter Logic: Main grid (Mobile) and Sidebar (Desktop)
   const filteredVideos = useMemo(() => {
     if (!searchTerm.trim()) return videos;
     return videos.filter(v => 
@@ -122,7 +121,11 @@ export default function Home() {
     <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
       
       {/* NAVIGATION */}
-      <nav style={isDesktop ? { width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 } : { display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "#000", borderBottom: "1px solid #262626" }}>
+      <nav style={isDesktop ? { 
+        width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 
+      } : { 
+        display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "#000", borderBottom: "1px solid #262626" 
+      }}>
         {TABS.map((tab, index) => (
           <button key={index} onClick={() => setActiveTab(index)} style={{ flex: isDesktop ? "none" : 1, display: "flex", flexDirection: isDesktop ? "row" : "column", alignItems: "center", gap: isDesktop ? "15px" : "4px", padding: isDesktop ? "12px 20px" : "12px 0", background: activeTab === index ? "#1c1c1e" : "transparent", borderRadius: isDesktop ? "10px" : "0px", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", cursor: "pointer", transition: "0.2s" }}>
             {tab.icon}
@@ -147,9 +150,16 @@ export default function Home() {
           </header>
         )}
 
-        {/* 🟢 MOBILE SEARCH & BRANDING */}
+        {/* 🟢 MOBILE SEARCH & BRANDING (Updated Layout) */}
         {!isDesktop && (
-          <div style={{ padding: "15px 15px 10px", display: "flex", alignItems: "center", background: "#000", minHeight: "50px", position: "relative" }}>
+          <div style={{ 
+            padding: "15px 15px 10px", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "space-between", // 🟢 Spreads Logo and Search to extremes
+            background: "#000", 
+            minHeight: "50px" 
+          }}>
             {isMobileSearchVisible ? (
               <div style={{ display: "flex", alignItems: "center", flex: 1, background: "#1c1c1e", borderRadius: "8px", padding: "0 10px" }}>
                 <Search size={16} color="#8e8e8e" />
@@ -158,10 +168,17 @@ export default function Home() {
               </div>
             ) : (
               <>
-                <Search size={20} color="#fff" onClick={() => setIsMobileSearchVisible(true)} style={{ cursor: "pointer", zIndex: 10 }} />
-                <h1 style={{ color: "#fff", fontSize: "16px", fontWeight: "900", margin: 0, position: "absolute", left: "50%", transform: "translateX(-50%)", pointerEvents: "none" }}>
+                {/* 🟢 Logo on the extreme left */}
+                <h1 style={{ color: "#fff", fontSize: "18px", fontWeight: "900", margin: 0 }}>
                   NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span>
                 </h1>
+                {/* 🟢 Search Icon on the extreme right */}
+                <Search 
+                  size={22} 
+                  color="#fff" 
+                  onClick={() => setIsMobileSearchVisible(true)} 
+                  style={{ cursor: "pointer" }} 
+                />
               </>
             )}
           </div>
@@ -171,7 +188,6 @@ export default function Home() {
           <div style={{ flex: 1, padding: isDesktop ? "40px" : "10px", borderRight: isDesktop ? "1px solid #262626" : "none" }}>
             <div style={{ minHeight: "80vh" }}>
               <div style={{ display: "grid", gridTemplateColumns: getGridColumns(), gridAutoRows: "min-content", gap: isDesktop ? "20px" : (isDetailedLayout ? "12px" : "1px") }}>
-                {/* 🟢 Mapping filteredVideos here */}
                 {filteredVideos.map(video => (
                   <VideoCard key={`${video.chat_id}:${video.message_id}`} video={video} layoutType={currentCategory} onOpen={() => handleOpenVideo(video)} />
                 ))}
