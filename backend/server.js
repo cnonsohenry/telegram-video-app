@@ -189,7 +189,11 @@ app.get("/api/videos", async (req, res) => {
     
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
-    const baseUrl = req.get("host");
+    // Inside your /api/videos route in server.js
+const host = req.get('host');
+// If host contains 'localhost', use http. Otherwise, use https.
+const protocol = host.includes('localhost') ? 'http' : 'https';
+const baseUrl = `${protocol}://${host}`;
 
     res.json({
       page,
@@ -201,7 +205,7 @@ app.get("/api/videos", async (req, res) => {
         views: v.views,
         caption: v.caption,
         uploader_id: v.uploader_id,
-        thumbnail_url: `https://${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
+        thumbnail_url: `${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
       }))
     });
   } catch (err) {

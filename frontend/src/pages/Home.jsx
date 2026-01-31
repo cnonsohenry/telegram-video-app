@@ -15,7 +15,6 @@ export default function Home() {
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
 
   const CATEGORIES = ["hotties", "knacks", "baddies", "trends"];
-  const baseUrl = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     expandApp();
@@ -44,7 +43,7 @@ export default function Home() {
     const pageToFetch = isNewTab ? 1 : page;
     const currentCategory = CATEGORIES[activeTab];
     try {
-      let url = `${baseUrl}/api/videos?page=${pageToFetch}&limit=16&category=${currentCategory}`;
+      let url = `https://videos.naijahomemade.com/api/videos?page=${pageToFetch}&limit=12&category=${currentCategory}`;
       if (currentCategory === "trends") url += `&sort=trending`;
       const res = await fetch(url);
       const data = await res.json();
@@ -85,7 +84,7 @@ export default function Home() {
 
   const playVideo = async (video) => {
     try {
-      const res = await fetch(`${baseUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+      const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       const data = await res.json();
       if (data.video_url) {
         setVideos(prev => prev.map(v => (v.chat_id === video.chat_id && v.message_id === video.message_id) ? { ...v, views: Number(v.views || 0) + 1 } : v));

@@ -102,7 +102,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
           </p>
           <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
             <img 
-              src={`${baseUrl}/api/avatar?user_id=${video.uploader_id}`}
+              src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
               onError={(e) => { e.target.style.opacity = 0; }}
               style={{ width: 16, height: 16, borderRadius: "50%", objectFit: "cover", background: "#333" }}
             />
