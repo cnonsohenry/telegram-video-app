@@ -27,12 +27,23 @@ const pool = new Pool({
 });
 
 /* =====================
-   Create/Update Table
+   Create/Update Tables
 ===================== */
 async function initDatabase() {
   let retries = 5;
   while (retries) {
     try {
+      // 1. Create Users Table First
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          user_id BIGINT PRIMARY KEY,
+          username TEXT,
+          full_name TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // 2. Create Videos Table
       await pool.query(`
         CREATE TABLE IF NOT EXISTS videos (
           id SERIAL PRIMARY KEY,
@@ -40,7 +51,7 @@ async function initDatabase() {
           message_id TEXT NOT NULL,
           file_id TEXT NOT NULL,
           thumb_file_id TEXT,
-          uploader_id BIGINT,
+          uploader_id BIGINT REFERENCES users(user_id),
           category TEXT DEFAULT 'hotties',
           caption TEXT,
           views BIGINT DEFAULT 0,
@@ -48,7 +59,7 @@ async function initDatabase() {
           UNIQUE(chat_id, message_id)
         )
       `);
-      console.log("✅ Database initialized");
+      console.log("✅ Database initialized (Users & Videos)");
       break;
     } catch (err) {
       retries--;
@@ -67,7 +78,7 @@ function signWorkerUrl(filePath) {
 }
 
 /* =====================
-   Webhook (The Traffic Controller)
+   Webhook (Saves User & Video)
 ===================== */
 app.post("/webhook", async (req, res) => {
   try {
@@ -77,6 +88,18 @@ app.post("/webhook", async (req, res) => {
 
     const userId = message.from?.id;
     if (!userId || !ALLOWED_USERS.includes(userId)) return res.sendStatus(200); 
+
+    // 🟢 NEW: Capture/Update User details from the message
+    const username = message.from.username || null;
+    const fullName = message.from.first_name || 'Member';
+
+    await pool.query(
+      `INSERT INTO users (user_id, username, full_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) 
+       DO UPDATE SET username = EXCLUDED.username, full_name = EXCLUDED.full_name`,
+      [userId, username, fullName]
+    );
 
     const media = message.video || 
                   (message.document && message.document.mime_type?.startsWith("video/")) || 
@@ -145,7 +168,7 @@ app.get("/api/video", async (req, res) => {
 });
 
 /* =====================
-   List videos (Modified for Trends)
+   List videos (Modified with JOIN)
 ===================== */
 app.get("/api/videos", async (req, res) => {
   try {
@@ -154,46 +177,41 @@ app.get("/api/videos", async (req, res) => {
     const offset = (page - 1) * limit;
     
     const category = req.query.category || "hotties";
-    const sort = req.query.sort;
+    const host = req.get('host');
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const baseUrl = `${protocol}://${host}`;
 
     let query;
     let queryValues;
 
-    // 🟢 SPECIAL LOGIC FOR TRENDS
+    // 🟢 UPDATED SQL: Includes LEFT JOIN with users table
     if (category === "trends") {
-      // Fetch everything, ignore category, sort by views
       query = `
-        SELECT chat_id, message_id, created_at, views, caption, category, uploader_id
-        FROM videos 
-        ORDER BY views DESC 
+        SELECT v.*, u.username as uploader_name
+        FROM videos v
+        LEFT JOIN users u ON v.uploader_id = u.user_id
+        ORDER BY v.views DESC 
         LIMIT $1 OFFSET $2`;
       queryValues = [limit, offset];
     } else {
-      // Standard category filtering
       query = `
-        SELECT chat_id, message_id, created_at, views, caption, category, uploader_id
-        FROM videos 
-        WHERE category = $1
-        ORDER BY created_at DESC 
+        SELECT v.*, u.username as uploader_name
+        FROM videos v
+        LEFT JOIN users u ON v.uploader_id = u.user_id
+        WHERE v.category = $1
+        ORDER BY v.created_at DESC 
         LIMIT $2 OFFSET $3`;
       queryValues = [category, limit, offset];
     }
 
     const videosRes = await pool.query(query, queryValues);
-
-    // Count logic needs to match
+    
     const countQuery = category === "trends" 
       ? `SELECT COUNT(*) FROM videos` 
       : `SELECT COUNT(*) FROM videos WHERE category = $1`;
     const countValues = category === "trends" ? [] : [category];
-    
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
-    // Inside your /api/videos route in server.js
-const host = req.get('host');
-// If host contains 'localhost', use http. Otherwise, use https.
-const protocol = host.includes('localhost') ? 'http' : 'https';
-const baseUrl = `${protocol}://${host}`;
 
     res.json({
       page,
@@ -205,6 +223,7 @@ const baseUrl = `${protocol}://${host}`;
         views: v.views,
         caption: v.caption,
         uploader_id: v.uploader_id,
+        uploader_name: v.uploader_name || "Member", // 🟢 Now dynamic!
         thumbnail_url: `${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
       }))
     });
@@ -239,7 +258,7 @@ app.get("/api/thumbnail", async (req, res) => {
 });
 
 /* =====================
-   User Profile Photo (Avatar Proxy)
+   User Profile Photo
 ===================== */
 app.get("/api/avatar", async (req, res) => {
   try {
@@ -253,20 +272,16 @@ app.get("/api/avatar", async (req, res) => {
     const photos = photosRes.data.result.photos;
     if (!photos || photos.length === 0) return res.status(204).end();
 
-    // Grab the smallest version (index 0) of the first photo set
     const fileId = photos[0][0].file_id;
     const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId } });
-    const filePath = fileRes.data.result.file_path;
-
-    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${filePath}`, { responseType: "arraybuffer" });
-    const buffer = Buffer.from(imageRes.data);
-
+    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
+    
     res.set({
       "Content-Type": "image/jpeg",
       "Cache-Control": "public, max-age=86400", 
       "Access-Control-Allow-Origin": "*"
     });
-    res.send(buffer);
+    res.send(Buffer.from(imageRes.data));
   } catch (err) {
     res.status(500).end();
   }

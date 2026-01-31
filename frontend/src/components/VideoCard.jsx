@@ -6,10 +6,11 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
-  const isKnacks = layoutType === 1;
-  const isLarge = layoutType === 2;
+  // 🟢 Logic now uses String names (passed from Home.jsx)
+  const isKnacks = layoutType === 'knacks';
+  const isLarge = layoutType === 'baddies';
 
-  // 🟢 Deterministic heights to keep Android and iPhone consistent
+  // Deterministic heights for the Knacks "Masonry" look
   const cardHeight = isKnacks 
     ? (parseInt(video.message_id) % 2 === 0 ? "260px" : "310px") 
     : "auto";
@@ -39,7 +40,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         borderRadius: (isKnacks || isLarge) ? "12px" : "0px",
         overflow: "hidden",
         width: "100%",
-        height: "fit-content", // Essential for iPhone
+        height: "fit-content",
       }}
     >
       {/* MEDIA CONTAINER */}
@@ -55,7 +56,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
           src={video.thumbnail_url} 
           style={{
             width: "100%", height: "100%", objectFit: "cover",
-            position: "absolute", inset: 0, zIndex: 2, // Layered above video initially
+            position: "absolute", inset: 0, zIndex: 2,
             opacity: isHovered ? 0 : 1, transition: "opacity 0.4s"
           }}
         />
@@ -70,19 +71,11 @@ export default function VideoCard({ video, onOpen, layoutType }) {
           }}
         />
         
-        {/* 🟢 VIEW COUNT OVERLAY - Boosted Z-Index */}
+        {/* VIEW COUNT OVERLAY */}
         <div style={{
-          position: "absolute", 
-          bottom: 10, 
-          left: 10, 
-          zIndex: 10, // Must be higher than the image and video
-          display: "flex", 
-          alignItems: "center", 
-          gap: 4, 
-          color: "#fff",
-          fontSize: "11px", 
-          fontWeight: "800", 
-          textShadow: "0px 1px 8px rgba(0,0,0,1)" // Added heavy shadow for visibility
+          position: "absolute", bottom: 10, left: 10, zIndex: 10, 
+          display: "flex", alignItems: "center", gap: 4, color: "#fff",
+          fontSize: "11px", fontWeight: "800", textShadow: "0px 1px 8px rgba(0,0,0,1)"
         }}>
           <Play size={12} fill="#fff" strokeWidth={0} />
           <span>{Number(video.views || 0).toLocaleString()}</span>
@@ -90,7 +83,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       </div>
 
       {/* CAPTION SECTION */}
-      {isKnacks && (
+      {(isKnacks || isLarge) && (
         <div style={{ padding: "12px 10px", background: "inherit" }}>
           <p style={{
             margin: 0, fontSize: "13px", color: "#fff",
@@ -106,8 +99,9 @@ export default function VideoCard({ video, onOpen, layoutType }) {
               onError={(e) => { e.target.style.opacity = 0; }}
               style={{ width: 16, height: 16, borderRadius: "50%", objectFit: "cover", background: "#333" }}
             />
+            {/* 🟢 DYNAMIC USERNAME: No more hardcoded "Chief" */}
             <span style={{ fontSize: "11px", color: "#8e8e8e", fontWeight: "600" }}>
-              {String(video.uploader_id) === "1881815190" ? "Chief" : "Admin"}
+              @{video.uploader_name || video.uploader_id || "Member"}
             </span>
           </div>
         </div>

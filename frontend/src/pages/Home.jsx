@@ -8,13 +8,17 @@ import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function Home() {
   const [videos, setVideos] = useState([]);
-  const [page, setPage] = useState(1); // Ensure this is 1, not 'page'
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null);
   const [activeTab, setActiveTab] = useState(0); 
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
 
-  const CATEGORIES = ["hotties", "knacks", "baddies", "trends"];
+  // KNACKS is the first tab (Index 0)
+  const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
+  
+  // 🟢 Helper to get the current string name (e.g., 'knacks')
+  const currentCategory = CATEGORIES[activeTab];
 
   useEffect(() => {
     expandApp();
@@ -41,7 +45,6 @@ export default function Home() {
     if (loading) return;
     setLoading(true);
     const pageToFetch = isNewTab ? 1 : page;
-    const currentCategory = CATEGORIES[activeTab];
     try {
       let url = `https://videos.naijahomemade.com/api/videos?page=${pageToFetch}&limit=12&category=${currentCategory}`;
       if (currentCategory === "trends") url += `&sort=trending`;
@@ -95,14 +98,17 @@ export default function Home() {
     }
   };
 
+  // 🟢 Logic for which categories use the Large/Caption layout
+  const isDetailedLayout = currentCategory === "knacks" || currentCategory === "baddies";
+
   return (
     <div style={{ background: "#000", minHeight: "100vh" }}>
       
       {/* STICKY TAB BAR */}
       <div style={{ display: "flex", position: "sticky", top: 0, zIndex: 100, background: "#000", borderBottom: "1px solid #262626" }}>
         {[
-          { icon: <Grid3X3 size={20} />, label: "HOTTIES"},
           { icon: <Play size={20} />, label: "KNACKS"},
+          { icon: <Grid3X3 size={20} />, label: "HOTTIES"},
           { icon: <User size={20} />, label: "BADDIES"},
           { icon: <Flame size={20} />, label: "TRENDS"}
         ].map((tab, index) => (
@@ -119,16 +125,15 @@ export default function Home() {
       </div>
 
       {/* VIDEO GRID SECTION */}
-      <div style={{ minHeight: "80vh", padding: activeTab === 1 ? "10px" : "1px" }}>
+      <div style={{ minHeight: "80vh", padding: isDetailedLayout ? "10px" : "1px" }}>
         
-        {/* THE MAIN GRID */}
         <div 
           style={{ 
             display: "grid", 
-            gridTemplateColumns: (activeTab === 1 || activeTab === 2) ? "repeat(2, 1fr)" : 
-                                 activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
+            gridTemplateColumns: isDetailedLayout ? "repeat(2, 1fr)" : 
+                                 currentCategory === "trends" ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
             gridAutoRows: "min-content",
-            gap: activeTab === 1 ? "12px" : "1px",
+            gap: isDetailedLayout ? "12px" : "1px",
             alignItems: "start" 
           }}
         >
@@ -136,28 +141,29 @@ export default function Home() {
             <VideoCard
               key={`${video.chat_id}:${video.message_id}`}
               video={video}
-              layoutType={activeTab} 
+              // 🟢 PASSING STRING NAME INSTEAD OF INDEX
+              layoutType={currentCategory} 
               onOpen={() => handleOpenVideo(video)}
             />
           ))}
-        </div> {/* ✅ FIXED: This closing div was missing! */}
+        </div>
 
         {/* LOADING SKELETONS */}
         {loading && videos.length === 0 && (
           <div style={{ 
             display: "grid", 
-            gridTemplateColumns: (activeTab === 1 || activeTab === 2) ? "repeat(2, 1fr)" : 
-                                 activeTab === 3 ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
-            gap: activeTab === 1 ? 8 : 1,
-            padding: activeTab === 1 ? "8px" : "1px",
+            gridTemplateColumns: isDetailedLayout ? "repeat(2, 1fr)" : 
+                                 currentCategory === "trends" ? "repeat(4, 1fr)" : "repeat(3, 1fr)", 
+            gap: isDetailedLayout ? 8 : 1,
+            padding: isDetailedLayout ? "8px" : "1px",
             marginTop: "10px"
           }}>
             {[...Array(12)].map((_, i) => (
-              <div key={i} style={{ aspectRatio: activeTab === 1 ? "9/14" : "9/16", background: "#111", borderRadius: (activeTab === 1 || activeTab === 2) ? "8px" : "0px" }} />
+              <div key={i} style={{ aspectRatio: isDetailedLayout ? "9/14" : "9/16", background: "#111", borderRadius: isDetailedLayout ? "8px" : "0px" }} />
             ))}
           </div>
         )}
-
+        
         {/* EMPTY STATE */}
         {!loading && videos.length === 0 && (
           <div style={{ color: "#333", textAlign: "center", padding: "100px 20px" }}>
@@ -170,22 +176,15 @@ export default function Home() {
       {/* VIEW MORE */}
       {!loading && videos.length > 0 && (
         <div style={{ textAlign: "center", padding: "30px 10px" }}>
-          <button 
-            onClick={() => loadVideos(false)} 
-            style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", width: "100%", display: "flex", alignItems: "center", gap: 10 }}
-          >
+          <button onClick={() => loadVideos(false)} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", width: "100%", display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1, height: 1, background: "#262626" }} />
-            <span style={{ fontSize: 10, fontWeight: "900", letterSpacing: 2 }}>
-              {loading ? "LOADING..." : "VIEW MORE"}
-            </span>
+            <span style={{ fontSize: 10, fontWeight: "900", letterSpacing: 2 }}>{loading ? "LOADING..." : "VIEW MORE"}</span>
             <div style={{ flex: 1, height: 1, background: "#262626" }} />
           </button>
         </div>
       )}
 
-      {activeVideo && (
-        <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} />
-      )}
+      {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} />}
     </div>
   );
 }
