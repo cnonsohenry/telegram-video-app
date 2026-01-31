@@ -33,7 +33,6 @@ async function initDatabase() {
   let retries = 5;
   while (retries) {
     try {
-      // 1. Create Users Table First
       await pool.query(`
         CREATE TABLE IF NOT EXISTS users (
           user_id BIGINT PRIMARY KEY,
@@ -43,7 +42,6 @@ async function initDatabase() {
         )
       `);
 
-      // 2. Create Videos Table
       await pool.query(`
         CREATE TABLE IF NOT EXISTS videos (
           id SERIAL PRIMARY KEY,
@@ -89,7 +87,6 @@ app.post("/webhook", async (req, res) => {
     const userId = message.from?.id;
     if (!userId || !ALLOWED_USERS.includes(userId)) return res.sendStatus(200); 
 
-    // 🟢 NEW: Capture/Update User details from the message
     const username = message.from.username || null;
     const fullName = message.from.first_name || 'Member';
 
@@ -168,64 +165,68 @@ app.get("/api/video", async (req, res) => {
 });
 
 /* =====================
-   List videos (Modified with JOIN)
+   List videos (With Bundled Suggestions)
 ===================== */
 app.get("/api/videos", async (req, res) => {
   try {
     const page = Number(req.query.page || 1);
     const limit = Number(req.query.limit || 12);
     const offset = (page - 1) * limit;
-    
     const category = req.query.category || "hotties";
+    
     const host = req.get('host');
     const protocol = host.includes('localhost') ? 'http' : 'https';
     const baseUrl = `${protocol}://${host}`;
 
+    // 1. Fetch Main Grid Videos
     let query;
     let queryValues;
 
-    // 🟢 UPDATED SQL: Includes LEFT JOIN with users table
     if (category === "trends") {
-      query = `
-        SELECT v.*, u.username as uploader_name
-        FROM videos v
-        LEFT JOIN users u ON v.uploader_id = u.user_id
-        ORDER BY v.views DESC 
-        LIMIT $1 OFFSET $2`;
+      query = `SELECT v.*, u.username as uploader_name FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id ORDER BY v.views DESC LIMIT $1 OFFSET $2`;
       queryValues = [limit, offset];
     } else {
-      query = `
-        SELECT v.*, u.username as uploader_name
-        FROM videos v
-        LEFT JOIN users u ON v.uploader_id = u.user_id
-        WHERE v.category = $1
-        ORDER BY v.created_at DESC 
-        LIMIT $2 OFFSET $3`;
+      query = `SELECT v.*, u.username as uploader_name FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id WHERE v.category = $1 ORDER BY v.created_at DESC LIMIT $2 OFFSET $3`;
       queryValues = [category, limit, offset];
     }
 
     const videosRes = await pool.query(query, queryValues);
-    
-    const countQuery = category === "trends" 
-      ? `SELECT COUNT(*) FROM videos` 
-      : `SELECT COUNT(*) FROM videos WHERE category = $1`;
+
+    // 2. 🟢 EXTRA: Fetch Suggestions ONLY on Page 1 (Prevents server load)
+    let suggestions = [];
+    if (page === 1) {
+      const suggestQuery = `
+        SELECT v.*, u.username as uploader_name 
+        FROM videos v 
+        LEFT JOIN users u ON v.uploader_id = u.user_id 
+        ORDER BY RANDOM() LIMIT 10`;
+      const suggestRes = await pool.query(suggestQuery);
+      suggestions = suggestRes.rows;
+    }
+
+    const countQuery = category === "trends" ? `SELECT COUNT(*) FROM videos` : `SELECT COUNT(*) FROM videos WHERE category = $1`;
     const countValues = category === "trends" ? [] : [category];
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
+
+    // Helper to map video object with thumbnails
+    const mapVideo = (v) => ({
+      chat_id: v.chat_id,
+      message_id: v.message_id,
+      views: v.views,
+      caption: v.caption,
+      uploader_id: v.uploader_id,
+      uploader_name: v.uploader_name || "Member",
+      created_at: v.created_at,
+      thumbnail_url: `${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
+    });
 
     res.json({
       page,
       limit,
       total,
-      videos: videosRes.rows.map(v => ({
-        chat_id: v.chat_id,
-        message_id: v.message_id,
-        views: v.views,
-        caption: v.caption,
-        uploader_id: v.uploader_id,
-        uploader_name: v.uploader_name || "Member", // 🟢 Now dynamic!
-        thumbnail_url: `${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
-      }))
+      videos: videosRes.rows.map(mapVideo),
+      suggestions: suggestions.map(mapVideo) // 🟢 Sent only when page=1
     });
   } catch (err) {
     console.error("DB Error:", err);

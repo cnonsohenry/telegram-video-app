@@ -6,7 +6,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
-  // 🟢 Logic now uses String names (passed from Home.jsx)
+  // Logic uses String names for categories
   const isKnacks = layoutType === 'knacks';
   const isLarge = layoutType === 'baddies';
 
@@ -18,16 +18,33 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver(([entry]) => setIsVisible(entry.isIntersecting), { threshold: 0.1 });
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.1 }
+    );
+
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      if (el) observer.unobserve(el);
+    };
   }, []);
 
   useEffect(() => {
     const el = videoRef.current;
-    if (!el || !isVisible) return;
-    el.play().catch(() => {});
-    return () => { el.pause(); setIsHovered(false); };
+    if (!el) return;
+
+    if (isVisible) {
+      el.play().catch(() => {
+        // Handle autoplay restrictions (user hasn't interacted with doc yet)
+        console.log("Autoplay blocked");
+      });
+    } else {
+      el.pause();
+      setIsHovered(false);
+    }
   }, [isVisible]);
 
   return (
@@ -41,7 +58,12 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         overflow: "hidden",
         width: "100%",
         height: "fit-content",
+        cursor: "pointer",
+        transition: "transform 0.2s ease-in-out",
       }}
+      // Simple hover scale effect for desktop
+      onMouseEnter={(e) => { if (window.innerWidth > 1024) e.currentTarget.style.transform = 'scale(1.02)'; }}
+      onMouseLeave={(e) => { if (window.innerWidth > 1024) e.currentTarget.style.transform = 'scale(1)'; }}
     >
       {/* MEDIA CONTAINER */}
       <div style={{ 
@@ -54,6 +76,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       }}>
         <img 
           src={video.thumbnail_url} 
+          alt={video.caption || "Thumbnail"}
           style={{
             width: "100%", height: "100%", objectFit: "cover",
             position: "absolute", inset: 0, zIndex: 2,
@@ -96,12 +119,12 @@ export default function VideoCard({ video, onOpen, layoutType }) {
           <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
             <img 
               src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
-              onError={(e) => { e.target.style.opacity = 0; }}
-              style={{ width: 16, height: 16, borderRadius: "50%", objectFit: "cover", background: "#333" }}
+              alt="Avatar"
+              onError={(e) => { e.target.style.display = 'none'; }}
+              style={{ width: 18, height: 18, borderRadius: "50%", objectFit: "cover", background: "#333" }}
             />
-            {/* 🟢 DYNAMIC USERNAME: No more hardcoded "Chief" */}
             <span style={{ fontSize: "11px", color: "#8e8e8e", fontWeight: "600" }}>
-              @{video.uploader_name || video.uploader_id || "Member"}
+              @{video.uploader_name || "Member"}
             </span>
           </div>
         </div>
