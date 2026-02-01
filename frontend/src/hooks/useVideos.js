@@ -6,25 +6,35 @@ export function useVideos(currentCategory) {
   const [sidebarSuggestions, setSidebarSuggestions] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  
+  // Ref to prevent double-fetching in React Strict Mode
   const isFetching = useRef(false);
 
-  // 1. Fetch Top 4 from all categories for Mobile Home
+  // 1. Fetch Top 4 from all categories for Mobile Home Dashboard
   const fetchDashboard = useCallback(async () => {
     try {
       const categories = ["knacks", "hotties", "baddies", "trends"];
       const results = {};
+      
+      // Fetch all 4 categories in parallel
       const responses = await Promise.all(
         categories.map(cat => 
           fetch(`https://videos.naijahomemade.com/api/videos?page=1&limit=4&category=${cat}`)
             .then(res => res.json())
         )
       );
-      responses.forEach((data, i) => { results[categories[i]] = data.videos || []; });
+      
+      responses.forEach((data, i) => { 
+        results[categories[i]] = data.videos || []; 
+      });
+      
       setDashboardVideos(results);
-    } catch (err) { console.error("Dashboard Fetch Error:", err); }
+    } catch (err) { 
+      console.error("Dashboard Fetch Error:", err); 
+    }
   }, []);
 
-  // 2. Main Data Fetcher
+  // 2. Main Data Fetcher for Grid/Explore
   const fetchData = useCallback(async (targetPage, isNew) => {
     if (isFetching.current) return;
     isFetching.current = true;
@@ -39,28 +49,48 @@ export function useVideos(currentCategory) {
       
       if (data?.videos) {
         setVideos(prev => {
+          // Combine old and new videos
           const combined = isNew ? data.videos : [...prev, ...data.videos];
+          
+          // Filter out duplicates using chat_id + message_id
           const uniqueMap = new Map();
           combined.forEach(v => uniqueMap.set(`${v.chat_id}:${v.message_id}`, v));
           return Array.from(uniqueMap.values());
         });
         
-        // Ensure suggestions are captured
-        if (data.suggestions) setSidebarSuggestions(data.suggestions);
+        // Save sidebar suggestions if provided
+        if (data.suggestions) {
+          setSidebarSuggestions(data.suggestions);
+        }
+        
         setPage(targetPage + 1);
       }
-    } catch (err) { console.error("Fetch Error:", err); } 
-    finally { 
+    } catch (err) { 
+      console.error("Fetch Error:", err); 
+    } finally { 
       setLoading(false); 
       isFetching.current = false; 
     }
   }, [currentCategory]);
 
+  // 3. Initial Load Effect
   useEffect(() => {
-    setVideos([]);
-    fetchData(1, true);
-    if (Object.keys(dashboardVideos).length === 0) fetchDashboard();
+    setVideos([]); // Clear videos when tab changes
+    fetchData(1, true); // Load Page 1
+    
+    // Only fetch dashboard once per session
+    if (Object.keys(dashboardVideos).length === 0) {
+      fetchDashboard();
+    }
   }, [currentCategory, fetchData, fetchDashboard]);
 
-  return { videos, dashboardVideos, sidebarSuggestions, loading, loadMore: () => fetchData(page, false), setVideos };
+  // 4. Return the data and functions to the component
+  return { 
+    videos, 
+    dashboardVideos, 
+    sidebarSuggestions, 
+    loading, 
+    loadMore: () => fetchData(page, false), 
+    setVideos 
+  };
 }
