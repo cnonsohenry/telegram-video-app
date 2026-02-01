@@ -1,229 +1,101 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { Grid3X3, Play, Flame, User, Search, X } from "lucide-react"; 
+import React, { useState } from "react";
+import { Home as HomeIcon, Compass, User as UserIcon, Play, Flame, Grid3X3 } from "lucide-react";
+import AppHeader from "../components/AppHeader";
+import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
-import { expandApp } from "../utils/telegram";
-import { openRewardedAd } from "../utils/rewardedAd";
-import { adReturnWatcher } from "../utils/adReturnWatcher";
+import { useVideos } from "../hooks/useVideos";
 
 export default function Home() {
-  const [videos, setVideos] = useState([]);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [activeVideo, setActiveVideo] = useState(null);
+  const [activeBottomTab, setActiveBottomTab] = useState("home"); 
   const [activeTab, setActiveTab] = useState(0); 
-  const [unlockedVideos, setUnlockedVideos] = useState(new Set());
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const [sidebarSuggestions, setSidebarSuggestions] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isMobileSearchVisible, setIsMobileSearchVisible] = useState(false);
+  const [activeVideo, setActiveVideo] = useState(null);
+  const isDesktop = windowWidth > 1024;
 
   const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
   const currentCategory = CATEGORIES[activeTab];
-  const isDesktop = windowWidth > 1024;
-
-  const filteredVideos = useMemo(() => {
-    if (!searchTerm.trim()) return videos;
-    return videos.filter(v => 
-      v.caption?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.uploader_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [videos, searchTerm]);
-
-  const filteredSuggestions = useMemo(() => {
-    if (!searchTerm.trim()) return sidebarSuggestions;
-    return sidebarSuggestions.filter(v => 
-      v.caption?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.uploader_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [sidebarSuggestions, searchTerm]);
-
-  const loadVideos = useCallback(async (isNewTab = false) => {
-    setLoading(true);
-    setPage(prevPage => {
-      const pageToFetch = isNewTab ? 1 : prevPage;
-      const fetchData = async () => {
-        try {
-          let url = `https://videos.naijahomemade.com/api/videos?page=${pageToFetch}&limit=20&category=${currentCategory}`;
-          if (currentCategory === "trends") url += `&sort=trending`;
-          const res = await fetch(url);
-          const data = await res.json();
-          if (data?.videos) {
-            setVideos(prev => {
-              const combined = isNewTab ? data.videos : [...prev, ...data.videos];
-              const uniqueMap = new Map();
-              combined.forEach(v => uniqueMap.set(`${v.chat_id}:${v.message_id}`, v));
-              return Array.from(uniqueMap.values());
-            });
-            if (data.suggestions && data.suggestions.length > 0) {
-              setSidebarSuggestions(data.suggestions);
-            }
-          }
-        } catch (err) { console.error("Fetch Error:", err); } finally { setLoading(false); }
-      };
-      fetchData();
-      return isNewTab ? 2 : prevPage + 1;
-    });
-  }, [currentCategory]);
-
-  useEffect(() => {
-    expandApp();
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    setVideos([]);
-    loadVideos(true); 
-  }, [activeTab, loadVideos]);
-
-  const handleOpenVideo = async (video) => {
-    const videoKey = `${video.chat_id}:${video.message_id}`;
-    if (unlockedVideos.has(videoKey)) { playVideo(video); return; }
-    try {
-      openRewardedAd();
-      const nextSet = new Set(unlockedVideos);
-      nextSet.add(videoKey);
-      setUnlockedVideos(nextSet);
-      localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
-      await adReturnWatcher();
-      playVideo(video);
-    } catch (err) { playVideo(video); }
-  };
-
-  const playVideo = async (video) => {
-    try {
-      const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
-      const data = await res.json();
-      if (data.video_url) {
-        setVideos(prev => prev.map(v => (v.chat_id === video.chat_id && v.message_id === video.message_id) ? { ...v, views: Number(v.views || 0) + 1 } : v));
-        setActiveVideo({ ...video, video_url: data.video_url });
-      }
-    } catch (e) { alert("Error fetching video"); }
-  };
-
-  const isDetailedLayout = currentCategory === "knacks" || currentCategory === "baddies";
-
-  const getGridColumns = () => {
-    if (isDesktop) return isDetailedLayout ? "repeat(3, 1fr)" : "repeat(5, 1fr)";
-    return isDetailedLayout ? "repeat(2, 1fr)" : "repeat(3, 1fr)";
-  };
+  const { videos, dashboardVideos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory);
 
   const TABS = [
-    { icon: <Play size={isDesktop ? 22 : 20} />, label: "KNACKS"},
-    { icon: <Grid3X3 size={isDesktop ? 22 : 20} />, label: "HOTTIES"},
-    { icon: <User size={isDesktop ? 22 : 20} />, label: "BADDIES"},
-    { icon: <Flame size={isDesktop ? 22 : 20} />, label: "TRENDS"}
+    { icon: <Play size={20} />, label: "KNACKS"},
+    { icon: <Grid3X3 size={20} />, label: "HOTTIES"},
+    { icon: <UserIcon size={20} />, label: "BADDIES"},
+    { icon: <Flame size={20} />, label: "TRENDS"}
   ];
 
   return (
-    <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
+    <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block", paddingBottom: !isDesktop ? "80px" : 0 }}>
       
-      {/* NAVIGATION */}
-      <nav style={isDesktop ? { 
-        width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0 
-      } : { 
-        display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "#000", borderBottom: "1px solid #262626" 
-      }}>
-        {TABS.map((tab, index) => (
-          <button key={index} onClick={() => setActiveTab(index)} style={{ flex: isDesktop ? "none" : 1, display: "flex", flexDirection: isDesktop ? "row" : "column", alignItems: "center", gap: isDesktop ? "15px" : "4px", padding: isDesktop ? "12px 20px" : "12px 0", background: activeTab === index ? "#1c1c1e" : "transparent", borderRadius: isDesktop ? "10px" : "0px", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", cursor: "pointer", transition: "0.2s" }}>
-            {tab.icon}
-            <span style={{ fontSize: isDesktop ? "14px" : "8px", fontWeight: "bold" }}>{tab.label}</span>
-          </button>
-        ))}
-        {!isDesktop && (
+      {/* 1. TOP STICKY TABS (Mobile - Only on Explore) */}
+      {!isDesktop && activeBottomTab === "explore" && (
+        <nav style={{ display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "#000", borderBottom: "1px solid #262626" }}>
+          {TABS.map((tab, index) => (
+            <button key={index} onClick={() => setActiveTab(index)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e" }}>
+              {tab.icon} <span style={{ fontSize: "8px", fontWeight: "bold" }}>{tab.label}</span>
+            </button>
+          ))}
           <div style={{ position: "absolute", bottom: 0, left: 0, width: "25%", height: "2px", background: "#fff", transform: `translateX(${activeTab * 100}%)`, transition: "0.3s" }} />
-        )}
-      </nav>
+        </nav>
+      )}
 
+      {/* 2. MAIN CONTENT */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        
-        {/* DESKTOP HEADER */}
-        {isDesktop && (
-          <header style={{ position: "sticky", top: 0, zIndex: 100, height: "70px", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)", borderBottom: "1px solid #262626", padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ userSelect: "none" }}><h1 style={{ color: "#fff", fontSize: "24px", fontWeight: "900", letterSpacing: "-1px", margin: 0 }}>NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span></h1></div>
-            <div style={{ display: "flex", alignItems: "center", background: "#1c1c1e", borderRadius: "20px", padding: "0 15px", width: "400px", border: "1px solid #333" }}>
-              <Search size={18} color="#8e8e8e" /><input type="text" placeholder="Search suggestions..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ background: "none", border: "none", color: "#fff", padding: "10px", width: "100%", outline: "none", fontSize: "14px" }} />
-              {searchTerm && <X size={16} color="#8e8e8e" style={{ cursor: "pointer" }} onClick={() => setSearchTerm("")} />}
-            </div>
-          </header>
-        )}
-
-        {/* 🟢 MOBILE SEARCH & BRANDING (Updated Layout) */}
-        {!isDesktop && (
-          <div style={{ 
-            padding: "15px 15px 10px", 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "space-between", // 🟢 Spreads Logo and Search to extremes
-            background: "#000", 
-            minHeight: "50px" 
-          }}>
-            {isMobileSearchVisible ? (
-              <div style={{ display: "flex", alignItems: "center", flex: 1, background: "#1c1c1e", borderRadius: "8px", padding: "0 10px" }}>
-                <Search size={16} color="#8e8e8e" />
-                <input autoFocus type="text" placeholder="Search grid..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ background: "none", border: "none", color: "#fff", padding: "10px", width: "100%", outline: "none", fontSize: "14px" }} />
-                <X size={18} color="#8e8e8e" onClick={() => { setIsMobileSearchVisible(false); setSearchTerm(""); }} />
-              </div>
-            ) : (
-              <>
-                {/* 🟢 Logo on the extreme left */}
-                <h1 style={{ color: "#fff", fontSize: "18px", fontWeight: "900", margin: 0 }}>
-                  NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span>
-                </h1>
-                {/* 🟢 Search Icon on the extreme right */}
-                <Search 
-                  size={22} 
-                  color="#fff" 
-                  onClick={() => setIsMobileSearchVisible(true)} 
-                  style={{ cursor: "pointer" }} 
-                />
-              </>
-            )}
-          </div>
-        )}
+        <AppHeader isDesktop={isDesktop} />
 
         <div style={{ display: "flex", flex: 1 }}>
-          <div style={{ flex: 1, padding: isDesktop ? "40px" : "10px", borderRight: isDesktop ? "1px solid #262626" : "none" }}>
-            <div style={{ minHeight: "80vh" }}>
-              <div style={{ display: "grid", gridTemplateColumns: getGridColumns(), gridAutoRows: "min-content", gap: isDesktop ? "20px" : (isDetailedLayout ? "12px" : "1px") }}>
-                {filteredVideos.map(video => (
-                  <VideoCard key={`${video.chat_id}:${video.message_id}`} video={video} layoutType={currentCategory} onOpen={() => handleOpenVideo(video)} />
+          <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px" }}>
+            
+            {/* 🟢 DASHBOARD VIEW */}
+            {!isDesktop && activeBottomTab === "home" ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "30px" }}>
+                {CATEGORIES.map(cat => (
+                  <section key={cat}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                      <h3 style={{ color: "#fff", fontSize: "16px", fontWeight: "900", textTransform: "uppercase" }}>{cat}</h3>
+                      <span onClick={() => { setActiveBottomTab("explore"); setActiveTab(CATEGORIES.indexOf(cat)); }} style={{ color: "#ff0000", fontSize: "12px", fontWeight: "bold" }}>See All</span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
+                      {dashboardVideos[cat]?.map(video => (
+                        <VideoCard key={video.message_id} video={video} layoutType={cat} onOpen={setActiveVideo} />
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
-              {filteredVideos.length === 0 && searchTerm && (
-                <div style={{ color: "#8e8e8e", textAlign: "center", marginTop: "40px", fontSize: "14px" }}>No results found for "{searchTerm}"</div>
-              )}
-            </div>
-            {!loading && videos.length > 0 && (
-              <div style={{ textAlign: "center", padding: "40px 10px" }}>
-                <button onClick={() => loadVideos(false)} style={{ background: "#1c1c1e", border: "none", color: "#fff", padding: "12px 30px", borderRadius: "30px", fontSize: 12, fontWeight: "900", cursor: "pointer" }}>SHOW MORE</button>
+            ) : (
+              /* 🟢 EXPLORE GRID */
+              <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(3, 1fr)", gap: "15px" }}>
+                {videos.map(video => (
+                  <VideoCard key={video.message_id} video={video} layoutType={currentCategory} onOpen={setActiveVideo} />
+                ))}
               </div>
             )}
           </div>
-
-          {/* SIDEBAR */}
-          {isDesktop && (
-            <aside style={{ width: "380px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", padding: "30px 15px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, overflowY: "auto", borderLeft: "1px solid #262626" }}>
-              <h3 style={{ color: "#fff", fontSize: "16px", fontWeight: "800", margin: "0 0 10px 0" }}>Suggested for you</h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {filteredSuggestions.map((v) => (
-                  <div key={`suggested-${v.chat_id}-${v.message_id}`} onClick={() => handleOpenVideo(v)} style={{ display: "flex", gap: "12px", cursor: "pointer", alignItems: "flex-start", padding: "10px", borderRadius: "10px", transition: "0.2s" }} onMouseEnter={(e) => e.currentTarget.style.background = "#1c1c1e"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                    <div style={{ width: "80px", height: "100px", borderRadius: "6px", overflow: "hidden", background: "#111", flexShrink: 0 }}><img src={v.thumbnail_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /></div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ color: "#fff", fontSize: "13px", fontWeight: "600", margin: "0 0 4px 0", lineHeight: "1.4", wordWrap: "break-word" }}>{v.caption || "View trending video..."}</p>
-                      <div style={{ color: "#8e8e8e", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}><Play size={10} fill="#8e8e8e" strokeWidth={0} /><span>{Number(v.views).toLocaleString()} views</span></div>
-                      <div style={{ color: "#555", fontSize: "11px", fontWeight: "700", marginTop: "4px" }}>@{v.uploader_name || "Member"}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </aside>
-          )}
+          {isDesktop && <SuggestedSidebar suggestions={sidebarSuggestions} onVideoClick={setActiveVideo} />}
         </div>
       </div>
-      {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} />}
+
+      {/* 🟢 3. BOTTOM STICKY NAV (Mobile) */}
+      {!isDesktop && (
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, height: "70px", background: "rgba(0,0,0,0.95)", backdropFilter: "blur(15px)", borderTop: "1px solid #262626", display: "flex", alignItems: "center", justifyContent: "space-around", zIndex: 2000 }}>
+          <TabButton icon={<HomeIcon />} label="Home" active={activeBottomTab === "home"} onClick={() => setActiveBottomTab("home")} />
+          <TabButton icon={<Compass />} label="Explore" active={activeBottomTab === "explore"} onClick={() => setActiveBottomTab("explore")} />
+          <TabButton icon={<UserIcon />} label="Profile" active={activeBottomTab === "profile"} onClick={() => setActiveBottomTab("profile")} />
+        </div>
+      )}
+
+      {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} />}
     </div>
+  );
+}
+
+// Small helper component for bottom tabs
+function TabButton({ icon, label, active, onClick }) {
+  return (
+    <button onClick={onClick} style={{ background: "none", border: "none", color: active ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+      {React.cloneElement(icon, { size: 24 })}
+      <span style={{ fontSize: "10px", fontWeight: "bold" }}>{label}</span>
+    </button>
   );
 }
