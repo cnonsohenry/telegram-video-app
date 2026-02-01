@@ -9,9 +9,10 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   const isKnacks = layoutType === 'knacks';
   const isLarge = layoutType === 'baddies';
 
+  // Height logic: Masonry for Knacks, standard 200px for others (fixes mobile grid congestion)
   const cardHeight = isKnacks 
     ? (parseInt(video.message_id) % 2 === 0 ? "260px" : "310px") 
-    : "auto";
+    : "200px";
 
   useEffect(() => {
     const el = videoRef.current;
@@ -48,26 +49,25 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       style={{
         display: "flex",
         flexDirection: "column",
-        background: isKnacks ? "#1c1c1e" : "transparent",
-        // 🟢 Rounded corners applied to ALL tabs for consistency
+        // 🟢 Unified background for all cards so captions are readable
+        background: "#1c1c1e", 
         borderRadius: "12px", 
         overflow: "hidden",
         width: "100%",
-        height: "fit-content",
+        height: "100%", // Fill grid cell height
         cursor: "pointer",
         transition: "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s"
       }}
-      // 🟢 Consistent Desktop Hover: Slight lift and scale
       onMouseEnter={(e) => { 
         if (window.innerWidth > 1024) {
           e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-          if (!isKnacks) e.currentTarget.style.background = "#0a0a0a";
+          e.currentTarget.style.background = "#252525"; // Lighter on hover
         }
       }}
       onMouseLeave={(e) => { 
         if (window.innerWidth > 1024) {
           e.currentTarget.style.transform = 'translateY(0) scale(1)';
-          if (!isKnacks) e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.background = "#1c1c1e";
         }
       }}
     >
@@ -75,10 +75,8 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       <div style={{ 
         position: "relative", 
         width: "100%", 
-        height: isKnacks ? cardHeight : "auto",
-        aspectRatio: isKnacks ? "unset" : (isLarge ? "9/14" : "9/16"),
-        background: "#111",
-        borderRadius: "12px", // 🟢 Ensure internal rounding matches
+        height: cardHeight, // 🟢 Enforced height to prevent layout shifts
+        background: "#000",
         overflow: "hidden"
       }}>
         <img 
@@ -103,39 +101,42 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         
         {/* VIEW COUNT OVERLAY */}
         <div style={{
-          position: "absolute", bottom: 10, left: 10, zIndex: 10, 
-          display: "flex", alignItems: "center", gap: 4, color: "#fff",
-          fontSize: "11px", fontWeight: "800", textShadow: "0px 1px 8px rgba(0,0,0,1)"
+          position: "absolute", bottom: 8, left: 8, zIndex: 10, 
+          display: "flex", alignItems: "center", gap: 4, 
+          background: "rgba(0,0,0,0.6)", padding: "2px 6px", borderRadius: "4px"
         }}>
-          <Play size={12} fill="#fff" strokeWidth={0} />
-          <span>{Number(video.views || 0).toLocaleString()}</span>
+          <Play size={10} fill="#fff" strokeWidth={0} />
+          <span style={{ color: "#fff", fontSize: "10px", fontWeight: "700" }}>
+            {Number(video.views || 0).toLocaleString()}
+          </span>
         </div>
       </div>
 
-      {/* CAPTION SECTION */}
-      {(isKnacks || isLarge) && (
-        <div style={{ padding: "12px 10px", background: "inherit" }}>
-          <p style={{
-            margin: 0, fontSize: "13px", color: "#fff",
-            lineHeight: "1.4", display: "-webkit-box",
-            WebkitLineClamp: "2", WebkitBoxOrient: "vertical",
-            overflow: "hidden", minHeight: "36px"
-          }}>
-            {video.caption || "No caption provided..."}
-          </p>
-          <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <img 
-              src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
-              alt="Avatar"
-              onError={(e) => { e.target.style.display = 'none'; }}
-              style={{ width: 18, height: 18, borderRadius: "50%", objectFit: "cover", background: "#333" }}
-            />
-            <span style={{ fontSize: "11px", color: "#8e8e8e", fontWeight: "600" }}>
-              @{video.uploader_name || "Member"}
-            </span>
+      {/* 🟢 CAPTION SECTION (Always Visible) */}
+      <div style={{ padding: "12px 10px", display: "flex", flexDirection: "column", flex: 1 }}>
+        <p style={{
+          margin: "0 0 8px 0", fontSize: "12px", color: "#fff",
+          lineHeight: "1.4", display: "-webkit-box",
+          WebkitLineClamp: "2", WebkitBoxOrient: "vertical",
+          overflow: "hidden", minHeight: "34px", fontWeight: "500"
+        }}>
+          {video.caption || "No caption provided..."}
+        </p>
+        
+        <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "#333", overflow: "hidden", flexShrink: 0 }}>
+             <img 
+               src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
+               alt=""
+               onError={(e) => { e.target.style.display = 'none'; }}
+               style={{ width: "100%", height: "100%", objectFit: "cover" }}
+             />
           </div>
+          <span style={{ fontSize: "11px", color: "#8e8e8e", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            @{video.uploader_name || "Member"}
+          </span>
         </div>
-      )}
+      </div>
     </div>
   );
 }
