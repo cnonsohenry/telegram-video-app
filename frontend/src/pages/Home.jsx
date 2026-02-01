@@ -10,7 +10,8 @@ import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function Home() {
-  const [activeBottomTab, setActiveBottomTab] = useState("explore"); 
+  // 🟢 CHANGED DEFAULT: Now starts on "home" instead of "explore"
+  const [activeBottomTab, setActiveBottomTab] = useState("home"); 
   const [activeTab, setActiveTab] = useState(0); 
   const [activeVideo, setActiveVideo] = useState(null);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -64,21 +65,9 @@ export default function Home() {
     { icon: <Flame size={18} />, label: "TRENDS"}
   ];
 
-  // 🟢 SMART GRID LAYOUT
   const getGridStyle = () => {
-    // Desktop: Auto-fit columns min 220px wide (Prevents congestion)
-    if (isDesktop) return { 
-      display: "grid", 
-      gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", 
-      gap: "20px" 
-    };
-    
-    // Mobile: 2 Columns for better visibility (3 is too crowded)
-    return { 
-      display: "grid", 
-      gridTemplateColumns: "repeat(2, 1fr)", 
-      gap: "10px" 
-    };
+    if (isDesktop) return { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "20px" };
+    return { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" };
   };
 
   return (
@@ -95,18 +84,12 @@ export default function Home() {
         </nav>
       )}
 
-      {/* 2. MOBILE TOP TABS (Polished) */}
+      {/* 2. MOBILE TOP TABS (Only Visible on Explore Tab) */}
       {!isDesktop && activeBottomTab === "explore" && (
         <nav style={{ 
-          display: "flex", 
-          justifyContent: "space-evenly", // Distribute space evenly
-          position: "sticky", 
-          top: 0, 
-          zIndex: 900, 
-          background: "rgba(0,0,0,0.95)", // Solid but translucent background
-          backdropFilter: "blur(12px)", 
-          borderBottom: "1px solid #262626",
-          boxShadow: "0 4px 15px rgba(0,0,0,0.5)" // Shadow for depth
+          display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 900, 
+          background: "rgba(0,0,0,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid #262626",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.5)"
         }}>
           {TABS.map((tab, index) => (
             <button key={index} onClick={() => setActiveTab(index)} style={{ flex: 1, padding: "12px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
@@ -125,14 +108,14 @@ export default function Home() {
           <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px" }}>
             
             {(isDesktop || activeBottomTab === "explore") ? (
-              // 🟢 GRID VIEW (Cleaned up)
+              // EXPLORE GRID VIEW
               <div style={getGridStyle()}>
                 {videos.map(v => (
                   <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} layoutType={currentCategory} onOpen={() => handleOpenVideo(v)} />
                 ))}
               </div>
             ) : activeBottomTab === "home" ? (
-              // 🟢 DASHBOARD VIEW
+              // 🟢 HOME DASHBOARD VIEW (Default on Mobile)
               <div style={{ display: "flex", flexDirection: "column", gap: "40px" }}>
                 {CATEGORIES.map(cat => (
                   <section key={cat}>
@@ -140,7 +123,6 @@ export default function Home() {
                       <h3 style={{ color: "#fff", textTransform: "uppercase", fontSize: "14px", fontWeight: "900", margin: 0 }}>{cat}</h3>
                       <button onClick={() => { setActiveBottomTab("explore"); setActiveTab(CATEGORIES.indexOf(cat)); }} style={{ color: "#ff0000", fontSize: "12px", fontWeight: "800", background: "none", border: "none" }}>See All</button>
                     </div>
-                    {/* Dashboard always uses 2 columns for clarity */}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
                       {dashboardVideos[cat]?.map(v => (
                         <VideoCard key={`dash-${v.message_id}`} video={v} layoutType={cat} onOpen={() => handleOpenVideo(v)} />
@@ -150,6 +132,7 @@ export default function Home() {
                 ))}
               </div>
             ) : (
+              // PROFILE VIEW
               <div style={{ color: "#8e8e8e", textAlign: "center", marginTop: "100px" }}>
                 <UserIcon size={48} style={{ margin: "0 auto 20px" }} />
                 <h3>Profile Coming Soon</h3>
