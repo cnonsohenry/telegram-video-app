@@ -10,7 +10,6 @@ import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function Home() {
-  // 🟢 CHANGED DEFAULT: Now starts on "home" instead of "explore"
   const [activeBottomTab, setActiveBottomTab] = useState("home"); 
   const [activeTab, setActiveTab] = useState(0); 
   const [activeVideo, setActiveVideo] = useState(null);
@@ -65,8 +64,17 @@ export default function Home() {
     { icon: <Flame size={18} />, label: "TRENDS"}
   ];
 
+  // 🟢 LAYOUT FIX: Responsive Auto-Fill for Desktop
   const getGridStyle = () => {
-    if (isDesktop) return { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "20px" };
+    if (isDesktop) {
+      return { 
+        display: "grid", 
+        // Auto-fill allows 3, 4, or 5 cols depending on screen width without breaking layout
+        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", 
+        gap: "10px" 
+      };
+    }
+    // Mobile stays 2 columns
     return { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" };
   };
 
@@ -84,7 +92,7 @@ export default function Home() {
         </nav>
       )}
 
-      {/* 2. MOBILE TOP TABS (Only Visible on Explore Tab) */}
+      {/* 2. MOBILE TOP TABS */}
       {!isDesktop && activeBottomTab === "explore" && (
         <nav style={{ 
           display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 900, 
@@ -101,11 +109,12 @@ export default function Home() {
         </nav>
       )}
 
+      {/* 🟢 MAIN WRAPPER: minWidth: 0 prevents Grid blowout */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <AppHeader isDesktop={isDesktop} searchTerm={searchTerm} setSearchTerm={setSearchTerm} isMobileSearchVisible={isMobileSearchVisible} setIsMobileSearchVisible={setIsMobileSearchVisible} />
         
         <div style={{ display: "flex", flex: 1 }}>
-          <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px" }}>
+          <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px", minWidth: 0 }}>
             
             {(isDesktop || activeBottomTab === "explore") ? (
               // EXPLORE GRID VIEW
@@ -115,7 +124,7 @@ export default function Home() {
                 ))}
               </div>
             ) : activeBottomTab === "home" ? (
-              // 🟢 HOME DASHBOARD VIEW (Default on Mobile)
+              // HOME DASHBOARD VIEW
               <div style={{ display: "flex", flexDirection: "column", gap: "40px" }}>
                 {CATEGORIES.map(cat => (
                   <section key={cat}>
@@ -144,7 +153,12 @@ export default function Home() {
             )}
           </div>
 
-          {isDesktop && <SuggestedSidebar suggestions={sidebarSuggestions} onVideoClick={handleOpenVideo} />}
+          {/* 🟢 SIDEBAR FIX: flexShrink: 0 protects right sidebar */}
+          {isDesktop && (
+            <div style={{ flexShrink: 0 }}>
+              <SuggestedSidebar suggestions={sidebarSuggestions} onVideoClick={handleOpenVideo} />
+            </div>
+          )}
         </div>
       </div>
 
