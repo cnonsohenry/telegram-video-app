@@ -5,6 +5,7 @@ import cors from "cors";
 import pkg from "pg";
 import https from "https";
 import crypto from "crypto";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 
 const { Pool } = pkg;
 
@@ -234,26 +235,71 @@ app.get("/api/videos", async (req, res) => {
   }
 });
 
+// Configure R2 Client
+const r2 = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT, // e.g., https://<account_id>.r2.cloudflarestorage.com
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+});
+
 /* =====================
-   Thumbnail (Static Headers)
+   UPDATED: Thumbnail (R2 Caching Logic)
 ===================== */
 app.get("/api/thumbnail", async (req, res) => {
+  const { chat_id, message_id } = req.query;
+  if (!chat_id || !message_id) return res.status(400).end();
+  
+  const fileName = `thumbs/${chat_id}_${message_id}.jpg`;
+
   try {
-    const { chat_id, message_id } = req.query;
+    // 1. Try to get from R2 first
+    try {
+      const r2Object = await r2.send(new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: fileName
+      }));
+      
+      res.set({
+        "Content-Type": "image/jpeg",
+        "Cache-Control": "public, max-age=31536000, immutable", // 1 year
+        "Access-Control-Allow-Origin": "*"
+      });
+      return r2Object.Body.pipe(res);
+    } catch (r2Err) {
+      // If not in R2, proceed to fetch from Telegram
+      console.log(`Thumbnail ${fileName} not in R2, fetching from Telegram...`);
+    }
+
+    // 2. Fetch thumb_file_id from DB
     const dbRes = await pool.query("SELECT thumb_file_id FROM videos WHERE chat_id=$1 AND message_id=$2", [chat_id, message_id]);
     if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) return res.status(204).end();
 
+    // 3. Download from Telegram
     const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: dbRes.rows[0].thumb_file_id } });
     const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
     const buffer = Buffer.from(imageRes.data);
 
+    // 4. Upload to R2 in the background (Don't await to keep response fast)
+    r2.send(new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: fileName,
+      Body: buffer,
+      ContentType: "image/jpeg"
+    })).catch(e => console.error("R2 Upload Failed:", e.message));
+
+    // 5. Send to user
     res.set({
       "Content-Type": "image/jpeg",
       "Cache-Control": "public, max-age=604800, immutable",
       "Access-Control-Allow-Origin": "*"
     });
     res.send(buffer);
+
   } catch (err) {
+    console.error("Thumbnail Route Error:", err.message);
     res.status(500).end();
   }
 });

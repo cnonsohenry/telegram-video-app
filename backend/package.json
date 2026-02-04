@@ -8,6 +8,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.982.0",
     "axios": "^1.6.0",
     "better-sqlite3": "^12.5.0",
     "cors": "^2.8.5",

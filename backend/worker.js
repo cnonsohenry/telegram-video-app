@@ -2,71 +2,60 @@ export default {
   async fetch(request, env) {
     try {
       const url = new URL(request.url);
+      
+      // Handle Thumbnail Requests (Optional: if called via worker)
+      if (url.pathname.startsWith("/api/thumbnail")) {
+        const chatId = url.searchParams.get("chat_id");
+        const messageId = url.searchParams.get("message_id");
+        const cacheKey = `thumbs/${chatId}_${messageId}.jpg`;
+        
+        const thumb = await env.VIDEOS_BUCKET.get(cacheKey);
+        if (!thumb) return new Response("Not found", { status: 404 });
 
-      /* ===== METHOD GUARD ===== */
-      if (request.method !== "GET" && request.method !== "OPTIONS") {
-        return corsResponse("Method not allowed", 405);
+        const headers = new Headers(corsHeaders());
+        headers.set("Content-Type", "image/jpeg");
+        headers.set("Cache-Control", "public, max-age=31536000, immutable");
+        return new Response(thumb.body, { headers });
       }
 
-      /* ===== CORS PREFLIGHT ===== */
-      if (request.method === "OPTIONS") {
-        return new Response(null, { headers: corsHeaders() });
-      }
+      /* ===== EXISTING VIDEO LOGIC ===== */
+      if (request.method !== "GET" && request.method !== "OPTIONS") return corsResponse("Method not allowed", 405);
+      if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders() });
 
       const filePath = url.searchParams.get("file_path");
       const exp = url.searchParams.get("exp");
       const sig = url.searchParams.get("sig");
 
-      if (!filePath || !exp || !sig) {
-        return corsResponse("Missing parameters", 400);
-      }
+      if (!filePath || !exp || !sig) return corsResponse("Missing parameters", 400);
 
-      /* ===== VERIFY SIGNATURE ===== */
       const valid = await verifySignature(filePath, exp, sig, env.SIGNING_SECRET);
-      if (!valid) {
-        return corsResponse("Unauthorized or Expired Link", 403);
-      }
+      if (!valid) return corsResponse("Unauthorized or Expired Link", 403);
 
       const cacheKey = filePath.replace(/\//g, "_");
 
-      /* ===== TRY R2 ===== */
-      let object = await env.VIDEOS_BUCKET.get(cacheKey, {
-        range: request.headers,
-      });
+      let object = await env.VIDEOS_BUCKET.get(cacheKey, { range: request.headers });
 
-      /* ===== COLD FETCH FROM TELEGRAM ===== */
       if (!object) {
         const telegramUrl = `https://api.telegram.org/file/bot${env.BOT_TOKEN}/${filePath}`;
         const tgResponse = await fetch(telegramUrl);
         if (!tgResponse.ok) return corsResponse("Telegram fetch failed", tgResponse.status);
 
+        // Optimization: Put and then get
         await env.VIDEOS_BUCKET.put(cacheKey, tgResponse.body, {
           httpMetadata: { contentType: "video/mp4" },
         });
-
         object = await env.VIDEOS_BUCKET.get(cacheKey, { range: request.headers });
       }
 
-      if (!object) return corsResponse("Not found", 404);
-
-      /* ===== RESPONSE HEADERS ===== */
       const headers = new Headers(corsHeaders());
       object.writeHttpMetadata(headers);
-
       headers.set("Accept-Ranges", "bytes");
-      headers.set("Vary", "Range");
-
-      // 🟢 CHANGE: Allow the browser to cache this video for 24 hours.
-      // 'private' means the browser caches it, but Cloudflare's public edge doesn't.
       headers.set("Cache-Control", "private, max-age=86400");
 
       let status = 200;
       if (object.range) {
         status = 206;
-        headers.set(
-          "Content-Range",
-          `bytes ${object.range.offset}-${object.range.offset + object.range.length - 1}/${object.size}`
-        );
+        headers.set("Content-Range", `bytes ${object.range.offset}-${object.range.offset + object.range.length - 1}/${object.size}`);
       }
 
       return new Response(object.body, { status, headers });
