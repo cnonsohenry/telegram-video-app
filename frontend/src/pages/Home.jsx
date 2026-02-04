@@ -31,6 +31,11 @@ export default function Home() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // 🟢 Helper for smooth scrolling to top
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleOpenVideo = async (video) => {
     const videoKey = `${video.chat_id}:${video.message_id}`;
     if (unlockedVideos.has(videoKey)) { playVideo(video); return; }
@@ -64,17 +69,14 @@ export default function Home() {
     { icon: <Flame size={18} />, label: "TRENDS"}
   ];
 
-  // 🟢 LAYOUT FIX: Responsive Auto-Fill for Desktop
   const getGridStyle = () => {
     if (isDesktop) {
       return { 
         display: "grid", 
-        // Auto-fill allows 3, 4, or 5 cols depending on screen width without breaking layout
         gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", 
         gap: "10px" 
       };
     }
-    // Mobile stays 2 columns
     return { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" };
   };
 
@@ -85,14 +87,21 @@ export default function Home() {
       {isDesktop && (
         <nav style={{ width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, zIndex: 50 }}>
           {TABS.map((tab, index) => (
-            <button key={index} onClick={() => setActiveTab(index)} style={{ display: "flex", alignItems: "center", gap: "15px", padding: "12px 20px", background: activeTab === index ? "#1c1c1e" : "none", border: "none", color: "#fff", borderRadius: "10px", cursor: "pointer", textAlign: "left" }}>
+            <button 
+              key={index} 
+              onClick={() => {
+                if (activeTab === index) scrollToTop();
+                else setActiveTab(index);
+              }} 
+              style={{ display: "flex", alignItems: "center", gap: "15px", padding: "12px 20px", background: activeTab === index ? "#1c1c1e" : "none", border: "none", color: "#fff", borderRadius: "10px", cursor: "pointer", textAlign: "left" }}
+            >
               {tab.icon} <span style={{ fontWeight: "bold" }}>{tab.label}</span>
             </button>
           ))}
         </nav>
       )}
 
-      {/* 2. MOBILE TOP TABS */}
+      {/* 2. MOBILE TOP TABS (Scroll to top logic added) */}
       {!isDesktop && activeBottomTab === "explore" && (
         <nav style={{ 
           display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 900, 
@@ -100,7 +109,14 @@ export default function Home() {
           boxShadow: "0 4px 15px rgba(0,0,0,0.5)"
         }}>
           {TABS.map((tab, index) => (
-            <button key={index} onClick={() => setActiveTab(index)} style={{ flex: 1, padding: "12px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+            <button 
+              key={index} 
+              onClick={() => {
+                if (activeTab === index) scrollToTop();
+                else setActiveTab(index);
+              }} 
+              style={{ flex: 1, padding: "12px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}
+            >
               {tab.icon}
               <span style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px" }}>{tab.label}</span>
             </button>
@@ -109,7 +125,6 @@ export default function Home() {
         </nav>
       )}
 
-      {/* 🟢 MAIN WRAPPER: minWidth: 0 prevents Grid blowout */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <AppHeader isDesktop={isDesktop} searchTerm={searchTerm} setSearchTerm={setSearchTerm} isMobileSearchVisible={isMobileSearchVisible} setIsMobileSearchVisible={setIsMobileSearchVisible} />
         
@@ -117,20 +132,18 @@ export default function Home() {
           <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px", minWidth: 0 }}>
             
             {(isDesktop || activeBottomTab === "explore") ? (
-              // EXPLORE GRID VIEW
               <div style={getGridStyle()}>
                 {videos.map(v => (
                   <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} layoutType={currentCategory} onOpen={() => handleOpenVideo(v)} />
                 ))}
               </div>
             ) : activeBottomTab === "home" ? (
-              // HOME DASHBOARD VIEW
               <div style={{ display: "flex", flexDirection: "column", gap: "40px" }}>
                 {CATEGORIES.map(cat => (
                   <section key={cat}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", alignItems: "center" }}>
                       <h3 style={{ color: "#fff", textTransform: "uppercase", fontSize: "14px", fontWeight: "900", margin: 0 }}>{cat}</h3>
-                      <button onClick={() => { setActiveBottomTab("explore"); setActiveTab(CATEGORIES.indexOf(cat)); }} style={{ color: "#ff0000", fontSize: "12px", fontWeight: "800", background: "none", border: "none" }}>See All</button>
+                      <button onClick={() => { setActiveBottomTab("explore"); setActiveTab(CATEGORIES.indexOf(cat)); scrollToTop(); }} style={{ color: "#ff0000", fontSize: "12px", fontWeight: "800", background: "none", border: "none" }}>See All</button>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
                       {dashboardVideos[cat]?.map(v => (
@@ -141,7 +154,6 @@ export default function Home() {
                 ))}
               </div>
             ) : (
-              // PROFILE VIEW
               <div style={{ color: "#8e8e8e", textAlign: "center", marginTop: "100px" }}>
                 <UserIcon size={48} style={{ margin: "0 auto 20px" }} />
                 <h3>Profile Coming Soon</h3>
@@ -153,7 +165,6 @@ export default function Home() {
             )}
           </div>
 
-          {/* 🟢 SIDEBAR FIX: flexShrink: 0 protects right sidebar */}
           {isDesktop && (
             <div style={{ flexShrink: 0 }}>
               <SuggestedSidebar suggestions={sidebarSuggestions} onVideoClick={handleOpenVideo} />
@@ -162,15 +173,36 @@ export default function Home() {
         </div>
       </div>
 
+      {/* 🟢 MOBILE BOTTOM NAV (Scroll to top logic added) */}
       {!isDesktop && (
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, height: "65px", background: "rgba(0,0,0,0.95)", backdropFilter: "blur(10px)", borderTop: "1px solid #262626", display: "flex", alignItems: "center", justifyContent: "space-around", zIndex: 2000 }}>
-          <button onClick={() => setActiveBottomTab("home")} style={{ background: "none", border: "none", color: activeBottomTab === "home" ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+          <button 
+            onClick={() => {
+              if (activeBottomTab === "home") scrollToTop();
+              else setActiveBottomTab("home");
+            }} 
+            style={{ background: "none", border: "none", color: activeBottomTab === "home" ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}
+          >
             <HomeIcon size={24} /> <span style={{ fontSize: "10px", fontWeight: "600" }}>Home</span>
           </button>
-          <button onClick={() => setActiveBottomTab("explore")} style={{ background: "none", border: "none", color: activeBottomTab === "explore" ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+          
+          <button 
+            onClick={() => {
+              if (activeBottomTab === "explore") scrollToTop();
+              else setActiveBottomTab("explore");
+            }} 
+            style={{ background: "none", border: "none", color: activeBottomTab === "explore" ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}
+          >
             <Compass size={24} /> <span style={{ fontSize: "10px", fontWeight: "600" }}>Explore</span>
           </button>
-          <button onClick={() => setActiveBottomTab("profile")} style={{ background: "none", border: "none", color: activeBottomTab === "profile" ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+          
+          <button 
+            onClick={() => {
+              if (activeBottomTab === "profile") scrollToTop();
+              else setActiveBottomTab("profile");
+            }} 
+            style={{ background: "none", border: "none", color: activeBottomTab === "profile" ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}
+          >
             <UserIcon size={24} /> <span style={{ fontSize: "10px", fontWeight: "600" }}>Profile</span>
           </button>
         </div>
