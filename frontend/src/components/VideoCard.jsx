@@ -82,10 +82,13 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         <img 
           src={video.thumbnail_url} 
           alt={video.caption || "Thumbnail"}
+          loading="lazy"
+          decoding="async"
           style={{
             width: "100%", height: "100%", objectFit: "cover",
             position: "absolute", inset: 0, zIndex: 2,
             opacity: isHovered ? 0 : 1, transition: "opacity 0.4s"
+            
           }}
         />
         <video
