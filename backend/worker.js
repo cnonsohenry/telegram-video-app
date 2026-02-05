@@ -3,42 +3,55 @@ export default {
     try {
       const url = new URL(request.url);
       
-      /* =====================
-   Worker: Updated Thumbnail Handler with Signature
+/* =====================
+   Worker: Thumbnail Handler (The Final Boss Fix)
 ===================== */
 if (url.pathname.startsWith("/api/thumbnail")) {
   const chatId = url.searchParams.get("chat_id");
   const messageId = url.searchParams.get("message_id");
   const sig = url.searchParams.get("sig");
-  const requestedWidth = url.searchParams.get("w") || 400;
+  const w = parseInt(url.searchParams.get("w")) || 400;
 
-  // 1. VERIFY SIGNATURE (Prevent Hotlinking/Crawling)
+  // 1. Signature Verification
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw", encoder.encode(env.SIGNING_SECRET), 
     { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
   );
-  
   const data = encoder.encode(`${chatId}:${messageId}`);
   const signatureBytes = Uint8Array.from(sig.match(/.{2}/g).map(b => parseInt(b, 16)));
-  
   const isValid = await crypto.subtle.verify("HMAC", key, signatureBytes, data);
+  
   if (!isValid) return new Response("Unauthorized", { status: 403 });
 
-  // 2. Fetch from R2 and Resize (as before)
-  const cacheKey = `thumbs/${chatId}_${messageId}.jpg`;
-  const thumb = await env.VIDEOS_BUCKET.get(cacheKey);
-  
-  if (!thumb) return new Response("Not found", { status: 404 });
+  // 2. Fetch directly from the Custom Domain with 'cf' options
+  // This tells Cloudflare to grab the image and resize it before giving it to the worker
+  const imageOriginUrl = `https://bucket.naijahomemade.com/thumbs/${chatId}_${messageId}.jpg`;
 
-  const headers = new Headers(corsHeaders());
+  const response = await fetch(imageOriginUrl, {
+  cf: {
+    image: {
+      width: w,
+      height: Math.round(w * 1.5), // 🟢 Providing height fixes the 'cover' warning
+      fit: 'cover',
+      format: 'webp', // 🟢 Explicitly asking for webp ensures it transforms
+      quality: 80
+    }
+  }
+});
+  // 3. Handle Errors from the Custom Domain
+  if (!response.ok) {
+    return new Response(`Origin Error: ${response.status}`, { status: response.status });
+  }
+
+  // 4. Return the optimized image
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", "*");
   headers.set("Cache-Control", "public, max-age=31536000, immutable");
 
-  return new Response(thumb.body, { 
-    headers,
-    cf: {
-      image: { format: 'auto', width: requestedWidth, fit: 'cover', quality: 80 }
-    }
+  return new Response(response.body, {
+    status: 200,
+    headers: headers
   });
 }
 

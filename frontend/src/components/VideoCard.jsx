@@ -1,20 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Play } from 'lucide-react';
-// 🟢 Import the new utility
-import { getOptimizedThumbnail } from "../utils/imageOptimizer";
 
 export default function VideoCard({ video, onOpen, layoutType }) {
   const videoRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  
+  // 🟢 NEW: Track if the thumbnail image has loaded
+  const [isImgLoaded, setIsImgLoaded] = useState(false);
 
   const isKnacks = layoutType === 'knacks';
-  const isLarge = layoutType === 'baddies';
-
-  // 🟢 Optimized Thumbnail URL: Requests a 400px WebP from your worker
+  
+  // 🟢 Optimized Thumbnail URL
   const thumbSrc = `${video.thumbnail_url}&w=400`;
 
-  // Height logic: Masonry for Knacks, standard 200px for others
+  // Height logic
   const cardHeight = isKnacks 
     ? (parseInt(video.message_id) % 2 === 0 ? "260px" : "310px") 
     : "200px";
@@ -22,24 +22,17 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsVisible(entry.isIntersecting);
-      },
+      ([entry]) => { setIsVisible(entry.isIntersecting); },
       { threshold: 0.1 }
     );
-
     observer.observe(el);
-    return () => {
-      if (el) observer.unobserve(el);
-    };
+    return () => { if (el) observer.unobserve(el); };
   }, []);
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-
     if (isVisible) {
       el.play().catch(() => {});
     } else {
@@ -52,15 +45,10 @@ export default function VideoCard({ video, onOpen, layoutType }) {
     <div
       onClick={() => onOpen(video)}
       style={{
-        display: "flex",
-        flexDirection: "column",
-        background: "#1c1c1e", 
-        borderRadius: "12px", 
-        overflow: "hidden",
-        width: "100%",
-        height: "100%", 
-        cursor: "pointer",
-        transition: "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s"
+        display: "flex", flexDirection: "column",
+        background: "#1c1c1e", borderRadius: "12px", 
+        overflow: "hidden", width: "100%", height: "100%", 
+        cursor: "pointer", position: "relative"
       }}
       onMouseEnter={(e) => { 
         if (window.innerWidth > 1024) {
@@ -75,27 +63,39 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         }
       }}
     >
-      {/* MEDIA CONTAINER */}
+      {/* 🟢 MEDIA CONTAINER */}
       <div style={{ 
-        position: "relative", 
-        width: "100%", 
-        height: cardHeight, 
-        background: "#000",
-        overflow: "hidden"
+        position: "relative", width: "100%", height: cardHeight, 
+        background: "#000", overflow: "hidden"
       }}>
+        
+        {/* 🟢 1. SKELETON OVERLAY (Visible only while loading) */}
+        {!isImgLoaded && (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 5,
+            background: "linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%)",
+            backgroundSize: "200% 100%",
+            animation: "skeleton-loading 1.5s infinite"
+          }} />
+        )}
+
+        {/* 🟢 2. THE THUMBNAIL IMAGE */}
         <img 
-          // 🟢 Use the optimized WebP source
           src={thumbSrc} 
           alt={video.caption || "Thumbnail"}
           loading="lazy"
           decoding="async"
+          // When the image is ready, hide the skeleton
+          onLoad={() => setIsImgLoaded(true)}
           style={{
             width: "100%", height: "100%", objectFit: "cover",
             position: "absolute", inset: 0, zIndex: 2,
-            opacity: isHovered ? 0 : 1, transition: "opacity 0.4s",
-            background: "#1a1a1a" // Dark placeholder during load
+            // Fade in the image smoothly
+            opacity: (isImgLoaded && !isHovered) ? 1 : 0, 
+            transition: "opacity 0.4s"
           }}
         />
+
         <video
           ref={videoRef}
           src={video.video_url}
@@ -145,6 +145,14 @@ export default function VideoCard({ video, onOpen, layoutType }) {
           </span>
         </div>
       </div>
+
+      {/* 🟢 CSS ANIMATION FOR SKELETON */}
+      <style>{`
+        @keyframes skeleton-loading {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
     </div>
   );
 }
