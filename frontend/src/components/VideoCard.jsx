@@ -12,7 +12,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   const isLarge = layoutType === 'baddies';
 
   // 🟢 Optimized Thumbnail URL: Requests a 400px WebP from your worker
-  const optimizedThumb = getOptimizedThumbnail(video.chat_id, video.message_id, 400);
+  const thumbSrc = `${video.thumbnail_url}&w=400`;
 
   // Height logic: Masonry for Knacks, standard 200px for others
   const cardHeight = isKnacks 
@@ -85,7 +85,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       }}>
         <img 
           // 🟢 Use the optimized WebP source
-          src={optimizedThumb} 
+          src={thumbSrc} 
           alt={video.caption || "Thumbnail"}
           loading="lazy"
           decoding="async"

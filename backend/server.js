@@ -217,7 +217,18 @@ app.get("/api/video", async (req, res) => {
 });
 
 /* =====================
-   List videos (With Bundled Suggestions)
+   HELPER: Sign Thumbnail URL
+===================== */
+function signThumbnail(chatId, messageId) {
+  const payload = `${chatId}:${messageId}`;
+  return crypto
+    .createHmac("sha256", process.env.SIGNING_SECRET)
+    .update(payload)
+    .digest("hex");
+}
+
+/* =====================
+   List videos (With Signed Thumbnails)
 ===================== */
 app.get("/api/videos", async (req, res) => {
   try {
@@ -226,9 +237,8 @@ app.get("/api/videos", async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category || "hotties";
     
-    const host = req.get('host');
-    const protocol = host.includes('localhost') ? 'http' : 'https';
-    const baseUrl = `${protocol}://${host}`;
+    // 🟢 Worker domain for direct thumbnail delivery
+    const mediaBaseUrl = "https://media.naijahomemade.com";
 
     // 1. Fetch Main Grid Videos
     let query;
@@ -244,7 +254,7 @@ app.get("/api/videos", async (req, res) => {
 
     const videosRes = await pool.query(query, queryValues);
 
-    // 2. 🟢 EXTRA: Fetch Suggestions ONLY on Page 1 (Prevents server load)
+    // 2. Fetch Suggestions ONLY on Page 1
     let suggestions = [];
     if (page === 1) {
       const suggestQuery = `
@@ -261,24 +271,28 @@ app.get("/api/videos", async (req, res) => {
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
 
-    // Helper to map video object with thumbnails
-    const mapVideo = (v) => ({
-      chat_id: v.chat_id,
-      message_id: v.message_id,
-      views: v.views,
-      caption: v.caption,
-      uploader_id: v.uploader_id,
-      uploader_name: v.uploader_name || "Member",
-      created_at: v.created_at,
-      thumbnail_url: `${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
-    });
+    // 🟢 Helper to map video object with SECURE thumbnails
+    const mapVideo = (v) => {
+      const sig = signThumbnail(v.chat_id, v.message_id);
+      return {
+        chat_id: v.chat_id,
+        message_id: v.message_id,
+        views: v.views,
+        caption: v.caption,
+        uploader_id: v.uploader_id,
+        uploader_name: v.uploader_name || "Member",
+        created_at: v.created_at,
+        // 🟢 Includes the security signature for the Worker to verify
+        thumbnail_url: `${mediaBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`
+      };
+    };
 
     res.json({
       page,
       limit,
       total,
       videos: videosRes.rows.map(mapVideo),
-      suggestions: suggestions.map(mapVideo) // 🟢 Sent only when page=1
+      suggestions: suggestions.map(mapVideo)
     });
   } catch (err) {
     console.error("DB Error:", err);

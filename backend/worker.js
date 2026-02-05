@@ -4,37 +4,43 @@ export default {
       const url = new URL(request.url);
       
       /* =====================
-         1. ENHANCED THUMBNAIL HANDLER
-      ===================== */
-      if (url.pathname.startsWith("/api/thumbnail")) {
-        const chatId = url.searchParams.get("chat_id");
-        const messageId = url.searchParams.get("message_id");
-        const requestedWidth = url.searchParams.get("w") || 400; // Default to 400px
-        
-        const cacheKey = `thumbs/${chatId}_${messageId}.jpg`;
-        
-        // Fetch original from R2
-        const thumb = await env.VIDEOS_BUCKET.get(cacheKey);
-        if (!thumb) return new Response("Not found", { status: 404 });
+   Worker: Updated Thumbnail Handler with Signature
+===================== */
+if (url.pathname.startsWith("/api/thumbnail")) {
+  const chatId = url.searchParams.get("chat_id");
+  const messageId = url.searchParams.get("message_id");
+  const sig = url.searchParams.get("sig");
+  const requestedWidth = url.searchParams.get("w") || 400;
 
-        const headers = new Headers(corsHeaders());
-        headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  // 1. VERIFY SIGNATURE (Prevent Hotlinking/Crawling)
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", encoder.encode(env.SIGNING_SECRET), 
+    { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+  );
+  
+  const data = encoder.encode(`${chatId}:${messageId}`);
+  const signatureBytes = Uint8Array.from(sig.match(/.{2}/g).map(b => parseInt(b, 16)));
+  
+  const isValid = await crypto.subtle.verify("HMAC", key, signatureBytes, data);
+  if (!isValid) return new Response("Unauthorized", { status: 403 });
 
-        /* Cloudflare Image Resizing (The "Turbo" Step)
-           This automatically converts to WebP/AVIF if the browser supports it.
-        */
-        return new Response(thumb.body, { 
-          headers,
-          cf: {
-            image: {
-              format: 'auto',       // Automatically serves WebP
-              width: requestedWidth, 
-              fit: 'cover',         // Crops to fill the width/height
-              quality: 80           // High compression with low quality loss
-            }
-          }
-        });
-      }
+  // 2. Fetch from R2 and Resize (as before)
+  const cacheKey = `thumbs/${chatId}_${messageId}.jpg`;
+  const thumb = await env.VIDEOS_BUCKET.get(cacheKey);
+  
+  if (!thumb) return new Response("Not found", { status: 404 });
+
+  const headers = new Headers(corsHeaders());
+  headers.set("Cache-Control", "public, max-age=31536000, immutable");
+
+  return new Response(thumb.body, { 
+    headers,
+    cf: {
+      image: { format: 'auto', width: requestedWidth, fit: 'cover', quality: 80 }
+    }
+  });
+}
 
       /* =====================
          2. EXISTING VIDEO LOGIC
