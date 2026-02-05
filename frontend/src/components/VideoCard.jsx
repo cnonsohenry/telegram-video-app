@@ -46,7 +46,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       onClick={() => onOpen(video)}
       style={{
         display: "flex", flexDirection: "column",
-        background: "#1c1c1e", borderRadius: "12px", 
+        background: "#1c1c1e", borderRadius: "0px", 
         overflow: "hidden", width: "100%", height: "100%", 
         cursor: "pointer", position: "relative"
       }}
@@ -69,7 +69,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         background: "#000", overflow: "hidden"
       }}>
         
-        {/* 🟢 1. SKELETON OVERLAY (Visible only while loading) */}
+        {/* 🟢 1. SKELETON OVERLAY (Visible only while loading) 
         {!isImgLoaded && (
           <div style={{
             position: "absolute", inset: 0, zIndex: 5,
@@ -78,6 +78,8 @@ export default function VideoCard({ video, onOpen, layoutType }) {
             animation: "skeleton-loading 1.5s infinite"
           }} />
         )}
+
+        */}
 
         {/* 🟢 2. THE THUMBNAIL IMAGE */}
         <img 
