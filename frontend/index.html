@@ -12,6 +12,11 @@
       body, html {
         margin: 0; padding: 0;
         background-color: #000;
+        /* 🟢 CHANGED: Removed 'overflow: hidden' from here to prevent permanent lock */
+      }
+
+      /* 🟢 NEW: Class to temporarily lock scrolling */
+      body.no-scroll {
         overflow: hidden;
       }
 
@@ -31,16 +36,15 @@
       .logo-text {
         color: #ffffff;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        font-size: 24px;
-        font-weight: 800;
-        letter-spacing: -0.5px;
+        font-size: 28px;
+        font-weight: 900;
+        letter-spacing: -1px;
         margin-bottom: 20px;
         text-transform: uppercase;
       }
 
-      /* 🟢 NEW: The Red Highlight Class */
       .highlight {
-        color: #ff3b30; /* A nice vibrant red. Change to your exact logo hex if needed. */
+        color: #ff3b30; 
       }
 
       /* LOADING BAR ANIMATION */
@@ -79,10 +83,13 @@
       }
     </style>
   </head>
-  <body>
+  
+  <body class="no-scroll">
+    
     <div id="splash-screen">
-      <div class="logo-text">Naija<span class="highlight">Homemade</span></div>
-      
+      <div class="logo-text">
+        NAIJA<span class="highlight">HOMEMADE</span>
+      </div>
       <div class="loader-container">
         <div class="loader-bar"></div>
       </div>
@@ -94,14 +101,25 @@
     <script src="https://pl28640933.effectivegatecpm.com/ef/8f/7e/ef8f7ec30c881245423ab301030a35ab.js"></script>
 
     <script>
-      window.addEventListener('load', function() {
+      // Function to unlock scroll and hide splash
+      function removeSplash() {
         const splash = document.getElementById('splash-screen');
-        setTimeout(() => {
-          splash.style.opacity = '0';
-          splash.style.visibility = 'hidden';
-          document.body.style.overflow = 'auto';
-        }, 800);
+        if (!splash) return;
+        
+        splash.style.opacity = '0';
+        splash.style.visibility = 'hidden';
+        
+        // 🟢 UNLOCK SCROLLING
+        document.body.classList.remove('no-scroll');
+      }
+
+      // Wait for load, but also set a safety timer in case Adsterra stalls the load event
+      window.addEventListener('load', () => {
+        setTimeout(removeSplash, 800);
       });
+
+      // Safety Fallback: If page takes longer than 4 seconds (e.g. slow ad), force unlock
+      setTimeout(removeSplash, 4000);
     </script>
   </body>
 </html>

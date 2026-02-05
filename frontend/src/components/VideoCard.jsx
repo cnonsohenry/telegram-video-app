@@ -69,7 +69,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         background: "#000", overflow: "hidden"
       }}>
         
-        {/* 🟢 1. SKELETON OVERLAY (Visible only while loading) 
+        {/* 🟢 1. SKELETON OVERLAY (Visible only while loading) */}
         {!isImgLoaded && (
           <div style={{
             position: "absolute", inset: 0, zIndex: 5,
@@ -79,7 +79,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
           }} />
         )}
 
-        */}
+        
 
         {/* 🟢 2. THE THUMBNAIL IMAGE */}
         <img 
