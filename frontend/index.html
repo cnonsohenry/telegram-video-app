@@ -10,18 +10,25 @@
     <title>NaijaHomemade</title>
     
     <style>
-      /* Targets the ad iframe by looking for IDs starting with "container-" 
-         and the specific high z-index Adsterra uses.
-      */
+      /* Targets the Adsterra Social Bar iframe */
       iframe[id^="container-"][style*="z-index: 2147483647"] {
-        bottom: auto !important;             /* Unstick from top */
+        /* 1. Reset bottom positions */
+        bottom: auto !important;
         
-        /* 🟢 Adjusted: Move it up 70px to clear the nav bar */
-        top: 70px !important;          
+        /* 2. Set to TOP and push down 65px (adjust this to match your nav height) */
+        top: 65px !important;             
         
-        inset: auto 0px 70px !important;  /* Ensure 'inset' matches the bottom spacing */
-        position: fixed !important;       /* Ensure it floats */
-        margin-top: 0px !important;    /* Reset any margins */
+        /* 3. Sync 'inset' to match the top spacing: [top] [right] [bottom] [left] */
+        inset: 65px 0px auto 0px !important;  
+        
+        position: fixed !important;       
+        margin-top: 0px !important;
+        
+        /* Ensure it's centered if it's not full width */
+        left: 0 !important;
+        right: 0 !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
       }
     </style>
   </head>
