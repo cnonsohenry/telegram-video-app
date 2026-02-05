@@ -3,22 +3,42 @@ export default {
     try {
       const url = new URL(request.url);
       
-      // Handle Thumbnail Requests (Optional: if called via worker)
+      /* =====================
+         1. ENHANCED THUMBNAIL HANDLER
+      ===================== */
       if (url.pathname.startsWith("/api/thumbnail")) {
         const chatId = url.searchParams.get("chat_id");
         const messageId = url.searchParams.get("message_id");
+        const requestedWidth = url.searchParams.get("w") || 400; // Default to 400px
+        
         const cacheKey = `thumbs/${chatId}_${messageId}.jpg`;
         
+        // Fetch original from R2
         const thumb = await env.VIDEOS_BUCKET.get(cacheKey);
         if (!thumb) return new Response("Not found", { status: 404 });
 
         const headers = new Headers(corsHeaders());
-        headers.set("Content-Type", "image/jpeg");
         headers.set("Cache-Control", "public, max-age=31536000, immutable");
-        return new Response(thumb.body, { headers });
+
+        /* Cloudflare Image Resizing (The "Turbo" Step)
+           This automatically converts to WebP/AVIF if the browser supports it.
+        */
+        return new Response(thumb.body, { 
+          headers,
+          cf: {
+            image: {
+              format: 'auto',       // Automatically serves WebP
+              width: requestedWidth, 
+              fit: 'cover',         // Crops to fill the width/height
+              quality: 80           // High compression with low quality loss
+            }
+          }
+        });
       }
 
-      /* ===== EXISTING VIDEO LOGIC ===== */
+      /* =====================
+         2. EXISTING VIDEO LOGIC
+      ===================== */
       if (request.method !== "GET" && request.method !== "OPTIONS") return corsResponse("Method not allowed", 405);
       if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders() });
 
@@ -40,12 +60,13 @@ export default {
         const tgResponse = await fetch(telegramUrl);
         if (!tgResponse.ok) return corsResponse("Telegram fetch failed", tgResponse.status);
 
-        // Optimization: Put and then get
         await env.VIDEOS_BUCKET.put(cacheKey, tgResponse.body, {
           httpMetadata: { contentType: "video/mp4" },
         });
         object = await env.VIDEOS_BUCKET.get(cacheKey, { range: request.headers });
       }
+
+      if (!object) return corsResponse("Not found", 404);
 
       const headers = new Headers(corsHeaders());
       object.writeHttpMetadata(headers);
@@ -74,8 +95,7 @@ function corsHeaders() {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Range, Content-Type",
-    "Access-Control-Expose-Headers":
-      "Content-Range, Content-Length, Accept-Ranges",
+    "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges",
   };
 }
 
@@ -87,27 +107,16 @@ function corsResponse(body, status) {
 }
 
 async function verifySignature(filePath, exp, sig, secret) {
-  // Expiry check
   if (!exp || Date.now() / 1000 > Number(exp)) return false;
-
-  // Hex validation
   if (!/^[a-f0-9]{64}$/i.test(sig)) return false;
 
   const encoder = new TextEncoder();
-
   const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["verify"]
+    "raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
   );
 
   const data = encoder.encode(`${filePath}:${exp}`);
-
-  const signatureBytes = Uint8Array.from(
-    sig.match(/.{2}/g).map(b => parseInt(b, 16))
-  );
+  const signatureBytes = Uint8Array.from(sig.match(/.{2}/g).map(b => parseInt(b, 16)));
 
   return crypto.subtle.verify("HMAC", key, signatureBytes, data);
 }

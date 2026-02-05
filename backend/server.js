@@ -27,6 +27,16 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+// Configure R2 Client
+const r2 = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT, // e.g., https://<account_id>.r2.cloudflarestorage.com
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+});
+
 /* =====================
    Create/Update Tables
 ===================== */
@@ -77,7 +87,39 @@ function signWorkerUrl(filePath) {
 }
 
 /* =====================
-   Webhook (Saves User & Video)
+   HELPER: Upload Thumbnail to R2
+===================== */
+async function uploadThumbnailToR2(thumbFileId, chatId, messageId) {
+  if (!thumbFileId) return null;
+  
+  try {
+    // 1. Get file path from Telegram
+    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: thumbFileId } });
+    const filePath = fileRes.data.result.file_path;
+
+    // 2. Download the image buffer
+    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${filePath}`, { responseType: "arraybuffer" });
+    const buffer = Buffer.from(imageRes.data);
+
+    // 3. Upload to Cloudflare R2
+    const key = `thumbs/${chatId}_${messageId}.jpg`;
+    await r2.send(new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: "image/jpeg",
+    }));
+
+    console.log(`✅ Webhook: Thumbnail saved to R2 -> ${key}`);
+    return key;
+  } catch (err) {
+    console.error("❌ Webhook Thumbnail Sync Failed:", err.message);
+    return null;
+  }
+}
+
+/* =====================
+   Webhook (Updated with R2 Sync)
 ===================== */
 app.post("/webhook", async (req, res) => {
   try {
@@ -118,7 +160,16 @@ app.post("/webhook", async (req, res) => {
 
     const chatId = (message.forward_from_chat?.id ?? message.chat.id).toString();
     const messageId = (message.forward_from_message_id ?? message.message_id).toString();
+    
+    // Identify Thumbnail
     const thumb = media.thumb || media.thumbs?.[0] || media.thumbnail || null;
+    const thumbFileId = thumb?.file_id || null;
+
+    // 🟢 NEW: Trigger R2 Upload immediately
+    if (thumbFileId) {
+      // We don't 'await' this so the webhook returns 200 to Telegram immediately
+      uploadThumbnailToR2(thumbFileId, chatId, messageId);
+    }
 
     await pool.query(
       `INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id, uploader_id, category, caption)
@@ -129,7 +180,7 @@ app.post("/webhook", async (req, res) => {
           category = EXCLUDED.category,
           caption = EXCLUDED.caption,
           uploader_id = EXCLUDED.uploader_id`,
-      [chatId, messageId, media.file_id, thumb?.file_id || null, userId, category, cleanCaption]
+      [chatId, messageId, media.file_id, thumbFileId, userId, category, cleanCaption]
     );
 
     res.sendStatus(200);
@@ -233,16 +284,6 @@ app.get("/api/videos", async (req, res) => {
     console.error("DB Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
-});
-
-// Configure R2 Client
-const r2 = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ENDPOINT, // e.g., https://<account_id>.r2.cloudflarestorage.com
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-  },
 });
 
 /* =====================

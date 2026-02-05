@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Play } from 'lucide-react';
+// 🟢 Import the new utility
+import { getOptimizedThumbnail } from "../utils/imageOptimizer";
 
 export default function VideoCard({ video, onOpen, layoutType }) {
   const videoRef = useRef(null);
@@ -9,7 +11,10 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   const isKnacks = layoutType === 'knacks';
   const isLarge = layoutType === 'baddies';
 
-  // Height logic: Masonry for Knacks, standard 200px for others (fixes mobile grid congestion)
+  // 🟢 Optimized Thumbnail URL: Requests a 400px WebP from your worker
+  const optimizedThumb = getOptimizedThumbnail(video.chat_id, video.message_id, 400);
+
+  // Height logic: Masonry for Knacks, standard 200px for others
   const cardHeight = isKnacks 
     ? (parseInt(video.message_id) % 2 === 0 ? "260px" : "310px") 
     : "200px";
@@ -49,19 +54,18 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       style={{
         display: "flex",
         flexDirection: "column",
-        // 🟢 Unified background for all cards so captions are readable
         background: "#1c1c1e", 
         borderRadius: "12px", 
         overflow: "hidden",
         width: "100%",
-        height: "100%", // Fill grid cell height
+        height: "100%", 
         cursor: "pointer",
         transition: "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s"
       }}
       onMouseEnter={(e) => { 
         if (window.innerWidth > 1024) {
           e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-          e.currentTarget.style.background = "#252525"; // Lighter on hover
+          e.currentTarget.style.background = "#252525";
         }
       }}
       onMouseLeave={(e) => { 
@@ -75,20 +79,21 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       <div style={{ 
         position: "relative", 
         width: "100%", 
-        height: cardHeight, // 🟢 Enforced height to prevent layout shifts
+        height: cardHeight, 
         background: "#000",
         overflow: "hidden"
       }}>
         <img 
-          src={video.thumbnail_url} 
+          // 🟢 Use the optimized WebP source
+          src={optimizedThumb} 
           alt={video.caption || "Thumbnail"}
           loading="lazy"
           decoding="async"
           style={{
             width: "100%", height: "100%", objectFit: "cover",
             position: "absolute", inset: 0, zIndex: 2,
-            opacity: isHovered ? 0 : 1, transition: "opacity 0.4s"
-            
+            opacity: isHovered ? 0 : 1, transition: "opacity 0.4s",
+            background: "#1a1a1a" // Dark placeholder during load
           }}
         />
         <video
@@ -115,7 +120,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         </div>
       </div>
 
-      {/* 🟢 CAPTION SECTION (Always Visible) */}
+      {/* CAPTION SECTION */}
       <div style={{ padding: "12px 10px", display: "flex", flexDirection: "column", flex: 1 }}>
         <p style={{
           margin: "0 0 8px 0", fontSize: "12px", color: "#fff",
