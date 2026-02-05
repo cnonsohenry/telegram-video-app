@@ -3,18 +3,27 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- ✅ Telegram WebApp SDK (MUST be early) -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NaijaHomemade</title>
     
+    <style>
+      /* Targets the ad iframe by looking for IDs starting with "container-" 
+         and the specific high z-index Adsterra uses.
+      */
+      iframe[id^="container-"][style*="z-index: 2147483647"] {
+        top: auto !important;          /* Unstick from top */
+        bottom: 0px !important;        /* Stick to bottom */
+        inset: auto 0px 0px !important; /* CSS logical property to force bottom */
+        position: fixed !important;    /* Ensure it floats */
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
 
-    <!-- Vite entry -->
     <script type="module" src="/src/main.jsx"></script>
 
     <script src="https://pl28640933.effectivegatecpm.com/ef/8f/7e/ef8f7ec30c881245423ab301030a35ab.js"></script>
