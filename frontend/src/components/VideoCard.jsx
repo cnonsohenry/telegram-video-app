@@ -45,7 +45,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       onClick={() => onOpen(video)}
       style={{
         display: "flex", flexDirection: "column",
-        background: "#1c1c1e", borderRadius: "12px", 
+        background: "#1c1c1e", borderRadius: "0px", 
         overflow: "hidden", width: "100%", height: "100%", 
         cursor: "pointer", position: "relative"
       }}
