@@ -6,6 +6,7 @@ import pkg from "pg";
 import https from "https";
 import crypto from "crypto";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import authRoutes from "./auth.js";
 
 const { Pool } = pkg;
 
@@ -68,6 +69,7 @@ async function initDatabase() {
           UNIQUE(chat_id, message_id)
         )
       `);
+      
       console.log("✅ Database initialized (Users & Videos)");
       break;
     } catch (err) {
@@ -85,6 +87,12 @@ function signWorkerUrl(filePath) {
   const sig = crypto.createHmac("sha256", process.env.SIGNING_SECRET).update(payload).digest("hex");
   return { exp, sig };
 }
+
+
+/* =====================
+   AUTH
+===================== */
+app.use("/api/auth", authRoutes);
 
 /* =====================
    HELPER: Upload Thumbnail to R2
