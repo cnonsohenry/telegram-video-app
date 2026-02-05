@@ -14,14 +14,14 @@
          and the specific high z-index Adsterra uses.
       */
       iframe[id^="container-"][style*="z-index: 2147483647"] {
-        top: auto !important;             /* Unstick from top */
+        bottom: auto !important;             /* Unstick from top */
         
         /* 🟢 Adjusted: Move it up 70px to clear the nav bar */
-        bottom: 70px !important;          
+        top: 70px !important;          
         
         inset: auto 0px 70px !important;  /* Ensure 'inset' matches the bottom spacing */
         position: fixed !important;       /* Ensure it floats */
-        margin-bottom: 0px !important;    /* Reset any margins */
+        margin-top: 0px !important;    /* Reset any margins */
       }
     </style>
   </head>
