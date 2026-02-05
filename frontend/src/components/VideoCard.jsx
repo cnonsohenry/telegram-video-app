@@ -6,15 +6,14 @@ export default function VideoCard({ video, onOpen, layoutType }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   
-  // 🟢 NEW: Track if the thumbnail image has loaded
+  // Track image loading state
   const [isImgLoaded, setIsImgLoaded] = useState(false);
 
   const isKnacks = layoutType === 'knacks';
-  
-  // 🟢 Optimized Thumbnail URL
+
+  // Cloudflare Resized URL
   const thumbSrc = `${video.thumbnail_url}&w=400`;
 
-  // Height logic
   const cardHeight = isKnacks 
     ? (parseInt(video.message_id) % 2 === 0 ? "260px" : "310px") 
     : "200px";
@@ -46,10 +45,11 @@ export default function VideoCard({ video, onOpen, layoutType }) {
       onClick={() => onOpen(video)}
       style={{
         display: "flex", flexDirection: "column",
-        background: "#1c1c1e", borderRadius: "0px", 
+        background: "#1c1c1e", borderRadius: "12px", 
         overflow: "hidden", width: "100%", height: "100%", 
         cursor: "pointer", position: "relative"
       }}
+      // Hover effects
       onMouseEnter={(e) => { 
         if (window.innerWidth > 1024) {
           e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
@@ -63,38 +63,34 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         }
       }}
     >
-      {/* 🟢 MEDIA CONTAINER */}
       <div style={{ 
         position: "relative", width: "100%", height: cardHeight, 
         background: "#000", overflow: "hidden"
       }}>
         
-        {/* 🟢 1. SKELETON OVERLAY (Visible only while loading) */}
-        {!isImgLoaded && (
-          <div style={{
-            position: "absolute", inset: 0, zIndex: 5,
-            background: "linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%)",
-            backgroundSize: "200% 100%",
-            animation: "skeleton-loading 1.5s infinite"
-          }} />
-        )}
+        {/* 🟢 1. SKELETON (Now persists and fades out smoothly) */}
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 1, // Sit behind image
+          background: "linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%)",
+          backgroundSize: "200% 100%",
+          animation: "skeleton-loading 1.5s infinite",
+          // Fade out logic:
+          opacity: isImgLoaded ? 0 : 1,
+          transition: "opacity 0.4s ease-in-out"
+        }} />
 
-        
-
-        {/* 🟢 2. THE THUMBNAIL IMAGE */}
+        {/* 🟢 2. IMAGE (Fades in on top) */}
         <img 
           src={thumbSrc} 
           alt={video.caption || "Thumbnail"}
           loading="lazy"
-          decoding="async"
-          // When the image is ready, hide the skeleton
           onLoad={() => setIsImgLoaded(true)}
           style={{
             width: "100%", height: "100%", objectFit: "cover",
-            position: "absolute", inset: 0, zIndex: 2,
-            // Fade in the image smoothly
+            position: "absolute", inset: 0, zIndex: 2, // Sit on top of skeleton
+            // Fade in logic:
             opacity: (isImgLoaded && !isHovered) ? 1 : 0, 
-            transition: "opacity 0.4s"
+            transition: "opacity 0.4s ease-in-out"
           }}
         />
 
@@ -103,13 +99,9 @@ export default function VideoCard({ video, onOpen, layoutType }) {
           src={video.video_url}
           muted loop playsInline
           onPlaying={() => setIsHovered(true)}
-          style={{ 
-            width: "100%", height: "100%", objectFit: "cover",
-            position: "absolute", inset: 0, zIndex: 1 
-          }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0, zIndex: 3 }}
         />
         
-        {/* VIEW COUNT OVERLAY */}
         <div style={{
           position: "absolute", bottom: 8, left: 8, zIndex: 10, 
           display: "flex", alignItems: "center", gap: 4, 
@@ -122,8 +114,12 @@ export default function VideoCard({ video, onOpen, layoutType }) {
         </div>
       </div>
 
-      {/* CAPTION SECTION */}
-      <div style={{ padding: "12px 10px", display: "flex", flexDirection: "column", flex: 1 }}>
+      {/* 🟢 3. PADDING FIX (Separated properties to prevent error) */}
+      <div style={{ 
+        paddingTop: "12px", paddingBottom: "12px", 
+        paddingLeft: "10px", paddingRight: "10px",
+        display: "flex", flexDirection: "column", flex: 1 
+      }}>
         <p style={{
           margin: "0 0 8px 0", fontSize: "12px", color: "#fff",
           lineHeight: "1.4", display: "-webkit-box",
@@ -142,13 +138,12 @@ export default function VideoCard({ video, onOpen, layoutType }) {
                style={{ width: "100%", height: "100%", objectFit: "cover" }}
              />
           </div>
-          <span style={{ fontSize: "11px", color: "#8e8e8e", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ fontSize: "11px", color: "#8e8e8e", fontWeight: "600" }}>
             @{video.uploader_name || "Member"}
           </span>
         </div>
       </div>
 
-      {/* 🟢 CSS ANIMATION FOR SKELETON */}
       <style>{`
         @keyframes skeleton-loading {
           0% { background-position: 200% 0; }
