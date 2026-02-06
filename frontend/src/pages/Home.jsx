@@ -55,7 +55,7 @@ export default function Home() {
   const playVideo = async (video) => {
     try {
       setActiveVideo({ ...video, video_url: null }); 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+      const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       const data = await res.json();
       if (data.video_url) {
         setVideos(prev => prev.map(v => (v.chat_id === video.chat_id && v.message_id === video.message_id) ? { ...v, views: Number(v.views || 0) + 1 } : v));

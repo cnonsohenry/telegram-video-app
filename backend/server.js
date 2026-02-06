@@ -23,6 +23,14 @@ if (!BOT_TOKEN) throw new Error("BOT_TOKEN is missing");
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const TELEGRAM_FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
 
+app.use(cors({
+  origin: [
+    "https://naijahomemade.com",
+    "https://www.naijahomemade.com",
+    "http://localhost:5173" // Keep this for your local dev work
+  ]
+}));
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
