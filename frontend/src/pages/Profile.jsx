@@ -120,11 +120,14 @@ export default function Profile({ onOpenVideo }) {
           </div>
           <div style={{ width: "96px", height: "96px", borderRadius: "50%", overflow: "hidden", border: "1px solid #333", marginBottom: "12px" }}>
              <img 
-               src={user.avatar_url || "https://videos.naijahomemade.com/assets/default-avatar.png"} 
-               style={{ width: "100%", height: "100%", objectFit: "cover" }} 
-               onError={(e) => { e.target.src = "https://videos.naijahomemade.com/assets/default-avatar.png"; }}
-               alt="Profile"
-             />
+  // 🟢 Use the domain that you KNOW works for the fallback
+  src={user.avatar_url || "https://naijahomemade.com/assets/default-avatar.png"} 
+  onError={(e) => { 
+    e.target.src = "https://naijahomemade.com/assets/default-avatar.png"; 
+  }}
+  style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+  alt="Profile"
+/>
           </div>
           <p style={{ margin: "0", fontSize: "14px", color: "#eee" }}>@{user.username}</p>
           <div style={{ display: "flex", gap: "20px", marginTop: "16px", alignItems: "center" }}>
