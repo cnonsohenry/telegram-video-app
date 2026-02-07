@@ -50,20 +50,33 @@ export default function Profile({ onOpenVideo }) {
   }, []);
 
   const fetchProfile = async (token) => {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const userData = await res.json();
-        setUser(userData);
-        setView("dashboard");
-      } else {
-        localStorage.removeItem("auth_token");
-        setView("login");
+  if (!token) return;
+
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+      method: "GET",
+      headers: { 
+        // 🟢 THIS LINE MUST BE EXACT
+        "Authorization": `Bearer ${token}`, 
+        "Content-Type": "application/json"
       }
-    } catch (err) { console.error(err); }
-  };
+    });
+
+    if (res.ok) {
+      const userData = await res.json();
+      setUser(userData);
+      setView("dashboard");
+    } else {
+      // If we get a 401, it means the token is dead or secret changed
+      console.error("Auth check failed with status:", res.status);
+      localStorage.removeItem("auth_token");
+      setUser(null);
+      setView("login");
+    }
+  } catch (err) {
+    console.error("Connection error during auth check:", err);
+  }
+};
 
   const handleAuth = async (e) => {
     e.preventDefault();
