@@ -16,13 +16,6 @@ const agent = new https.Agent({ family: 4 });
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) throw new Error("BOT_TOKEN is missing");
-
-const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
-const TELEGRAM_FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
-
 app.use(cors({
   origin: [
     "https://naijahomemade.com",
@@ -30,6 +23,12 @@ app.use(cors({
     "http://localhost:5173" // Keep this for your local dev work
   ]
 }));
+
+const BOT_TOKEN = process.env.BOT_TOKEN;
+if (!BOT_TOKEN) throw new Error("BOT_TOKEN is missing");
+
+const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+const TELEGRAM_FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

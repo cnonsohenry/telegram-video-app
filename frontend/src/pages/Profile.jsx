@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, Mail, Lock, LogOut, Settings, Video } from "lucide-react";
-import VideoCard from "../components/VideoCard";
+import { User, Mail, Lock, LogOut, Settings, ChevronRight, PlayCircle, ShieldCheck } from "lucide-react";
 
 export default function Profile({ onOpenVideo }) {
   const [user, setUser] = useState(null);
@@ -11,7 +10,6 @@ export default function Profile({ onOpenVideo }) {
   const [formData, setFormData] = useState({ email: "", password: "", username: "" });
   const [error, setError] = useState("");
 
-  // 1. Check for logged-in user on load
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (token) fetchProfile(token);
@@ -27,7 +25,7 @@ export default function Profile({ onOpenVideo }) {
         setUser(userData);
         setView("dashboard");
       } else {
-        localStorage.removeItem("auth_token"); // Token expired
+        localStorage.removeItem("auth_token");
       }
     } catch (err) {
       console.error(err);
@@ -49,14 +47,11 @@ export default function Profile({ onOpenVideo }) {
       });
 
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.error || "Something went wrong");
 
-      // Success!
       localStorage.setItem("auth_token", data.token);
       setUser(data.user);
       setView("dashboard");
-
     } catch (err) {
       setError(err.message);
     } finally {
@@ -70,146 +65,191 @@ export default function Profile({ onOpenVideo }) {
     setView("login");
   };
 
-  // 🟢 1. DASHBOARD VIEW (Logged In)
+  useEffect(() => {
+    // When Profile mounts (opens), add the class
+    document.body.classList.add("hide-ads");
+
+    // When Profile unmounts (closes), remove the class
+    return () => {
+      document.body.classList.remove("hide-ads");
+    };
+  }, []);
+
+  // 🟢 1. MODERN DASHBOARD VIEW
   if (user && view === "dashboard") {
     return (
-      <div style={{ padding: "20px 16px 100px", color: "#fff", minHeight: "100vh" }}>
+      <div style={{ minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "-apple-system, sans-serif" }}>
         
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{ width: "60px", height: "60px", borderRadius: "50%", background: "#333", overflow: "hidden" }}>
-               <img src={user.avatar_url} style={{ width: "100%", height: "100%" }} />
+        {/* Profile Header Card */}
+        <div style={{ 
+          padding: "40px 20px", 
+          background: "linear-gradient(180deg, #1c1c1e 0%, #000 100%)",
+          display: "flex", flexDirection: "column", alignItems: "center", borderBottom: "1px solid #222"
+        }}>
+          <div style={{ position: "relative", marginBottom: "16px" }}>
+            <div style={{ width: "90px", height: "90px", borderRadius: "50%", background: "#333", overflow: "hidden", border: "3px solid #1c1c1e", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+               <img src={user.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Avatar" />
             </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: "20px" }}>{user.username}</h2>
-              <p style={{ margin: 0, color: "#888", fontSize: "12px" }}>{user.email}</p>
+            <div style={{ position: "absolute", bottom: 0, right: 0, background: "#ff3b30", padding: "6px", borderRadius: "50%", border: "2px solid #000" }}>
+              <Settings size={14} color="#fff" />
             </div>
           </div>
-          <Settings size={24} color="#888" />
+          
+          <h2 style={{ margin: 0, fontSize: "22px", fontWeight: "700" }}>{user.username}</h2>
+          <p style={{ margin: "4px 0 0", color: "#666", fontSize: "14px" }}>{user.email}</p>
+
+          {/* Mini Stats (Placeholder) */}
+          <div style={{ display: "flex", gap: "30px", marginTop: "20px" }}>
+            <div style={{ textAlign: "center" }}>
+              <span style={{ display: "block", fontWeight: "800", fontSize: "18px" }}>0</span>
+              <span style={{ color: "#666", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px" }}>Videos</span>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <span style={{ display: "block", fontWeight: "800", fontSize: "18px" }}>0</span>
+              <span style={{ color: "#666", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px" }}>Views</span>
+            </div>
+          </div>
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: "grid", gap: "10px", marginBottom: "30px" }}>
-          <button style={{ 
-            background: "#1c1c1e", border: "none", color: "#fff", padding: "16px", 
-            borderRadius: "12px", display: "flex", alignItems: "center", gap: "10px", fontSize: "16px"
-          }}>
-            <Video size={20} color="#ff3b30" /> My Videos
-          </button>
-          
-          <button onClick={handleLogout} style={{ 
-            background: "#1c1c1e", border: "none", color: "#ff3b30", padding: "16px", 
-            borderRadius: "12px", display: "flex", alignItems: "center", gap: "10px", fontSize: "16px"
-          }}>
-            <LogOut size={20} /> Log Out
-          </button>
+        {/* Menu Actions List */}
+        <div style={{ padding: "20px" }}>
+          <h3 style={{ color: "#444", fontSize: "13px", fontWeight: "600", marginBottom: "10px", paddingLeft: "10px", textTransform: "uppercase" }}>Content</h3>
+          <div style={menuGroupStyle}>
+            <MenuRow icon={<PlayCircle size={20} color="#ff3b30" />} label="My Videos" onClick={() => {}} />
+            <MenuRow icon={<ShieldCheck size={20} color="#34c759" />} label="Privacy Settings" onClick={() => {}} border={false} />
+          </div>
+
+          <h3 style={{ color: "#444", fontSize: "13px", fontWeight: "600", marginBottom: "10px", marginTop: "30px", paddingLeft: "10px", textTransform: "uppercase" }}>Account</h3>
+          <div style={menuGroupStyle}>
+             <button onClick={handleLogout} style={{ ...rowStyle, color: "#ff3b30", justifyContent: "center", borderBottom: "none" }}>
+               Log Out
+             </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // 🟢 2. AUTH FORMS (Login / Register)
+  // 🟢 2. SLEEK AUTH VIEW
   return (
     <div style={{ 
-      display: "flex", flexDirection: "column", justifyContent: "center", 
-      padding: "40px 24px", minHeight: "80vh", color: "#fff" 
+      minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", 
+      padding: "30px", background: "#000", color: "#fff" 
     }}>
-      <div style={{ textAlign: "center", marginBottom: "40px" }}>
-        <h1 style={{ fontSize: "32px", fontWeight: "900", marginBottom: "8px" }}>
+      
+      {/* Brand Header */}
+      <div style={{ textAlign: "center", marginBottom: "50px", animation: "fadeIn 0.8s ease" }}>
+        <h1 style={{ fontSize: "28px", fontWeight: "800", letterSpacing: "-1px", margin: 0 }}>
           NAIJA<span style={{ color: "#ff3b30" }}>HOMEMADE</span>
         </h1>
-        <p style={{ color: "#888" }}>Welcome to the community</p>
+        <p style={{ color: "#666", fontSize: "14px", marginTop: "8px" }}>
+          {view === "login" ? "Welcome back, Chief." : "Join the movement."}
+        </p>
       </div>
 
-      <form onSubmit={handleAuth} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <form onSubmit={handleAuth} style={{ display: "flex", flexDirection: "column", gap: "16px", animation: "slideUp 0.5s ease" }}>
         
         {view === "register" && (
-          <div style={inputContainerStyle}>
-            <User size={20} color="#888" />
+          <div style={inputWrapperStyle}>
+            <User size={18} color="#666" style={{ position: "absolute", left: "16px" }} />
             <input 
               placeholder="Username" 
               required
-              style={inputStyle}
+              style={modernInputStyle}
               value={formData.username}
               onChange={e => setFormData({...formData, username: e.target.value})}
             />
           </div>
         )}
 
-        <div style={inputContainerStyle}>
-          <Mail size={20} color="#888" />
+        <div style={inputWrapperStyle}>
+          <Mail size={18} color="#666" style={{ position: "absolute", left: "16px" }} />
           <input 
             type="email" 
             placeholder="Email Address" 
             required
-            style={inputStyle}
+            style={modernInputStyle}
             value={formData.email}
             onChange={e => setFormData({...formData, email: e.target.value})}
           />
         </div>
 
-        <div style={inputContainerStyle}>
-          <Lock size={20} color="#888" />
+        <div style={inputWrapperStyle}>
+          <Lock size={18} color="#666" style={{ position: "absolute", left: "16px" }} />
           <input 
             type="password" 
             placeholder="Password" 
             required
-            style={inputStyle}
+            style={modernInputStyle}
             value={formData.password}
             onChange={e => setFormData({...formData, password: e.target.value})}
           />
         </div>
 
-        {error && <p style={{ color: "#ff3b30", fontSize: "14px", textAlign: "center" }}>{error}</p>}
+        {error && <p style={{ color: "#ff3b30", fontSize: "13px", textAlign: "center", background: "rgba(255, 59, 48, 0.1)", padding: "10px", borderRadius: "8px" }}>{error}</p>}
 
-        <button type="submit" disabled={isLoading} style={{
-          background: "#ff3b30", color: "#fff", border: "none", padding: "16px", 
-          borderRadius: "12px", fontSize: "16px", fontWeight: "bold", marginTop: "10px",
-          opacity: isLoading ? 0.7 : 1
-        }}>
-          {isLoading ? "Please wait..." : (view === "login" ? "Log In" : "Create Account")}
+        <button type="submit" disabled={isLoading} style={primaryButtonStyle}>
+          {isLoading ? <span className="loader"></span> : (view === "login" ? "Log In" : "Create Account")}
         </button>
       </form>
 
-      {/* Social Login Placeholders */}
-      <div style={{ marginTop: "30px", textAlign: "center" }}>
-        <p style={{ color: "#555", fontSize: "12px", marginBottom: "15px" }}>OR CONTINUE WITH</p>
-        <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
-          <SocialButton label="Google" />
-          <SocialButton label="Apple" />
-        </div>
+      {/* Switcher */}
+      <div style={{ marginTop: "40px", textAlign: "center" }}>
+        <p style={{ color: "#666", fontSize: "14px" }}>
+          {view === "login" ? "Don't have an account?" : "Already a member?"}
+        </p>
+        <button 
+          onClick={() => { setError(""); setView(view === "login" ? "register" : "login"); }}
+          style={{ background: "none", border: "none", color: "#fff", fontWeight: "600", fontSize: "14px", marginTop: "5px", cursor: "pointer", textDecoration: "underline", textDecorationColor: "#333" }}
+        >
+          {view === "login" ? "Sign up now" : "Log in here"}
+        </button>
       </div>
 
-      <p style={{ textAlign: "center", marginTop: "30px", color: "#888", fontSize: "14px" }}>
-        {view === "login" ? "New here? " : "Already have an account? "}
-        <span 
-          onClick={() => setView(view === "login" ? "register" : "login")}
-          style={{ color: "#fff", fontWeight: "bold", cursor: "pointer" }}
-        >
-          {view === "login" ? "Sign Up" : "Log In"}
-        </span>
-      </p>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        input:focus { background: #1c1c1e !important; border-color: #444 !important; }
+      `}</style>
     </div>
   );
 }
 
-// Sub-components for styling
-const inputContainerStyle = {
-  background: "#1c1c1e", borderRadius: "12px", padding: "12px 16px", 
-  display: "flex", alignItems: "center", gap: "12px"
-};
+// 🎨 SUB-COMPONENTS & STYLES
 
-const inputStyle = {
-  background: "transparent", border: "none", color: "#fff", fontSize: "16px", 
-  outline: "none", width: "100%"
-};
-
-const SocialButton = ({ label }) => (
-  <button style={{
-    background: "#fff", color: "#000", border: "none", padding: "10px 20px", 
-    borderRadius: "8px", fontWeight: "600", fontSize: "14px", flex: 1
-  }}>
-    {label}
+const MenuRow = ({ icon, label, onClick, border = true }) => (
+  <button onClick={onClick} style={{ ...rowStyle, borderBottom: border ? "1px solid #2a2a2a" : "none" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+      {icon}
+      <span style={{ fontSize: "15px", fontWeight: "500" }}>{label}</span>
+    </div>
+    <ChevronRight size={16} color="#444" />
   </button>
 );
+
+const menuGroupStyle = {
+  background: "#1c1c1e", borderRadius: "16px", overflow: "hidden"
+};
+
+const rowStyle = {
+  width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
+  padding: "16px 20px", background: "none", border: "none", color: "#fff", cursor: "pointer",
+  transition: "background 0.2s"
+};
+
+const inputWrapperStyle = {
+  position: "relative", display: "flex", alignItems: "center"
+};
+
+const modernInputStyle = {
+  width: "100%", background: "#111", border: "1px solid #222", borderRadius: "12px",
+  padding: "16px 16px 16px 48px", color: "#fff", fontSize: "16px", outline: "none",
+  transition: "all 0.2s ease"
+};
+
+const primaryButtonStyle = {
+  background: "#ff3b30", color: "#fff", border: "none", padding: "16px", 
+  borderRadius: "12px", fontSize: "16px", fontWeight: "700", marginTop: "10px",
+  cursor: "pointer", boxShadow: "0 4px 12px rgba(255, 59, 48, 0.3)",
+  transition: "transform 0.1s"
+};

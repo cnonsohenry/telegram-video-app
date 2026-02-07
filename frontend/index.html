@@ -81,6 +81,15 @@
         left: 0 !important; right: 0 !important;
         margin: auto !important;
       }
+
+      /* 🟢 NEW RULE: Hide Ad when 'hide-ads' class is on body */
+    body.hide-ads iframe[id^="container-"],
+    body.hide-ads div[id^="container-"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    z-index: -1 !important;
+  }
     </style>
   </head>
   
