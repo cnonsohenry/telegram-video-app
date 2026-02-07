@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Grid3X3, Heart, Lock, Eye, EyeOff, LogOut } from "lucide-react";
+import { Settings, Grid3X3, Heart, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function Profile({ onOpenVideo }) {
   const [user, setUser] = useState(null);
@@ -11,18 +11,28 @@ export default function Profile({ onOpenVideo }) {
   const [formData, setFormData] = useState({ email: "", password: "", username: "" });
   const [error, setError] = useState("");
 
-  // 🟢 1. SCROLL MANAGEMENT
+  // 🟢 1. HARD SCROLL REMOVAL
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (token) fetchProfile(token);
     
-    // Lock body scroll for app-like feel
-    document.body.style.overflow = "hidden";
+    // This physically prevents the browser from moving the page
+    if (!user) {
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none"; // Kills swipe-to-scroll
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+      document.body.style.height = "100%";
+    } 
     
     return () => { 
+      document.documentElement.style.overflow = "";
       document.body.style.overflow = ""; 
+      document.body.style.touchAction = "";
+      document.body.style.position = "";
     };
-  }, []);
+  }, [user]);
 
   // 🟢 2. ADSTERRA BLOCKER
   useEffect(() => {
@@ -32,7 +42,6 @@ export default function Profile({ onOpenVideo }) {
         el.style.display = 'none';
         el.style.visibility = 'hidden';
         el.style.pointerEvents = 'none';
-        el.style.zIndex = '-100';
       });
     };
     zapAds();
@@ -81,33 +90,24 @@ export default function Profile({ onOpenVideo }) {
     setView("login");
   };
 
-  // 🟢 3. DASHBOARD VIEW (Logged In)
+  // 🟢 3. DASHBOARD VIEW (Scrollable only here)
   if (user && view === "dashboard") {
     return (
       <div style={{ 
-        height: "100vh", 
-        background: "#000", 
-        color: "#fff", 
-        fontFamily: "-apple-system, sans-serif", 
-        overflowY: "auto", 
-        WebkitOverflowScrolling: "touch",
-        paddingBottom: "80px" // Space for Global Nav
+        height: "100vh", background: "#000", color: "#fff", 
+        fontFamily: "-apple-system, sans-serif", overflowY: "auto", 
+        WebkitOverflowScrolling: "touch", paddingBottom: "80px" 
       }}>
-        
-        {/* HEADER */}
         <div style={{ padding: "20px 0", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ display: "flex", width: "100%", justifyContent: "space-between", padding: "0 20px", marginBottom: "10px" }}>
             <div /> 
             <h2 style={{ fontSize: "17px", fontWeight: "700" }}>{user.username}</h2>
             <Settings size={24} onClick={handleLogout} style={{ cursor: "pointer" }} />
           </div>
-
           <div style={{ width: "96px", height: "96px", borderRadius: "50%", overflow: "hidden", border: "1px solid #333", marginBottom: "12px" }}>
              <img src={user.avatar_url || "https://videos.naijahomemade.com/api/avatar?user_id=default"} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="Avatar" />
           </div>
-
           <p style={{ margin: "0", fontSize: "14px", color: "#eee" }}>@{user.username}</p>
-          
           <div style={{ display: "flex", gap: "20px", marginTop: "16px", alignItems: "center" }}>
             <div style={{ textAlign: "center" }}>
               <span style={{ fontWeight: "700", fontSize: "17px" }}>0</span>
@@ -122,21 +122,12 @@ export default function Profile({ onOpenVideo }) {
               <p style={{ margin: 0, fontSize: "13px", color: "#888" }}>Likes</p>
             </div>
           </div>
-
-          <div style={{ display: "flex", gap: "8px", marginTop: "20px" }}>
-            <button style={{ background: "#1c1c1e", border: "none", color: "#fff", padding: "10px 24px", borderRadius: "4px", fontSize: "14px", fontWeight: "600" }}>Edit Profile</button>
-            <button style={{ background: "#1c1c1e", border: "none", color: "#fff", padding: "10px 14px", borderRadius: "4px" }}><Settings size={16} /></button>
-          </div>
         </div>
-
-        {/* STICKY TABS */}
         <div style={{ position: "sticky", top: 0, zIndex: 50, background: "#000", display: "flex", borderBottom: "1px solid #222", marginTop: "10px" }}>
           <TabButton active={activeTab === "videos"} onClick={() => setActiveTab("videos")} icon={<Grid3X3 size={20} />} />
           <TabButton active={activeTab === "premium"} onClick={() => setActiveTab("premium")} icon={<Lock size={20} />} />
           <TabButton active={activeTab === "likes"} onClick={() => setActiveTab("likes")} icon={<Heart size={20} />} />
         </div>
-
-        {/* GRID CONTENT */}
         <div style={{ minHeight: "300px", padding: "1px" }}>
           {activeTab === "videos" && <div style={gridStyle}><div style={emptyStateStyle}>No videos yet</div></div>}
           {activeTab === "premium" && <div style={{ padding: "40px", textAlign: "center", color: "#666" }}><Lock size={40} style={{ marginBottom: "10px" }} /><p>Premium content is locked.</p></div>}
@@ -146,88 +137,107 @@ export default function Profile({ onOpenVideo }) {
     );
   }
 
-  // 🟢 4. LOGIN VIEW (Fixed Layout)
+  // 🟢 4. LOGIN VIEW (Totally Frozen & No Overlap)
   return (
     <div style={containerStyle}>
-      <div style={innerContainer}>
-        <h1 style={logoStyle}>NaijaHomemade</h1>
-        <form onSubmit={handleAuth} style={formStyle}>
-          {view === "register" && (
-            <input placeholder="Username" style={roundedInputStyle} value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} required />
-          )}
-          <input type="email" placeholder="Email address" style={roundedInputStyle} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
-          <div style={{ position: "relative", width: "100%" }}>
-            <input type={showPassword ? "text" : "password"} placeholder="Password" style={roundedInputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required />
-            <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#666", cursor: "pointer", display: "flex" }}>
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+      
+      {/* Scrollable Content Area */}
+      <div style={contentWrapper}>
+        <div style={innerContainer}>
+          <h1 style={logoStyle}>NaijaHomemade</h1>
+          
+          <form onSubmit={handleAuth} style={formStyle}>
+            {view === "register" && (
+              <input placeholder="Username" style={roundedInputStyle} value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} required />
+            )}
+            
+            <input type="email" placeholder="Email address" style={roundedInputStyle} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
+            
+            <div style={{ position: "relative", width: "100%" }}>
+              <input type={showPassword ? "text" : "password"} placeholder="Password" style={roundedInputStyle} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#666", cursor: "pointer", display: "flex" }}>
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+
+            {error && <p style={{ color: "#ff3b30", fontSize: "13px", textAlign: "center", margin: "5px 0" }}>{error}</p>}
+
+            <button type="submit" disabled={isLoading} style={{...loginButtonStyle, opacity: formData.email && formData.password.length >= 6 ? 1 : 0.5 }}>
+              {isLoading ? "..." : (view === "login" ? "Log in" : "Sign up")}
             </button>
-          </div>
-          {error && <p style={{ color: "#ff3b30", fontSize: "14px", textAlign: "center", margin: "10px 0" }}>{error}</p>}
-          <button type="submit" disabled={isLoading} style={{...loginButtonStyle, opacity: formData.email && formData.password.length >= 6 ? 1 : 0.5 }}>
-            {isLoading ? "Please wait..." : (view === "login" ? "Log in" : "Sign up")}
+          </form>
+
+          <div style={dividerContainer}><div style={line} /><span style={orText}>OR</span><div style={line} /></div>
+          
+          <button onClick={() => alert("Coming soon")} style={googleButtonStyle}>
+             <span style={{ fontWeight: "bold", marginRight: "10px" }}>G</span> Continue with Google
           </button>
-        </form>
-        <div style={dividerContainer}><div style={line} /><span style={orText}>OR</span><div style={line} /></div>
-        <button onClick={() => alert("Backend setup needed for Google Auth")} style={googleButtonStyle}>
-           <span style={{ fontSize: "18px", fontWeight: "bold" }}>G</span> 
-           <span>Continue with Google</span>
-        </button>
-        {view === "login" && <p style={forgotPassword}>Forgot password?</p>}
+          
+          {view === "login" && <p style={forgotPassword}>Forgot password?</p>}
+        </div>
       </div>
 
-      {/* 🟢 FIXED FOOTER: Now sits ABOVE the Global Nav */}
+      {/* Footer (Now naturally placed below content) */}
       <div style={footerBox}>
+        <div style={{ height: "1px", background: "#262626", width: "100%", marginBottom: "15px" }} />
         <p style={{ fontSize: "14px", color: "#fff", margin: 0 }}>
           {view === "login" ? "Don't have an account? " : "Have an account? "}
-          <span onClick={() => { setView(view === "login" ? "register" : "login"); setError(""); }} style={{ color: "#ff3b30", fontWeight: "700", cursor: "pointer" }}>{view === "login" ? "Sign up" : "Log in"}</span>
+          <span 
+            onClick={() => { setView(view === "login" ? "register" : "login"); setError(""); }} 
+            style={{ color: "#ff3b30", fontWeight: "700", cursor: "pointer" }}
+          >
+            {view === "login" ? "Sign up" : "Log in"}
+          </span>
         </p>
       </div>
     </div>
   );
 }
 
-// 🎨 COMPONENT STYLES
-const TabButton = ({ active, onClick, icon }) => (
-  <button onClick={onClick} style={{ flex: 1, background: "none", border: "none", borderBottom: active ? "2px solid #fff" : "2px solid transparent", padding: "12px 0", color: active ? "#fff" : "#666", cursor: "pointer", display: "flex", justifyContent: "center", transition: "color 0.2s" }}>
-    {icon}
-  </button>
-);
-const gridStyle = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px" };
-const emptyStateStyle = { gridColumn: "span 3", textAlign: "center", padding: "40px", color: "#444", fontSize: "14px" };
-
-// 🎨 AUTH STYLES
+// 🎨 AUTH STYLES - RE-ENGINEERED FOR STABILITY
 const containerStyle = { 
-  // 🟢 CHANGED: Removed fixed inset/z-index. Now it behaves as a normal page.
-  minHeight: "100vh", 
+  height: "100dvh", 
   background: "#000", 
   display: "flex", 
-  flexDirection: "column", 
-  alignItems: "center", 
-  justifyContent: "center", 
-  padding: "20px", 
-  paddingBottom: "100px", // Extra padding so content isn't hidden by footers
-  touchAction: "none"
+  flexDirection: "column", // 🟢 Stack content and footer
+  overflow: "hidden", 
+  touchAction: "none", 
+  position: "fixed",
+  width: "100%",
+  zIndex: 100
 };
 
-const innerContainer = { width: "100%", maxWidth: "350px", display: "flex", flexDirection: "column", alignItems: "center" };
-const logoStyle = { fontFamily: '"Billabong", cursive', fontSize: "40px", fontWeight: "400", marginBottom: "35px", color: "#fff", fontStyle: "italic" };
-const formStyle = { width: "100%", display: "flex", flexDirection: "column", gap: "12px" };
-const roundedInputStyle = { width: "100%", background: "transparent", border: "1px solid #333", borderRadius: "30px", padding: "14px 20px", color: "#fff", fontSize: "15px", outline: "none", transition: "border-color 0.2s" };
-const loginButtonStyle = { background: "#ff3b30", color: "#fff", border: "none", borderRadius: "30px", padding: "14px", fontSize: "15px", fontWeight: "700", marginTop: "10px", cursor: "pointer", width: "100%" };
-const dividerContainer = { width: "100%", display: "flex", alignItems: "center", margin: "25px 0", gap: "15px" };
-const line = { flex: 1, height: "1px", background: "#262626" };
-const orText = { color: "#8e8e8e", fontSize: "13px", fontWeight: "700" };
-const googleButtonStyle = { width: "100%", background: "#fff", border: "none", borderRadius: "30px", padding: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", color: "#000", fontSize: "14px", fontWeight: "600", cursor: "pointer", marginBottom: "15px" };
-const forgotPassword = { fontSize: "12px", color: "#ccc", cursor: "pointer", marginTop: "5px" };
+const contentWrapper = {
+  flex: 1, // 🟢 Takes up all available space, pushing footer down
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center", // 🟢 Centers form in the remaining space
+  width: "100%",
+  padding: "20px"
+};
 
-// 🟢 ADJUSTED FOOTER BOX: Pinned to bottom, but high enough to clear Global Nav
+const innerContainer = { 
+  width: "100%", 
+  maxWidth: "350px", 
+  display: "flex", 
+  flexDirection: "column", 
+  alignItems: "center" 
+};
+
+const logoStyle = { fontFamily: '"Billabong", cursive', fontSize: "40px", marginBottom: "30px", color: "#fff", fontStyle: "italic" };
+const formStyle = { width: "100%", display: "flex", flexDirection: "column", gap: "10px" };
+const roundedInputStyle = { width: "100%", background: "#121212", border: "1px solid #333", borderRadius: "30px", padding: "12px 20px", color: "#fff", fontSize: "15px", outline: "none" };
+const loginButtonStyle = { background: "#ff3b30", color: "#fff", border: "none", borderRadius: "30px", padding: "14px", fontSize: "15px", fontWeight: "700", marginTop: "10px" };
+const dividerContainer = { width: "100%", display: "flex", alignItems: "center", margin: "20px 0", gap: "15px" };
+const line = { flex: 1, height: "1px", background: "#262626" };
+const orText = { color: "#8e8e8e", fontSize: "13px", fontWeight: "600" };
+const googleButtonStyle = { width: "100%", background: "#fff", border: "none", borderRadius: "30px", padding: "12px", color: "#000", fontSize: "14px", fontWeight: "600", marginBottom: "10px" };
+const forgotPassword = { fontSize: "12px", color: "#ccc", cursor: "pointer" };
+
 const footerBox = { 
-  position: "fixed", 
-  bottom: "70px", // 🟢 Sits ABOVE the App.jsx bottom bar (approx 65px height)
   width: "100%", 
   textAlign: "center", 
-  padding: "20px 0", 
-  borderTop: "1px solid #262626", 
-  background: "#000",
-  zIndex: 10 // Lower z-index than the global nav
+  paddingBottom: "100px", // 🟢 Enough space to clear your App.jsx global nav
+  background: "#000"
 };
