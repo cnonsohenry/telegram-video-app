@@ -50,33 +50,33 @@ export default function Profile({ onOpenVideo }) {
   }, []);
 
   const fetchProfile = async (token) => {
-  if (!token) return;
+    if (!token) return;
 
-  try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
-      method: "GET",
-      headers: { 
-        // 🟢 THIS LINE MUST BE EXACT
-        "Authorization": `Bearer ${token}`, 
-        "Content-Type": "application/json"
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+        method: "GET",
+        headers: { 
+          // 🟢 THIS LINE MUST BE EXACT
+          "Authorization": `Bearer ${token}`, 
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (res.ok) {
+        const userData = await res.json();
+        setUser(userData);
+        setView("dashboard");
+      } else {
+        // If we get a 401, it means the token is dead or secret changed
+        console.error("Auth check failed with status:", res.status);
+        localStorage.removeItem("auth_token");
+        setUser(null);
+        setView("login");
       }
-    });
-
-    if (res.ok) {
-      const userData = await res.json();
-      setUser(userData);
-      setView("dashboard");
-    } else {
-      // If we get a 401, it means the token is dead or secret changed
-      console.error("Auth check failed with status:", res.status);
-      localStorage.removeItem("auth_token");
-      setUser(null);
-      setView("login");
+    } catch (err) {
+      console.error("Connection error during auth check:", err);
     }
-  } catch (err) {
-    console.error("Connection error during auth check:", err);
-  }
-};
+  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -119,7 +119,12 @@ export default function Profile({ onOpenVideo }) {
             <Settings size={24} onClick={handleLogout} style={{ cursor: "pointer" }} />
           </div>
           <div style={{ width: "96px", height: "96px", borderRadius: "50%", overflow: "hidden", border: "1px solid #333", marginBottom: "12px" }}>
-             <img src={user.avatar_url || "https://videos.naijahomemade.com/api/avatar?user_id=default"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+             <img 
+               src={user.avatar_url || "https://videos.naijahomemade.com/assets/default-avatar.png"} 
+               style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+               onError={(e) => { e.target.src = "https://videos.naijahomemade.com/assets/default-avatar.png"; }}
+               alt="Profile"
+             />
           </div>
           <p style={{ margin: "0", fontSize: "14px", color: "#eee" }}>@{user.username}</p>
           <div style={{ display: "flex", gap: "20px", marginTop: "16px", alignItems: "center" }}>
