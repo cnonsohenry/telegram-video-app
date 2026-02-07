@@ -2,6 +2,7 @@
    Backend: Authentication Logic
    File: backend/auth.js
 ===================== */
+import 'dotenv/config'; // 🟢 CRITICAL: Loads .env variables immediately
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -9,11 +10,16 @@ import pkg from "pg";
 const { Pool } = pkg;
 
 const router = express.Router();
+
+// 🟢 1. DATABASE & SECRET SETUP
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_change_me";
 
-// 🟢 1. REGISTER (Email/Password)
+// Debug Log: Runs when server starts to confirm the key is loaded
+console.log(`[AUTH] System Start. Secret Status: ${process.env.JWT_SECRET ? "✅ Loaded from .env" : "⚠️ USING FALLBACK (CHECK .ENV)"}`);
+
+// 🟢 2. REGISTER (Email/Password)
 router.post("/register", async (req, res) => {
   const { email, password, username } = req.body;
   
@@ -26,10 +32,10 @@ router.post("/register", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
-    // Insert User
+    // Insert User with Working Avatar
     const newUser = await pool.query(
-      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username",
-      [email, hash, username || email.split('@')[0], "https://via.placeholder.com/150"]
+      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url",
+      [email, hash, username || email.split('@')[0], "https://naijahomemade.com/assets/default-avatar.png"]
     );
 
     // Generate Token
@@ -38,12 +44,12 @@ router.post("/register", async (req, res) => {
     res.json({ token, user: newUser.rows[0] });
 
   } catch (err) {
-    console.error(err);
+    console.error("[REGISTER ERROR]", err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// 🟢 2. LOGIN (Email/Password)
+// 🟢 3. LOGIN (Email/Password)
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -61,21 +67,43 @@ router.post("/login", async (req, res) => {
     res.json({ token, user: userData });
 
   } catch (err) {
+    console.error("[LOGIN ERROR]", err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// 🟢 3. GET PROFILE (Protected Route)
+// 🟢 4. GET PROFILE (Protected Route - Improved Debugging)
 router.get("/me", async (req, res) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "No token" });
+  const authHeader = req.headers.authorization;
+
+  // Check 1: Is the header present and formatted correctly?
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.warn("[AUTH FAIL] No Bearer token provided");
+    return res.status(401).json({ error: "No token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
 
   try {
+    // Check 2: Verify the token signature
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await pool.query("SELECT id, email, username, avatar_url, settings FROM app_users WHERE id = $1", [decoded.id]);
+    
+    const user = await pool.query(
+      "SELECT id, email, username, avatar_url, settings FROM app_users WHERE id = $1", 
+      [decoded.id]
+    );
+
+    if (user.rows.length === 0) {
+      console.warn(`[AUTH FAIL] User ID ${decoded.id} not found in DB`);
+      return res.status(401).json({ error: "User not found" });
+    }
+
     res.json(user.rows[0]);
+
   } catch (err) {
-    res.status(401).json({ error: "Invalid token" });
+    // Check 3: Log why the token was rejected
+    console.error(`[AUTH FAIL] Invalid Token: ${err.message}`);
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 });
 
