@@ -159,11 +159,20 @@ useEffect(() => {
     );
   }
 
-  // 🟢 2. SLEEK AUTH VIEW
+  // 🟢 2. SLEEK AUTH VIEW (LOCKED)
   return (
     <div style={{ 
-      minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", 
-      padding: "30px", background: "#000", color: "#fff" 
+      position: "fixed",      // 🟢 1. Locks it to the screen
+      inset: 0,               // 🟢 2. Stretches to all 4 corners
+      height: "100dvh",       // 🟢 3. Dynamic height (fixes mobile address bar glitches)
+      overflow: "hidden",     // 🟢 4. Kills the scrollbar
+      display: "flex", 
+      flexDirection: "column", 
+      justifyContent: "center", 
+      padding: "30px", 
+      background: "#000", 
+      color: "#fff",
+      touchAction: "none"     // 🟢 5. Disables swipe gestures on the background
     }}>
       
       {/* Brand Header */}
@@ -238,7 +247,8 @@ useEffect(() => {
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        input:focus { background: #1c1c1e !important; border-color: #444 !important; }
+        /* 🟢 Optional: Prevent rubber-banding on iOS */
+        html, body { overscroll-behavior: none; }
       `}</style>
     </div>
   );
