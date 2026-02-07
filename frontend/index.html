@@ -82,13 +82,14 @@
         margin: auto !important;
       }
 
-      /* 🟢 NEW RULE: Hide Ad when 'hide-ads' class is on body */
-    body.hide-ads iframe[id^="container-"],
-    body.hide-ads div[id^="container-"] {
+/* Target the exact z-index Adsterra uses to force it hidden */
+  body.hide-ads [style*="z-index: 2147483647"],
+  body.hide-ads [id^="container-"],
+  body.hide-ads .social-bar-container {
     display: none !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
     visibility: hidden !important;
-    pointer-events: none !important;
-    z-index: -1 !important;
   }
     </style>
   </head>

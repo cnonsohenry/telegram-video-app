@@ -65,15 +65,44 @@ export default function Profile({ onOpenVideo }) {
     setView("login");
   };
 
-  useEffect(() => {
-    // When Profile mounts (opens), add the class
-    document.body.classList.add("hide-ads");
+useEffect(() => {
+  // 1. Function to find and destroy the ad
+  const zapAds = () => {
+    // This targets both the iframe and the dynamic container Adsterra creates
+    const adElements = document.querySelectorAll('iframe[id^="container-"], div[id^="container-"], [id*="effectivegatecpm"]');
+    adElements.forEach(el => {
+      el.style.display = 'none';
+      el.style.opacity = '0';
+      el.style.pointerEvents = 'none';
+      // Optional: el.remove(); // Use this if style hiding isn't enough
+    });
+  };
 
-    // When Profile unmounts (closes), remove the class
-    return () => {
-      document.body.classList.remove("hide-ads");
-    };
-  }, []);
+  // 2. Zap existing ads immediately
+  zapAds();
+
+  // 3. Set up a MutationObserver to zap ads that try to pop up later
+  const observer = new MutationObserver((mutations) => {
+    zapAds();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  // 4. Cleanup when leaving the profile page
+  return () => {
+    observer.disconnect();
+    // Allow ads to return when we go back to Home
+    const adElements = document.querySelectorAll('iframe[id^="container-"], div[id^="container-"]');
+    adElements.forEach(el => {
+      el.style.display = 'block';
+      el.style.opacity = '1';
+      el.style.pointerEvents = 'auto';
+    });
+  };
+}, []);
 
   // 🟢 1. MODERN DASHBOARD VIEW
   if (user && view === "dashboard") {
