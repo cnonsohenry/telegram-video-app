@@ -3,8 +3,8 @@ import { Settings, Grid3X3, Heart, Lock, Eye, EyeOff, LogOut } from "lucide-reac
 
 export default function Profile({ onOpenVideo }) {
   const [user, setUser] = useState(null);
-  const [view, setView] = useState("login"); // 'login', 'register', 'dashboard'
-  const [activeTab, setActiveTab] = useState("videos"); // 'videos', 'premium', 'likes'
+  const [view, setView] = useState("login");
+  const [activeTab, setActiveTab] = useState("videos");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
@@ -16,15 +16,11 @@ export default function Profile({ onOpenVideo }) {
     const token = localStorage.getItem("auth_token");
     if (token) fetchProfile(token);
     
-    // Default: Lock body to prevent browser bounce
-    document.body.style.overflow = "hidden"; 
-    document.body.style.position = "fixed";
-    document.body.style.width = "100%";
+    // Lock body scroll for app-like feel
+    document.body.style.overflow = "hidden";
     
     return () => { 
       document.body.style.overflow = ""; 
-      document.body.style.position = "";
-      document.body.style.width = "";
     };
   }, []);
 
@@ -85,7 +81,7 @@ export default function Profile({ onOpenVideo }) {
     setView("login");
   };
 
-  // 🟢 3. TIKTOK-STYLE DASHBOARD
+  // 🟢 3. DASHBOARD VIEW (Logged In)
   if (user && view === "dashboard") {
     return (
       <div style={{ 
@@ -93,15 +89,15 @@ export default function Profile({ onOpenVideo }) {
         background: "#000", 
         color: "#fff", 
         fontFamily: "-apple-system, sans-serif", 
-        overflowY: "auto", // Allow scrolling INSIDE this container
+        overflowY: "auto", 
         WebkitOverflowScrolling: "touch",
-        paddingBottom: "80px"
+        paddingBottom: "80px" // Space for Global Nav
       }}>
         
-        {/* HEADER SECTION */}
+        {/* HEADER */}
         <div style={{ padding: "20px 0", display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ display: "flex", width: "100%", justifyContent: "space-between", padding: "0 20px", marginBottom: "10px" }}>
-            <div /> {/* Spacer */}
+            <div /> 
             <h2 style={{ fontSize: "17px", fontWeight: "700" }}>{user.username}</h2>
             <Settings size={24} onClick={handleLogout} style={{ cursor: "pointer" }} />
           </div>
@@ -112,7 +108,6 @@ export default function Profile({ onOpenVideo }) {
 
           <p style={{ margin: "0", fontSize: "14px", color: "#eee" }}>@{user.username}</p>
           
-          {/* Stats Row */}
           <div style={{ display: "flex", gap: "20px", marginTop: "16px", alignItems: "center" }}>
             <div style={{ textAlign: "center" }}>
               <span style={{ fontWeight: "700", fontSize: "17px" }}>0</span>
@@ -128,72 +123,30 @@ export default function Profile({ onOpenVideo }) {
             </div>
           </div>
 
-          {/* Edit / Share Buttons */}
           <div style={{ display: "flex", gap: "8px", marginTop: "20px" }}>
-            <button style={{ background: "#1c1c1e", border: "none", color: "#fff", padding: "10px 24px", borderRadius: "4px", fontSize: "14px", fontWeight: "600" }}>
-              Edit Profile
-            </button>
-            <button style={{ background: "#1c1c1e", border: "none", color: "#fff", padding: "10px 14px", borderRadius: "4px" }}>
-              <Settings size={16} />
-            </button>
+            <button style={{ background: "#1c1c1e", border: "none", color: "#fff", padding: "10px 24px", borderRadius: "4px", fontSize: "14px", fontWeight: "600" }}>Edit Profile</button>
+            <button style={{ background: "#1c1c1e", border: "none", color: "#fff", padding: "10px 14px", borderRadius: "4px" }}><Settings size={16} /></button>
           </div>
         </div>
 
-        {/* 🟢 STICKY TABS */}
-        <div style={{ 
-          position: "sticky", 
-          top: 0, 
-          zIndex: 50, 
-          background: "#000", 
-          display: "flex", 
-          borderBottom: "1px solid #222",
-          marginTop: "10px"
-        }}>
-          <TabButton 
-            active={activeTab === "videos"} 
-            onClick={() => setActiveTab("videos")} 
-            icon={<Grid3X3 size={20} />} 
-          />
-          <TabButton 
-            active={activeTab === "premium"} 
-            onClick={() => setActiveTab("premium")} 
-            icon={<Lock size={20} />} 
-          />
-          <TabButton 
-            active={activeTab === "likes"} 
-            onClick={() => setActiveTab("likes")} 
-            icon={<Heart size={20} />} 
-          />
+        {/* STICKY TABS */}
+        <div style={{ position: "sticky", top: 0, zIndex: 50, background: "#000", display: "flex", borderBottom: "1px solid #222", marginTop: "10px" }}>
+          <TabButton active={activeTab === "videos"} onClick={() => setActiveTab("videos")} icon={<Grid3X3 size={20} />} />
+          <TabButton active={activeTab === "premium"} onClick={() => setActiveTab("premium")} icon={<Lock size={20} />} />
+          <TabButton active={activeTab === "likes"} onClick={() => setActiveTab("likes")} icon={<Heart size={20} />} />
         </div>
 
-        {/* 🟢 GRID CONTENT */}
+        {/* GRID CONTENT */}
         <div style={{ minHeight: "300px", padding: "1px" }}>
-          {activeTab === "videos" && (
-            <div style={gridStyle}>
-               {/* Placeholders for now since we don't have user videos loaded yet */}
-               <div style={emptyStateStyle}>No videos yet</div>
-            </div>
-          )}
-
-          {activeTab === "premium" && (
-            <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>
-               <Lock size={40} style={{ marginBottom: "10px" }} />
-               <p>Premium content is locked.</p>
-            </div>
-          )}
-
-          {activeTab === "likes" && (
-            <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>
-               <Heart size={40} style={{ marginBottom: "10px" }} />
-               <p>Videos you liked will appear here.</p>
-            </div>
-          )}
+          {activeTab === "videos" && <div style={gridStyle}><div style={emptyStateStyle}>No videos yet</div></div>}
+          {activeTab === "premium" && <div style={{ padding: "40px", textAlign: "center", color: "#666" }}><Lock size={40} style={{ marginBottom: "10px" }} /><p>Premium content is locked.</p></div>}
+          {activeTab === "likes" && <div style={{ padding: "40px", textAlign: "center", color: "#666" }}><Heart size={40} style={{ marginBottom: "10px" }} /><p>Videos you liked will appear here.</p></div>}
         </div>
       </div>
     );
   }
 
-  // 🟢 4. LOGIN VIEW (LOCKED & ROUNDED)
+  // 🟢 4. LOGIN VIEW (Fixed Layout)
   return (
     <div style={containerStyle}>
       <div style={innerContainer}>
@@ -221,6 +174,8 @@ export default function Profile({ onOpenVideo }) {
         </button>
         {view === "login" && <p style={forgotPassword}>Forgot password?</p>}
       </div>
+
+      {/* 🟢 FIXED FOOTER: Now sits ABOVE the Global Nav */}
       <div style={footerBox}>
         <p style={{ fontSize: "14px", color: "#fff", margin: 0 }}>
           {view === "login" ? "Don't have an account? " : "Have an account? "}
@@ -233,41 +188,27 @@ export default function Profile({ onOpenVideo }) {
 
 // 🎨 COMPONENT STYLES
 const TabButton = ({ active, onClick, icon }) => (
-  <button 
-    onClick={onClick} 
-    style={{ 
-      flex: 1, 
-      background: "none", 
-      border: "none", 
-      borderBottom: active ? "2px solid #fff" : "2px solid transparent", 
-      padding: "12px 0", 
-      color: active ? "#fff" : "#666", 
-      cursor: "pointer",
-      display: "flex",
-      justifyContent: "center",
-      transition: "color 0.2s"
-    }}
-  >
+  <button onClick={onClick} style={{ flex: 1, background: "none", border: "none", borderBottom: active ? "2px solid #fff" : "2px solid transparent", padding: "12px 0", color: active ? "#fff" : "#666", cursor: "pointer", display: "flex", justifyContent: "center", transition: "color 0.2s" }}>
     {icon}
   </button>
 );
-
-const gridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, 1fr)",
-  gap: "1px",
-};
-
-const emptyStateStyle = {
-  gridColumn: "span 3",
-  textAlign: "center",
-  padding: "40px",
-  color: "#444",
-  fontSize: "14px"
-};
+const gridStyle = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px" };
+const emptyStateStyle = { gridColumn: "span 3", textAlign: "center", padding: "40px", color: "#444", fontSize: "14px" };
 
 // 🎨 AUTH STYLES
-const containerStyle = { position: "fixed", inset: 0, background: "#000", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px", touchAction: "none", overscrollBehavior: "none" };
+const containerStyle = { 
+  // 🟢 CHANGED: Removed fixed inset/z-index. Now it behaves as a normal page.
+  minHeight: "100vh", 
+  background: "#000", 
+  display: "flex", 
+  flexDirection: "column", 
+  alignItems: "center", 
+  justifyContent: "center", 
+  padding: "20px", 
+  paddingBottom: "100px", // Extra padding so content isn't hidden by footers
+  touchAction: "none"
+};
+
 const innerContainer = { width: "100%", maxWidth: "350px", display: "flex", flexDirection: "column", alignItems: "center" };
 const logoStyle = { fontFamily: '"Billabong", cursive', fontSize: "40px", fontWeight: "400", marginBottom: "35px", color: "#fff", fontStyle: "italic" };
 const formStyle = { width: "100%", display: "flex", flexDirection: "column", gap: "12px" };
@@ -278,4 +219,15 @@ const line = { flex: 1, height: "1px", background: "#262626" };
 const orText = { color: "#8e8e8e", fontSize: "13px", fontWeight: "700" };
 const googleButtonStyle = { width: "100%", background: "#fff", border: "none", borderRadius: "30px", padding: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", color: "#000", fontSize: "14px", fontWeight: "600", cursor: "pointer", marginBottom: "15px" };
 const forgotPassword = { fontSize: "12px", color: "#ccc", cursor: "pointer", marginTop: "5px" };
-const footerBox = { position: "absolute", bottom: "0", width: "100%", textAlign: "center", padding: "20px 0", borderTop: "1px solid #262626", background: "#000" };
+
+// 🟢 ADJUSTED FOOTER BOX: Pinned to bottom, but high enough to clear Global Nav
+const footerBox = { 
+  position: "fixed", 
+  bottom: "70px", // 🟢 Sits ABOVE the App.jsx bottom bar (approx 65px height)
+  width: "100%", 
+  textAlign: "center", 
+  padding: "20px 0", 
+  borderTop: "1px solid #262626", 
+  background: "#000",
+  zIndex: 10 // Lower z-index than the global nav
+};
