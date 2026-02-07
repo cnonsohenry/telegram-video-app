@@ -10,16 +10,16 @@ import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function Home() {
-  // 🟢 1. REFACTORED STATE
-  // We only care if we are looking at the "dashboard" (summary) or a specific "category" grid
   const [viewMode, setViewMode] = useState("dashboard"); // 'dashboard' or 'category'
-  
   const [activeTab, setActiveTab] = useState(0); 
   const [activeVideo, setActiveVideo] = useState(null);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [isMobileSearchVisible, setIsMobileSearchVisible] = useState(false);
+  
+  // 🟢 1. NEW: Client-Side Cache to stop reloading blink
+  const [videoCache, setVideoCache] = useState({});
 
   const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
   const currentCategory = CATEGORIES[activeTab];
@@ -33,6 +33,16 @@ export default function Home() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // 🟢 2. NEW: Update Cache when new videos arrive
+  useEffect(() => {
+    if (videos && videos.length > 0) {
+      setVideoCache(prev => ({
+        ...prev,
+        [currentCategory]: videos
+      }));
+    }
+  }, [videos, currentCategory]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -58,7 +68,15 @@ export default function Home() {
       const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       const data = await res.json();
       if (data.video_url) {
-        setVideos(prev => prev.map(v => (v.chat_id === video.chat_id && v.message_id === video.message_id) ? { ...v, views: Number(v.views || 0) + 1 } : v));
+        // Update both the active view state AND the cache so view counts update instantly
+        const updateLogic = (prev) => prev.map(v => (v.chat_id === video.chat_id && v.message_id === video.message_id) ? { ...v, views: Number(v.views || 0) + 1 } : v);
+        
+        setVideos(updateLogic);
+        setVideoCache(prev => ({
+          ...prev,
+          [currentCategory]: updateLogic(prev[currentCategory] || [])
+        }));
+        
         setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
       }
     } catch (e) { alert("Error fetching video link"); }
@@ -78,6 +96,13 @@ export default function Home() {
     return { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" };
   };
 
+  // 🟢 3. NEW: Decide what to render (Cache vs Live Data)
+  // If we have cached videos for this tab, show them immediately. 
+  // If not, fall back to the hook's 'videos' (which might be loading).
+  const videosToDisplay = (videoCache[currentCategory] && videoCache[currentCategory].length > 0) 
+    ? videoCache[currentCategory] 
+    : videos;
+
   return (
     <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
       
@@ -92,7 +117,7 @@ export default function Home() {
         </nav>
       )}
 
-      {/* 🟢 MOBILE TOP TABS (Only show when in 'category' view mode) */}
+      {/* MOBILE TOP TABS */}
       {!isDesktop && viewMode === "category" && (
         <nav style={{ 
           display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 1000,
@@ -118,8 +143,7 @@ export default function Home() {
         <div style={{ display: "flex", flex: 1 }}>
           <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px" }}>
             
-            {/* 🟢 2. CONDITIONAL RENDER: Dashboard vs Category Grid */}
-            
+            {/* CONDITIONAL RENDER */}
             {(isDesktop || viewMode === "category") ? (
               // FULL GRID VIEW
               <>
@@ -128,12 +152,21 @@ export default function Home() {
                      ← Back to Overview
                    </button>
                  )}
+                 
                  <div style={getGridStyle()}>
-                    {videos.map(v => (
+                    {/* 🟢 4. Render from 'videosToDisplay' instead of 'videos' */}
+                    {videosToDisplay.map(v => (
                       <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} layoutType={currentCategory} onOpen={() => handleOpenVideo(v)} />
                     ))}
                  </div>
-                 {!loading && videos.length > 0 && (
+
+                 {/* Show loading spinner if cache is empty AND we are loading */}
+                 {loading && videosToDisplay.length === 0 && (
+                   <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>Loading videos...</div>
+                 )}
+
+                 {/* Show More Button */}
+                 {!loading && videosToDisplay.length > 0 && (
                   <button onClick={loadMore} style={{ display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "900", cursor: "pointer" }}>Show More</button>
                  )}
               </>
@@ -146,7 +179,7 @@ export default function Home() {
                       <h3 style={{ color: "#fff", textTransform: "uppercase", fontSize: "14px", fontWeight: "900", margin: 0 }}>{cat}</h3>
                       <button 
                         onClick={() => { 
-                          setViewMode("category"); // Switch to full category view
+                          setViewMode("category"); 
                           setActiveTab(CATEGORIES.indexOf(cat)); 
                           scrollToTop(); 
                         }} 
@@ -173,8 +206,6 @@ export default function Home() {
           )}
         </div>
       </div>
-
-      {/* 🟢 3. NO BOTTOM NAV HERE (It's in App.jsx now) */}
 
       {activeVideo && <div style={{ position: "fixed", inset: 0, zIndex: 2000 }}><FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} /></div>}
     </div>
