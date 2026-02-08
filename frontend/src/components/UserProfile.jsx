@@ -4,7 +4,6 @@ import {
   CheckCircle, Share2, ArrowLeft, ChevronRight, User, Shield, Bell 
 } from "lucide-react";
 
-// Video Logic Imports
 import VideoCard from "./VideoCard"; 
 import FullscreenPlayer from "./FullscreenPlayer"; 
 import { useVideos } from "../hooks/useVideos";
@@ -12,17 +11,21 @@ import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function UserProfile({ user, onLogout }) {
-  const [activeTab, setActiveTab] = useState("videos");
+  const [activeTab, setActiveTab] = useState("videos"); // 'videos' = Shots
   const [currentView, setCurrentView] = useState("profile");
   const [activeVideo, setActiveVideo] = useState(null);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
   const [videoCache, setVideoCache] = useState({});
   const isDesktop = window.innerWidth > 1024;
 
-  // 🟢 FETCH SHOTS (Teaser previews for Premium)
+  // 🟢 FETCH SHOTS
+  // Note: Ensure your backend actually returns videos with category="shots"
   const { videos, loading, loadMore } = useVideos("shots");
 
   useEffect(() => {
+    // Debug: Check if videos are actually arriving
+    console.log("UserProfile: Loaded videos for 'shots':", videos);
+    
     if (videos?.length > 0) {
       setVideoCache(prev => ({ ...prev, shots: videos }));
     }
@@ -61,7 +64,8 @@ export default function UserProfile({ user, onLogout }) {
       <div style={containerStyle}>
         <div style={navBarStyle}>
           <ArrowLeft size={24} color="#fff" onClick={() => setCurrentView("profile")} style={{ cursor: "pointer" }} />
-          <h2 style={{...usernameStyle, flex: 1, justifyContent: "center", marginRight: "24px"}}>Settings</h2>
+          <h2 style={headerTitleStyle}>Settings</h2>
+          <div style={{ width: "24px" }} /> {/* Dummy spacer for balance */}
         </div>
         <div style={{ padding: "10px 0" }}>
           <SettingsItem icon={<User size={20} />} label="Account" />
@@ -81,10 +85,19 @@ export default function UserProfile({ user, onLogout }) {
   // 🟢 PROFILE VIEW
   return (
     <div style={containerStyle}>
-      <div style={navBarStyle}>
-        <div style={{ width: "24px" }} />
-        <h2 style={usernameStyle}>{user.username} <CheckCircle size={14} color="#20D5EC" fill="black" style={{ marginLeft: "4px" }} /></h2>
-        <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+      {/* 🟢 FIXED: Header Alignment using CSS Grid */}
+      <div style={navGridStyle}>
+        {/* Left: Spacer to balance the layout */}
+        <div style={{ width: "60px" }}></div>
+        
+        {/* Center: Username */}
+        <div style={centerTitleContainer}>
+          <h2 style={usernameStyle}>{user.username}</h2>
+          <CheckCircle size={14} color="#20D5EC" fill="black" style={{ marginLeft: "4px" }} />
+        </div>
+
+        {/* Right: Icons */}
+        <div style={{ display: "flex", gap: "16px", justifyContent: "flex-end", width: "60px" }}>
           <Bell size={24} color="#fff" style={{ cursor: "pointer" }} />
           <Settings size={24} color="#fff" onClick={() => setCurrentView("settings")} style={{ cursor: "pointer" }} />
         </div>
@@ -113,21 +126,33 @@ export default function UserProfile({ user, onLogout }) {
         </div>
       </div>
 
-      {/* 🟢 PRONOUNCED CENTRALIZED TABS */}
+      {/* 🟢 PRONOUNCED TABS */}
       <div style={tabsContainerStyle}>
         <TabButton active={activeTab === "videos"} onClick={() => setActiveTab("videos")} icon={<Grid3X3 size={24} />} label="Shots" />
         <TabButton active={activeTab === "premium"} onClick={() => setActiveTab("premium")} icon={<Lock size={24} />} label="Premium" />
         <TabButton active={activeTab === "likes"} onClick={() => setActiveTab("likes")} icon={<Heart size={24} />} label="Liked" />
       </div>
 
+      {/* 🟢 CONTENT AREA */}
       <div style={contentAreaStyle}>
         {activeTab === "videos" ? (
           <div style={gridStyle}>
-            {videosToDisplay.map(v => (
-              <VideoCard key={v.message_id} video={v} layoutType="shots" onOpen={() => handleOpenVideo(v)} />
-            ))}
-            {loading && <p style={{ gridColumn: "span 3", textAlign: "center", padding: "20px" }}>Loading...</p>}
-            {!loading && videosToDisplay.length > 0 && <button onClick={loadMore} style={loadMoreStyle}>Load More</button>}
+            {videosToDisplay.length > 0 ? (
+              videosToDisplay.map(v => (
+                <VideoCard key={v.message_id} video={v} layoutType="shots" onOpen={() => handleOpenVideo(v)} />
+              ))
+            ) : (
+              // 🟢 DEBUG EMPTY STATE
+              <div style={{ gridColumn: "span 3", textAlign: "center", padding: "40px", color: "#666" }}>
+                {loading ? "Loading Shots..." : "No Shots found. Check database category = 'shots'"}
+              </div>
+            )}
+            
+            {!loading && videosToDisplay.length > 0 && (
+              <div style={{ gridColumn: "span 3", padding: "20px", display: "flex", justifyContent: "center" }}>
+                <button onClick={loadMore} style={loadMoreStyle}>Load More</button>
+              </div>
+            )}
           </div>
         ) : (
           <div style={emptyStateStyle}>
@@ -150,15 +175,17 @@ export default function UserProfile({ user, onLogout }) {
 }
 
 // 🎨 COMPONENT STYLES
+
 const TabButton = ({ active, onClick, icon, label }) => (
   <button onClick={onClick} style={{ 
     flex: 1, display: "flex", flexDirection: "column", alignItems: "center", 
     background: "none", border: "none", padding: "12px 0",
     borderBottom: active ? "2.5px solid #fff" : "1px solid #222",
-    color: active ? "#fff" : "#666", cursor: "pointer", transition: "0.2s"
+    opacity: active ? 1 : 0.5, // 🟢 Visually dims inactive tabs
+    color: active ? "#fff" : "#fff", cursor: "pointer", transition: "0.2s"
   }}>
     {icon}
-    <span style={{ fontSize: "11px", fontWeight: "700", marginTop: "4px", textTransform: "uppercase" }}>{label}</span>
+    <span style={{ fontSize: "12px", fontWeight: "700", marginTop: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</span>
   </button>
 );
 
@@ -168,23 +195,45 @@ const SettingsItem = ({ icon, label }) => (
   </div>
 );
 
+// 🖌 STYLES
 const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "sans-serif" };
-const navBarStyle = { display: "flex", alignItems: "center", padding: "15px 20px", borderBottom: "1px solid #222", position: "sticky", top: 0, background: "#000", zIndex: 100 };
-const usernameStyle = { fontSize: "17px", fontWeight: "700", margin: 0, textAlign: "center" };
+
+// 🟢 NEW HEADER GRID (Solves Alignment)
+const navGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "1fr auto 1fr", // Left, Center, Right
+  alignItems: "center",
+  padding: "15px 20px",
+  borderBottom: "1px solid #222",
+  position: "sticky",
+  top: 0,
+  background: "rgba(0,0,0,0.95)",
+  zIndex: 100,
+  backdropFilter: "blur(10px)"
+};
+// Used for the Settings Sub-page
+const navBarStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid #222" };
+
+const centerTitleContainer = { display: "flex", alignItems: "center", justifyContent: "center" };
+const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
+const headerTitleStyle = { fontSize: "16px", fontWeight: "700", margin: 0, flex: 1, textAlign: "center" };
+
 const headerSectionStyle = { padding: "20px" };
 const profileTopRowStyle = { display: "flex", alignItems: "flex-start", gap: "20px", marginBottom: "20px" };
 const avatarContainerStyle = { width: "86px", height: "86px", borderRadius: "50%", padding: "2px", background: "linear-gradient(45deg, #FFD700, #ff3b30)" };
 const avatarImageStyle = { width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "3px solid #000" };
-const infoColumnStyle = { flex: 1 };
-const displayNameStyle = { fontSize: "22px", fontWeight: "800", margin: "0 0 8px 0" };
-const bioStyle = { fontSize: "14px", color: "#bbb", margin: 0, lineHeight: "1.4" };
+const infoColumnStyle = { flex: 1, paddingTop: "4px" };
+const displayNameStyle = { fontSize: "20px", fontWeight: "800", margin: "0 0 6px 0" };
+const bioStyle = { fontSize: "13px", color: "#ccc", margin: 0, lineHeight: "1.4" };
+
 const actionButtonsRowStyle = { display: "flex", gap: "8px" };
-const primaryButtonStyle = { flex: 1, background: "#1E1E1E", color: "#fff", border: "none", borderRadius: "8px", padding: "10px", fontWeight: "600" };
+const primaryButtonStyle = { flex: 1, background: "#fff", color: "#000", border: "none", borderRadius: "8px", padding: "10px", fontWeight: "700", fontSize: "14px" };
 const secondaryButtonStyle = { background: "#1E1E1E", color: "#fff", border: "none", borderRadius: "8px", padding: "10px 14px" };
+
 const tabsContainerStyle = { display: "flex", background: "#000", position: "sticky", top: "54px", zIndex: 90 };
 const contentAreaStyle = { minHeight: "400px" };
 const gridStyle = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px" };
-const loadMoreStyle = { gridColumn: "span 3", margin: "20px", padding: "10px", background: "#111", border: "none", color: "#fff", borderRadius: "8px" };
+const loadMoreStyle = { padding: "10px 24px", background: "#111", border: "none", color: "#fff", borderRadius: "30px", fontWeight: "600", fontSize: "13px" };
 const emptyStateStyle = { textAlign: "center", padding: "80px 20px" };
 const emptyIconCircle = { width: "64px", height: "64px", borderRadius: "50%", border: "2px solid #222", display: "inline-flex", alignItems: "center", justifyContent: "center" };
 const settingsItemStyle = { display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #111", cursor: "pointer" };
