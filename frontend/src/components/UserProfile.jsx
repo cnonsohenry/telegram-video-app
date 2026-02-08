@@ -27,11 +27,9 @@ export default function UserProfile({ user, onLogout }) {
   }, [videos]);
 
   const handleOpenVideo = async (video) => {
-    // 🟢 1. Check if unlocked
     const videoKey = `${video.chat_id}:${video.message_id}`;
     if (unlockedVideos.has(videoKey)) { playVideo(video); return; }
     
-    // 🟢 2. Run Ad Logic if locked
     try {
       openRewardedAd();
       const nextSet = new Set(unlockedVideos);
@@ -45,12 +43,9 @@ export default function UserProfile({ user, onLogout }) {
 
   const playVideo = async (video) => {
     try {
-      // 🟢 3. Set Active Video (Triggers Full Screen)
       setActiveVideo({ ...video, video_url: null }); 
-      
       const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       const data = await res.json();
-      
       if (data.video_url) {
         setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
       }
@@ -59,7 +54,7 @@ export default function UserProfile({ user, onLogout }) {
 
   const videosToDisplay = videoCache["shots"] || videos || [];
 
-  // 🟢 SETTINGS VIEW (unchanged)
+  // 🟢 SETTINGS VIEW
   if (currentView === "settings") {
     return (
       <div style={containerStyle}>
@@ -71,6 +66,7 @@ export default function UserProfile({ user, onLogout }) {
         <div style={{ padding: "10px 0" }}>
           <SettingsItem icon={<User size={20} />} label="Account" />
           <SettingsItem icon={<Lock size={20} />} label="Privacy" />
+          <SettingsItem icon={<Shield size={20} />} label="Security" />
           <SettingsItem icon={<Bell size={20} />} label="Notifications" />
           <div style={{ height: "1px", background: "#222", margin: "20px 0" }} />
           <div style={{...settingsItemStyle, color: "#ff3b30"}} onClick={onLogout}>
@@ -87,12 +83,17 @@ export default function UserProfile({ user, onLogout }) {
     <div style={containerStyle}>
       {/* HEADER GRID */}
       <div style={navGridStyle}>
-        <div style={{ width: "60px" }}></div>
+        {/* Left Spacer */}
+        <div style={{ width: "40px" }}></div>
+        
+        {/* Center Title */}
         <div style={centerTitleContainer}>
           <h2 style={usernameStyle}>{user.username}</h2>
           <CheckCircle size={14} color="#20D5EC" fill="black" style={{ marginLeft: "4px" }} />
         </div>
-        <div style={{ display: "flex", gap: "16px", justifyContent: "flex-end", width: "60px" }}>
+
+        {/* 🟢 Right Icons (Pushed to Extreme Right) */}
+        <div style={{ display: "flex", gap: "16px", justifyContent: "flex-end", flex: 1 }}>
           <Bell size={24} color="#fff" style={{ cursor: "pointer" }} />
           <Settings size={24} color="#fff" onClick={() => setCurrentView("settings")} style={{ cursor: "pointer" }} />
         </div>
@@ -115,9 +116,15 @@ export default function UserProfile({ user, onLogout }) {
             </p>
           </div>
         </div>
+
+        {/* 🟢 NEW: RED PREMIUM BUTTON */}
         <div style={actionButtonsRowStyle}>
-          <button style={primaryButtonStyle}>Edit profile</button>
-          <button style={secondaryButtonStyle}><Share2 size={18} /></button>
+          <button style={premiumButtonStyle} onClick={() => alert("Redirecting to Premium...")}>
+            SUBSCRIBE PREMIUM
+          </button>
+          <button style={secondaryButtonStyle} onClick={() => alert("Share Profile")}>
+            <Share2 size={18} />
+          </button>
         </div>
       </div>
 
@@ -154,47 +161,18 @@ export default function UserProfile({ user, onLogout }) {
         )}
       </div>
 
-      {/* 🟢 TIKTOK STYLE FULLSCREEN PLAYER */}
-{activeVideo && (
-  <FullscreenPlayer 
-    video={activeVideo} 
-    onClose={() => setActiveVideo(null)} 
-    isDesktop={isDesktop} 
-  />
-)}
+      {activeVideo && (
+        <FullscreenPlayer 
+          video={activeVideo} 
+          onClose={() => setActiveVideo(null)} 
+          isDesktop={isDesktop} 
+        />
+      )}
     </div>
   );
 }
 
-// 🎨 NEW STYLES FOR FULLSCREEN
-const fullScreenContainerStyle = {
-  position: "fixed", 
-  inset: 0, 
-  zIndex: 3000, 
-  background: "#000",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center"
-};
-
-const floatingBackButtonStyle = {
-  position: "absolute",
-  top: "20px",
-  left: "20px",
-  zIndex: 3010, // Higher than player
-  background: "rgba(0,0,0,0.5)",
-  border: "none",
-  borderRadius: "50%",
-  width: "44px",
-  height: "44px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-  backdropFilter: "blur(4px)"
-};
-
-// 🎨 EXISTING COMPONENT STYLES
+// 🎨 COMPONENT STYLES
 const TabButton = ({ active, onClick, icon, label }) => (
   <button onClick={onClick} style={{ 
     flex: 1, display: "flex", flexDirection: "column", alignItems: "center", 
@@ -214,8 +192,23 @@ const SettingsItem = ({ icon, label }) => (
   </div>
 );
 
+// 🖌 STYLES
 const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "sans-serif" };
-const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "15px 20px", borderBottom: "1px solid #222", position: "sticky", top: 0, background: "rgba(0,0,0,0.95)", zIndex: 100, backdropFilter: "blur(10px)" };
+
+// 🟢 HEADER GRID (Optimized for Extreme Right Alignment)
+const navGridStyle = { 
+  display: "grid", 
+  gridTemplateColumns: "1fr auto 1fr", 
+  alignItems: "center", 
+  padding: "15px 20px", 
+  borderBottom: "1px solid #222", 
+  position: "sticky", 
+  top: 0, 
+  background: "rgba(0,0,0,0.95)", 
+  zIndex: 100, 
+  backdropFilter: "blur(10px)" 
+};
+
 const navBarStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid #222" };
 const centerTitleContainer = { display: "flex", alignItems: "center", justifyContent: "center" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
@@ -227,9 +220,27 @@ const avatarImageStyle = { width: "100%", height: "100%", borderRadius: "50%", o
 const infoColumnStyle = { flex: 1, paddingTop: "4px" };
 const displayNameStyle = { fontSize: "20px", fontWeight: "800", margin: "0 0 6px 0" };
 const bioStyle = { fontSize: "13px", color: "#ccc", margin: 0, lineHeight: "1.4" };
-const actionButtonsRowStyle = { display: "flex", gap: "8px" };
-const primaryButtonStyle = { flex: 1, background: "#fff", color: "#000", border: "none", borderRadius: "8px", padding: "10px", fontWeight: "700", fontSize: "14px" };
-const secondaryButtonStyle = { background: "#1E1E1E", color: "#fff", border: "none", borderRadius: "8px", padding: "10px 14px" };
+const actionButtonsRowStyle = { display: "flex", gap: "10px", alignItems: "center" };
+
+// 🟢 BEAUTIFUL PREMIUM BUTTON STYLE
+const premiumButtonStyle = { 
+  flex: 1, 
+  background: "linear-gradient(45deg, #ff3b30, #d70015)", // Vibrant Red Gradient
+  color: "#fff", 
+  border: "none", 
+  borderRadius: "10px", 
+  padding: "12px", 
+  fontWeight: "800", // Extra Bold
+  fontSize: "14px", 
+  textTransform: "uppercase",
+  letterSpacing: "0.5px",
+  boxShadow: "0 4px 15px rgba(255, 59, 48, 0.4)", // Red Glow
+  cursor: "pointer",
+  transition: "transform 0.1s ease"
+};
+
+const secondaryButtonStyle = { background: "#1E1E1E", color: "#fff", border: "1px solid #333", borderRadius: "10px", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "center" };
+
 const tabsContainerStyle = { display: "flex", background: "#000", position: "sticky", top: "54px", zIndex: 90 };
 const contentAreaStyle = { minHeight: "400px" };
 const gridStyle = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px" };
