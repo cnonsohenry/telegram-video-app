@@ -169,6 +169,7 @@ app.post("/webhook", async (req, res) => {
     if (rawCaption.toLowerCase().includes("#knacks")) category = "knacks";
     else if (rawCaption.toLowerCase().includes("#baddies")) category = "baddies";
     else if (rawCaption.toLowerCase().includes("#trends")) category = "trends";
+    else if (rawCaption.toLowerCase().includes("#shots")) category = "shots";
     else if (rawCaption.toLowerCase().includes("#hotties")) category = "hotties";
 
     const cleanCaption = rawCaption.replace(/#\w+/g, "").trim();
