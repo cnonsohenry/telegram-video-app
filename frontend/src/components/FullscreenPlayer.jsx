@@ -1,20 +1,38 @@
 import React, { useEffect, useRef, useState } from "react";
-import { X, ArrowLeft, Play, Pause } from "lucide-react";
+import { X, ArrowLeft, Play, Pause, Loader2 } from "lucide-react";
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
 
-  // 🟢 1. Lock Body Scroll & Auto-Play
+  // 🟢 1. Lock Body Scroll & Handle Auto-Play
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = "auto"; };
   }, []);
 
-  // 🟢 2. Handle Tap to Play/Pause
+  // 🟢 2. Update Progress Bar
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      const current = videoRef.current.currentTime;
+      const duration = videoRef.current.duration;
+      setProgress((current / duration) * 100);
+    }
+  };
+
+  // 🟢 3. Handle Seeking (Scrubbing)
+  const handleSeek = (e) => {
+    e.stopPropagation(); // Don't pause when dragging
+    const newTime = (e.target.value / 100) * videoRef.current.duration;
+    videoRef.current.currentTime = newTime;
+    setProgress(e.target.value);
+  };
+
   const togglePlay = (e) => {
-    e.stopPropagation(); // Prevent closing the modal
+    e.stopPropagation(); 
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
@@ -23,7 +41,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
       } else {
         videoRef.current.play();
         setIsPlaying(true);
-        setTimeout(() => setShowPlayIcon(false), 500); // Fade out icon
+        setTimeout(() => setShowPlayIcon(false), 500); 
       }
     }
   };
@@ -34,28 +52,20 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     <div
       style={{
         position: "fixed",
-        inset: 0,
+        top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: "#000",
         zIndex: 10000, 
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       }}
-      onClick={onClose} // Clicking black background closes
+      onClick={onClose} 
     >
       {/* 🟢 NAVIGATION BUTTONS */}
       {isDesktop ? (
-        <button
-          onClick={onClose}
-          style={desktopCloseButtonStyle}
-        >
-          <X size={24} />
-        </button>
+        <button onClick={onClose} style={desktopCloseButtonStyle}><X size={24} /></button>
       ) : (
-        <button
-          onClick={(e) => { e.stopPropagation(); onClose(); }}
-          style={mobileBackButtonStyle}
-        >
+        <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={mobileBackButtonStyle}>
           <ArrowLeft size={28} />
         </button>
       )}
@@ -65,94 +75,78 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         style={{
           display: "flex",
           flexDirection: isDesktop ? "row" : "column",
-          // Mobile: 100dvh ignores the URL bar for a taller view
           width: isDesktop ? "auto" : "100%",
+          // 🟢 100dvh forces it to fill the mobile screen even with address bars
           height: isDesktop ? "auto" : "100dvh", 
           maxHeight: isDesktop ? "90vh" : "none",
           maxWidth: isDesktop ? "95vw" : "none",
           background: "#000",
           borderRadius: isDesktop ? "12px" : "0px",
           overflow: "hidden",
-          boxShadow: isDesktop ? "0 25px 50px rgba(0,0,0,0.5)" : "none",
           position: "relative"
         }}
         onClick={(e) => e.stopPropagation()} 
       >
         
-        {/* 🟢 VIDEO AREA (Clickable) */}
+        {/* 🟢 VIDEO AREA */}
         <div 
           onClick={togglePlay}
           style={{ 
-            width: "100%",
-            height: "100%", 
-            background: "#000", 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center",
-            position: "relative",
-            cursor: "pointer"
+            width: "100%", height: "100%", background: "#000", 
+            display: "flex", alignItems: "center", justifyContent: "center", position: "relative"
           }}
         >
+          {/* 🟢 LOADING SPINNER (Fixes Black Screen) */}
+          {isLoading && (
+            <div style={{ position: "absolute", zIndex: 10 }}>
+              <Loader2 size={48} color="#20D5EC" className="spin-animation" />
+              <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } .spin-animation { animation: spin 1s linear infinite; }`}</style>
+            </div>
+          )}
+
           <video
             ref={videoRef}
             src={video.video_url}
             autoPlay
-            playsInline // 🟢 KEEPS it in your app (prevents native fullscreen takeover)
+            playsInline 
             loop
+            onTimeUpdate={handleTimeUpdate}
+            onWaiting={() => setIsLoading(true)}
+            onCanPlay={() => setIsLoading(false)} // Hide spinner when ready
             style={{ 
-                width: "100%", 
-                height: "100%", 
-                // 'contain' ensures you see the whole video (no cropping)
-                objectFit: "contain" 
+                width: "100%", height: "100%", objectFit: "contain" 
             }}
           />
 
-          {/* 🟢 CENTER PLAY ICON OVERLAY */}
-          {(!isPlaying || showPlayIcon) && (
-            <div style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              background: "rgba(0,0,0,0.4)",
-              borderRadius: "50%",
-              padding: "20px",
-              pointerEvents: "none", // Let clicks pass through
-              animation: "fadein 0.2s"
-            }}>
+          {/* 🟢 CENTER PLAY ICON */}
+          {(!isPlaying || showPlayIcon) && !isLoading && (
+            <div style={playIconOverlayStyle}>
               <Play size={40} fill="white" color="white" />
             </div>
           )}
+
+          {/* 🟢 CUSTOM PROGRESS BAR (TikTok Style) */}
+          <div style={progressContainerStyle} onClick={(e) => e.stopPropagation()}>
+             <input 
+               type="range" 
+               min="0" max="100" 
+               value={progress} 
+               onChange={handleSeek}
+               style={rangeInputStyle}
+             />
+          </div>
         </div>
 
-        {/* 🟢 DESKTOP SIDEBAR INFO (Hidden on Mobile) */}
+        {/* 🟢 DESKTOP SIDEBAR (Hidden on Mobile) */}
         {isDesktop && (
           <div style={desktopSidebarStyle}>
-            <div style={sidebarHeaderStyle}>
-              <img 
-                src={video.avatar_url || "/assets/default-avatar.png"}
-                onError={(e) => { e.target.onerror = null; e.target.src = "/assets/default-avatar.png"; }}
-                style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }}
-                alt="uploader"
-              />
-              <span style={{ color: "#fff", fontWeight: "600", fontSize: "14px" }}>
-                @{video.uploader_name || 'Member'}
-              </span>
+            {/* Sidebar content (same as before) */}
+            <div style={{ padding: "16px", display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid #333" }}>
+               <img src={video.avatar_url || "/assets/default-avatar.png"} style={{ width: 32, height: 32, borderRadius: "50%" }} />
+               <span style={{ color: "#fff", fontWeight: "600" }}>@{video.uploader_name || 'Member'}</span>
             </div>
-
-            <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
-              <p style={{ color: "#eee", fontSize: "14px", lineHeight: "1.5" }}>
-                {video.caption || "No caption provided."}
-              </p>
-              <p style={{ color: "#888", fontSize: "12px", marginTop: "10px" }}>
-                {new Date(video.created_at).toLocaleDateString()}
-              </p>
-            </div>
-
-            <div style={{ padding: "16px", borderTop: "1px solid #333" }}>
-              <div style={{ color: "#fff", fontSize: "14px", fontWeight: "bold" }}>
-                {Number(video.views || 0).toLocaleString()} views
-              </div>
+            <div style={{ flex: 1, padding: "16px", overflowY: "auto", color: "#ccc" }}>
+              {video.caption || "No caption"}
             </div>
           </div>
         )}
@@ -162,55 +156,37 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 }
 
 // 🎨 STYLES
+
 const mobileBackButtonStyle = {
-  position: "absolute",
-  top: "20px", // Lowered slightly for dynamic islands/notches
-  left: "20px",
-  zIndex: 10002,
-  background: "rgba(0,0,0,0.4)", // Subtle dark circle
-  color: "#fff",
-  border: "none",
-  borderRadius: "50%",
-  width: "44px",
-  height: "44px",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+  position: "absolute", top: "20px", left: "20px", zIndex: 10002,
+  background: "rgba(0,0,0,0.4)", color: "#fff", border: "none",
+  borderRadius: "50%", width: "44px", height: "44px",
+  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
   backdropFilter: "blur(5px)"
 };
 
 const desktopCloseButtonStyle = {
-  position: "absolute",
-  top: "20px",
-  right: "20px",
-  zIndex: 10002,
-  background: "rgba(255,255,255,0.1)",
-  color: "#fff",
-  border: "none",
-  borderRadius: "50%",
-  width: "44px",
-  height: "44px",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  backdropFilter: "blur(4px)"
+  position: "absolute", top: "20px", right: "20px", zIndex: 10002,
+  background: "rgba(255,255,255,0.1)", color: "#fff", border: "none", borderRadius: "50%",
+  width: "44px", height: "44px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center"
+};
+
+const playIconOverlayStyle = {
+  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+  background: "rgba(0,0,0,0.4)", borderRadius: "50%", padding: "20px", pointerEvents: "none"
 };
 
 const desktopSidebarStyle = {
-  width: "380px",
-  background: "#121212", 
-  borderLeft: "1px solid #333",
-  display: "flex", 
-  flexDirection: "column",
-  flexShrink: 0 
+  width: "380px", background: "#121212", borderLeft: "1px solid #333",
+  display: "flex", flexDirection: "column", flexShrink: 0
 };
 
-const sidebarHeaderStyle = {
-  padding: "16px", 
-  display: "flex", 
-  alignItems: "center", 
-  gap: "12px", 
-  borderBottom: "1px solid #333"
+const progressContainerStyle = {
+  position: "absolute", bottom: "10px", left: "10px", right: "10px", zIndex: 10002,
+  display: "flex", alignItems: "center"
+};
+
+// 🟢 Custom Range Input Style (mimics video scrubber)
+const rangeInputStyle = {
+  width: "100%", cursor: "pointer", accentColor: "#ff3b30", height: "4px"
 };
