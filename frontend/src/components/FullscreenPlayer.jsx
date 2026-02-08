@@ -1,7 +1,8 @@
 import React, { useEffect } from "react";
-import { X } from "lucide-react";
+import { X, ArrowLeft } from "lucide-react";
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
+  // 🟢 Lock body scroll when open
   useEffect(() => {
     document.body.style.overflow = "hidden";
     const handleEsc = (e) => { if (e.key === "Escape") onClose(); };
@@ -16,29 +17,29 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   return (
     <div
-      onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 1)", // 🟢 Solid black for immersive mobile feel
-        // 🟢 Z-Index Trick: On Desktop, stay high (9999). 
-        // On Mobile, drop to 1 so the "Back Arrow" (z-3010) stays on top.
-        zIndex: isDesktop ? 9999 : 1, 
+        backgroundColor: "#000",
+        // 🟢 FORCE TOP: Highest Z-Index to cover everything (headers, navs)
+        zIndex: 10000, 
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: isDesktop ? "20px" : "0", // No padding on mobile
+        padding: isDesktop ? "20px" : "0",
       }}
+      onClick={onClose} // Clicking background closes it
     >
-      {/* CLOSE BUTTON - Desktop Only (Mobile uses the Back Arrow) */}
-      {isDesktop && (
+      {/* 🟢 NAVIGATION BUTTONS (Built-in) */}
+      {isDesktop ? (
+        // Desktop: Top-Right "X"
         <button
           onClick={onClose}
           style={{
             position: "absolute",
             top: "20px",
             right: "20px",
-            zIndex: 10001,
+            zIndex: 10002,
             background: "rgba(255,255,255,0.1)",
             color: "#fff",
             border: "none",
@@ -48,93 +49,117 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center"
+            justifyContent: "center",
+            backdropFilter: "blur(4px)"
           }}
         >
           <X size={24} />
         </button>
+      ) : (
+        // Mobile: Top-Left "Back Arrow"
+        <button
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          style={{
+            position: "absolute",
+            top: "15px", // Safe area from top
+            left: "15px",
+            zIndex: 10002,
+            background: "rgba(0,0,0,0.5)", // Darker pill for visibility
+            color: "#fff",
+            border: "none",
+            borderRadius: "50%",
+            width: "40px",
+            height: "40px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(4px)"
+          }}
+        >
+          <ArrowLeft size={24} />
+        </button>
       )}
 
-      {/* MODAL WRAPPER */}
+      {/* MODAL CONTAINER */}
       <div
         style={{
           display: "flex",
           flexDirection: isDesktop ? "row" : "column",
-          // 🟢 Mobile: Full Screen (100% W/H). Desktop: Float (90vh/95vw)
+          // 🟢 Mobile: 100dvh (Dynamic Viewport Height) fixes "stuck" address bar issues
           width: isDesktop ? "auto" : "100%",
-          height: isDesktop ? "auto" : "100%",
+          height: isDesktop ? "auto" : "100dvh", 
           maxHeight: isDesktop ? "90vh" : "none",
           maxWidth: isDesktop ? "95vw" : "none",
           background: "#000",
-          borderRadius: isDesktop ? "8px" : "0px", // No round corners on mobile
+          borderRadius: isDesktop ? "8px" : "0px",
           overflow: "hidden",
           boxShadow: isDesktop ? "0 25px 50px rgba(0,0,0,0.5)" : "none",
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()} // Clicking content doesn't close
       >
         
-        {/* LEFT SIDE: THE VIDEO */}
+        {/* VIDEO PLAYER */}
         <div style={{ 
           width: "100%",
-          height: "100%", // 🟢 Force full height on mobile
-          aspectRatio: isDesktop ? "9/16" : "unset",
+          height: "100%", 
           background: "#000", 
           display: "flex", 
           alignItems: "center", 
           justifyContent: "center",
-          flexShrink: 1,
           position: "relative"
         }}>
           <video
             src={video.video_url}
-            controls={isDesktop} // 🟢 Optional: Hide controls on mobile for true TikTok feel
+            // 🟢 CRITICAL: Enable controls on mobile so you can play/pause/seek
+            controls={true} 
             autoPlay
-            playsInline
-            loop // 🟢 Loop video like TikTok
+            playsInline // Prevents iOS from forcing its own player
+            loop
             style={{ 
                 width: "100%", 
                 height: "100%", 
-                objectFit: "contain" // Ensures whole video is visible
+                // 'contain' shows the whole video (good for quality)
+                // 'cover' fills the screen (good for immersion, cuts edges)
+                objectFit: "contain" 
             }}
           />
         </div>
 
-        {/* RIGHT SIDE: THE SIDEBAR (Desktop Only) */}
+        {/* DESKTOP SIDEBAR INFO */}
         {isDesktop && (
           <div style={{ 
             width: "380px",
-            background: "#000", 
-            borderLeft: "1px solid #262626",
+            background: "#121212", 
+            borderLeft: "1px solid #333",
             display: "flex", 
             flexDirection: "column",
             flexShrink: 0 
           }}>
-            {/* Header */}
-            <div style={{ padding: "16px", display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid #262626" }}>
+            <div style={{ padding: "16px", display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid #333" }}>
               <img 
                 src={video.avatar_url || "/assets/default-avatar.png"}
                 onError={(e) => { e.target.onerror = null; e.target.src = "/assets/default-avatar.png"; }}
                 style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }}
+                alt="uploader"
               />
               <span style={{ color: "#fff", fontWeight: "600", fontSize: "14px" }}>
                 @{video.uploader_name || 'Member'}
               </span>
             </div>
 
-            {/* Caption Area */}
             <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
-              <p style={{ color: "#fff", fontSize: "14px", lineHeight: "1.5" }}>
+              <p style={{ color: "#eee", fontSize: "14px", lineHeight: "1.5" }}>
                 {video.caption || "No caption provided."}
               </p>
-              <p style={{ color: "#8e8e8e", fontSize: "12px", marginTop: "10px" }}>
+              <p style={{ color: "#888", fontSize: "12px", marginTop: "10px" }}>
                 {new Date(video.created_at).toLocaleDateString()}
               </p>
             </div>
 
-            {/* Stats Area */}
-            <div style={{ padding: "16px", borderTop: "1px solid #262626" }}>
+            <div style={{ padding: "16px", borderTop: "1px solid #333" }}>
               <div style={{ color: "#fff", fontSize: "14px", fontWeight: "bold" }}>
-                {Number(video.views).toLocaleString()} views
+                {Number(video.views || 0).toLocaleString()} views
               </div>
             </div>
           </div>

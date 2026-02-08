@@ -155,23 +155,13 @@ export default function UserProfile({ user, onLogout }) {
       </div>
 
       {/* 🟢 TIKTOK STYLE FULLSCREEN PLAYER */}
-      {activeVideo && (
-        <div style={fullScreenContainerStyle}>
-          {/* 🟢 RETURN ARROW (Floating on top left) */}
-          <button 
-            onClick={() => setActiveVideo(null)} 
-            style={floatingBackButtonStyle}
-          >
-            <ArrowLeft size={28} color="#fff" />
-          </button>
-
-          <FullscreenPlayer 
-            video={activeVideo} 
-            onClose={() => setActiveVideo(null)} 
-            isDesktop={isDesktop} 
-          />
-        </div>
-      )}
+{activeVideo && (
+  <FullscreenPlayer 
+    video={activeVideo} 
+    onClose={() => setActiveVideo(null)} 
+    isDesktop={isDesktop} 
+  />
+)}
     </div>
   );
 }
