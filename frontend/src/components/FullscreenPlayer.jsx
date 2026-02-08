@@ -1,17 +1,32 @@
-import React, { useEffect } from "react";
-import { X, ArrowLeft } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { X, ArrowLeft, Play, Pause } from "lucide-react";
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
-  // 🟢 Lock body scroll when open
+  const videoRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [showPlayIcon, setShowPlayIcon] = useState(false);
+
+  // 🟢 1. Lock Body Scroll & Auto-Play
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    const handleEsc = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handleEsc);
-    return () => {
-      document.body.style.overflow = "auto";
-      window.removeEventListener("keydown", handleEsc);
-    };
-  }, [onClose]);
+    return () => { document.body.style.overflow = "auto"; };
+  }, []);
+
+  // 🟢 2. Handle Tap to Play/Pause
+  const togglePlay = (e) => {
+    e.stopPropagation(); // Prevent closing the modal
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+        setIsPlaying(false);
+        setShowPlayIcon(true);
+      } else {
+        videoRef.current.play();
+        setIsPlaying(true);
+        setTimeout(() => setShowPlayIcon(false), 500); // Fade out icon
+      }
+    }
+  };
 
   if (!video) return null;
 
@@ -21,122 +36,99 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         position: "fixed",
         inset: 0,
         backgroundColor: "#000",
-        // 🟢 FORCE TOP: Highest Z-Index to cover everything (headers, navs)
         zIndex: 10000, 
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: isDesktop ? "20px" : "0",
       }}
-      onClick={onClose} // Clicking background closes it
+      onClick={onClose} // Clicking black background closes
     >
-      {/* 🟢 NAVIGATION BUTTONS (Built-in) */}
+      {/* 🟢 NAVIGATION BUTTONS */}
       {isDesktop ? (
-        // Desktop: Top-Right "X"
         <button
           onClick={onClose}
-          style={{
-            position: "absolute",
-            top: "20px",
-            right: "20px",
-            zIndex: 10002,
-            background: "rgba(255,255,255,0.1)",
-            color: "#fff",
-            border: "none",
-            borderRadius: "50%",
-            width: "44px",
-            height: "44px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backdropFilter: "blur(4px)"
-          }}
+          style={desktopCloseButtonStyle}
         >
           <X size={24} />
         </button>
       ) : (
-        // Mobile: Top-Left "Back Arrow"
         <button
           onClick={(e) => { e.stopPropagation(); onClose(); }}
-          style={{
-            position: "absolute",
-            top: "15px", // Safe area from top
-            left: "15px",
-            zIndex: 10002,
-            background: "rgba(0,0,0,0.5)", // Darker pill for visibility
-            color: "#fff",
-            border: "none",
-            borderRadius: "50%",
-            width: "40px",
-            height: "40px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backdropFilter: "blur(4px)"
-          }}
+          style={mobileBackButtonStyle}
         >
-          <ArrowLeft size={24} />
+          <ArrowLeft size={28} />
         </button>
       )}
 
-      {/* MODAL CONTAINER */}
+      {/* 🟢 MAIN CONTAINER */}
       <div
         style={{
           display: "flex",
           flexDirection: isDesktop ? "row" : "column",
-          // 🟢 Mobile: 100dvh (Dynamic Viewport Height) fixes "stuck" address bar issues
+          // Mobile: 100dvh ignores the URL bar for a taller view
           width: isDesktop ? "auto" : "100%",
           height: isDesktop ? "auto" : "100dvh", 
           maxHeight: isDesktop ? "90vh" : "none",
           maxWidth: isDesktop ? "95vw" : "none",
           background: "#000",
-          borderRadius: isDesktop ? "8px" : "0px",
+          borderRadius: isDesktop ? "12px" : "0px",
           overflow: "hidden",
           boxShadow: isDesktop ? "0 25px 50px rgba(0,0,0,0.5)" : "none",
+          position: "relative"
         }}
-        onClick={(e) => e.stopPropagation()} // Clicking content doesn't close
+        onClick={(e) => e.stopPropagation()} 
       >
         
-        {/* VIDEO PLAYER */}
-        <div style={{ 
-          width: "100%",
-          height: "100%", 
-          background: "#000", 
-          display: "flex", 
-          alignItems: "center", 
-          justifyContent: "center",
-          position: "relative"
-        }}>
+        {/* 🟢 VIDEO AREA (Clickable) */}
+        <div 
+          onClick={togglePlay}
+          style={{ 
+            width: "100%",
+            height: "100%", 
+            background: "#000", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center",
+            position: "relative",
+            cursor: "pointer"
+          }}
+        >
           <video
+            ref={videoRef}
             src={video.video_url}
-            // 🟢 CRITICAL: Enable controls on mobile so you can play/pause/seek
-            controls={true} 
             autoPlay
-            playsInline // Prevents iOS from forcing its own player
+            playsInline // 🟢 KEEPS it in your app (prevents native fullscreen takeover)
             loop
             style={{ 
                 width: "100%", 
                 height: "100%", 
-                // 'contain' shows the whole video (good for quality)
-                // 'cover' fills the screen (good for immersion, cuts edges)
+                // 'contain' ensures you see the whole video (no cropping)
                 objectFit: "contain" 
             }}
           />
+
+          {/* 🟢 CENTER PLAY ICON OVERLAY */}
+          {(!isPlaying || showPlayIcon) && (
+            <div style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              background: "rgba(0,0,0,0.4)",
+              borderRadius: "50%",
+              padding: "20px",
+              pointerEvents: "none", // Let clicks pass through
+              animation: "fadein 0.2s"
+            }}>
+              <Play size={40} fill="white" color="white" />
+            </div>
+          )}
         </div>
 
-        {/* DESKTOP SIDEBAR INFO */}
+        {/* 🟢 DESKTOP SIDEBAR INFO (Hidden on Mobile) */}
         {isDesktop && (
-          <div style={{ 
-            width: "380px",
-            background: "#121212", 
-            borderLeft: "1px solid #333",
-            display: "flex", 
-            flexDirection: "column",
-            flexShrink: 0 
-          }}>
-            <div style={{ padding: "16px", display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid #333" }}>
+          <div style={desktopSidebarStyle}>
+            <div style={sidebarHeaderStyle}>
               <img 
                 src={video.avatar_url || "/assets/default-avatar.png"}
                 onError={(e) => { e.target.onerror = null; e.target.src = "/assets/default-avatar.png"; }}
@@ -168,3 +160,57 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     </div>
   );
 }
+
+// 🎨 STYLES
+const mobileBackButtonStyle = {
+  position: "absolute",
+  top: "20px", // Lowered slightly for dynamic islands/notches
+  left: "20px",
+  zIndex: 10002,
+  background: "rgba(0,0,0,0.4)", // Subtle dark circle
+  color: "#fff",
+  border: "none",
+  borderRadius: "50%",
+  width: "44px",
+  height: "44px",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  backdropFilter: "blur(5px)"
+};
+
+const desktopCloseButtonStyle = {
+  position: "absolute",
+  top: "20px",
+  right: "20px",
+  zIndex: 10002,
+  background: "rgba(255,255,255,0.1)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "50%",
+  width: "44px",
+  height: "44px",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  backdropFilter: "blur(4px)"
+};
+
+const desktopSidebarStyle = {
+  width: "380px",
+  background: "#121212", 
+  borderLeft: "1px solid #333",
+  display: "flex", 
+  flexDirection: "column",
+  flexShrink: 0 
+};
+
+const sidebarHeaderStyle = {
+  padding: "16px", 
+  display: "flex", 
+  alignItems: "center", 
+  gap: "12px", 
+  borderBottom: "1px solid #333"
+};
