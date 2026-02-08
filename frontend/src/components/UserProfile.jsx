@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { 
-  Settings, Grid3X3, Heart, Lock, LogOut, Edit3, 
+  Settings, Grid3X3, Heart, Lock, LogOut, 
   CheckCircle, Share2, ArrowLeft, ChevronRight, User, Shield, Bell 
 } from "lucide-react";
 
 export default function UserProfile({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState("videos");
-  const [showDropdown, setShowDropdown] = useState(false);
   const [currentView, setCurrentView] = useState("profile"); // 'profile' or 'settings'
 
   // 🟢 SETTINGS SCREEN COMPONENT
@@ -62,56 +61,40 @@ export default function UserProfile({ user, onLogout }) {
           <CheckCircle size={14} color="#20D5EC" fill="black" style={{ marginLeft: "4px" }} />
         </h2>
         
-        {/* Settings Toggle */}
-        <div style={{ position: "relative" }}>
-          <Settings 
-            size={24} 
-            color="#fff" 
-            onClick={() => setShowDropdown(!showDropdown)} 
-            style={{ cursor: "pointer" }} 
-          />
-          
-          {/* Mini Dropdown (Quick Actions) */}
-          {showDropdown && (
-            <div style={dropdownStyle}>
-              <div 
-                style={dropdownItemStyle} 
-                onClick={() => { setShowDropdown(false); setCurrentView("settings"); }}
-              >
-                <Settings size={16} /> Settings and privacy
-              </div>
-              <div style={{ height: "1px", background: "#333", margin: "4px 0" }} />
-              <div style={{...dropdownItemStyle, color: "#ff3b30"}} onClick={onLogout}>
-                <LogOut size={16} /> Log Out
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Settings Button (Direct Link) */}
+        <Settings 
+          size={24} 
+          color="#fff" 
+          onClick={() => setCurrentView("settings")} 
+          style={{ cursor: "pointer" }} 
+        />
       </div>
 
-      {/* Profile Header */}
+      {/* 🟢 NEW HORIZONTAL HEADER LAYOUT */}
       <div style={headerSectionStyle}>
-        <div style={avatarContainerStyle}>
-          <img 
-            src={user.avatar_url || "/assets/default-avatar.png"} 
-            onError={(e) => { e.target.onerror = null; e.target.src = "/assets/default-avatar.png"; }}
-            style={avatarImageStyle} 
-            alt="Profile"
-          />
+        
+        <div style={profileTopRowStyle}>
+          {/* Left Side: Avatar */}
+          <div style={avatarContainerStyle}>
+            <img 
+              src={user.avatar_url || "/assets/default-avatar.png"} 
+              onError={(e) => { e.target.onerror = null; e.target.src = "/assets/default-avatar.png"; }}
+              style={avatarImageStyle} 
+              alt="Profile"
+            />
+          </div>
+
+          {/* Right Side: Bio & Info */}
+          <div style={infoColumnStyle}>
+            <h1 style={displayNameStyle}>@{user.username}</h1>
+            <p style={bioStyle}>
+              Creator on NaijaHomemade 🇳🇬 <br/>
+              Building the future of video sharing.
+            </p>
+          </div>
         </div>
 
-        <h1 style={displayNameStyle}>@{user.username}</h1>
-        <p style={bioStyle}>
-          Creator on NaijaHomemade 🇳🇬 <br/>
-          Building the future of video sharing.
-        </p>
-
-        <div style={statsRowStyle}>
-          <StatBox count="0" label="Following" />
-          <StatBox count="0" label="Followers" />
-          <StatBox count="0" label="Likes" />
-        </div>
-
+        {/* Action Buttons (Below the info) */}
         <div style={actionButtonsRowStyle}>
           <button style={primaryButtonStyle} onClick={() => alert("Edit Profile")}>Edit profile</button>
           <button style={secondaryButtonStyle} onClick={() => alert("Share Profile")}>
@@ -153,13 +136,6 @@ export default function UserProfile({ user, onLogout }) {
 
 // 🎨 SUB-COMPONENTS
 
-const StatBox = ({ count, label }) => (
-  <div style={{ textAlign: "center", minWidth: "60px" }}>
-    <span style={{ fontWeight: "700", fontSize: "17px", display: "block" }}>{count}</span>
-    <span style={{ fontSize: "13px", color: "#888" }}>{label}</span>
-  </div>
-);
-
 const TabButton = ({ active, onClick, icon }) => (
   <button onClick={onClick} style={{ 
     flex: 1, background: "none", border: "none", 
@@ -184,19 +160,24 @@ const SettingsItem = ({ icon, label }) => (
 const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "-apple-system, sans-serif", paddingBottom: "80px" };
 const navBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 20px", borderBottom: "0.5px solid #222", position: "sticky", top: 0, background: "rgba(0,0,0,0.9)", backdropFilter: "blur(10px)", zIndex: 100 };
 const usernameStyle = { fontSize: "17px", fontWeight: "700", display: "flex", alignItems: "center", margin: 0 };
-const dropdownStyle = { position: "absolute", right: 0, top: "35px", background: "#1E1E1E", borderRadius: "12px", width: "200px", boxShadow: "0 4px 20px rgba(0,0,0,0.5)", border: "1px solid #333", overflow: "hidden", zIndex: 200 };
-const dropdownItemStyle = { padding: "12px 15px", fontSize: "14px", fontWeight: "500", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", color: "#fff" };
 const settingsItemStyle = { display: "flex", alignItems: "center", padding: "16px 20px", cursor: "pointer", transition: "background 0.2s" };
 
-const headerSectionStyle = { padding: "20px", display: "flex", flexDirection: "column", alignItems: "center" };
-const avatarContainerStyle = { width: "96px", height: "96px", borderRadius: "50%", padding: "2px", background: "linear-gradient(45deg, #FFD700, #ff3b30)", marginBottom: "12px" };
+const headerSectionStyle = { padding: "20px", display: "flex", flexDirection: "column" };
+
+// New Horizontal Layout Styles
+const profileTopRowStyle = { display: "flex", alignItems: "center", marginBottom: "20px", gap: "20px" };
+const infoColumnStyle = { display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" };
+
+const avatarContainerStyle = { width: "86px", height: "86px", borderRadius: "50%", padding: "2px", background: "linear-gradient(45deg, #FFD700, #ff3b30)", flexShrink: 0 };
 const avatarImageStyle = { width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "3px solid #000" };
-const displayNameStyle = { fontSize: "18px", fontWeight: "600", margin: "0 0 5px 0" };
-const bioStyle = { fontSize: "14px", color: "#ccc", textAlign: "center", lineHeight: "1.4", marginBottom: "20px", maxWidth: "300px" };
-const statsRowStyle = { display: "flex", gap: "30px", marginBottom: "20px" };
-const actionButtonsRowStyle = { display: "flex", gap: "8px", width: "100%", maxWidth: "350px" };
+
+const displayNameStyle = { fontSize: "20px", fontWeight: "700", margin: "0 0 5px 0", lineHeight: "1.2" };
+const bioStyle = { fontSize: "14px", color: "#ccc", margin: 0, lineHeight: "1.4" };
+
+const actionButtonsRowStyle = { display: "flex", gap: "8px", width: "100%" };
 const primaryButtonStyle = { flex: 1, background: "#1E1E1E", color: "#fff", border: "none", borderRadius: "8px", padding: "10px", fontSize: "14px", fontWeight: "600", cursor: "pointer" };
 const secondaryButtonStyle = { background: "#1E1E1E", color: "#fff", border: "none", borderRadius: "8px", padding: "10px 14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+
 const tabsContainerStyle = { display: "flex", borderBottom: "1px solid #222", background: "#000", position: "sticky", top: "54px", zIndex: 40 };
 const contentAreaStyle = { minHeight: "300px", background: "#000" };
 const gridStyle = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px" };
