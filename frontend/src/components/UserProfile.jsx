@@ -61,16 +61,24 @@ export default function UserProfile({ user, onLogout }) {
           <CheckCircle size={14} color="#20D5EC" fill="black" style={{ marginLeft: "4px" }} />
         </h2>
         
-        {/* Settings Button (Direct Link) */}
-        <Settings 
-          size={24} 
-          color="#fff" 
-          onClick={() => setCurrentView("settings")} 
-          style={{ cursor: "pointer" }} 
-        />
+        {/* 🟢 NEW: Notification & Settings Group */}
+        <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+          <Bell 
+            size={24} 
+            color="#fff" 
+            style={{ cursor: "pointer" }} 
+            onClick={() => alert("No new notifications")}
+          />
+          <Settings 
+            size={24} 
+            color="#fff" 
+            onClick={() => setCurrentView("settings")} 
+            style={{ cursor: "pointer" }} 
+          />
+        </div>
       </div>
 
-      {/* 🟢 NEW HORIZONTAL HEADER LAYOUT */}
+      {/* Horizontal Header Layout */}
       <div style={headerSectionStyle}>
         
         <div style={profileTopRowStyle}>
@@ -94,7 +102,7 @@ export default function UserProfile({ user, onLogout }) {
           </div>
         </div>
 
-        {/* Action Buttons (Below the info) */}
+        {/* Action Buttons */}
         <div style={actionButtonsRowStyle}>
           <button style={primaryButtonStyle} onClick={() => alert("Edit Profile")}>Edit profile</button>
           <button style={secondaryButtonStyle} onClick={() => alert("Share Profile")}>
@@ -103,11 +111,26 @@ export default function UserProfile({ user, onLogout }) {
         </div>
       </div>
 
-      {/* Sticky Tabs */}
+      {/* 🟢 NEW: Pronounced & Labelled Tabs */}
       <div style={tabsContainerStyle}>
-        <TabButton active={activeTab === "videos"} onClick={() => setActiveTab("videos")} icon={<Grid3X3 size={20} />} />
-        <TabButton active={activeTab === "premium"} onClick={() => setActiveTab("premium")} icon={<Lock size={20} />} />
-        <TabButton active={activeTab === "likes"} onClick={() => setActiveTab("likes")} icon={<Heart size={20} />} />
+        <TabButton 
+          active={activeTab === "videos"} 
+          onClick={() => setActiveTab("videos")} 
+          icon={<Grid3X3 size={24} />} 
+          label="Videos"
+        />
+        <TabButton 
+          active={activeTab === "premium"} 
+          onClick={() => setActiveTab("premium")} 
+          icon={<Lock size={24} />} 
+          label="Premium"
+        />
+        <TabButton 
+          active={activeTab === "likes"} 
+          onClick={() => setActiveTab("likes")} 
+          icon={<Heart size={24} />} 
+          label="Likes"
+        />
       </div>
 
       {/* Content Grid */}
@@ -136,14 +159,25 @@ export default function UserProfile({ user, onLogout }) {
 
 // 🎨 SUB-COMPONENTS
 
-const TabButton = ({ active, onClick, icon }) => (
+// 🟢 NEW: Updated TabButton with Labels
+const TabButton = ({ active, onClick, icon, label }) => (
   <button onClick={onClick} style={{ 
-    flex: 1, background: "none", border: "none", 
-    borderBottom: active ? "2px solid #fff" : "1px solid #222", 
-    padding: "12px 0", color: active ? "#fff" : "#666",
-    cursor: "pointer", transition: "all 0.2s"
+    flex: 1, 
+    display: "flex", 
+    flexDirection: "column", 
+    alignItems: "center", 
+    justifyContent: "center",
+    background: "none", 
+    border: "none", 
+    borderBottom: active ? "2px solid #fff" : "1px solid #333", 
+    padding: "12px 0", 
+    color: active ? "#fff" : "#666",
+    cursor: "pointer", 
+    transition: "all 0.2s",
+    gap: "5px"
   }}>
-    {icon}
+    {React.cloneElement(icon, { color: active ? "#fff" : "#666" })}
+    <span style={{ fontSize: "12px", fontWeight: active ? "600" : "400" }}>{label}</span>
   </button>
 );
 
@@ -164,7 +198,6 @@ const settingsItemStyle = { display: "flex", alignItems: "center", padding: "16p
 
 const headerSectionStyle = { padding: "20px", display: "flex", flexDirection: "column" };
 
-// New Horizontal Layout Styles
 const profileTopRowStyle = { display: "flex", alignItems: "center", marginBottom: "20px", gap: "20px" };
 const infoColumnStyle = { display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" };
 
