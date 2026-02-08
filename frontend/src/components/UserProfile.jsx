@@ -11,29 +11,27 @@ import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function UserProfile({ user, onLogout }) {
-  const [activeTab, setActiveTab] = useState("videos"); // 'videos' = Shots
+  const [activeTab, setActiveTab] = useState("videos");
   const [currentView, setCurrentView] = useState("profile");
   const [activeVideo, setActiveVideo] = useState(null);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
   const [videoCache, setVideoCache] = useState({});
   const isDesktop = window.innerWidth > 1024;
 
-  // 🟢 FETCH SHOTS
-  // Note: Ensure your backend actually returns videos with category="shots"
   const { videos, loading, loadMore } = useVideos("shots");
 
   useEffect(() => {
-    // Debug: Check if videos are actually arriving
-    console.log("UserProfile: Loaded videos for 'shots':", videos);
-    
     if (videos?.length > 0) {
       setVideoCache(prev => ({ ...prev, shots: videos }));
     }
   }, [videos]);
 
   const handleOpenVideo = async (video) => {
+    // 🟢 1. Check if unlocked
     const videoKey = `${video.chat_id}:${video.message_id}`;
     if (unlockedVideos.has(videoKey)) { playVideo(video); return; }
+    
+    // 🟢 2. Run Ad Logic if locked
     try {
       openRewardedAd();
       const nextSet = new Set(unlockedVideos);
@@ -47,9 +45,12 @@ export default function UserProfile({ user, onLogout }) {
 
   const playVideo = async (video) => {
     try {
+      // 🟢 3. Set Active Video (Triggers Full Screen)
       setActiveVideo({ ...video, video_url: null }); 
+      
       const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       const data = await res.json();
+      
       if (data.video_url) {
         setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
       }
@@ -58,19 +59,18 @@ export default function UserProfile({ user, onLogout }) {
 
   const videosToDisplay = videoCache["shots"] || videos || [];
 
-  // 🟢 SETTINGS VIEW
+  // 🟢 SETTINGS VIEW (unchanged)
   if (currentView === "settings") {
     return (
       <div style={containerStyle}>
         <div style={navBarStyle}>
           <ArrowLeft size={24} color="#fff" onClick={() => setCurrentView("profile")} style={{ cursor: "pointer" }} />
           <h2 style={headerTitleStyle}>Settings</h2>
-          <div style={{ width: "24px" }} /> {/* Dummy spacer for balance */}
+          <div style={{ width: "24px" }} />
         </div>
         <div style={{ padding: "10px 0" }}>
           <SettingsItem icon={<User size={20} />} label="Account" />
           <SettingsItem icon={<Lock size={20} />} label="Privacy" />
-          <SettingsItem icon={<Shield size={20} />} label="Security" />
           <SettingsItem icon={<Bell size={20} />} label="Notifications" />
           <div style={{ height: "1px", background: "#222", margin: "20px 0" }} />
           <div style={{...settingsItemStyle, color: "#ff3b30"}} onClick={onLogout}>
@@ -82,21 +82,16 @@ export default function UserProfile({ user, onLogout }) {
     );
   }
 
-  // 🟢 PROFILE VIEW
+  // 🟢 MAIN PROFILE VIEW
   return (
     <div style={containerStyle}>
-      {/* 🟢 FIXED: Header Alignment using CSS Grid */}
+      {/* HEADER GRID */}
       <div style={navGridStyle}>
-        {/* Left: Spacer to balance the layout */}
         <div style={{ width: "60px" }}></div>
-        
-        {/* Center: Username */}
         <div style={centerTitleContainer}>
           <h2 style={usernameStyle}>{user.username}</h2>
           <CheckCircle size={14} color="#20D5EC" fill="black" style={{ marginLeft: "4px" }} />
         </div>
-
-        {/* Right: Icons */}
         <div style={{ display: "flex", gap: "16px", justifyContent: "flex-end", width: "60px" }}>
           <Bell size={24} color="#fff" style={{ cursor: "pointer" }} />
           <Settings size={24} color="#fff" onClick={() => setCurrentView("settings")} style={{ cursor: "pointer" }} />
@@ -126,28 +121,22 @@ export default function UserProfile({ user, onLogout }) {
         </div>
       </div>
 
-      {/* 🟢 PRONOUNCED TABS */}
       <div style={tabsContainerStyle}>
         <TabButton active={activeTab === "videos"} onClick={() => setActiveTab("videos")} icon={<Grid3X3 size={24} />} label="Shots" />
         <TabButton active={activeTab === "premium"} onClick={() => setActiveTab("premium")} icon={<Lock size={24} />} label="Premium" />
         <TabButton active={activeTab === "likes"} onClick={() => setActiveTab("likes")} icon={<Heart size={24} />} label="Liked" />
       </div>
 
-      {/* 🟢 CONTENT AREA */}
       <div style={contentAreaStyle}>
         {activeTab === "videos" ? (
           <div style={gridStyle}>
-            {videosToDisplay.length > 0 ? (
-              videosToDisplay.map(v => (
-                <VideoCard key={v.message_id} video={v} layoutType="shots" onOpen={() => handleOpenVideo(v)} />
-              ))
-            ) : (
-              // 🟢 DEBUG EMPTY STATE
+            {videosToDisplay.length > 0 ? videosToDisplay.map(v => (
+              <VideoCard key={v.message_id} video={v} layoutType="shots" onOpen={() => handleOpenVideo(v)} />
+            )) : (
               <div style={{ gridColumn: "span 3", textAlign: "center", padding: "40px", color: "#666" }}>
-                {loading ? "Loading Shots..." : "No Shots found. Check database category = 'shots'"}
+                {loading ? "Loading..." : "No Shots found."}
               </div>
             )}
-            
             {!loading && videosToDisplay.length > 0 && (
               <div style={{ gridColumn: "span 3", padding: "20px", display: "flex", justifyContent: "center" }}>
                 <button onClick={loadMore} style={loadMoreStyle}>Load More</button>
@@ -165,23 +154,63 @@ export default function UserProfile({ user, onLogout }) {
         )}
       </div>
 
+      {/* 🟢 TIKTOK STYLE FULLSCREEN PLAYER */}
       {activeVideo && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 3000 }}>
-          <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} />
+        <div style={fullScreenContainerStyle}>
+          {/* 🟢 RETURN ARROW (Floating on top left) */}
+          <button 
+            onClick={() => setActiveVideo(null)} 
+            style={floatingBackButtonStyle}
+          >
+            <ArrowLeft size={28} color="#fff" />
+          </button>
+
+          <FullscreenPlayer 
+            video={activeVideo} 
+            onClose={() => setActiveVideo(null)} 
+            isDesktop={isDesktop} 
+          />
         </div>
       )}
     </div>
   );
 }
 
-// 🎨 COMPONENT STYLES
+// 🎨 NEW STYLES FOR FULLSCREEN
+const fullScreenContainerStyle = {
+  position: "fixed", 
+  inset: 0, 
+  zIndex: 3000, 
+  background: "#000",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center"
+};
 
+const floatingBackButtonStyle = {
+  position: "absolute",
+  top: "20px",
+  left: "20px",
+  zIndex: 3010, // Higher than player
+  background: "rgba(0,0,0,0.5)",
+  border: "none",
+  borderRadius: "50%",
+  width: "44px",
+  height: "44px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  backdropFilter: "blur(4px)"
+};
+
+// 🎨 EXISTING COMPONENT STYLES
 const TabButton = ({ active, onClick, icon, label }) => (
   <button onClick={onClick} style={{ 
     flex: 1, display: "flex", flexDirection: "column", alignItems: "center", 
     background: "none", border: "none", padding: "12px 0",
     borderBottom: active ? "2.5px solid #fff" : "1px solid #222",
-    opacity: active ? 1 : 0.5, // 🟢 Visually dims inactive tabs
+    opacity: active ? 1 : 0.5, 
     color: active ? "#fff" : "#fff", cursor: "pointer", transition: "0.2s"
   }}>
     {icon}
@@ -195,29 +224,12 @@ const SettingsItem = ({ icon, label }) => (
   </div>
 );
 
-// 🖌 STYLES
 const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "sans-serif" };
-
-// 🟢 NEW HEADER GRID (Solves Alignment)
-const navGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "1fr auto 1fr", // Left, Center, Right
-  alignItems: "center",
-  padding: "15px 20px",
-  borderBottom: "1px solid #222",
-  position: "sticky",
-  top: 0,
-  background: "rgba(0,0,0,0.95)",
-  zIndex: 100,
-  backdropFilter: "blur(10px)"
-};
-// Used for the Settings Sub-page
+const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "15px 20px", borderBottom: "1px solid #222", position: "sticky", top: 0, background: "rgba(0,0,0,0.95)", zIndex: 100, backdropFilter: "blur(10px)" };
 const navBarStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid #222" };
-
 const centerTitleContainer = { display: "flex", alignItems: "center", justifyContent: "center" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
 const headerTitleStyle = { fontSize: "16px", fontWeight: "700", margin: 0, flex: 1, textAlign: "center" };
-
 const headerSectionStyle = { padding: "20px" };
 const profileTopRowStyle = { display: "flex", alignItems: "flex-start", gap: "20px", marginBottom: "20px" };
 const avatarContainerStyle = { width: "86px", height: "86px", borderRadius: "50%", padding: "2px", background: "linear-gradient(45deg, #FFD700, #ff3b30)" };
@@ -225,11 +237,9 @@ const avatarImageStyle = { width: "100%", height: "100%", borderRadius: "50%", o
 const infoColumnStyle = { flex: 1, paddingTop: "4px" };
 const displayNameStyle = { fontSize: "20px", fontWeight: "800", margin: "0 0 6px 0" };
 const bioStyle = { fontSize: "13px", color: "#ccc", margin: 0, lineHeight: "1.4" };
-
 const actionButtonsRowStyle = { display: "flex", gap: "8px" };
 const primaryButtonStyle = { flex: 1, background: "#fff", color: "#000", border: "none", borderRadius: "8px", padding: "10px", fontWeight: "700", fontSize: "14px" };
 const secondaryButtonStyle = { background: "#1E1E1E", color: "#fff", border: "none", borderRadius: "8px", padding: "10px 14px" };
-
 const tabsContainerStyle = { display: "flex", background: "#000", position: "sticky", top: "54px", zIndex: 90 };
 const contentAreaStyle = { minHeight: "400px" };
 const gridStyle = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px" };
