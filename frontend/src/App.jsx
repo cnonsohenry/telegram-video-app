@@ -62,7 +62,7 @@ export default function App() {
           }}
         >
           <User size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
-          <span style={{ fontSize: '10px', fontWeight: '600' }}>Profile</span>
+          <span style={{ fontSize: '10px', fontWeight: '600' }}>Exclusive</span>
         </button>
 
       </nav>
