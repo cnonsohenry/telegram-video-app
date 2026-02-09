@@ -3,16 +3,21 @@ import { X, ArrowLeft, Play, Loader2 } from "lucide-react";
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const videoRef = useRef(null);
-  const containerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
 
-  // 🟢 1. Lock Body Scroll
+  // 🟢 1. Lock Body Scroll (Prevents background page from moving)
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = "auto"; };
+    // 🟢 iOS Fix: Prevent rubber-banding on the player itself
+    document.documentElement.style.overflow = "hidden"; 
+    
+    return () => { 
+      document.body.style.overflow = "auto";
+      document.documentElement.style.overflow = "auto";
+    };
   }, []);
 
   const handleTimeUpdate = () => {
@@ -32,15 +37,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   const togglePlay = (e) => {
     e.stopPropagation(); 
-    
-    // 🟢 CRITICAL FIX FOR IPHONE CRASH
-    // We strictly check if the browser SUPPORTS fullscreen before calling it.
-    // iPhone Safari returns 'undefined' for requestFullscreen on divs.
-    if (!isDesktop && containerRef.current && containerRef.current.requestFullscreen) {
-      if (!document.fullscreenElement) {
-        containerRef.current.requestFullscreen().catch(() => {});
-      }
-    }
+    // 🟢 REMOVED requestFullscreen() 
+    // This fixes the Android instability and iPhone crash.
+    // We now rely purely on CSS for the full-screen look.
 
     if (videoRef.current) {
       if (isPlaying) {
@@ -59,7 +58,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   return (
     <div
-      ref={containerRef}
       style={{
         position: "fixed",
         inset: 0,
@@ -68,8 +66,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        // 🟢 FIX: Ensure we respect the iPhone notches/home bars
-        paddingBottom: "env(safe-area-inset-bottom)"
       }}
       onClick={onClose} 
     >
@@ -88,8 +84,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
           display: "flex",
           flexDirection: isDesktop ? "row" : "column",
           width: isDesktop ? "85vw" : "100%", 
-          // 🟢 FIX: '100%' is often more stable on iOS Safari when position is fixed
-          height: isDesktop ? "85vh" : "100%", 
+          // 🟢 100dvh (Dynamic Viewport Height) pushes past the address bar on mobile
+          height: isDesktop ? "85vh" : "100dvh", 
           maxWidth: isDesktop ? "1100px" : "none",
           background: "#000",
           borderRadius: isDesktop ? "12px" : "0px",
@@ -112,7 +108,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             alignItems: "center", 
             justifyContent: "center", 
             position: "relative",
-            cursor: "pointer" // Helps iOS recognize this as clickable
+            cursor: "pointer"
           }}
         >
           {isLoading && (
@@ -126,7 +122,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             ref={videoRef}
             src={video.video_url}
             autoPlay
-            playsInline // Essential for iOS to play inline
+            playsInline // Essential for iOS
             loop
             onTimeUpdate={handleTimeUpdate}
             onWaiting={() => setIsLoading(true)}
@@ -134,7 +130,10 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             style={{ 
                 width: "100%", 
                 height: "100%", 
-                objectFit: "contain" 
+                // 🟢 FIX FOR BLACK BARS:
+                // Desktop = 'contain' (see whole video)
+                // Mobile = 'cover' (fill screen like TikTok, no black bars)
+                objectFit: isDesktop ? "contain" : "cover" 
             }}
           />
 
@@ -144,7 +143,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             </div>
           )}
 
-          {/* 🟢 PROGRESS BAR WITH SAFE AREA */}
+          {/* 🟢 PROGRESS BAR (Pushed up slightly for Safe Area) */}
           <div style={progressContainerStyle} onClick={(e) => e.stopPropagation()}>
              <input 
                type="range" 
@@ -196,8 +195,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 // 🎨 STYLES
 const mobileBackButtonStyle = {
   position: "absolute", 
-  // 🟢 Move down slightly to clear dynamic island/notches
-  top: "30px", 
+  top: "30px", // Safe distance from top
   left: "20px", 
   zIndex: 10002,
   background: "rgba(0,0,0,0.4)", color: "#fff", border: "none",
@@ -225,8 +223,7 @@ const desktopSidebarStyle = {
 
 const progressContainerStyle = {
   position: "absolute", 
-  // 🟢 MOVE UP to clear the Home Swipe Bar on iPhone
-  bottom: "40px", 
+  bottom: "40px", // 🟢 Pushed up to avoid iPhone Home Bar
   left: "10px", 
   right: "10px", 
   zIndex: 10002,
