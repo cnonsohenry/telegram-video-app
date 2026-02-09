@@ -1,20 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
-import { X, ArrowLeft, Play, Pause, Loader2 } from "lucide-react";
+import { X, ArrowLeft, Play, Loader2, Maximize2 } from "lucide-react"; // 🟢 Added Maximize icon
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const videoRef = useRef(null);
+  const containerRef = useRef(null); // 🟢 1. Ref for the main container
   const [isPlaying, setIsPlaying] = useState(true);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
 
-  // 🟢 1. Lock Body Scroll
+  // 🟢 2. Lock Scroll on Mount
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = "auto"; };
   }, []);
 
-  // 🟢 2. Update Progress Bar
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       const current = videoRef.current.currentTime;
@@ -23,7 +23,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     }
   };
 
-  // 🟢 3. Handle Seeking
   const handleSeek = (e) => {
     e.stopPropagation();
     const newTime = (e.target.value / 100) * videoRef.current.duration;
@@ -31,8 +30,24 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     setProgress(e.target.value);
   };
 
+  // 🟢 3. Attempt Fullscreen on Interaction
+  const attemptFullscreen = () => {
+    if (!isDesktop && containerRef.current) {
+      if (!document.fullscreenElement) {
+        containerRef.current.requestFullscreen().catch((err) => {
+          // Safari on iPhone doesn't support this, so we silently fail
+          console.log("Fullscreen not supported or blocked:", err);
+        });
+      }
+    }
+  };
+
   const togglePlay = (e) => {
     e.stopPropagation(); 
+    
+    // 🟢 Trigger Fullscreen on first tap (Android/Desktop)
+    attemptFullscreen();
+
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
@@ -50,10 +65,11 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   return (
     <div
+      ref={containerRef} // 🟢 Attach ref here
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(0,0,0,0.9)", // Darker overlay for desktop focus
+        backgroundColor: "rgba(0,0,0,1)", // Solid black for immersion
         zIndex: 10000, 
         display: "flex",
         alignItems: "center",
@@ -75,10 +91,10 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         style={{
           display: "flex",
           flexDirection: isDesktop ? "row" : "column",
-          // 🟢 DESKTOP FIX: Use fixed constraints so flexbox works
           width: isDesktop ? "85vw" : "100%", 
+          // 🟢 100dvh is crucial for mobile browsers to ignore the address bar area
           height: isDesktop ? "85vh" : "100dvh",
-          maxWidth: isDesktop ? "1100px" : "none", // Prevent ultra-wide stretching
+          maxWidth: isDesktop ? "1100px" : "none",
           background: "#000",
           borderRadius: isDesktop ? "12px" : "0px",
           overflow: "hidden",
@@ -92,9 +108,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         <div 
           onClick={togglePlay}
           style={{ 
-            // 🟢 CRITICAL DESKTOP FIX:
-            // flex: 1 tells it to take ONLY the remaining space after the sidebar
-            // minWidth: 0 prevents it from forcing overflow
             flex: 1, 
             minWidth: 0, 
             height: "100%", 
@@ -105,7 +118,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             position: "relative"
           }}
         >
-          {/* Loading Spinner */}
           {isLoading && (
             <div style={{ position: "absolute", zIndex: 10 }}>
               <Loader2 size={48} color="#20D5EC" className="spin-animation" />
@@ -117,7 +129,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             ref={videoRef}
             src={video.video_url}
             autoPlay
-            playsInline 
+            playsInline // 🟢 KEEPS it in your custom player instead of Apple's native one
             loop
             onTimeUpdate={handleTimeUpdate}
             onWaiting={() => setIsLoading(true)}
@@ -125,11 +137,10 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             style={{ 
                 width: "100%", 
                 height: "100%", 
-                objectFit: "contain" // Ensures video is never cropped
+                objectFit: "contain" 
             }}
           />
 
-          {/* Center Play Icon */}
           {(!isPlaying || showPlayIcon) && !isLoading && (
             <div style={playIconOverlayStyle}>
               <Play size={40} fill="white" color="white" />
@@ -151,7 +162,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         {/* 🟢 DESKTOP SIDEBAR */}
         {isDesktop && (
           <div style={desktopSidebarStyle}>
-            {/* Header */}
             <div style={{ padding: "20px", display: "flex", alignItems: "center", gap: "12px", borderBottom: "1px solid #222" }}>
                <img 
                  src={video.avatar_url || "/assets/default-avatar.png"} 
@@ -165,17 +175,14 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
                </div>
             </div>
 
-            {/* Caption / Comments Placeholder */}
             <div style={{ flex: 1, padding: "20px", overflowY: "auto", color: "#ccc", fontSize: "14px", lineHeight: "1.6" }}>
               {video.caption ? video.caption : <span style={{ fontStyle: "italic", color: "#666" }}>No caption provided.</span>}
-              
               <div style={{ marginTop: "30px", borderTop: "1px solid #222", paddingTop: "20px" }}>
                  <h4 style={{ margin: "0 0 10px 0", color: "#fff", fontSize: "14px" }}>Comments</h4>
                  <p style={{ color: "#666", fontSize: "13px" }}>No comments yet. Be the first to say something!</p>
               </div>
             </div>
             
-            {/* Footer Stats */}
             <div style={{ padding: "20px", borderTop: "1px solid #222", background: "#050505" }}>
                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ color: "#fff", fontWeight: "bold" }}>{Number(video.views || 0).toLocaleString()} views</span>
@@ -190,7 +197,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 }
 
 // 🎨 STYLES
-
 const mobileBackButtonStyle = {
   position: "absolute", top: "20px", left: "20px", zIndex: 10002,
   background: "rgba(0,0,0,0.4)", color: "#fff", border: "none",
@@ -199,7 +205,6 @@ const mobileBackButtonStyle = {
   backdropFilter: "blur(5px)"
 };
 
-// Positioned relative to the screen, ensuring it's always clickable
 const desktopCloseButtonStyle = {
   position: "absolute", top: "30px", right: "30px", zIndex: 10002,
   background: "rgba(255,255,255,0.1)", color: "#fff", border: "none", borderRadius: "50%",
@@ -213,12 +218,8 @@ const playIconOverlayStyle = {
 };
 
 const desktopSidebarStyle = {
-  width: "360px", // Fixed width sidebar
-  background: "#121212", 
-  borderLeft: "1px solid #222",
-  display: "flex", 
-  flexDirection: "column",
-  flexShrink: 0 // Prevent sidebar from squashing
+  width: "360px", background: "#121212", borderLeft: "1px solid #222",
+  display: "flex", flexDirection: "column", flexShrink: 0
 };
 
 const progressContainerStyle = {
