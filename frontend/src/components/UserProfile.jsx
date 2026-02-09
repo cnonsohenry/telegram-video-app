@@ -7,14 +7,16 @@ import {
 import VideoCard from "./VideoCard"; 
 import FullscreenPlayer from "./FullscreenPlayer"; 
 import { useVideos } from "../hooks/useVideos";
-import { openRewardedAd } from "../utils/rewardedAd";
-import { adReturnWatcher } from "../utils/adReturnWatcher";
+// 🟢 REMOVED AD IMPORTS
+// import { openRewardedAd } from "../utils/rewardedAd";
+// import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function UserProfile({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState("videos");
   const [currentView, setCurrentView] = useState("profile");
   const [activeVideo, setActiveVideo] = useState(null);
-  const [unlockedVideos, setUnlockedVideos] = useState(new Set());
+  
+  // 🟢 REMOVED UNLOCKED STATE (No longer needed)
   const [videoCache, setVideoCache] = useState({});
   const isDesktop = window.innerWidth > 1024;
 
@@ -26,19 +28,9 @@ export default function UserProfile({ user, onLogout }) {
     }
   }, [videos]);
 
+  // 🟢 UPDATED: OPEN VIDEO DIRECTLY (NO ADS)
   const handleOpenVideo = async (video) => {
-    const videoKey = `${video.chat_id}:${video.message_id}`;
-    if (unlockedVideos.has(videoKey)) { playVideo(video); return; }
-    
-    try {
-      openRewardedAd();
-      const nextSet = new Set(unlockedVideos);
-      nextSet.add(videoKey);
-      setUnlockedVideos(nextSet);
-      localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
-      await adReturnWatcher();
-      playVideo(video);
-    } catch (err) { playVideo(video); }
+    playVideo(video);
   };
 
   const playVideo = async (video) => {
@@ -117,7 +109,7 @@ export default function UserProfile({ user, onLogout }) {
           </div>
         </div>
 
-        {/* 🟢 NEW: RED PREMIUM BUTTON */}
+        {/* 🟢 RED PREMIUM BUTTON */}
         <div style={actionButtonsRowStyle}>
           <button style={premiumButtonStyle} onClick={() => alert("Redirecting to Premium...")}>
             SUBSCRIBE PREMIUM
@@ -195,7 +187,6 @@ const SettingsItem = ({ icon, label }) => (
 // 🖌 STYLES
 const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "sans-serif" };
 
-// 🟢 HEADER GRID (Optimized for Extreme Right Alignment)
 const navGridStyle = { 
   display: "grid", 
   gridTemplateColumns: "1fr auto 1fr", 
@@ -222,19 +213,18 @@ const displayNameStyle = { fontSize: "20px", fontWeight: "800", margin: "0 0 6px
 const bioStyle = { fontSize: "13px", color: "#ccc", margin: 0, lineHeight: "1.4" };
 const actionButtonsRowStyle = { display: "flex", gap: "10px", alignItems: "center" };
 
-// 🟢 BEAUTIFUL PREMIUM BUTTON STYLE
 const premiumButtonStyle = { 
   flex: 1, 
-  background: "linear-gradient(45deg, #ff3b30, #d70015)", // Vibrant Red Gradient
+  background: "linear-gradient(45deg, #ff3b30, #d70015)", 
   color: "#fff", 
   border: "none", 
   borderRadius: "10px", 
   padding: "12px", 
-  fontWeight: "800", // Extra Bold
+  fontWeight: "800", 
   fontSize: "14px", 
   textTransform: "uppercase",
   letterSpacing: "0.5px",
-  boxShadow: "0 4px 15px rgba(255, 59, 48, 0.4)", // Red Glow
+  boxShadow: "0 4px 15px rgba(255, 59, 48, 0.4)", 
   cursor: "pointer",
   transition: "transform 0.1s ease"
 };
