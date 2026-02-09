@@ -4,13 +4,14 @@ import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
+import PullToRefresh from "../components/PullToRefresh"; // 🟢 1. Import PullToRefresh
 import { useVideos } from "../hooks/useVideos";
 import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function Home() {
-  const [viewMode, setViewMode] = useState("dashboard"); // 'dashboard' or 'category'
+  const [viewMode, setViewMode] = useState("dashboard");
   const [activeTab, setActiveTab] = useState(0); 
   const [activeVideo, setActiveVideo] = useState(null);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -18,7 +19,6 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isMobileSearchVisible, setIsMobileSearchVisible] = useState(false);
   
-  // 🟢 1. Client-Side Cache
   const [videoCache, setVideoCache] = useState({});
 
   const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
@@ -34,7 +34,6 @@ export default function Home() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🟢 2. Update Cache
   useEffect(() => {
     if (videos && videos.length > 0) {
       setVideoCache(prev => ({
@@ -46,6 +45,13 @@ export default function Home() {
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // 🟢 2. Refresh Handler
+  const handleRefresh = async () => {
+    // This reloads the page to fetch fresh data.
+    // In a more complex app, you could call a refetch() function from your hook instead.
+    window.location.reload(); 
   };
 
   const handleOpenVideo = async (video) => {
@@ -88,9 +94,19 @@ export default function Home() {
 
   const getGridStyle = () => {
     if (isDesktop) {
-      return { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" };
+      return { 
+        display: "grid", 
+        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", 
+        gap: "10px",
+        alignItems: "start" 
+      };
     }
-    return { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" };
+    return { 
+      display: "grid", 
+      gridTemplateColumns: "repeat(2, 1fr)", 
+      gap: "10px",
+      alignItems: "start" // 🟢 Ensures Knacks/Text don't stretch vertically
+    };
   };
 
   const videosToDisplay = (videoCache[currentCategory] && videoCache[currentCategory].length > 0) 
@@ -98,115 +114,115 @@ export default function Home() {
     : videos;
 
   return (
-    <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
-      
-      {/* DESKTOP SIDEBAR */}
-      {isDesktop && (
-        <nav style={{ width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, zIndex: 100 }}>
-          {TABS.map((tab, index) => (
-            <button key={index} onClick={() => { if (activeTab === index) scrollToTop(); else setActiveTab(index); }} style={{ display: "flex", alignItems: "center", gap: "15px", padding: "12px 20px", background: activeTab === index ? "#1c1c1e" : "none", border: "none", color: "#fff", borderRadius: "10px", cursor: "pointer", textAlign: "left" }}>
-              {tab.icon} <span style={{ fontWeight: "bold" }}>{tab.label}</span>
-            </button>
-          ))}
-        </nav>
-      )}
-
-      {/* RIGHT SIDE (Mobile & Desktop) */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+    // 🟢 3. Wrapped with PullToRefresh
+    <PullToRefresh onRefresh={handleRefresh}>
+      <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
         
-        {/* 🟢 1. APP HEADER - Not Sticky anymore */}
-        <div style={{ background: "#000" }}>
-           <AppHeader isDesktop={isDesktop} searchTerm={searchTerm} setSearchTerm={setSearchTerm} isMobileSearchVisible={isMobileSearchVisible} setIsMobileSearchVisible={setIsMobileSearchVisible} />
-        </div>
-
-        {/* 🟢 2. MOBILE TOP TABS - Sticky at Top: 0 */}
-        {!isDesktop && (
-          <nav style={{ 
-            display: "flex", justifyContent: "space-evenly", 
-            position: "sticky", top: 0, // 🟢 Sticks to the very top now
-            zIndex: 1000,
-            background: "rgba(0,0,0,0.95)", backdropFilter: "blur(15px)", WebkitBackdropFilter: "blur(15px)", borderBottom: "1px solid #262626"
-          }}>
+        {/* DESKTOP SIDEBAR */}
+        {isDesktop && (
+          <nav style={{ width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, zIndex: 100 }}>
             {TABS.map((tab, index) => (
-              <button 
-                key={index} 
-                onClick={() => { 
-                  // 🟢 Auto-switch to category view on click
-                  setViewMode("category"); 
-                  if (activeTab === index) scrollToTop(); 
-                  else setActiveTab(index); 
-                }} 
-                style={{ flex: 1, padding: "14px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}
-              >
-                {tab.icon}
-                <span style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px" }}>{tab.label}</span>
+              <button key={index} onClick={() => { if (activeTab === index) scrollToTop(); else setActiveTab(index); }} style={{ display: "flex", alignItems: "center", gap: "15px", padding: "12px 20px", background: activeTab === index ? "#1c1c1e" : "none", border: "none", color: "#fff", borderRadius: "10px", cursor: "pointer", textAlign: "left" }}>
+                {tab.icon} <span style={{ fontWeight: "bold" }}>{tab.label}</span>
               </button>
             ))}
-            <div style={{ position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "#ff0000", transform: `translateX(${activeTab * 100}%)`, transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }} />
           </nav>
         )}
-        
-        <div style={{ display: "flex", flex: 1 }}>
-          <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px" }}>
-            
-            {/* CONDITIONAL RENDER */}
-            {(isDesktop || viewMode === "category") ? (
-              // FULL GRID VIEW
-              <>
-                 {/* 🟢 Removed "Back to Overview" Button as requested */}
-                 
-                 <div style={getGridStyle()}>
-                    {videosToDisplay.map(v => (
-                      <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} layoutType={currentCategory} onOpen={() => handleOpenVideo(v)} />
-                    ))}
-                 </div>
 
-                 {loading && videosToDisplay.length === 0 && (
-                   <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>Loading videos...</div>
-                 )}
+        {/* RIGHT SIDE (Mobile & Desktop) */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          
+          {/* APP HEADER */}
+          <div style={{ background: "#000" }}>
+             <AppHeader isDesktop={isDesktop} searchTerm={searchTerm} setSearchTerm={setSearchTerm} isMobileSearchVisible={isMobileSearchVisible} setIsMobileSearchVisible={setIsMobileSearchVisible} />
+          </div>
 
-                 {!loading && videosToDisplay.length > 0 && (
-                  <button onClick={loadMore} style={{ display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "900", cursor: "pointer" }}>Show More</button>
-                 )}
-              </>
-            ) : (
-              // DASHBOARD SUMMARY VIEW
-              <div style={{ display: "flex", flexDirection: "column", gap: "40px" }}>
-                {CATEGORIES.map(cat => (
-                  <section key={cat}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", alignItems: "center" }}>
-                      <h3 style={{ color: "#fff", textTransform: "uppercase", fontSize: "14px", fontWeight: "900", margin: 0 }}>{cat}</h3>
-                      <button 
-                        onClick={() => { 
-                          setViewMode("category"); 
-                          setActiveTab(CATEGORIES.indexOf(cat)); 
-                          scrollToTop(); 
-                        }} 
-                        style={{ color: "#ff0000", fontSize: "12px", fontWeight: "800", background: "none", border: "none" }}
-                      >
-                        See All
-                      </button>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
-                      {dashboardVideos[cat]?.map(v => (
-                        <VideoCard key={`dash-${v.message_id}`} video={v} layoutType={cat} onOpen={() => handleOpenVideo(v)} />
+          {/* MOBILE TOP TABS */}
+          {!isDesktop && (
+            <nav style={{ 
+              display: "flex", justifyContent: "space-evenly", 
+              position: "sticky", top: 0, 
+              zIndex: 1000,
+              background: "rgba(0,0,0,0.95)", backdropFilter: "blur(15px)", WebkitBackdropFilter: "blur(15px)", borderBottom: "1px solid #262626"
+            }}>
+              {TABS.map((tab, index) => (
+                <button 
+                  key={index} 
+                  onClick={() => { 
+                    setViewMode("category"); 
+                    if (activeTab === index) scrollToTop(); 
+                    else setActiveTab(index); 
+                  }} 
+                  style={{ flex: 1, padding: "14px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}
+                >
+                  {tab.icon}
+                  <span style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px" }}>{tab.label}</span>
+                </button>
+              ))}
+              <div style={{ position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "#ff0000", transform: `translateX(${activeTab * 100}%)`, transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }} />
+            </nav>
+          )}
+          
+          <div style={{ display: "flex", flex: 1 }}>
+            <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px" }}>
+              
+              {/* CONDITIONAL RENDER */}
+              {(isDesktop || viewMode === "category") ? (
+                // FULL GRID VIEW
+                <>
+                   <div style={getGridStyle()}>
+                      {videosToDisplay.map(v => (
+                        <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} layoutType={currentCategory} onOpen={() => handleOpenVideo(v)} />
                       ))}
-                    </div>
-                  </section>
-                ))}
+                   </div>
+
+                   {loading && videosToDisplay.length === 0 && (
+                     <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>Loading videos...</div>
+                   )}
+
+                   {!loading && videosToDisplay.length > 0 && (
+                    <button onClick={loadMore} style={{ display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "900", cursor: "pointer" }}>Show More</button>
+                   )}
+                </>
+              ) : (
+                // DASHBOARD SUMMARY VIEW
+                <div style={{ display: "flex", flexDirection: "column", gap: "40px" }}>
+                  {CATEGORIES.map(cat => (
+                    <section key={cat}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", alignItems: "center" }}>
+                        <h3 style={{ color: "#fff", textTransform: "uppercase", fontSize: "14px", fontWeight: "900", margin: 0 }}>{cat}</h3>
+                        <button 
+                          onClick={() => { 
+                            setViewMode("category"); 
+                            setActiveTab(CATEGORIES.indexOf(cat)); 
+                            scrollToTop(); 
+                          }} 
+                          style={{ color: "#ff0000", fontSize: "12px", fontWeight: "800", background: "none", border: "none" }}
+                        >
+                          See All
+                        </button>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
+                        {dashboardVideos[cat]?.map(v => (
+                          <VideoCard key={`dash-${v.message_id}`} video={v} layoutType={cat} onOpen={() => handleOpenVideo(v)} />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {isDesktop && (
+              <div style={{ flexShrink: 0 }}>
+                <SuggestedSidebar suggestions={sidebarSuggestions} onVideoClick={handleOpenVideo} />
               </div>
             )}
           </div>
-
-          {isDesktop && (
-            <div style={{ flexShrink: 0 }}>
-              <SuggestedSidebar suggestions={sidebarSuggestions} onVideoClick={handleOpenVideo} />
-            </div>
-          )}
         </div>
-      </div>
 
-      {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} />}
-    </div>
+        {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} />}
+      </div>
+    </PullToRefresh>
   );
 }

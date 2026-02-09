@@ -11,3 +11,9 @@ body {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
+
+html, body {
+  /* 🟢 Tells the browser "I'm handling the pull gesture, don't do yours" */
+  overscroll-behavior-y: contain; 
+  overflow-x: hidden;
+}
