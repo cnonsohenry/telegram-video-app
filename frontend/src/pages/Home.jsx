@@ -18,7 +18,7 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isMobileSearchVisible, setIsMobileSearchVisible] = useState(false);
   
-  // 🟢 1. NEW: Client-Side Cache to stop reloading blink
+  // 🟢 1. Client-Side Cache
   const [videoCache, setVideoCache] = useState({});
 
   const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
@@ -34,7 +34,7 @@ export default function Home() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🟢 2. NEW: Update Cache when new videos arrive
+  // 🟢 2. Update Cache
   useEffect(() => {
     if (videos && videos.length > 0) {
       setVideoCache(prev => ({
@@ -68,15 +68,12 @@ export default function Home() {
       const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       const data = await res.json();
       if (data.video_url) {
-        // Update both the active view state AND the cache so view counts update instantly
         const updateLogic = (prev) => prev.map(v => (v.chat_id === video.chat_id && v.message_id === video.message_id) ? { ...v, views: Number(v.views || 0) + 1 } : v);
-        
         setVideos(updateLogic);
         setVideoCache(prev => ({
           ...prev,
           [currentCategory]: updateLogic(prev[currentCategory] || [])
         }));
-        
         setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
       }
     } catch (e) { alert("Error fetching video link"); }
@@ -96,9 +93,6 @@ export default function Home() {
     return { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" };
   };
 
-  // 🟢 3. NEW: Decide what to render (Cache vs Live Data)
-  // If we have cached videos for this tab, show them immediately. 
-  // If not, fall back to the hook's 'videos' (which might be loading).
   const videosToDisplay = (videoCache[currentCategory] && videoCache[currentCategory].length > 0) 
     ? videoCache[currentCategory] 
     : videos;
@@ -117,28 +111,40 @@ export default function Home() {
         </nav>
       )}
 
-      {/* MOBILE TOP TABS */}
-      {!isDesktop && viewMode === "category" && (
-        <nav style={{ 
-          display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 1000,
-          background: "rgba(0,0,0,0.85)", backdropFilter: "blur(15px)", WebkitBackdropFilter: "blur(15px)", borderBottom: "1px solid #262626"
-        }}>
-          {TABS.map((tab, index) => (
-            <button 
-              key={index} 
-              onClick={() => { if (activeTab === index) scrollToTop(); else setActiveTab(index); }} 
-              style={{ flex: 1, padding: "14px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}
-            >
-              {tab.icon}
-              <span style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px" }}>{tab.label}</span>
-            </button>
-          ))}
-          <div style={{ position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "#ff0000", transform: `translateX(${activeTab * 100}%)`, transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }} />
-        </nav>
-      )}
-
+      {/* RIGHT SIDE (Mobile & Desktop) */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <AppHeader isDesktop={isDesktop} searchTerm={searchTerm} setSearchTerm={setSearchTerm} isMobileSearchVisible={isMobileSearchVisible} setIsMobileSearchVisible={setIsMobileSearchVisible} />
+        
+        {/* 🟢 1. APP HEADER - Not Sticky anymore */}
+        <div style={{ background: "#000" }}>
+           <AppHeader isDesktop={isDesktop} searchTerm={searchTerm} setSearchTerm={setSearchTerm} isMobileSearchVisible={isMobileSearchVisible} setIsMobileSearchVisible={setIsMobileSearchVisible} />
+        </div>
+
+        {/* 🟢 2. MOBILE TOP TABS - Sticky at Top: 0 */}
+        {!isDesktop && (
+          <nav style={{ 
+            display: "flex", justifyContent: "space-evenly", 
+            position: "sticky", top: 0, // 🟢 Sticks to the very top now
+            zIndex: 1000,
+            background: "rgba(0,0,0,0.95)", backdropFilter: "blur(15px)", WebkitBackdropFilter: "blur(15px)", borderBottom: "1px solid #262626"
+          }}>
+            {TABS.map((tab, index) => (
+              <button 
+                key={index} 
+                onClick={() => { 
+                  // 🟢 Auto-switch to category view on click
+                  setViewMode("category"); 
+                  if (activeTab === index) scrollToTop(); 
+                  else setActiveTab(index); 
+                }} 
+                style={{ flex: 1, padding: "14px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}
+              >
+                {tab.icon}
+                <span style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px" }}>{tab.label}</span>
+              </button>
+            ))}
+            <div style={{ position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "#ff0000", transform: `translateX(${activeTab * 100}%)`, transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }} />
+          </nav>
+        )}
         
         <div style={{ display: "flex", flex: 1 }}>
           <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px" }}>
@@ -147,25 +153,18 @@ export default function Home() {
             {(isDesktop || viewMode === "category") ? (
               // FULL GRID VIEW
               <>
-                 {!isDesktop && (
-                   <button onClick={() => setViewMode("dashboard")} style={{ marginBottom: "20px", background: "none", border: "none", color: "#8e8e8e", fontSize: "14px", fontWeight: "600" }}>
-                     ← Back to Overview
-                   </button>
-                 )}
+                 {/* 🟢 Removed "Back to Overview" Button as requested */}
                  
                  <div style={getGridStyle()}>
-                    {/* 🟢 4. Render from 'videosToDisplay' instead of 'videos' */}
                     {videosToDisplay.map(v => (
                       <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} layoutType={currentCategory} onOpen={() => handleOpenVideo(v)} />
                     ))}
                  </div>
 
-                 {/* Show loading spinner if cache is empty AND we are loading */}
                  {loading && videosToDisplay.length === 0 && (
                    <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>Loading videos...</div>
                  )}
 
-                 {/* Show More Button */}
                  {!loading && videosToDisplay.length > 0 && (
                   <button onClick={loadMore} style={{ display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "900", cursor: "pointer" }}>Show More</button>
                  )}
@@ -207,7 +206,7 @@ export default function Home() {
         </div>
       </div>
 
-      {activeVideo && <div style={{ position: "fixed", inset: 0, zIndex: 2000 }}><FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} /></div>}
+      {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} />}
     </div>
   );
 }

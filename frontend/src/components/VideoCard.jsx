@@ -1,22 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Play } from 'lucide-react';
 
-export default function VideoCard({ video, onOpen, layoutType }) {
+export default function VideoCard({ video, onOpen }) {
   const videoRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  
-  // Track image loading state
   const [isImgLoaded, setIsImgLoaded] = useState(false);
 
-  const isKnacks = layoutType === 'knacks';
-
-  // Cloudflare Resized URL
+  // Cloudflare Resized URL (Optimization)
   const thumbSrc = `${video.thumbnail_url}&w=400`;
-
-  const cardHeight = isKnacks 
-    ? (parseInt(video.message_id) % 2 === 0 ? "260px" : "310px") 
-    : "200px";
 
   useEffect(() => {
     const el = videoRef.current;
@@ -29,57 +21,55 @@ export default function VideoCard({ video, onOpen, layoutType }) {
     return () => { if (el) observer.unobserve(el); };
   }, []);
 
+  // Hover & Play Logic
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    if (isVisible) {
+    if (isVisible && isHovered) {
       el.play().catch(() => {});
     } else {
       el.pause();
-      setIsHovered(false);
     }
-  }, [isVisible]);
+  }, [isVisible, isHovered]);
 
   return (
     <div
       onClick={() => onOpen(video)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
-        display: "flex", flexDirection: "column",
-        background: "#1c1c1e", borderRadius: "0px", 
-        overflow: "hidden", width: "100%", height: "100%", 
-        cursor: "pointer", position: "relative"
-      }}
-      // Hover effects
-      onMouseEnter={(e) => { 
-        if (window.innerWidth > 1024) {
-          e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-          e.currentTarget.style.background = "#252525";
-        }
-      }}
-      onMouseLeave={(e) => { 
-        if (window.innerWidth > 1024) {
-          e.currentTarget.style.transform = 'translateY(0) scale(1)';
-          e.currentTarget.style.background = "#1c1c1e";
-        }
+        display: "flex", 
+        flexDirection: "column",
+        background: "#1c1c1e", 
+        borderRadius: "12px", // 🟢 Added rounded corners for a modern feel
+        overflow: "hidden", 
+        width: "100%", 
+        cursor: "pointer", 
+        position: "relative",
+        transition: "transform 0.2s ease",
+        transform: isHovered ? "scale(1.02)" : "scale(1)"
       }}
     >
+      {/* 🟢 1. UNIFORM ASPECT RATIO (Matches all tabs) */}
       <div style={{ 
-        position: "relative", width: "100%", height: cardHeight, 
-        background: "#000", overflow: "hidden"
+        position: "relative", 
+        width: "100%", 
+        aspectRatio: "9/16", // 🟢 Forces standard TikTok vertical shape
+        background: "#000", 
+        overflow: "hidden"
       }}>
         
-        {/* 🟢 1. SKELETON (Now persists and fades out smoothly) */}
+        {/* Skeleton Loader */}
         <div style={{
-          position: "absolute", inset: 0, zIndex: 1, // Sit behind image
+          position: "absolute", inset: 0, zIndex: 1,
           background: "linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%)",
           backgroundSize: "200% 100%",
           animation: "skeleton-loading 1.5s infinite",
-          // Fade out logic:
           opacity: isImgLoaded ? 0 : 1,
           transition: "opacity 0.4s ease-in-out"
         }} />
 
-        {/* 🟢 2. IMAGE (Fades in on top) */}
+        {/* Thumbnail Image */}
         <img 
           src={thumbSrc} 
           alt={video.caption || "Thumbnail"}
@@ -87,50 +77,64 @@ export default function VideoCard({ video, onOpen, layoutType }) {
           onLoad={() => setIsImgLoaded(true)}
           style={{
             width: "100%", height: "100%", objectFit: "cover",
-            position: "absolute", inset: 0, zIndex: 2, // Sit on top of skeleton
-            // Fade in logic:
+            position: "absolute", inset: 0, zIndex: 2,
             opacity: (isImgLoaded && !isHovered) ? 1 : 0, 
             transition: "opacity 0.4s ease-in-out"
           }}
         />
 
+        {/* Video Preview (Plays on Hover) */}
         <video
           ref={videoRef}
           src={video.video_url}
           muted loop playsInline
-          onPlaying={() => setIsHovered(true)}
-          style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0, zIndex: 3 }}
+          style={{ 
+            width: "100%", height: "100%", objectFit: "cover", 
+            position: "absolute", inset: 0, zIndex: 3,
+            opacity: isHovered ? 1 : 0, // Only show when hovered
+            transition: "opacity 0.2s ease"
+          }}
         />
         
+        {/* View Count Badge */}
         <div style={{
           position: "absolute", bottom: 8, left: 8, zIndex: 10, 
           display: "flex", alignItems: "center", gap: 4, 
-          background: "rgba(0,0,0,0.6)", padding: "2px 6px", borderRadius: "4px"
+          background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: "100px",
+          backdropFilter: "blur(4px)"
         }}>
           <Play size={10} fill="#fff" strokeWidth={0} />
-          <span style={{ color: "#fff", fontSize: "10px", fontWeight: "700" }}>
+          <span style={{ color: "#fff", fontSize: "11px", fontWeight: "700" }}>
             {Number(video.views || 0).toLocaleString()}
           </span>
         </div>
       </div>
 
-      {/* 🟢 3. PADDING FIX (Separated properties to prevent error) */}
-      <div style={{ 
-        paddingTop: "12px", paddingBottom: "12px", 
-        paddingLeft: "10px", paddingRight: "10px",
-        display: "flex", flexDirection: "column", flex: 1 
-      }}>
+      {/* 🟢 2. TIGHTER TEXT SPACING */}
+      <div style={{ padding: "12px", display: "flex", flexDirection: "column" }}>
         <p style={{
-          margin: "0 0 8px 0", fontSize: "12px", color: "#fff",
-          lineHeight: "1.4", display: "-webkit-box",
-          WebkitLineClamp: "2", WebkitBoxOrient: "vertical",
-          overflow: "hidden", minHeight: "34px", fontWeight: "500"
+          margin: "0 0 6px 0", // Reduced margin
+          fontSize: "13px", 
+          color: "#fff",
+          lineHeight: "1.3", 
+          display: "-webkit-box",
+          WebkitLineClamp: "2", 
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden", 
+          fontWeight: "500"
+          // 🟢 Removed minHeight so it doesn't create gaps for short captions
         }}>
-          {video.caption || "No caption provided..."}
+          {video.caption || "No caption provided"}
         </p>
         
-        <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "#333", overflow: "hidden", flexShrink: 0 }}>
+        {/* User Info Row */}
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          gap: "8px",
+          // 🟢 Removed marginTop: "auto" to fix the spacing gap
+        }}>
+          <div style={{ width: "22px", height: "22px", borderRadius: "50%", background: "#333", overflow: "hidden", flexShrink: 0 }}>
              <img 
                src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
                alt=""
@@ -138,7 +142,7 @@ export default function VideoCard({ video, onOpen, layoutType }) {
                style={{ width: "100%", height: "100%", objectFit: "cover" }}
              />
           </div>
-          <span style={{ fontSize: "11px", color: "#8e8e8e", fontWeight: "600" }}>
+          <span style={{ fontSize: "12px", color: "#aaa", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             @{video.uploader_name || "Member"}
           </span>
         </div>
