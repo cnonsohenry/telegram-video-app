@@ -1,15 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
-import { X, ArrowLeft, Play, Loader2, Maximize2 } from "lucide-react"; // 🟢 Added Maximize icon
+import { X, ArrowLeft, Play, Loader2 } from "lucide-react";
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const videoRef = useRef(null);
-  const containerRef = useRef(null); // 🟢 1. Ref for the main container
+  const containerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
 
-  // 🟢 2. Lock Scroll on Mount
+  // 🟢 1. Lock Body Scroll
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = "auto"; };
@@ -30,23 +30,17 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     setProgress(e.target.value);
   };
 
-  // 🟢 3. Attempt Fullscreen on Interaction
-  const attemptFullscreen = () => {
-    if (!isDesktop && containerRef.current) {
-      if (!document.fullscreenElement) {
-        containerRef.current.requestFullscreen().catch((err) => {
-          // Safari on iPhone doesn't support this, so we silently fail
-          console.log("Fullscreen not supported or blocked:", err);
-        });
-      }
-    }
-  };
-
   const togglePlay = (e) => {
     e.stopPropagation(); 
     
-    // 🟢 Trigger Fullscreen on first tap (Android/Desktop)
-    attemptFullscreen();
+    // 🟢 CRITICAL FIX FOR IPHONE CRASH
+    // We strictly check if the browser SUPPORTS fullscreen before calling it.
+    // iPhone Safari returns 'undefined' for requestFullscreen on divs.
+    if (!isDesktop && containerRef.current && containerRef.current.requestFullscreen) {
+      if (!document.fullscreenElement) {
+        containerRef.current.requestFullscreen().catch(() => {});
+      }
+    }
 
     if (videoRef.current) {
       if (isPlaying) {
@@ -65,15 +59,17 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   return (
     <div
-      ref={containerRef} // 🟢 Attach ref here
+      ref={containerRef}
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(0,0,0,1)", // Solid black for immersion
+        backgroundColor: "#000",
         zIndex: 10000, 
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        // 🟢 FIX: Ensure we respect the iPhone notches/home bars
+        paddingBottom: "env(safe-area-inset-bottom)"
       }}
       onClick={onClose} 
     >
@@ -86,14 +82,14 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         </button>
       )}
 
-      {/* 🟢 MAIN MODAL WRAPPER */}
+      {/* 🟢 MAIN CONTAINER */}
       <div
         style={{
           display: "flex",
           flexDirection: isDesktop ? "row" : "column",
           width: isDesktop ? "85vw" : "100%", 
-          // 🟢 100dvh is crucial for mobile browsers to ignore the address bar area
-          height: isDesktop ? "85vh" : "100dvh",
+          // 🟢 FIX: '100%' is often more stable on iOS Safari when position is fixed
+          height: isDesktop ? "85vh" : "100%", 
           maxWidth: isDesktop ? "1100px" : "none",
           background: "#000",
           borderRadius: isDesktop ? "12px" : "0px",
@@ -115,7 +111,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             display: "flex", 
             alignItems: "center", 
             justifyContent: "center", 
-            position: "relative"
+            position: "relative",
+            cursor: "pointer" // Helps iOS recognize this as clickable
           }}
         >
           {isLoading && (
@@ -129,7 +126,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             ref={videoRef}
             src={video.video_url}
             autoPlay
-            playsInline // 🟢 KEEPS it in your custom player instead of Apple's native one
+            playsInline // Essential for iOS to play inline
             loop
             onTimeUpdate={handleTimeUpdate}
             onWaiting={() => setIsLoading(true)}
@@ -147,7 +144,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             </div>
           )}
 
-          {/* Progress Bar */}
+          {/* 🟢 PROGRESS BAR WITH SAFE AREA */}
           <div style={progressContainerStyle} onClick={(e) => e.stopPropagation()}>
              <input 
                type="range" 
@@ -198,7 +195,11 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
 // 🎨 STYLES
 const mobileBackButtonStyle = {
-  position: "absolute", top: "20px", left: "20px", zIndex: 10002,
+  position: "absolute", 
+  // 🟢 Move down slightly to clear dynamic island/notches
+  top: "30px", 
+  left: "20px", 
+  zIndex: 10002,
   background: "rgba(0,0,0,0.4)", color: "#fff", border: "none",
   borderRadius: "50%", width: "44px", height: "44px",
   cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
@@ -223,7 +224,12 @@ const desktopSidebarStyle = {
 };
 
 const progressContainerStyle = {
-  position: "absolute", bottom: "10px", left: "10px", right: "10px", zIndex: 10002,
+  position: "absolute", 
+  // 🟢 MOVE UP to clear the Home Swipe Bar on iPhone
+  bottom: "40px", 
+  left: "10px", 
+  right: "10px", 
+  zIndex: 10002,
   display: "flex", alignItems: "center"
 };
 
