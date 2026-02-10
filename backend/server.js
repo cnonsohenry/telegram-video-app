@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import axios from "axios";
 import cors from "cors";
+import fs from "fs";
 import pkg from "pg";
 import https from "https";
 import crypto from "crypto";
@@ -258,7 +259,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     );
 
     // 🟢 4. Cleanup: Delete the temp file from your VPS to save space
-    import fs from "fs";
+
     fs.unlinkSync(videoFile.path);
 
     res.json({ success: true, videoId: cfResult.uid });
