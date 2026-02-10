@@ -4,31 +4,32 @@ import {
   CheckCircle, Share2, ArrowLeft, ChevronRight, User, Shield, Bell 
 } from "lucide-react";
 
-import VideoCard from "./VideoCard"; 
-import FullscreenPlayer from "./FullscreenPlayer"; 
+import VideoCard from "../components/VideoCard"; 
+import FullscreenPlayer from "../components/FullscreenPlayer"; 
 import { useVideos } from "../hooks/useVideos";
-// 🟢 REMOVED AD IMPORTS
-// import { openRewardedAd } from "../utils/rewardedAd";
-// import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function UserProfile({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState("videos");
   const [currentView, setCurrentView] = useState("profile");
   const [activeVideo, setActiveVideo] = useState(null);
   
-  // 🟢 REMOVED UNLOCKED STATE (No longer needed)
   const [videoCache, setVideoCache] = useState({});
   const isDesktop = window.innerWidth > 1024;
 
-  const { videos, loading, loadMore } = useVideos("shots");
+  // 🟢 1. FETCH BOTH STREAMS SEPARATELY
+  // We rename the destructured variables so they don't clash
+  const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots");
+  const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium");
 
+  // 🟢 2. CACHE BOTH STREAMS
   useEffect(() => {
-    if (videos?.length > 0) {
-      setVideoCache(prev => ({ ...prev, shots: videos }));
-    }
-  }, [videos]);
+    setVideoCache(prev => ({
+      ...prev,
+      shots: shots || [],
+      premium: premium || []
+    }));
+  }, [shots, premium]);
 
-  // 🟢 UPDATED: OPEN VIDEO DIRECTLY (NO ADS)
   const handleOpenVideo = async (video) => {
     playVideo(video);
   };
@@ -44,9 +45,30 @@ export default function UserProfile({ user, onLogout }) {
     } catch (e) { console.error("Video fetch failed"); }
   };
 
-  const videosToDisplay = videoCache["shots"] || videos || [];
+  // 🟢 3. DETERMINE WHICH LIST TO SHOW BASED ON TAB
+  const getCurrentList = () => {
+    if (activeTab === "premium") {
+      return { 
+        data: videoCache["premium"] || premium || [], 
+        loading: premiumLoading, 
+        loadMore: loadMorePremium,
+        emptyTitle: "No Premium Content",
+        emptyMsg: "Stay tuned for exclusive drops."
+      };
+    }
+    // Default to Shots
+    return { 
+      data: videoCache["shots"] || shots || [], 
+      loading: shotsLoading, 
+      loadMore: loadMoreShots,
+      emptyTitle: "No Shots found",
+      emptyMsg: "Start uploading to see them here."
+    };
+  };
 
-  // 🟢 SETTINGS VIEW
+  const { data: videosToDisplay, loading, loadMore, emptyTitle, emptyMsg } = getCurrentList();
+
+  // SETTINGS VIEW
   if (currentView === "settings") {
     return (
       <div style={containerStyle}>
@@ -70,21 +92,16 @@ export default function UserProfile({ user, onLogout }) {
     );
   }
 
-  // 🟢 MAIN PROFILE VIEW
+  // MAIN PROFILE VIEW
   return (
     <div style={containerStyle}>
       {/* HEADER GRID */}
       <div style={navGridStyle}>
-        {/* Left Spacer */}
         <div style={{ width: "40px" }}></div>
-        
-        {/* Center Title */}
         <div style={centerTitleContainer}>
           <h2 style={usernameStyle}>{user.username}</h2>
           <CheckCircle size={14} color="#20D5EC" fill="black" style={{ marginLeft: "4px" }} />
         </div>
-
-        {/* 🟢 Right Icons (Pushed to Extreme Right) */}
         <div style={{ display: "flex", gap: "16px", justifyContent: "flex-end", flex: 1 }}>
           <Bell size={24} color="#fff" style={{ cursor: "pointer" }} />
           <Settings size={24} color="#fff" onClick={() => setCurrentView("settings")} style={{ cursor: "pointer" }} />
@@ -109,7 +126,6 @@ export default function UserProfile({ user, onLogout }) {
           </div>
         </div>
 
-        {/* 🟢 RED PREMIUM BUTTON */}
         <div style={actionButtonsRowStyle}>
           <button style={premiumButtonStyle} onClick={() => alert("Redirecting to Premium...")}>
             SUBSCRIBE PREMIUM
@@ -127,13 +143,20 @@ export default function UserProfile({ user, onLogout }) {
       </div>
 
       <div style={contentAreaStyle}>
-        {activeTab === "videos" ? (
+        {/* 🟢 4. UNIFIED GRID LOGIC (Handles both Shots and Premium) */}
+        {activeTab !== "likes" ? (
           <div style={gridStyle}>
             {videosToDisplay.length > 0 ? videosToDisplay.map(v => (
-              <VideoCard key={v.message_id} video={v} layoutType="shots" onOpen={() => handleOpenVideo(v)} />
+              <VideoCard 
+                key={`${v.chat_id || 'internal'}:${v.message_id}`} // Updated key for premium
+                video={v} 
+                layoutType={activeTab === "premium" ? "premium" : "shots"} 
+                onOpen={() => handleOpenVideo(v)} 
+              />
             )) : (
               <div style={{ gridColumn: "span 3", textAlign: "center", padding: "40px", color: "#666" }}>
-                {loading ? "Loading..." : "No Shots found."}
+                {loading ? "Loading..." : emptyTitle}
+                {!loading && <p style={{ fontSize: "12px", marginTop: "8px" }}>{emptyMsg}</p>}
               </div>
             )}
             {!loading && videosToDisplay.length > 0 && (
@@ -143,12 +166,13 @@ export default function UserProfile({ user, onLogout }) {
             )}
           </div>
         ) : (
+          // LIKES TAB (Still Empty State for now)
           <div style={emptyStateStyle}>
             <div style={emptyIconCircle}>
-              {activeTab === "premium" ? <Lock size={32} color="#444" /> : <Heart size={32} color="#444" />}
+              <Heart size={32} color="#444" />
             </div>
-            <h3 style={{ margin: "10px 0", fontSize: "16px" }}>{activeTab === "premium" ? "Premium Content" : "No Liked Videos"}</h3>
-            <p style={{ color: "#666", fontSize: "14px" }}>{activeTab === "premium" ? "Join the inner circle to unlock." : "Start exploring to save videos."}</p>
+            <h3 style={{ margin: "10px 0", fontSize: "16px" }}>No Liked Videos</h3>
+            <p style={{ color: "#666", fontSize: "14px" }}>Start exploring to save videos.</p>
           </div>
         )}
       </div>
@@ -184,22 +208,9 @@ const SettingsItem = ({ icon, label }) => (
   </div>
 );
 
-// 🖌 STYLES
+// 🖌 STYLES (Kept exactly the same as your version)
 const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "sans-serif" };
-
-const navGridStyle = { 
-  display: "grid", 
-  gridTemplateColumns: "1fr auto 1fr", 
-  alignItems: "center", 
-  padding: "15px 20px", 
-  borderBottom: "1px solid #222", 
-  position: "sticky", 
-  top: 0, 
-  background: "rgba(0,0,0,0.95)", 
-  zIndex: 100, 
-  backdropFilter: "blur(10px)" 
-};
-
+const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "15px 20px", borderBottom: "1px solid #222", position: "sticky", top: 0, background: "rgba(0,0,0,0.95)", zIndex: 100, backdropFilter: "blur(10px)" };
 const navBarStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid #222" };
 const centerTitleContainer = { display: "flex", alignItems: "center", justifyContent: "center" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
@@ -212,25 +223,8 @@ const infoColumnStyle = { flex: 1, paddingTop: "4px" };
 const displayNameStyle = { fontSize: "20px", fontWeight: "800", margin: "0 0 6px 0" };
 const bioStyle = { fontSize: "13px", color: "#ccc", margin: 0, lineHeight: "1.4" };
 const actionButtonsRowStyle = { display: "flex", gap: "10px", alignItems: "center" };
-
-const premiumButtonStyle = { 
-  flex: 1, 
-  background: "linear-gradient(45deg, #ff3b30, #d70015)", 
-  color: "#fff", 
-  border: "none", 
-  borderRadius: "10px", 
-  padding: "12px", 
-  fontWeight: "800", 
-  fontSize: "14px", 
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
-  boxShadow: "0 4px 15px rgba(255, 59, 48, 0.4)", 
-  cursor: "pointer",
-  transition: "transform 0.1s ease"
-};
-
+const premiumButtonStyle = { flex: 1, background: "linear-gradient(45deg, #ff3b30, #d70015)", color: "#fff", border: "none", borderRadius: "10px", padding: "12px", fontWeight: "800", fontSize: "14px", textTransform: "uppercase", letterSpacing: "0.5px", boxShadow: "0 4px 15px rgba(255, 59, 48, 0.4)", cursor: "pointer", transition: "transform 0.1s ease" };
 const secondaryButtonStyle = { background: "#1E1E1E", color: "#fff", border: "1px solid #333", borderRadius: "10px", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "center" };
-
 const tabsContainerStyle = { display: "flex", background: "#000", position: "sticky", top: "54px", zIndex: 90 };
 const contentAreaStyle = { minHeight: "400px" };
 const gridStyle = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px" };
