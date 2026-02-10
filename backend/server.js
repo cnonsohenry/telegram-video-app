@@ -270,34 +270,40 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 });
 
 /* =====================
-   api/video (Increment Views)
+   api/video (Increment Views & Get Link)
 ===================== */
-
-if (video.cloudflare_id) {
-    // Cloudflare Stream uses HLS (.m3u8) for the best quality
-    const video_url = `https://customer-${process.env.CF_ACCOUNT_ID}.cloudflarestream.com/${video.cloudflare_id}/manifest/video.m3u8`;
-    return res.json({ video_url });
-}
-
 app.get("/api/video", async (req, res) => {
   try {
     const { chat_id, message_id } = req.query;
     if (!chat_id || !message_id) return res.status(400).json({ error: "Missing parameters" });
 
+    // 🟢 1. Update views and fetch ALL video columns (including cloudflare_id)
     const dbRes = await pool.query(
-      `UPDATE videos SET views = views + 1 WHERE chat_id=$1 AND message_id=$2 RETURNING file_id`,
+      `UPDATE videos SET views = views + 1 WHERE chat_id=$1 AND message_id=$2 RETURNING file_id, cloudflare_id`,
       [chat_id, message_id]
     );
 
     if (!dbRes.rows.length) return res.status(404).json({ error: "Video not found" });
 
-    const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: dbRes.rows[0].file_id } });
+    const video = dbRes.rows[0];
+
+    // 🟢 2. CHECK: Is it a Cloudflare Stream video?
+    if (video.cloudflare_id) {
+      // Return the Cloudflare HLS URL directly
+      const video_url = `https://customer-${process.env.CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${video.cloudflare_id}/manifest/video.m3u8`;
+      return res.json({ video_url });
+    }
+
+    // 🟢 3. FALLBACK: If not on Cloudflare, fetch from Telegram
+    const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: video.file_id } });
     const filePath = tgRes.data.result.file_path;
     const { exp, sig } = signWorkerUrl(filePath);
 
     const workerUrl = `https://media.naijahomemade.com/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}`;
     res.json({ video_url: workerUrl });
+
   } catch (err) {
+    console.error("Video API Error:", err.message);
     res.status(500).json({ error: "Access denied" });
   }
 });
