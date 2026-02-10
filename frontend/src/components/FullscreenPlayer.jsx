@@ -1,12 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
-import { X, ArrowLeft, Play, Loader2 } from "lucide-react";
+import { X, ArrowLeft, Play, Loader2, Maximize, Minimize } from "lucide-react";
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const videoRef = useRef(null);
+  const lastTap = useRef(0); // 🟢 Track timing of the last tap
+  
   const [isPlaying, setIsPlaying] = useState(true);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [isZoomed, setIsZoomed] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -32,18 +35,35 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     setProgress(e.target.value);
   };
 
-  const togglePlay = (e) => {
-    e.stopPropagation(); 
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-        setIsPlaying(false);
-        setShowPlayIcon(true);
-      } else {
-        videoRef.current.play();
-        setIsPlaying(true);
-        setTimeout(() => setShowPlayIcon(false), 500); 
-      }
+  // 🟢 1. REFINED INTERACTION LOGIC
+  const handleInteraction = (e) => {
+    e.stopPropagation();
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+
+    if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+      // 🟢 DOUBLE TAP DETECTED: Toggle Zoom
+      setIsZoomed(!isZoomed);
+      // Reset lastTap so a triple tap doesn't trigger another zoom immediately
+      lastTap.current = 0; 
+    } else {
+      // 🟢 SINGLE TAP DETECTED: Toggle Play/Pause
+      lastTap.current = now;
+      
+      // Delay the play/pause slightly to see if a second tap is coming
+      setTimeout(() => {
+        if (lastTap.current === now && videoRef.current) {
+          if (isPlaying) {
+            videoRef.current.pause();
+            setIsPlaying(false);
+            setShowPlayIcon(true);
+          } else {
+            videoRef.current.play();
+            setIsPlaying(true);
+            setTimeout(() => setShowPlayIcon(false), 500); 
+          }
+        }
+      }, DOUBLE_TAP_DELAY);
     }
   };
 
@@ -57,13 +77,13 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         backgroundColor: "#000",
         zIndex: 10000, 
         display: "flex",
-        flexDirection: "column", // Stack elements vertically
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
       }}
       onClick={onClose} 
     >
-      {/* 🟢 NAVIGATION BUTTONS */}
+      {/* NAVIGATION */}
       {!isDesktop && (
         <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={mobileBackButtonStyle}>
           <ArrowLeft size={28} />
@@ -74,14 +94,13 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         <button onClick={onClose} style={desktopCloseButtonStyle}><X size={24} /></button>
       )}
 
-      {/* 🟢 MAIN CONTAINER */}
+      {/* MAIN CONTAINER */}
       <div
         style={{
           display: "flex",
           flexDirection: isDesktop ? "row" : "column",
           width: "100%", 
           height: isDesktop ? "85vh" : "100dvh", 
-          maxWidth: isDesktop ? "1100px" : "none",
           background: "#000",
           borderRadius: isDesktop ? "12px" : "0px",
           overflow: "hidden",
@@ -90,9 +109,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         onClick={(e) => e.stopPropagation()} 
       >
         
-        {/* 🟢 VIDEO AREA */}
+        {/* VIDEO AREA */}
         <div 
-          onClick={togglePlay}
+          onClick={handleInteraction} // 🟢 Updated to our new handler
           style={{ 
             flex: 1, 
             width: "100%",
@@ -102,7 +121,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             alignItems: "center", 
             justifyContent: "center", 
             position: "relative",
-            cursor: "pointer"
+            cursor: "pointer",
+            touchAction: "manipulation" // 🟢 Prevents browser zooming on double-tap
           }}
         >
           {isLoading && (
@@ -123,9 +143,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             style={{ 
                 width: "100%", 
                 height: "100%", 
-                // 🟢 FIXED: 'contain' prevents the "flat" look by keeping original ratio.
-                // We use 'contain' for both to ensure quality and proper dimensions.
-                objectFit: "contain" 
+                objectFit: isZoomed ? "cover" : "contain",
+                transition: "object-fit 0.25s cubic-bezier(0.4, 0, 0.2, 1)" 
             }}
           />
 
@@ -135,7 +154,15 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             </div>
           )}
 
-          {/* 🟢 PROGRESS BAR (Pushed up slightly for Safe Area) */}
+          {/* Optional: Keep the button as a visual indicator, or remove it to keep UI clean */}
+          <button 
+            onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
+            style={zoomToggleButtonStyle}
+          >
+            {isZoomed ? <Minimize size={20} /> : <Maximize size={20} />}
+          </button>
+
+          {/* PROGRESS BAR */}
           <div style={progressContainerStyle} onClick={(e) => e.stopPropagation()}>
              <input 
                type="range" 
@@ -146,14 +173,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
              />
           </div>
         </div>
-
-        {/* 🟢 DESKTOP SIDEBAR */}
-        {isDesktop && (
-          <div style={desktopSidebarStyle}>
-            {/* ... Sidebar code remains same ... */}
-          </div>
-        )}
       </div>
+
       <style>{`
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .spin-animation { animation: spin 1s linear infinite; }
@@ -162,29 +183,23 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   );
 }
 
-// 🎨 STYLES
+// 🎨 STYLES (Same as before)
 const mobileBackButtonStyle = {
-  position: "absolute", 
-  top: "max(20px, env(safe-area-inset-top))", // 🟢 iPhone Notch Protection
-  left: "20px", 
-  zIndex: 10005,
-  background: "rgba(0,0,0,0.5)", 
-  color: "#fff", 
-  border: "none",
-  borderRadius: "50%", 
-  width: "44px", 
-  height: "44px",
-  display: "flex", 
-  alignItems: "center", 
-  justifyContent: "center",
-  backdropFilter: "blur(10px)"
+  position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", 
+  zIndex: 10005, background: "rgba(0,0,0,0.5)", color: "#fff", border: "none",
+  borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)"
 };
 
 const desktopCloseButtonStyle = {
   position: "absolute", top: "30px", right: "30px", zIndex: 10002,
   background: "rgba(255,255,255,0.1)", color: "#fff", border: "none", borderRadius: "50%",
-  width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-  backdropFilter: "blur(5px)"
+  width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(5px)"
+};
+
+const zoomToggleButtonStyle = {
+  position: "absolute", right: "20px", bottom: "80px", zIndex: 10005,
+  background: "rgba(0,0,0,0.5)", color: "#fff", border: "none", borderRadius: "8px",
+  padding: "10px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)"
 };
 
 const playIconOverlayStyle = {
@@ -192,20 +207,9 @@ const playIconOverlayStyle = {
   background: "rgba(0,0,0,0.4)", borderRadius: "50%", padding: "20px", pointerEvents: "none"
 };
 
-const desktopSidebarStyle = {
-  width: "360px", background: "#121212", borderLeft: "1px solid #222",
-  display: "flex", flexDirection: "column", flexShrink: 0
-};
-
 const progressContainerStyle = {
-  position: "absolute", 
-  bottom: "max(30px, env(safe-area-inset-bottom))", // 🟢 iPhone Home Bar Protection
-  left: "20px", 
-  right: "20px", 
-  zIndex: 10002,
-  display: "flex", alignItems: "center"
+  position: "absolute", bottom: "max(30px, env(safe-area-inset-bottom))",
+  left: "20px", right: "20px", zIndex: 10002, display: "flex", alignItems: "center"
 };
 
-const rangeInputStyle = {
-  width: "100%", cursor: "pointer", accentColor: "#ff3b30", height: "4px"
-};
+const rangeInputStyle = { width: "100%", cursor: "pointer", accentColor: "#ff3b30", height: "4px" };
