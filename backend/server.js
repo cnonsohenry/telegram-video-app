@@ -367,6 +367,9 @@ app.get("/api/videos", async (req, res) => {
     const mapVideo = (v) => {
       // 🟢 1. IF CLOUDFLARE: Return direct stream thumbnail
       if (v.cloudflare_id) {
+         // 🛠 FIX: Clean the ID to remove any ?tusv2=true junk
+         const cleanId = v.cloudflare_id.split('?')[0];
+
          return {
             chat_id: v.chat_id,
             message_id: v.message_id,
@@ -376,8 +379,7 @@ app.get("/api/videos", async (req, res) => {
             uploader_name: v.uploader_name || "Member",
             created_at: v.created_at,
             // 🟢 Uses Cloudflare's instant thumbnail service
-            // 'time=1s' ensures we don't get a black frame if the start is dark
-            thumbnail_url: `https://customer-${process.env.CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${v.cloudflare_id}/thumbnails/thumbnail.jpg?time=1s&height=600`
+            thumbnail_url: `https://customer-${process.env.CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`
          };
       }
 
