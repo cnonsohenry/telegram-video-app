@@ -2,46 +2,24 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 export function useVideos(currentCategory) {
   const [videos, setVideos] = useState([]);
-  const [dashboardVideos, setDashboardVideos] = useState({});
   const [sidebarSuggestions, setSidebarSuggestions] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   
-  // Ref to prevent double-fetching in React Strict Mode
+  // 🟢 Ref to prevent race conditions
   const isFetching = useRef(false);
 
-  // 1. Fetch Top 4 from all categories for Mobile Home Dashboard
-  const fetchDashboard = useCallback(async () => {
-    try {
-      const categories = ["knacks", "hotties", "baddies", "trends"];
-      const results = {};
-      
-      // Fetch all 4 categories in parallel
-      const responses = await Promise.all(
-        categories.map(cat => 
-          fetch(`https://videos.naijahomemade.com/api/videos?page=1&limit=4&category=${cat}`)
-            .then(res => res.json())
-        )
-      );
-      
-      responses.forEach((data, i) => { 
-        results[categories[i]] = data.videos || []; 
-      });
-      
-      setDashboardVideos(results);
-    } catch (err) { 
-      console.error("Dashboard Fetch Error:", err); 
-    }
-  }, []);
-
-  // 2. Main Data Fetcher for Grid/Explore
+  // 🟢 Main Data Fetcher
   const fetchData = useCallback(async (targetPage, isNew) => {
+    // Prevent overlapping fetches
     if (isFetching.current) return;
+    
     isFetching.current = true;
     setLoading(true);
 
     try {
-      let url = `https://videos.naijahomemade.com/api/videos?page=${targetPage}&limit=20&category=${currentCategory}`;
+      let url = `https://videos.naijahomemade.com/api/videos?page=${targetPage}&limit=12&category=${currentCategory}`;
       if (currentCategory === "trends") url += `&sort=trending`;
       
       const res = await fetch(url);
@@ -49,20 +27,25 @@ export function useVideos(currentCategory) {
       
       if (data?.videos) {
         setVideos(prev => {
-          // Combine old and new videos
+          // If it's a new category/refresh, replace the array. Otherwise append.
           const combined = isNew ? data.videos : [...prev, ...data.videos];
           
-          // Filter out duplicates using chat_id + message_id
+          // Filter duplicates (Just in case)
           const uniqueMap = new Map();
           combined.forEach(v => uniqueMap.set(`${v.chat_id}:${v.message_id}`, v));
           return Array.from(uniqueMap.values());
         });
         
-        // Save sidebar suggestions if provided
-        if (data.suggestions) {
+        // Save sidebar suggestions if provided (only on first page)
+        if (targetPage === 1 && data.suggestions) {
           setSidebarSuggestions(data.suggestions);
         }
         
+        // If we got fewer videos than the limit, we reached the end
+        if (data.videos.length < 12) {
+            setHasMore(false);
+        }
+
         setPage(targetPage + 1);
       }
     } catch (err) { 
@@ -73,24 +56,27 @@ export function useVideos(currentCategory) {
     }
   }, [currentCategory]);
 
-  // 3. Initial Load Effect
+  // 🟢 Initial Load Effect (LOOP PROOF)
   useEffect(() => {
-    setVideos([]); // Clear videos when tab changes
-    fetchData(1, true); // Load Page 1
+    // Reset state specifically for the new category
+    isFetching.current = false; // Reset lock
+    setHasMore(true);
+    setVideos([]); // Visual reset
+    setPage(1);
     
-    // Only fetch dashboard once per session
-    if (Object.keys(dashboardVideos).length === 0) {
-      fetchDashboard();
-    }
-  }, [currentCategory, fetchData, fetchDashboard]);
+    // Trigger the first fetch
+    fetchData(1, true);
+    
+    // 🟢 cleanup function not strictly needed for fetch, but good practice
+  }, [currentCategory, fetchData]);
 
-  // 4. Return the data and functions to the component
   return { 
     videos, 
-    dashboardVideos, 
     sidebarSuggestions, 
     loading, 
-    loadMore: () => fetchData(page, false), 
-    setVideos 
+    hasMore,
+    loadMore: () => {
+        if (!loading && hasMore) fetchData(page, false);
+    }
   };
 }

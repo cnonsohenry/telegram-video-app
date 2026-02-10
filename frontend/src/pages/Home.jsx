@@ -4,14 +4,14 @@ import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
 import FullscreenPlayer from "../components/FullscreenPlayer";
-import PullToRefresh from "../components/PullToRefresh"; // 🟢 1. Import PullToRefresh
+import PullToRefresh from "../components/PullToRefresh"; 
 import { useVideos } from "../hooks/useVideos";
 import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 export default function Home() {
-  const [viewMode, setViewMode] = useState("dashboard");
+  // 🟢 1. Removed "viewMode" (Dashboard caused loops, so we stick to Grid)
   const [activeTab, setActiveTab] = useState(0); 
   const [activeVideo, setActiveVideo] = useState(null);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -25,7 +25,8 @@ export default function Home() {
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
 
-  const { videos, dashboardVideos, sidebarSuggestions, loading, loadMore, setVideos } = useVideos(currentCategory);
+  // 🟢 2. Clean Hook Call (No dashboardVideos)
+  const { videos, sidebarSuggestions, loading, loadMore, setVideos } = useVideos(currentCategory);
 
   useEffect(() => {
     expandApp();
@@ -47,10 +48,8 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 🟢 2. Refresh Handler
   const handleRefresh = async () => {
-    // This reloads the page to fetch fresh data.
-    // In a more complex app, you could call a refetch() function from your hook instead.
+    // 🟢 Hard Refresh to clear any stale states
     window.location.reload(); 
   };
 
@@ -105,7 +104,7 @@ export default function Home() {
       display: "grid", 
       gridTemplateColumns: "repeat(2, 1fr)", 
       gap: "10px",
-      alignItems: "start" // 🟢 Ensures Knacks/Text don't stretch vertically
+      alignItems: "start"
     };
   };
 
@@ -114,7 +113,6 @@ export default function Home() {
     : videos;
 
   return (
-    // 🟢 3. Wrapped with PullToRefresh
     <PullToRefresh onRefresh={handleRefresh}>
       <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
         
@@ -129,7 +127,7 @@ export default function Home() {
           </nav>
         )}
 
-        {/* RIGHT SIDE (Mobile & Desktop) */}
+        {/* MAIN CONTENT AREA */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           
           {/* APP HEADER */}
@@ -137,7 +135,7 @@ export default function Home() {
              <AppHeader isDesktop={isDesktop} searchTerm={searchTerm} setSearchTerm={setSearchTerm} isMobileSearchVisible={isMobileSearchVisible} setIsMobileSearchVisible={setIsMobileSearchVisible} />
           </div>
 
-          {/* MOBILE TOP TABS */}
+          {/* MOBILE TABS */}
           {!isDesktop && (
             <nav style={{ 
               display: "flex", justifyContent: "space-evenly", 
@@ -148,8 +146,8 @@ export default function Home() {
               {TABS.map((tab, index) => (
                 <button 
                   key={index} 
+                  // 🟢 3. Simplified Click Handler
                   onClick={() => { 
-                    setViewMode("category"); 
                     if (activeTab === index) scrollToTop(); 
                     else setActiveTab(index); 
                   }} 
@@ -166,51 +164,21 @@ export default function Home() {
           <div style={{ display: "flex", flex: 1 }}>
             <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px" }}>
               
-              {/* CONDITIONAL RENDER */}
-              {(isDesktop || viewMode === "category") ? (
-                // FULL GRID VIEW
-                <>
-                   <div style={getGridStyle()}>
-                      {videosToDisplay.map(v => (
-                        <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} layoutType={currentCategory} onOpen={() => handleOpenVideo(v)} />
-                      ))}
-                   </div>
-
-                   {loading && videosToDisplay.length === 0 && (
-                     <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>Loading videos...</div>
-                   )}
-
-                   {!loading && videosToDisplay.length > 0 && (
-                    <button onClick={loadMore} style={{ display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "900", cursor: "pointer" }}>Show More</button>
-                   )}
-                </>
-              ) : (
-                // DASHBOARD SUMMARY VIEW
-                <div style={{ display: "flex", flexDirection: "column", gap: "40px" }}>
-                  {CATEGORIES.map(cat => (
-                    <section key={cat}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", alignItems: "center" }}>
-                        <h3 style={{ color: "#fff", textTransform: "uppercase", fontSize: "14px", fontWeight: "900", margin: 0 }}>{cat}</h3>
-                        <button 
-                          onClick={() => { 
-                            setViewMode("category"); 
-                            setActiveTab(CATEGORIES.indexOf(cat)); 
-                            scrollToTop(); 
-                          }} 
-                          style={{ color: "#ff0000", fontSize: "12px", fontWeight: "800", background: "none", border: "none" }}
-                        >
-                          See All
-                        </button>
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
-                        {dashboardVideos[cat]?.map(v => (
-                          <VideoCard key={`dash-${v.message_id}`} video={v} layoutType={cat} onOpen={() => handleOpenVideo(v)} />
-                        ))}
-                      </div>
-                    </section>
+              {/* 🟢 4. Simplified Render: Always Show Grid */}
+               <div style={getGridStyle()}>
+                  {videosToDisplay.map(v => (
+                    <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} layoutType={currentCategory} onOpen={() => handleOpenVideo(v)} />
                   ))}
-                </div>
-              )}
+               </div>
+
+               {loading && videosToDisplay.length === 0 && (
+                 <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>Loading videos...</div>
+               )}
+
+               {!loading && videosToDisplay.length > 0 && (
+                <button onClick={loadMore} style={{ display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "900", cursor: "pointer" }}>Show More</button>
+               )}
+
             </div>
 
             {isDesktop && (
