@@ -7,6 +7,9 @@ import https from "https";
 import crypto from "crypto";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import authRoutes from "./auth.js";
+import multer from "multer";
+import { uploadDirectToStream } from "./scripts/upload_premium.js"; // The script we created earlier
+
 
 const { Pool } = pkg;
 
@@ -206,9 +209,75 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+
+/* =====================
+   PREMIUM UPLOAD
+===================== */
+// 🟢 1. Configure Temporary Storage
+const upload = multer({ dest: "uploads/" }); 
+
+/**
+ * POST /api/admin/upload-premium
+ * Purpose: Manual upload for high-quality videos (>20MB)
+ */
+app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) => {
+  try {
+    const { caption, category, uploader_id } = req.body;
+    const videoFile = req.file;
+
+    // Security Check: Ensure only YOU can upload (using your Telegram ID)
+    if (!ALLOWED_USERS.includes(Number(uploader_id))) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    if (!videoFile) return res.status(400).json({ error: "No video file provided" });
+
+    // 🟢 2. Push to Cloudflare Stream
+    // We pass the path where multer saved the file temporarily
+    const cfResult = await uploadDirectToStream(videoFile.path, {
+      caption: caption || "Premium Content",
+      category: category || "premium"
+    });
+
+    // 🟢 3. Save to Database
+    // We create a dummy chat_id/message_id for internal tracking
+    const internalId = `premium_${Date.now()}`;
+    
+    await pool.query(
+      `INSERT INTO videos (chat_id, message_id, file_id, uploader_id, category, caption, cloudflare_id, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready')`,
+      [
+        "internal", 
+        internalId, 
+        "none", // No Telegram file_id for direct uploads
+        uploader_id, 
+        category || "premium", 
+        caption, 
+        cfResult.uid // The Cloudflare Video ID
+      ]
+    );
+
+    // 🟢 4. Cleanup: Delete the temp file from your VPS to save space
+    import fs from "fs";
+    fs.unlinkSync(videoFile.path);
+
+    res.json({ success: true, videoId: cfResult.uid });
+  } catch (err) {
+    console.error("Admin Upload Error:", err.message);
+    res.status(500).json({ error: "Upload failed" });
+  }
+});
+
 /* =====================
    api/video (Increment Views)
 ===================== */
+
+if (video.cloudflare_id) {
+    // Cloudflare Stream uses HLS (.m3u8) for the best quality
+    const video_url = `https://customer-${process.env.CF_ACCOUNT_ID}.cloudflarestream.com/${video.cloudflare_id}/manifest/video.m3u8`;
+    return res.json({ video_url });
+}
+
 app.get("/api/video", async (req, res) => {
   try {
     const { chat_id, message_id } = req.query;

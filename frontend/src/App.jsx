@@ -1,24 +1,29 @@
 import { useEffect, useState } from "react";
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
-import { Home as HomeIcon, User } from "lucide-react";
+import AdminUpload from "./pages/AdminUpload"; // 🟢 1. Import Admin Page
+import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
-  // 🟢 Track a "refresh key" for each tab
   const [refreshKey, setRefreshKey] = useState({ home: 0, profile: 0 });
 
   const handleTabClick = (tab) => {
     if (activeTab === tab) {
-      // 🟢 If already on this tab, increment the key to force a refresh
       setRefreshKey((prev) => ({ ...prev, [tab]: prev[tab] + 1 }));
-      window.scrollTo({ top: 0, behavior: "smooth" }); // Scroll to top like TikTok
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       setActiveTab(tab);
     }
   };
 
   useEffect(() => {
+    // Check for a secret URL parameter to open Admin (e.g., yoursite.com/?admin=true)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("admin") === "true") {
+      setActiveTab("admin");
+    }
+
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
@@ -28,10 +33,17 @@ export default function App() {
   return (
     <div className="min-h-screen bg-black text-white">
       <main className="pb-20">
-        {activeTab === "home" ? (
-          <Home key={`home-${refreshKey.home}`} /> // 🟢 Key forces re-mount
-        ) : (
-          <Profile key={`profile-${refreshKey.profile}`} /> // 🟢 Key forces re-mount
+        {/* 🟢 2. UPDATED SWITCH LOGIC */}
+        {activeTab === "home" && (
+          <Home key={`home-${refreshKey.home}`} />
+        )}
+        
+        {activeTab === "profile" && (
+          <Profile key={`profile-${refreshKey.profile}`} />
+        )}
+
+        {activeTab === "admin" && (
+          <AdminUpload />
         )}
       </main>
 
@@ -54,6 +66,20 @@ export default function App() {
           <User size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
           <span style={labelStyle}>Profile</span>
         </button>
+
+        {/* 🟢 SECRET ADMIN ACCESS 
+            This button only shows if you are in admin mode, 
+            or you can keep it hidden and use the URL param instead. 
+        */}
+        {activeTab === "admin" && (
+          <button 
+            onClick={() => setActiveTab("admin")}
+            style={{...btnStyle, color: '#ff3b30'}}
+          >
+            <ShieldCheck size={24} />
+            <span style={labelStyle}>Admin</span>
+          </button>
+        )}
       </nav>
     </div>
   );
