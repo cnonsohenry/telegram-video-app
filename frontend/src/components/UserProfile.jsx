@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react"; // 🟢 Removed useEffect
 import { 
   Settings, Grid3X3, Heart, Lock, LogOut, 
   CheckCircle, Share2, ArrowLeft, ChevronRight, User, Shield, Bell 
@@ -13,22 +13,13 @@ export default function UserProfile({ user, onLogout }) {
   const [currentView, setCurrentView] = useState("profile");
   const [activeVideo, setActiveVideo] = useState(null);
   
-  const [videoCache, setVideoCache] = useState({});
+  // 🟢 REMOVED videoCache STATE (This was causing the loop)
   const isDesktop = window.innerWidth > 1024;
 
-  // 🟢 1. FETCH BOTH STREAMS SEPARATELY
-  // We rename the destructured variables so they don't clash
+  // 1. FETCH BOTH STREAMS
+  // The hook manages the data. We just consume it.
   const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots");
   const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium");
-
-  // 🟢 2. CACHE BOTH STREAMS
-  useEffect(() => {
-    setVideoCache(prev => ({
-      ...prev,
-      shots: shots || [],
-      premium: premium || []
-    }));
-  }, [shots, premium]);
 
   const handleOpenVideo = async (video) => {
     playVideo(video);
@@ -45,11 +36,11 @@ export default function UserProfile({ user, onLogout }) {
     } catch (e) { console.error("Video fetch failed"); }
   };
 
-  // 🟢 3. DETERMINE WHICH LIST TO SHOW BASED ON TAB
+  // 🟢 2. DIRECTLY SELECT LIST (No useEffect needed)
   const getCurrentList = () => {
     if (activeTab === "premium") {
       return { 
-        data: videoCache["premium"] || premium || [], 
+        data: premium || [], // Read directly from hook
         loading: premiumLoading, 
         loadMore: loadMorePremium,
         emptyTitle: "No Premium Content",
@@ -58,7 +49,7 @@ export default function UserProfile({ user, onLogout }) {
     }
     // Default to Shots
     return { 
-      data: videoCache["shots"] || shots || [], 
+      data: shots || [], // Read directly from hook
       loading: shotsLoading, 
       loadMore: loadMoreShots,
       emptyTitle: "No Shots found",
@@ -143,12 +134,11 @@ export default function UserProfile({ user, onLogout }) {
       </div>
 
       <div style={contentAreaStyle}>
-        {/* 🟢 4. UNIFIED GRID LOGIC (Handles both Shots and Premium) */}
         {activeTab !== "likes" ? (
           <div style={gridStyle}>
             {videosToDisplay.length > 0 ? videosToDisplay.map(v => (
               <VideoCard 
-                key={`${v.chat_id || 'internal'}:${v.message_id}`} // Updated key for premium
+                key={`${v.chat_id || 'internal'}:${v.message_id}`} 
                 video={v} 
                 layoutType={activeTab === "premium" ? "premium" : "shots"} 
                 onOpen={() => handleOpenVideo(v)} 
@@ -166,7 +156,6 @@ export default function UserProfile({ user, onLogout }) {
             )}
           </div>
         ) : (
-          // LIKES TAB (Still Empty State for now)
           <div style={emptyStateStyle}>
             <div style={emptyIconCircle}>
               <Heart size={32} color="#444" />
@@ -208,7 +197,7 @@ const SettingsItem = ({ icon, label }) => (
   </div>
 );
 
-// 🖌 STYLES (Kept exactly the same as your version)
+// 🖌 STYLES
 const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "sans-serif" };
 const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "15px 20px", borderBottom: "1px solid #222", position: "sticky", top: 0, background: "rgba(0,0,0,0.95)", zIndex: 100, backdropFilter: "blur(10px)" };
 const navBarStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid #222" };
