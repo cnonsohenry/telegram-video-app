@@ -277,24 +277,25 @@ app.get("/api/video", async (req, res) => {
     const { chat_id, message_id } = req.query;
     if (!chat_id || !message_id) return res.status(400).json({ error: "Missing parameters" });
 
-    // 🟢 1. Update views and fetch ALL video columns (including cloudflare_id)
+    // 1. Get Video
     const dbRes = await pool.query(
       `UPDATE videos SET views = views + 1 WHERE chat_id=$1 AND message_id=$2 RETURNING file_id, cloudflare_id`,
       [chat_id, message_id]
     );
 
     if (!dbRes.rows.length) return res.status(404).json({ error: "Video not found" });
-
     const video = dbRes.rows[0];
 
-    // 🟢 2. CHECK: Is it a Cloudflare Stream video?
+    // 🟢 2. CLOUDFLARE STREAM CHECK
     if (video.cloudflare_id) {
-      // Return the Cloudflare HLS URL directly
-      const video_url = `https://customer-${process.env.CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${video.cloudflare_id}/manifest/video.m3u8`;
+      // Clean ID
+      const cleanId = video.cloudflare_id.split('?')[0];
+      // 🟢 USE videodelivery.net for playback too
+      const video_url = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
       return res.json({ video_url });
     }
 
-    // 🟢 3. FALLBACK: If not on Cloudflare, fetch from Telegram
+    // 🔵 3. TELEGRAM FALLBACK
     const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: video.file_id } });
     const filePath = tgRes.data.result.file_path;
     const { exp, sig } = signWorkerUrl(filePath);
@@ -367,7 +368,7 @@ app.get("/api/videos", async (req, res) => {
     const mapVideo = (v) => {
       // 🟢 1. IF CLOUDFLARE: Return direct stream thumbnail
       if (v.cloudflare_id) {
-         // 🛠 FIX: Clean the ID to remove any ?tusv2=true junk
+         // Clean the ID (remove ?tusv2=true if present)
          const cleanId = v.cloudflare_id.split('?')[0];
 
          return {
@@ -378,8 +379,8 @@ app.get("/api/videos", async (req, res) => {
             uploader_id: v.uploader_id,
             uploader_name: v.uploader_name || "Member",
             created_at: v.created_at,
-            // 🟢 Uses Cloudflare's instant thumbnail service
-            thumbnail_url: `https://customer-${process.env.CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`
+            // 🟢 USE videodelivery.net (Universal Domain)
+            thumbnail_url: `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`
          };
       }
 
@@ -393,7 +394,6 @@ app.get("/api/videos", async (req, res) => {
         uploader_id: v.uploader_id,
         uploader_name: v.uploader_name || "Member",
         created_at: v.created_at,
-        // 🟢 Includes the security signature for the Worker to verify
         thumbnail_url: `${mediaBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`
       };
     };
