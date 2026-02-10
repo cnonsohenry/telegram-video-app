@@ -320,7 +320,7 @@ function signThumbnail(chatId, messageId) {
 }
 
 /* =====================
-   List videos (With Signed Thumbnails)
+   List videos (With Signed Thumbnails & Cloudflare Support)
 ===================== */
 app.get("/api/videos", async (req, res) => {
   try {
@@ -329,7 +329,7 @@ app.get("/api/videos", async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category || "hotties";
     
-    // 🟢 Worker domain for direct thumbnail delivery
+    // 🟢 Worker domain for direct thumbnail delivery (Telegram videos)
     const mediaBaseUrl = "https://media.naijahomemade.com";
 
     // 1. Fetch Main Grid Videos
@@ -365,6 +365,23 @@ app.get("/api/videos", async (req, res) => {
 
     // 🟢 Helper to map video object with SECURE thumbnails
     const mapVideo = (v) => {
+      // 🟢 1. IF CLOUDFLARE: Return direct stream thumbnail
+      if (v.cloudflare_id) {
+         return {
+            chat_id: v.chat_id,
+            message_id: v.message_id,
+            views: v.views,
+            caption: v.caption,
+            uploader_id: v.uploader_id,
+            uploader_name: v.uploader_name || "Member",
+            created_at: v.created_at,
+            // 🟢 Uses Cloudflare's instant thumbnail service
+            // 'time=1s' ensures we don't get a black frame if the start is dark
+            thumbnail_url: `https://customer-${process.env.CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${v.cloudflare_id}/thumbnails/thumbnail.jpg?time=1s&height=600`
+         };
+      }
+
+      // 🔵 2. IF TELEGRAM: Use your Worker/R2 logic
       const sig = signThumbnail(v.chat_id, v.message_id);
       return {
         chat_id: v.chat_id,
