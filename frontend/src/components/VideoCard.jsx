@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Play } from 'lucide-react';
 
-export default function VideoCard({ video, onOpen }) {
+// 🟢 Added showDetails prop (defaults to true)
+export default function VideoCard({ video, onOpen, showDetails = true }) {
   const videoRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isImgLoaded, setIsImgLoaded] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false); // 🟢 New state to track if video is ready
 
-  // Cloudflare Resized URL (Optimization)
   const thumbSrc = `${video.thumbnail_url}&w=400`;
 
   useEffect(() => {
@@ -21,7 +22,6 @@ export default function VideoCard({ video, onOpen }) {
     return () => { if (el) observer.unobserve(el); };
   }, []);
 
-  // Hover & Play Logic
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -29,6 +29,7 @@ export default function VideoCard({ video, onOpen }) {
       el.play().catch(() => {});
     } else {
       el.pause();
+      setIsVideoReady(false); // Reset when not hovered
     }
   }, [isVisible, isHovered]);
 
@@ -41,20 +42,19 @@ export default function VideoCard({ video, onOpen }) {
         display: "flex", 
         flexDirection: "column",
         background: "#1c1c1e", 
-        borderRadius: "12px", // 🟢 Added rounded corners for a modern feel
+        borderRadius: showDetails ? "12px" : "4px", // 🟢 Sharper look for grid
         overflow: "hidden", 
         width: "100%", 
         cursor: "pointer", 
         position: "relative",
         transition: "transform 0.2s ease",
-        transform: isHovered ? "scale(1.02)" : "scale(1)"
+        transform: (isHovered && showDetails) ? "scale(1.02)" : "scale(1)"
       }}
     >
-      {/* 🟢 1. UNIFORM ASPECT RATIO (Matches all tabs) */}
       <div style={{ 
         position: "relative", 
         width: "100%", 
-        aspectRatio: "9/16", // 🟢 Forces standard TikTok vertical shape
+        aspectRatio: showDetails ? "9/16" : "1/1", // 🟢 Square for profile, Vertical for Home
         background: "#000", 
         overflow: "hidden"
       }}>
@@ -69,7 +69,7 @@ export default function VideoCard({ video, onOpen }) {
           transition: "opacity 0.4s ease-in-out"
         }} />
 
-        {/* Thumbnail Image */}
+        {/* Thumbnail Image - 🟢 Stays visible under video to prevent black flash */}
         <img 
           src={thumbSrc} 
           alt={video.caption || "Thumbnail"}
@@ -78,75 +78,63 @@ export default function VideoCard({ video, onOpen }) {
           style={{
             width: "100%", height: "100%", objectFit: "cover",
             position: "absolute", inset: 0, zIndex: 2,
-            opacity: (isImgLoaded && !isHovered) ? 1 : 0, 
+            opacity: isImgLoaded ? 1 : 0, 
             transition: "opacity 0.4s ease-in-out"
           }}
         />
 
-        {/* Video Preview (Plays on Hover) */}
+        {/* Video Preview */}
         <video
           ref={videoRef}
           src={video.video_url}
           muted loop playsInline
+          onPlaying={() => setIsVideoReady(true)} // 🟢 Only show when actual playback starts
           style={{ 
             width: "100%", height: "100%", objectFit: "cover", 
             position: "absolute", inset: 0, zIndex: 3,
-            opacity: isHovered ? 1 : 0, // Only show when hovered
-            transition: "opacity 0.2s ease"
+            opacity: (isHovered && isVideoReady) ? 1 : 0, 
+            transition: "opacity 0.3s ease"
           }}
         />
         
-        {/* View Count Badge */}
-        <div style={{
-          position: "absolute", bottom: 8, left: 8, zIndex: 10, 
-          display: "flex", alignItems: "center", gap: 4, 
-          background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: "100px",
-          backdropFilter: "blur(4px)"
-        }}>
-          <Play size={10} fill="#fff" strokeWidth={0} />
-          <span style={{ color: "#fff", fontSize: "11px", fontWeight: "700" }}>
-            {Number(video.views || 0).toLocaleString()}
-          </span>
-        </div>
+        {/* View Count Badge - 🟢 Respects showDetails */}
+        {showDetails && (
+          <div style={{
+            position: "absolute", bottom: 8, left: 8, zIndex: 10, 
+            display: "flex", alignItems: "center", gap: 4, 
+            background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: "100px",
+            backdropFilter: "blur(4px)"
+          }}>
+            <Play size={10} fill="#fff" strokeWidth={0} />
+            <span style={{ color: "#fff", fontSize: "11px", fontWeight: "700" }}>
+              {Number(video.views || 0).toLocaleString()}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* 🟢 2. TIGHTER TEXT SPACING */}
-      <div style={{ padding: "12px", display: "flex", flexDirection: "column" }}>
-        <p style={{
-          margin: "0 0 6px 0", // Reduced margin
-          fontSize: "13px", 
-          color: "#fff",
-          lineHeight: "1.3", 
-          display: "-webkit-box",
-          WebkitLineClamp: "2", 
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden", 
-          fontWeight: "500"
-          // 🟢 Removed minHeight so it doesn't create gaps for short captions
-        }}>
-          {video.caption || "No caption provided"}
-        </p>
-        
-        {/* User Info Row */}
-        <div style={{ 
-          display: "flex", 
-          alignItems: "center", 
-          gap: "8px",
-          // 🟢 Removed marginTop: "auto" to fix the spacing gap
-        }}>
-          <div style={{ width: "22px", height: "22px", borderRadius: "50%", background: "#333", overflow: "hidden", flexShrink: 0 }}>
-             <img 
-               src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
-               alt=""
-               onError={(e) => { e.target.style.display = 'none'; }}
-               style={{ width: "100%", height: "100%", objectFit: "cover" }}
-             />
+      {/* 🟢 2. CONDITIONAL DETAILS AREA */}
+      {showDetails && (
+        <div style={{ padding: "12px", display: "flex", flexDirection: "column" }}>
+          <p style={captionTextStyle}>
+            {video.caption || "No caption provided"}
+          </p>
+          
+          <div style={userInfoRowStyle}>
+            <div style={avatarWrapperStyle}>
+               <img 
+                 src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
+                 alt=""
+                 onError={(e) => { e.target.style.display = 'none'; }}
+                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
+               />
+            </div>
+            <span style={uploaderNameStyle}>
+              @{video.uploader_name || "Member"}
+            </span>
           </div>
-          <span style={{ fontSize: "12px", color: "#aaa", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            @{video.uploader_name || "Member"}
-          </span>
         </div>
-      </div>
+      )}
 
       <style>{`
         @keyframes skeleton-loading {
@@ -157,3 +145,9 @@ export default function VideoCard({ video, onOpen }) {
     </div>
   );
 }
+
+// 🖌 Styles
+const captionTextStyle = { margin: "0 0 6px 0", fontSize: "13px", color: "#fff", lineHeight: "1.3", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "500" };
+const userInfoRowStyle = { display: "flex", alignItems: "center", gap: "8px" };
+const avatarWrapperStyle = { width: "22px", height: "22px", borderRadius: "50%", background: "#333", overflow: "hidden", flexShrink: 0 };
+const uploaderNameStyle = { fontSize: "12px", color: "#aaa", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
