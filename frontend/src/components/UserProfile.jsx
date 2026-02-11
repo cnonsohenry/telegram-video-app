@@ -142,6 +142,7 @@ export default function UserProfile({ user, onLogout }) {
                 video={v} 
                 layoutType={activeTab === "premium" ? "premium" : "shots"} 
                 onOpen={() => handleOpenVideo(v)} 
+                showDetails={false} // 🟢 Add this line to hide captions/views/names
               />
             )) : (
               <div style={{ gridColumn: "span 3", textAlign: "center", padding: "40px", color: "#666" }}>
