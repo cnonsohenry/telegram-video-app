@@ -270,42 +270,64 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 });
 
 /* =====================
-   api/video (Increment Views & Get Link)
+   api/video (Universal Handler)
 ===================== */
 app.get("/api/video", async (req, res) => {
   try {
     const { chat_id, message_id } = req.query;
     if (!chat_id || !message_id) return res.status(400).json({ error: "Missing parameters" });
 
-    // 1. Get Video
+    // 1. Fetch video details from DB
     const dbRes = await pool.query(
-      `UPDATE videos SET views = views + 1 WHERE chat_id=$1 AND message_id=$2 RETURNING file_id, cloudflare_id`,
+      `UPDATE videos SET views = views + 1 
+       WHERE chat_id=$1 AND message_id=$2 
+       RETURNING file_id, cloudflare_id`,
       [chat_id, message_id]
     );
 
-    if (!dbRes.rows.length) return res.status(404).json({ error: "Video not found" });
+    if (!dbRes.rows.length) {
+      return res.status(404).json({ error: "Video not found in database" });
+    }
+
     const video = dbRes.rows[0];
 
-    // 🟢 2. CLOUDFLARE STREAM CHECK
-    if (video.cloudflare_id) {
-      // Clean ID
+    // 🟢 2. OPTION A: CLOUDFLARE STREAM (Premium)
+    if (video.cloudflare_id && video.cloudflare_id !== "none") {
       const cleanId = video.cloudflare_id.split('?')[0];
-      // 🟢 USE videodelivery.net for playback too
       const video_url = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
+      console.log(`[PLAYBACK] Serving Cloudflare: ${cleanId}`);
       return res.json({ video_url });
     }
 
-    // 🔵 3. TELEGRAM FALLBACK
-    const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: video.file_id } });
+    // 🔵 3. OPTION B: TELEGRAM (Regular Videos)
+    // Make sure we actually have a file_id to fetch
+    if (!video.file_id || video.file_id === "none") {
+       return res.status(400).json({ error: "No video source (Telegram or Cloudflare) found" });
+    }
+
+    console.log(`[PLAYBACK] Fetching from Telegram: ${video.file_id.substring(0, 10)}...`);
+
+    // Fetch the file path from Telegram API
+    const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { 
+      params: { file_id: video.file_id } 
+    });
+
+    if (!tgRes.data?.result?.file_path) {
+      return res.status(404).json({ error: "Telegram could not find this file" });
+    }
+
     const filePath = tgRes.data.result.file_path;
     const { exp, sig } = signWorkerUrl(filePath);
 
+    // Construct the Worker URL
     const workerUrl = `https://media.naijahomemade.com/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}`;
-    res.json({ video_url: workerUrl });
+    
+    return res.json({ video_url: workerUrl });
 
   } catch (err) {
-    console.error("Video API Error:", err.message);
-    res.status(500).json({ error: "Access denied" });
+    // 🔴 4. Error Logging
+    console.error("❌ Video API Error Detail:", err.response?.data || err.message);
+    res.status(500).json({ error: "Playback failed", detail: err.message });
   }
 });
 
