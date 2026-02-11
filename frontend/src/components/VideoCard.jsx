@@ -54,7 +54,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
       <div style={{ 
         position: "relative", 
         width: "100%", 
-        aspectRatio: showDetails ? "9/16" : "1/1", // 🟢 Square for profile, Vertical for Home
+        aspectRatio: "9/16",
         background: "#000", 
         overflow: "hidden"
       }}>
