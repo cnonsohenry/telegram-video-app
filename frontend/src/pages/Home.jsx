@@ -69,21 +69,34 @@ export default function Home() {
 
   const playVideo = async (video) => {
     try {
+      // 1. Show the loader
       setActiveVideo({ ...video, video_url: null }); 
+
+      // 2. Fetch the link
       const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
-      const data = await res.json();
-      if (data.video_url) {
-        const updateLogic = (prev) => prev.map(v => (v.chat_id === video.chat_id && v.message_id === video.message_id) ? { ...v, views: Number(v.views || 0) + 1 } : v);
-        setVideos(updateLogic);
-        setVideoCache(prev => ({
-          ...prev,
-          [currentCategory]: updateLogic(prev[currentCategory] || [])
-        }));
-        setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server error ${res.status}`);
       }
-    } catch (e) { alert("Error fetching video link"); }
+
+      const data = await res.json();
+
+      if (data.video_url) {
+        // 3. Just set the URL and play
+        setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
+        
+        // 🟢 Note: We removed the setVideos/setVideoCache logic here.
+        // The view count will update globally next time the tab is refreshed.
+      }
+    } catch (e) { 
+      console.error("Playback fetch error:", e);
+      alert(`🚨 Playback Error: ${e.message}`);
+      setActiveVideo(null); 
+    }
   };
 
+  
   const TABS = [
     { icon: <Play size={18} />, label: "KNACKS"},
     { icon: <Grid3X3 size={18} />, label: "HOTTIES"},
