@@ -23,11 +23,7 @@ export default function App() {
     if (params.get("admin") === "true") {
       setActiveTab("admin");
     }
-
-    if (window.Telegram?.WebApp) {
-      window.Telegram.WebApp.ready();
-      window.Telegram.WebApp.expand();
-    }
+    
   }, []);
 
   return (
