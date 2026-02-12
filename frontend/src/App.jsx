@@ -10,6 +10,7 @@ export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [activeTab, setActiveTab] = useState("home");
   const [refreshKey, setRefreshKey] = useState({ home: 0, profile: 0 });
+  const [isFooterVisible, setIsFooterVisible] = useState(true); // 🟢 1. New State
 
   const handleTabClick = (tab) => {
     if (activeTab === tab) {
@@ -61,8 +62,13 @@ export default function App() {
         
         {/* 🟢 1. HOME: Always accessible to everyone */}
         {activeTab === "home" && (
-          <Home key={`home-${refreshKey.home}`} user={user} />
-        )}
+  <Home 
+    key={`home-${refreshKey.home}`} 
+    user={user} 
+    onProfileClick={() => setActiveTab("profile")} 
+    setHideFooter={(val) => setIsFooterVisible(!val)} // 🟢 2. Pass setter
+  />
+)}
         
         {/* 🟢 2. PROFILE: Guarded logic */}
         {activeTab === "profile" && (
@@ -71,6 +77,7 @@ export default function App() {
               key={`profile-${refreshKey.profile}`} 
               user={user} 
               onLogout={onLogout} 
+              setHideFooter={(val) => setIsFooterVisible(!val)} // 🟢 2. Pass setter
             />
           ) : (
             <AuthForm onLoginSuccess={onLoginSuccess} />

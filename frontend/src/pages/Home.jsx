@@ -10,7 +10,7 @@ import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
-export default function Home() {
+export default function Home({ user, onProfileClick, setHideFooter }) {
   const [activeTab, setActiveTab] = useState(0); 
   const [activeVideo, setActiveVideo] = useState(null);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -20,41 +20,47 @@ export default function Home() {
   const [videoCache, setVideoCache] = useState({});
   const [showScrollTop, setShowScrollTop] = useState(false);
   
-  // 🟢 1. Track which categories the user has "seen" this session
   const [viewedCategories, setViewedCategories] = useState(new Set());
 
   const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
 
-  const { videos, sidebarSuggestions, loading, loadMore, setVideos } = useVideos(currentCategory);
+  const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory);
 
-  // 🟢 2. Logic to determine if a "New" badge should show
+  // 🟢 FOOTER VISIBILITY LOGIC
+  useEffect(() => {
+    if (activeVideo) {
+      setHideFooter(true); // Tell App.jsx to hide footer
+      document.body.style.overflow = "hidden"; // Prevent background scrolling
+    } else {
+      setHideFooter(false); // Show footer again
+      document.body.style.overflow = "auto";
+    }
+    
+    // Cleanup if component unmounts
+    return () => {
+      document.body.style.overflow = "auto";
+      setHideFooter(false);
+    };
+  }, [activeVideo, setHideFooter]);
+
   const shouldShowBadge = (index) => {
     const catName = CATEGORIES[index];
-    
-    // Don't show if they are currently on the tab or have already viewed it
     if (activeTab === index || viewedCategories.has(catName)) return false;
-
     const catVideos = videoCache[catName];
     if (!catVideos || catVideos.length === 0) return false;
-
-    // Check if the newest video in this category is less than 24h old
     const latestUpload = new Date(catVideos[0].created_at).getTime();
     const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
-    
     return latestUpload > twentyFourHoursAgo;
   };
 
-  // 🟢 3. Mark current category as viewed whenever tab changes
   useEffect(() => {
     setViewedCategories(prev => new Set(prev).add(currentCategory));
   }, [currentCategory]);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setShowScrollTop(window.scrollY > 400);
-    };
+    const handleScroll = () => setShowScrollTop(window.scrollY > 400);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -72,13 +78,8 @@ export default function Home() {
     }
   }, [videos, currentCategory]);
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleRefresh = async () => {
-    window.location.reload(); 
-  };
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  const handleRefresh = async () => window.location.reload();
 
   const handleOpenVideo = async (video) => {
     const videoKey = `${video.chat_id}:${video.message_id}`;
@@ -123,7 +124,6 @@ export default function Home() {
   return (
     <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
       
-      {/* DESKTOP SIDEBAR */}
       {isDesktop && (
         <nav style={sidebarStyle}>
           {TABS.map((tab, index) => (
@@ -135,7 +135,6 @@ export default function Home() {
               <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "15px" }}>
                  {tab.icon} 
                  <span style={{ fontWeight: "bold" }}>{tab.label}</span>
-                 {/* 🟢 Desktop Badge */}
                  {shouldShowBadge(index) && <div style={desktopBadgeStyle} />}
               </div>
             </button>
@@ -143,13 +142,19 @@ export default function Home() {
         </nav>
       )}
 
-      {/* MAIN CONTENT AREA */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <div style={{ background: "#000" }}>
-           <AppHeader isDesktop={isDesktop} searchTerm={searchTerm} setSearchTerm={setSearchTerm} isMobileSearchVisible={isMobileSearchVisible} setIsMobileSearchVisible={setIsMobileSearchVisible} />
+           <AppHeader 
+              isDesktop={isDesktop}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              isMobileSearchVisible={isMobileSearchVisible}
+              setIsMobileSearchVisible={setIsMobileSearchVisible}
+              user={user} 
+              onProfileClick={onProfileClick} 
+            />
         </div>
 
-        {/* MOBILE TABS */}
         {!isDesktop && (
           <nav style={mobileNavStyle}>
             {TABS.map((tab, index) => (
@@ -160,7 +165,6 @@ export default function Home() {
               >
                 <div style={{ position: "relative" }}>
                   {tab.icon}
-                  {/* 🟢 Mobile Badge (Red Dot) */}
                   {shouldShowBadge(index) && <div style={mobileBadgeStyle} />}
                 </div>
                 <span style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px" }}>{tab.label}</span>
@@ -203,29 +207,12 @@ export default function Home() {
   );
 }
 
-// 🎨 UPDATED STYLES
-const mobileBadgeStyle = {
-  position: "absolute",
-  top: "-2px",
-  right: "-6px",
-  width: "8px",
-  height: "8px",
-  background: "#ff3b30",
-  borderRadius: "50%",
-  border: "1.5px solid #000"
-};
-
-const desktopBadgeStyle = {
-  width: "7px",
-  height: "7px",
-  background: "#ff3b30",
-  borderRadius: "50%",
-  marginLeft: "10px"
-};
-
-const mobileNavStyle = { display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 1000, background: "rgba(0,0,0,0.95)", backdropFilter: "blur(15px)", WebkitBackdropFilter: "blur(15px)", borderBottom: "1px solid #262626" };
+// 🎨 STYLES (Keep existing constants)
+const mobileBadgeStyle = { position: "absolute", top: "-2px", right: "-6px", width: "8px", height: "8px", background: "#ff3b30", borderRadius: "50%", border: "1.5px solid #000" };
+const desktopBadgeStyle = { width: "7px", height: "7px", background: "#ff3b30", borderRadius: "50%", marginLeft: "10px" };
+const mobileNavStyle = { display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 1000, background: "rgba(0,0,0,0.95)", backdropFilter: "blur(15px)", borderBottom: "1px solid #262626" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "#ff0000", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
 const sidebarStyle = { width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, zIndex: 100 };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", gap: "15px", padding: "12px 20px", border: "none", color: "#fff", borderRadius: "10px", cursor: "pointer", textAlign: "left" };
 const showMoreButtonStyle = { display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "900", cursor: "pointer" };
-const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "20px", width: "50px", height: "50px", borderRadius: "50%", background: "rgba(255, 0, 0, 0.9)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 15px rgba(0,0,0,0.4)", zIndex: 2000, transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", cursor: "pointer" };
+const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "20px", width: "50px", height: "50px", borderRadius: "50%", background: "rgba(255, 0, 0, 0.9)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", cursor: "pointer" };
