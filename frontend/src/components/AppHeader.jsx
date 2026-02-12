@@ -9,6 +9,10 @@ export default function AppHeader({
 
   // 🟢 Helper to render the Profile/Login trigger
   const ProfileTrigger = () => (
+
+    // 🟢 Logic: Only show logged in state if user AND user.id exist
+  const isLoggedIn = user && (user.id || user.email);
+  
     <button 
       onClick={onProfileClick} 
       style={{ 

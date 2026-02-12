@@ -31,11 +31,23 @@ export default function App() {
   };
 
   const onLogout = () => {
-    localStorage.removeItem("token");
-    setToken(null);
-    setUser(null);
-    setActiveTab("home");
-  };
+  console.log("Logging out...");
+  
+  // 1. Clear Storage First
+  localStorage.removeItem("token");
+  
+  // 2. Clear State immediately
+  setToken(null);
+  setUser(null);
+  
+  // 3. Reset Navigation
+  setActiveTab("home");
+  
+  // 4. Force a clean state for the Google GSI library
+  if (window.google) {
+    window.google.accounts.id.disableAutoSelect();
+  }
+};
 
   useEffect(() => {
     if (token && !user) {
