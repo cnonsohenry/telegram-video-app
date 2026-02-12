@@ -7,7 +7,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pkg from "pg";
-import { OAuth2Client } from "google-auth-library"; // 🟢 Added Google Library
+import { OAuth2Client } from "google-auth-library";
 
 const { Pool } = pkg;
 const router = express.Router();
@@ -19,9 +19,11 @@ const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_change_me";
 
 console.log(`[AUTH] System Start. Google Client ID: ${process.env.GOOGLE_CLIENT_ID ? "✅ Loaded" : "⚠️ MISSING"}`);
 
-// 🟢 2. GOOGLE LOGIN (Verified & Secure)
+// 🟢 2. GOOGLE LOGIN (Updated to handle NULL passwords)
 router.post("/google", async (req, res) => {
   const { token } = req.body;
+
+  if (!token) return res.status(400).json({ error: "No Google token provided" });
 
   try {
     // 1. Verify the Google Token
@@ -33,13 +35,14 @@ router.post("/google", async (req, res) => {
     const payload = ticket.getPayload();
     const { email, name, picture, sub: googleId } = payload;
 
-    // 2. Upsert User: Create if doesn't exist, Update if they do
-    // This handles both Registration and Login in one shot
+    // 2. Upsert User: Note we explicitly leave password_hash out of the INSERT
+    // We update google_id and avatar_url if the email already exists
     const userQuery = await pool.query(
       `INSERT INTO app_users (email, username, avatar_url, google_id) 
        VALUES ($1, $2, $3, $4) 
        ON CONFLICT (email) DO UPDATE 
-       SET avatar_url = EXCLUDED.avatar_url, google_id = EXCLUDED.google_id
+       SET avatar_url = EXCLUDED.avatar_url, 
+           google_id = EXCLUDED.google_id
        RETURNING id, email, username, avatar_url`,
       [email, name || email.split('@')[0], picture, googleId]
     );
@@ -52,7 +55,7 @@ router.post("/google", async (req, res) => {
     res.json({ token: appToken, user });
 
   } catch (err) {
-    console.error("[GOOGLE AUTH ERROR]", err);
+    console.error("[GOOGLE AUTH ERROR]", err.message);
     res.status(401).json({ error: "Invalid Google token" });
   }
 });
@@ -60,6 +63,8 @@ router.post("/google", async (req, res) => {
 // 🟢 3. REGISTER (Email/Password)
 router.post("/register", async (req, res) => {
   const { email, password, username } = req.body;
+  if (!password || password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+
   try {
     const userCheck = await pool.query("SELECT * FROM app_users WHERE email = $1", [email]);
     if (userCheck.rows.length > 0) return res.status(400).json({ error: "Email already exists" });
@@ -69,7 +74,7 @@ router.post("/register", async (req, res) => {
 
     const newUser = await pool.query(
       "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url",
-      [email, hash, username || email.split('@')[0], "https://naijahomemade.com/assets/default-avatar.png"]
+      [email, hash, username || email.split('@')[0], "https://videos.naijahomemade.com/assets/default-avatar.png"]
     );
 
     const token = jwt.sign({ id: newUser.rows[0].id }, JWT_SECRET, { expiresIn: "30d" });
@@ -84,18 +89,21 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await pool.query("SELECT * FROM app_users WHERE email = $1", [email]);
-    if (user.rows.length === 0) return res.status(400).json({ error: "User not found" });
+    const userResult = await pool.query("SELECT * FROM app_users WHERE email = $1", [email]);
+    if (userResult.rows.length === 0) return res.status(400).json({ error: "User not found" });
 
-    if (!user.rows[0].password_hash) {
-      return res.status(400).json({ error: "This account uses Google Login. Please sign in with Google." });
+    const user = userResult.rows[0];
+
+    // Check if the user has a password (they might be a Google-only user)
+    if (!user.password_hash) {
+      return res.status(400).json({ error: "This account was created with Google. Please use 'Sign in with Google'." });
     }
 
-    const validPass = await bcrypt.compare(password, user.rows[0].password_hash);
+    const validPass = await bcrypt.compare(password, user.password_hash);
     if (!validPass) return res.status(400).json({ error: "Invalid password" });
 
-    const token = jwt.sign({ id: user.rows[0].id }, JWT_SECRET, { expiresIn: "30d" });
-    const { password_hash, ...userData } = user.rows[0];
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "30d" });
+    const { password_hash, ...userData } = user;
     res.json({ token, user: userData });
   } catch (err) {
     console.error("[LOGIN ERROR]", err);
@@ -103,7 +111,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// 🟢 5. GET PROFILE
+// 🟢 5. GET PROFILE (Used by App.jsx for session check)
 router.get("/me", async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -113,13 +121,13 @@ router.get("/me", async (req, res) => {
   const token = authHeader.split(" ")[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await pool.query(
+    const userResult = await pool.query(
       "SELECT id, email, username, avatar_url, settings FROM app_users WHERE id = $1", 
       [decoded.id]
     );
 
-    if (user.rows.length === 0) return res.status(401).json({ error: "User not found" });
-    res.json(user.rows[0]);
+    if (userResult.rows.length === 0) return res.status(401).json({ error: "User not found" });
+    res.json(userResult.rows[0]);
   } catch (err) {
     res.status(401).json({ error: "Invalid or expired token" });
   }

@@ -9,31 +9,42 @@ export default function AuthForm({ onLoginSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 🟢 1. Initialize Google Identity & Render Official Button
+  // 🟢 Initialize Google Identity & Render Official Button
   useEffect(() => {
     /* global google */
-    if (window.google) {
-      google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        callback: handleGoogleResponse,
-        use_fedcm_for_prompt: true, // 🟢 Required for modern browser standards
-      });
+    const initGoogle = () => {
+      if (window.google) {
+        google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          callback: handleGoogleResponse,
+          use_fedcm_for_prompt: true,
+        });
 
-      // 🟢 2. Render the actual button into our target div
-      google.accounts.id.renderButton(
-        document.getElementById("googleSignInDiv"),
-        { 
-          theme: "outline", 
-          size: "large", 
-          shape: "pill", 
-          width: "310", // Matches your form width
-          text: "continue_with" 
-        }
-      );
+        // 🟢 Render the official button with Dark Mode to match your UI
+        google.accounts.id.renderButton(
+          document.getElementById("googleSignInDiv"),
+          { 
+            theme: "filled_blue", // Or "outline" with type="dark"
+            size: "large", 
+            shape: "pill", 
+            width: "310",
+            text: "continue_with",
+            logo_alignment: "left"
+          }
+        );
 
-      // Attempt One Tap for users with active sessions
-      google.accounts.id.prompt(); 
-    }
+        // 🟢 Non-blocking prompt (Safe for Incognito)
+        google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed()) {
+            console.warn("One Tap skipped:", notification.getNotDisplayedReason());
+          }
+        }); 
+      }
+    };
+
+    // Slight delay to ensure DOM is ready and prevent "hanging"
+    const timer = setTimeout(initGoogle, 300);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleGoogleResponse = async (response) => {
@@ -84,7 +95,7 @@ export default function AuthForm({ onLoginSuccess }) {
         <div style={innerContainer}>
           <h1 style={logoStyle}>NaijaHomemade</h1>
           
-          {error && <div style={{color: "#ff3b30", marginBottom: "15px", fontSize: "14px", textAlign: "center"}}>{error}</div>}
+          {error && <div style={errorBannerStyle}>{error}</div>}
 
           <form onSubmit={handleSubmit} style={formStyle}>
             {isRegistering && (
@@ -132,8 +143,8 @@ export default function AuthForm({ onLoginSuccess }) {
             <div style={line} />
           </div>
           
-          {/* 🟢 3. Target Div for the Official Google Button */}
-          <div id="googleSignInDiv" style={{ width: "100%", display: "flex", justifyContent: "center" }}></div>
+          {/* 🟢 Target Div for the Official Google Button */}
+          <div id="googleSignInDiv" style={{ width: "100%", display: "flex", justifyContent: "center", minHeight: "45px" }}></div>
         </div>
       </div>
       
@@ -150,7 +161,10 @@ export default function AuthForm({ onLoginSuccess }) {
   );
 }
 
-// Styles
+// 🖌 Added Error Banner Style
+const errorBannerStyle = { background: "rgba(255, 59, 48, 0.1)", color: "#ff3b30", padding: "10px", borderRadius: "8px", marginBottom: "15px", fontSize: "13px", textAlign: "center", width: "100%", border: "1px solid rgba(255, 59, 48, 0.2)" };
+
+// Styles (Verified same as yours)
 const loginContainerStyle = { height: "100dvh", background: "#000", display: "flex", flexDirection: "column", overflow: "hidden", position: "fixed", width: "100%", zIndex: 100, top: 0, left: 0 };
 const contentWrapper = { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%" };
 const innerContainer = { width: "100%", maxWidth: "350px", display: "flex", flexDirection: "column", alignItems: "center", padding: "20px" };
