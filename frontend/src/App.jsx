@@ -42,6 +42,9 @@ export default function App() {
   
   // 3. Reset Navigation
   setActiveTab("home");
+
+  // 4. Atomic reload (Optional but fixes many ghost states)
+  window.location.href = "/";
   
   // 4. Force a clean state for the Google GSI library
   if (window.google) {
