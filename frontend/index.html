@@ -7,17 +7,15 @@
     
     <meta name="referrer" content="no-referrer-when-downgrade">
     
-    <meta name="google-signin-client_id" content="YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com">
-
     <title>NaijaHomemade</title>
 
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     
     <style>
-      /* GLOBAL RESET */
       body, html {
         margin: 0; padding: 0;
         background-color: #000;
@@ -29,11 +27,10 @@
       body.no-scroll {
         overflow: hidden;
         height: 100%;
-        position: fixed; /* 🟢 Extra insurance for iOS scroll locking */
+        position: fixed; 
         width: 100%;
       }
 
-      /* SPLASH SCREEN STYLES */
       #splash-screen {
         position: fixed;
         inset: 0;
@@ -57,7 +54,6 @@
 
       .highlight { color: #ff3b30; }
 
-      /* LOADING BAR */
       .loader-container { width: 140px; height: 3px; background: #1c1c1e; border-radius: 10px; overflow: hidden; position: relative; }
       .loader-bar { width: 40%; height: 100%; background: #ffffff; border-radius: 10px; position: absolute; animation: loading-slide 1.5s infinite ease-in-out; }
 
@@ -67,7 +63,7 @@
         100% { left: -40%; }
       }
 
-      /* 🟢 ADSTERRA FIX: Using a more robust selector */
+      /* Adsterra Positioning Fix */
       [id^="container-"][style*="z-index: 2147483647"] {
         bottom: auto !important;
         top: 65px !important;             
@@ -75,23 +71,16 @@
       }
 
       body.hide-ads [style*="z-index: 2147483647"],
-      body.hide-ads [id^="container-"],
-      body.hide-ads .social-bar-container {
+      body.hide-ads [id^="container-"] {
         display: none !important;
-        pointer-events: none !important;
       }
     </style>
   </head>
   
   <body class="no-scroll">
-    
     <div id="splash-screen">
-      <div class="logo-text">
-        NAIJA<span class="highlight">HOMEMADE</span>
-      </div>
-      <div class="loader-container">
-        <div class="loader-bar"></div>
-      </div>
+      <div class="logo-text">NAIJA<span class="highlight">HOMEMADE</span></div>
+      <div class="loader-container"><div class="loader-bar"></div></div>
     </div>
 
     <div id="root"></div>
@@ -104,7 +93,6 @@
       function removeSplash() {
         const splash = document.getElementById('splash-screen');
         if (!splash) return;
-        
         splash.style.opacity = '0';
         setTimeout(() => {
           splash.style.visibility = 'hidden';
@@ -112,15 +100,8 @@
         }, 500);
       }
 
-      // 🟢 Improved Load Listener
-      if (document.readyState === 'complete') {
-        removeSplash();
-      } else {
-        window.addEventListener('load', removeSplash);
-      }
-
-      // Safety Fallback (4s)
-      setTimeout(removeSplash, 4000);
+      window.addEventListener('load', () => setTimeout(removeSplash, 800));
+      setTimeout(removeSplash, 4000); // Safety fallback
     </script>
   </body>
 </html>

@@ -9,19 +9,36 @@ export default function AuthForm({ onLoginSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 🟢 1. Initialize Google Identity
+  // 🟢 1. Initialize Google Identity & Render Official Button
   useEffect(() => {
     /* global google */
     if (window.google) {
       google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID, // Add this to your .env
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
         callback: handleGoogleResponse,
+        use_fedcm_for_prompt: true, // 🟢 Required for modern browser standards
       });
+
+      // 🟢 2. Render the actual button into our target div
+      google.accounts.id.renderButton(
+        document.getElementById("googleSignInDiv"),
+        { 
+          theme: "outline", 
+          size: "large", 
+          shape: "pill", 
+          width: "310", // Matches your form width
+          text: "continue_with" 
+        }
+      );
+
+      // Attempt One Tap for users with active sessions
+      google.accounts.id.prompt(); 
     }
   }, []);
 
   const handleGoogleResponse = async (response) => {
     setIsLoading(true);
+    setError("");
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google`, {
         method: "POST",
@@ -37,13 +54,6 @@ export default function AuthForm({ onLoginSuccess }) {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const triggerGoogleLogin = () => {
-    /* global google */
-    google.accounts.id.prompt(); // Shows One Tap
-    // Or for the button click:
-    google.accounts.id.requestCode(); 
   };
 
   const handleSubmit = async (e) => {
@@ -74,7 +84,7 @@ export default function AuthForm({ onLoginSuccess }) {
         <div style={innerContainer}>
           <h1 style={logoStyle}>NaijaHomemade</h1>
           
-          {error && <div style={{color: "red", marginBottom: "10px", fontSize: "14px"}}>{error}</div>}
+          {error && <div style={{color: "#ff3b30", marginBottom: "15px", fontSize: "14px", textAlign: "center"}}>{error}</div>}
 
           <form onSubmit={handleSubmit} style={formStyle}>
             {isRegistering && (
@@ -110,26 +120,20 @@ export default function AuthForm({ onLoginSuccess }) {
             <button 
               type="submit" 
               disabled={isLoading} 
-              style={{...loginButtonStyle, opacity: formData.email && formData.password.length >= 6 ? 1 : 0.5 }}
+              style={{...loginButtonStyle, opacity: (formData.email && formData.password.length >= 6) ? 1 : 0.5 }}
             >
-              {isLoading ? "..." : (isRegistering ? "Sign up" : "Log in")}
+              {isLoading ? "Please wait..." : (isRegistering ? "Sign up" : "Log in")}
             </button>
           </form>
 
-          <div style={dividerContainer}><div style={line} /><span style={orText}>OR</span><div style={line} /></div>
+          <div style={dividerContainer}>
+            <div style={line} />
+            <span style={orText}>OR</span>
+            <div style={line} />
+          </div>
           
-          {/* 🟢 2. Updated Google Button */}
-          <button 
-            type="button"
-            onClick={() => {
-              /* global google */
-              google.accounts.id.prompt(); 
-            }} 
-            style={googleButtonStyle}
-          >
-            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_Logo.svg" alt="" style={{width: "18px", marginRight: "10px"}} />
-            Continue with Google
-          </button>
+          {/* 🟢 3. Target Div for the Official Google Button */}
+          <div id="googleSignInDiv" style={{ width: "100%", display: "flex", justifyContent: "center" }}></div>
         </div>
       </div>
       
@@ -146,17 +150,16 @@ export default function AuthForm({ onLoginSuccess }) {
   );
 }
 
-// Styles (Unchanged)
+// Styles
 const loginContainerStyle = { height: "100dvh", background: "#000", display: "flex", flexDirection: "column", overflow: "hidden", position: "fixed", width: "100%", zIndex: 100, top: 0, left: 0 };
 const contentWrapper = { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%" };
 const innerContainer = { width: "100%", maxWidth: "350px", display: "flex", flexDirection: "column", alignItems: "center", padding: "20px" };
 const logoStyle = { fontFamily: '"Billabong", cursive', fontSize: "40px", marginBottom: "30px", color: "#fff", fontStyle: "italic" };
 const formStyle = { width: "100%", display: "flex", flexDirection: "column", gap: "10px" };
 const roundedInputStyle = { width: "100%", background: "#121212", border: "1px solid #333", borderRadius: "30px", padding: "12px 20px", color: "#fff", fontSize: "15px", outline: "none" };
-const loginButtonStyle = { background: "#ff3b30", color: "#fff", border: "none", borderRadius: "30px", padding: "14px", fontSize: "15px", fontWeight: "700", marginTop: "10px" };
-const eyeButtonStyle = { position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#666", display: "flex" };
+const loginButtonStyle = { background: "#ff3b30", color: "#fff", border: "none", borderRadius: "30px", padding: "14px", fontSize: "15px", fontWeight: "700", marginTop: "10px", cursor: "pointer" };
+const eyeButtonStyle = { position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#666", display: "flex", cursor: "pointer" };
 const dividerContainer = { width: "100%", display: "flex", alignItems: "center", margin: "20px 0", gap: "15px" };
 const line = { flex: 1, height: "1px", background: "#262626" };
 const orText = { color: "#8e8e8e", fontSize: "13px", fontWeight: "600" };
-const googleButtonStyle = { width: "100%", background: "#fff", border: "none", borderRadius: "30px", padding: "12px", color: "#000", fontSize: "14px", fontWeight: "600", display: "flex", alignItems: "center", justifyContent: "center" };
 const footerBox = { width: "100%", textAlign: "center", paddingBottom: "80px", background: "#000" };
