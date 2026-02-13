@@ -31,14 +31,12 @@ export default function App() {
   };
 
   const onLogout = () => {
-  localStorage.removeItem("token");
-  // Wrap these in a single batch
-  setTimeout(() => {
+    // 🔧 FIX: Clear localStorage first, then update all state in one batch
+    localStorage.removeItem("token");
     setUser(null);
     setToken(null);
     setActiveTab("home");
-  }, 0);
-};
+  };
 
   useEffect(() => {
     if (token && !user) {

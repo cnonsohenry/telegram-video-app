@@ -75,7 +75,7 @@ export default function UserProfile({ user, onLogout }) {
             onClick={() => {
               if (window.confirm("Are you sure you want to log out?")) {
                 // 1. Reset local view first to avoid showing a "Guest" settings page
-                setCurrentView("profile"); 
+                 
                 
                 // 2. Call the parent logout
                 onLogout(); 
