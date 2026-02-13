@@ -19,14 +19,14 @@ const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_change_me";
 
 console.log(`[AUTH] System Start. Google Client ID: ${process.env.GOOGLE_CLIENT_ID ? "✅ Loaded" : "⚠️ MISSING"}`);
 
-// 🟢 2. GOOGLE LOGIN (Updated to handle NULL passwords)
+// 🟢 2. GOOGLE LOGIN (FedCM Ready)
 router.post("/google", async (req, res) => {
   const { token } = req.body;
 
   if (!token) return res.status(400).json({ error: "No Google token provided" });
 
   try {
-    // 1. Verify the Google Token
+    // Verify the Google Token
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -35,35 +35,35 @@ router.post("/google", async (req, res) => {
     const payload = ticket.getPayload();
     const { email, name, picture, sub: googleId } = payload;
 
-    // 2. Upsert User: Note we explicitly leave password_hash out of the INSERT
-    // We update google_id and avatar_url if the email already exists
+    // Upsert User: Handle the case where they might have a local account or just Google
+    // Note: avatar_url is updated every time they log in to keep it fresh
     const userQuery = await pool.query(
       `INSERT INTO app_users (email, username, avatar_url, google_id) 
        VALUES ($1, $2, $3, $4) 
        ON CONFLICT (email) DO UPDATE 
        SET avatar_url = EXCLUDED.avatar_url, 
-           google_id = EXCLUDED.google_id
-       RETURNING id, email, username, avatar_url`,
+           google_id = COALESCE(app_users.google_id, EXCLUDED.google_id)
+       RETURNING id, email, username, avatar_url, role`,
       [email, name || email.split('@')[0], picture, googleId]
     );
 
     const user = userQuery.rows[0];
 
-    // 3. Issue your App's Session Token
+    // Issue App's Session Token
     const appToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "30d" });
 
     res.json({ token: appToken, user });
 
   } catch (err) {
     console.error("[GOOGLE AUTH ERROR]", err.message);
-    res.status(401).json({ error: "Invalid Google token" });
+    res.status(401).json({ error: "Google Authentication Failed" });
   }
 });
 
 // 🟢 3. REGISTER (Email/Password)
 router.post("/register", async (req, res) => {
   const { email, password, username } = req.body;
-  if (!password || password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+  if (!password || password.length < 6) return res.status(400).json({ error: "Password too short" });
 
   try {
     const userCheck = await pool.query("SELECT * FROM app_users WHERE email = $1", [email]);
@@ -73,7 +73,7 @@ router.post("/register", async (req, res) => {
     const hash = await bcrypt.hash(password, salt);
 
     const newUser = await pool.query(
-      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url",
+      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url, role",
       [email, hash, username || email.split('@')[0], "https://videos.naijahomemade.com/assets/default-avatar.png"]
     );
 
@@ -81,7 +81,7 @@ router.post("/register", async (req, res) => {
     res.json({ token, user: newUser.rows[0] });
   } catch (err) {
     console.error("[REGISTER ERROR]", err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Registration failed" });
   }
 });
 
@@ -94,9 +94,8 @@ router.post("/login", async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // Check if the user has a password (they might be a Google-only user)
     if (!user.password_hash) {
-      return res.status(400).json({ error: "This account was created with Google. Please use 'Sign in with Google'." });
+      return res.status(400).json({ error: "This account uses Google Login. Please sign in with Google." });
     }
 
     const validPass = await bcrypt.compare(password, user.password_hash);
@@ -107,29 +106,27 @@ router.post("/login", async (req, res) => {
     res.json({ token, user: userData });
   } catch (err) {
     console.error("[LOGIN ERROR]", err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Login failed" });
   }
 });
 
-// 🟢 5. GET PROFILE (Used by App.jsx for session check)
+// 🟢 5. GET PROFILE (Atomic Session Check)
 router.get("/me", async (req, res) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "No token provided" });
-  }
+  if (!authHeader?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
 
   const token = authHeader.split(" ")[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const userResult = await pool.query(
-      "SELECT id, email, username, avatar_url, settings FROM app_users WHERE id = $1", 
+      "SELECT id, email, username, avatar_url, role, settings FROM app_users WHERE id = $1", 
       [decoded.id]
     );
 
     if (userResult.rows.length === 0) return res.status(401).json({ error: "User not found" });
     res.json(userResult.rows[0]);
   } catch (err) {
-    res.status(401).json({ error: "Invalid or expired token" });
+    res.status(401).json({ error: "Session expired" });
   }
 });
 

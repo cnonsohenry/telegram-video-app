@@ -9,43 +9,32 @@ export default function AuthForm({ onLoginSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 🟢 Initialize Google Identity & Render Official Button
   useEffect(() => {
-    /* global google */
-    const initGoogle = () => {
-      if (window.google) {
-        google.accounts.id.initialize({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-          callback: handleGoogleResponse,
-          use_fedcm_for_prompt: true,
-        });
+  let isMounted = true;
 
-        // 🟢 Render the official button with Dark Mode to match your UI
-        google.accounts.id.renderButton(
-          document.getElementById("googleSignInDiv"),
-          { 
-            theme: "filled_blue", // Or "outline" with type="dark"
-            size: "large", 
-            shape: "pill", 
-            width: "310",
-            text: "continue_with",
-            logo_alignment: "left"
-          }
-        );
+  const initGoogle = () => {
+    if (!window.google || !isMounted) return;
 
-        // 🟢 Non-blocking prompt (Safe for Incognito)
-        google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed()) {
-            console.warn("One Tap skipped:", notification.getNotDisplayedReason());
-          }
-        }); 
-      }
-    };
+    google.accounts.id.initialize({
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      callback: handleGoogleResponse,
+      use_fedcm_for_prompt: true, // 🟢 This fixes the GSI_LOGGER warning
+    });
 
-    // Slight delay to ensure DOM is ready and prevent "hanging"
-    const timer = setTimeout(initGoogle, 300);
-    return () => clearTimeout(timer);
-  }, []);
+    google.accounts.id.renderButton(
+      document.getElementById("googleSignInDiv"),
+      { theme: "outline", size: "large", shape: "pill", width: "310" }
+    );
+  };
+
+  // Give the browser a moment to settle to avoid the AbortError
+  const timer = setTimeout(initGoogle, 500);
+
+  return () => {
+    isMounted = false;
+    clearTimeout(timer);
+  };
+}, []);
 
   const handleGoogleResponse = async (response) => {
     setIsLoading(true);
