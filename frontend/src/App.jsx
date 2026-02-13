@@ -31,12 +31,28 @@ export default function App() {
   };
 
   const onLogout = () => {
-    // 🔧 FIX: Clear localStorage first, then update all state in one batch
-    localStorage.removeItem("token");
-    setUser(null);
-    setToken(null);
-    setActiveTab("home");
-  };
+  console.log("Atomic logout initiated...");
+  
+  // 1. Clear everything from storage first
+  localStorage.clear(); // Clears token and any cached video data
+  
+  // 2. Disable Google's persistent session
+  if (window.google?.accounts?.id) {
+    window.google.accounts.id.disableAutoSelect();
+  }
+
+  // 3. Clear State BEFORE redirecting
+  // This tells React to stop rendering the Profile/Admin screens
+  setToken(null);
+  setUser(null);
+  setActiveTab("home");
+
+  // 4. Use a slight delay before the hard reload
+  // This gives React enough time to unmount the protected components
+  setTimeout(() => {
+    window.location.href = "/";
+  }, 100);
+};
 
   useEffect(() => {
     if (token && !user) {

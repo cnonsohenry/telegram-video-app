@@ -1,5 +1,4 @@
-// File: src/components/AuthForm.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function AuthForm({ onLoginSuccess }) {
@@ -9,36 +8,41 @@ export default function AuthForm({ onLoginSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // 🟢 1. Kill-switch to prevent "Double Attempt" bugs
+  const isSucceeded = useRef(false);
+
   useEffect(() => {
-  let isMounted = true;
+    let isMounted = true;
 
-  const initGoogle = () => {
-    if (!window.google || !isMounted) return;
+    const initGoogle = () => {
+      // Don't re-init if we already won or unmounted
+      if (!window.google || !isMounted || isSucceeded.current) return;
 
-    google.accounts.id.initialize({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-      callback: handleGoogleResponse,
-      use_fedcm_for_prompt: true, // 🟢 This fixes the GSI_LOGGER warning
-    });
+      google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: handleGoogleResponse,
+        use_fedcm_for_prompt: true,
+      });
 
-    google.accounts.id.renderButton(
-      document.getElementById("googleSignInDiv"),
-      { theme: "outline", size: "large", shape: "pill", width: "310" }
-    );
-  };
+      google.accounts.id.renderButton(
+        document.getElementById("googleSignInDiv"),
+        { theme: "outline", size: "large", shape: "pill", width: "310" }
+      );
+    };
 
-  // Give the browser a moment to settle to avoid the AbortError
-  const timer = setTimeout(initGoogle, 500);
+    const timer = setTimeout(initGoogle, 500);
 
-  return () => {
-    isMounted = false;
-    clearTimeout(timer);
-  };
-}, []);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, []);
 
   const handleGoogleResponse = async (response) => {
+    if (isSucceeded.current) return;
     setIsLoading(true);
     setError("");
+
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google`, {
         method: "POST",
@@ -46,20 +50,25 @@ export default function AuthForm({ onLoginSuccess }) {
         body: JSON.stringify({ token: response.credential }),
       });
       const data = await res.json();
+      
       if (!res.ok) throw new Error(data.error || "Google login failed");
       
+      // 🟢 2. LOCK logic immediately
+      isSucceeded.current = true;
       onLoginSuccess(data.user, data.token);
     } catch (err) {
-      setError(err.message);
+      if (!isSucceeded.current) setError(err.message);
     } finally {
-      setIsLoading(false);
+      if (!isSucceeded.current) setIsLoading(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSucceeded.current) return;
     setIsLoading(true);
     setError("");
+
     const endpoint = isRegistering ? "/api/auth/register" : "/api/auth/login";
     
     try {
@@ -69,12 +78,16 @@ export default function AuthForm({ onLoginSuccess }) {
         body: JSON.stringify(formData),
       });
       const data = await res.json();
+      
       if (!res.ok) throw new Error(data.error || "Authentication failed");
+
+      // 🟢 2. LOCK logic immediately
+      isSucceeded.current = true;
       onLoginSuccess(data.user, data.token);
     } catch (err) {
-      setError(err.message);
+      if (!isSucceeded.current) setError(err.message);
     } finally {
-      setIsLoading(false);
+      if (!isSucceeded.current) setIsLoading(false);
     }
   };
 
@@ -132,7 +145,6 @@ export default function AuthForm({ onLoginSuccess }) {
             <div style={line} />
           </div>
           
-          {/* 🟢 Target Div for the Official Google Button */}
           <div id="googleSignInDiv" style={{ width: "100%", display: "flex", justifyContent: "center", minHeight: "45px" }}></div>
         </div>
       </div>
@@ -150,10 +162,7 @@ export default function AuthForm({ onLoginSuccess }) {
   );
 }
 
-// 🖌 Added Error Banner Style
 const errorBannerStyle = { background: "rgba(255, 59, 48, 0.1)", color: "#ff3b30", padding: "10px", borderRadius: "8px", marginBottom: "15px", fontSize: "13px", textAlign: "center", width: "100%", border: "1px solid rgba(255, 59, 48, 0.2)" };
-
-// Styles (Verified same as yours)
 const loginContainerStyle = { height: "100dvh", background: "#000", display: "flex", flexDirection: "column", overflow: "hidden", position: "fixed", width: "100%", zIndex: 100, top: 0, left: 0 };
 const contentWrapper = { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%" };
 const innerContainer = { width: "100%", maxWidth: "350px", display: "flex", flexDirection: "column", alignItems: "center", padding: "20px" };
