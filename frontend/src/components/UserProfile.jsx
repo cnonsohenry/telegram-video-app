@@ -73,13 +73,9 @@ export default function UserProfile({ user, onLogout }) {
           <div 
             style={{...settingsItemStyle, color: "#ff3b30", borderBottom: "none"}} 
             onClick={() => {
-              if (window.confirm("Are you sure you want to log out?")) {
-                // 1. Reset local view first to avoid showing a "Guest" settings page
-                 
-                
-                // 2. Call the parent logout
+            
                 onLogout(); 
-              }
+              
             }}
           >
             <LogOut size={20} />
