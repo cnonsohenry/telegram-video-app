@@ -31,25 +31,13 @@ export default function App() {
   };
 
   const onLogout = () => {
-  console.log("Logging out...");
-  
-  // 1. Clear Storage First
   localStorage.removeItem("token");
-  
-  // 2. Clear State immediately
-  setToken(null);
-  setUser(null);
-  
-  // 3. Reset Navigation
-  setActiveTab("home");
-
-  // 4. Atomic reload (Optional but fixes many ghost states)
-  window.location.href = "/";
-  
-  // 4. Force a clean state for the Google GSI library
-  if (window.google) {
-    window.google.accounts.id.disableAutoSelect();
-  }
+  // Wrap these in a single batch
+  setTimeout(() => {
+    setUser(null);
+    setToken(null);
+    setActiveTab("home");
+  }, 0);
 };
 
   useEffect(() => {
