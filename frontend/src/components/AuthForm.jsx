@@ -2,6 +2,29 @@ import React, { useState, useEffect, useRef } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function AuthForm({ onLoginSuccess }) {
+
+  // 🟢 1. ADSTERRA BLOCKER
+  // Keeps your profile clean from intrusive popunders and social bars
+  useEffect(() => {
+    const zapAds = () => {
+      const adElements = document.querySelectorAll(
+        'iframe[id^="container-"], div[id^="container-"], [id*="effectivegatecpm"], .social-bar-container'
+      );
+      adElements.forEach(el => {
+        el.style.display = 'none';
+        el.style.visibility = 'hidden';
+      });
+    };
+
+    zapAds();
+    const observer = new MutationObserver(() => zapAds());
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, []);
+
+
+
   const [isRegistering, setIsRegistering] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "", username: "" });
   const [showPassword, setShowPassword] = useState(false);
