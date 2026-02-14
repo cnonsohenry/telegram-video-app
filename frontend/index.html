@@ -10,7 +10,6 @@
     <title>NaijaHomemade</title>
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-  
     
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     
@@ -38,7 +37,7 @@
         align-items: center;
         justify-content: center;
         background-color: #000;
-        z-index: 99999;
+        z-index: 999999; /* Higher than ads */
         transition: opacity 0.5s ease-out, visibility 0.5s;
       }
 
@@ -62,30 +61,50 @@
         100% { left: -40%; }
       }
 
-/* Adsterra Positioning: Below Header and Tabs */
-[id^="container-"][style*="z-index: 2147483647"] {
-  bottom: auto !important;
-  /* Adjust this to Header height + Tab height */
-  top: 105px !important;             
-  position: fixed !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  width: 100% !important;
-  display: flex !important;
-  justify-content: center !important;
-  z-index: 90 !important; /* Keep it below Header/Tabs (z-index 100) but above content */
-}
+      /* 🟢 Native Logout Animation */
+      @keyframes popIn {
+        0% { transform: scale(0.9); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
 
-/* Ensure the ad doesn't block clicks on the Tabs or Header */
-header, nav {
-  z-index: 1000 !important;
-}
+      /* 🟢 STABLE ADSTERRA POSITIONING (No-Flicker Version) */
+      [id^="container-"][style*="z-index: 2147483647"] {
+        bottom: auto !important;
+        top: 105px !important;             
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        
+        /* 1. Stop the flicker: Let the script have its high z-index */
+        z-index: 2147483647 !important; 
+        
+        /* 2. Fix focus: Allow clicks to pass THROUGH the container to navigation */
+        pointer-events: none !important; 
+        
+        display: block !important;
+        text-align: center !important;
+        transform: none !important;
+      }
 
-/* Hide Ads Logic */
-body.hide-ads [style*="z-index: 2147483647"],
-body.hide-ads [id^="container-"] {
-  display: none !important;
-}
+      /* 3. Re-enable clicks ONLY on the actual ad image/banner */
+      [id^="container-"] div, 
+      [id^="container-"] iframe, 
+      [id^="container-"] a {
+        pointer-events: auto !important;
+      }
+
+      /* 🟢 Navigation Safety: Ensure they stay on top of the AD "Invisible Zone" */
+      header, nav, .category-tabs {
+        z-index: 2147483647 !important;
+        pointer-events: auto !important;
+      }
+
+      /* Hide Ads Logic */
+      body.hide-ads [style*="z-index: 2147483647"],
+      body.hide-ads [id^="container-"] {
+        display: none !important;
+      }
     </style>
   </head>
   
@@ -98,8 +117,6 @@ body.hide-ads [id^="container-"] {
     <div id="root"></div>
 
     <script type="module" src="/src/main.jsx"></script>
-    
-    
 
     <script>
       function removeSplash() {
@@ -113,10 +130,9 @@ body.hide-ads [id^="container-"] {
       }
 
       window.addEventListener('load', () => setTimeout(removeSplash, 800));
-      setTimeout(removeSplash, 4000); // Safety fallback
+      setTimeout(removeSplash, 4000); 
     </script>
 
     <script src="https://pl28640933.effectivegatecpm.com/ef/8f/7e/ef8f7ec30c881245423ab301030a35ab.js" async></script>
-
   </body>
 </html>
