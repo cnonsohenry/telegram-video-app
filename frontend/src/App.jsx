@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
 import AdminUpload from "./pages/AdminUpload";
@@ -6,34 +6,40 @@ import AuthForm from "./components/AuthForm";
 import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
 export default function App() {
-  // 🟢 1. The ONLY source of truth: localStorage
+  // 🟢 1. CENTRALIZED STATE
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState("home");
   const [isFooterVisible, setIsFooterVisible] = useState(true);
 
-  // 🟢 2. LOGIN: Updates storage AND state in one millisecond
+  // 🟢 2. ATOMIC LOGIN
+  // This updates the "One Brain" instantly
   const onLoginSuccess = (userData, userToken) => {
     localStorage.setItem("token", userToken);
-    setToken(userToken); // React notices this instantly
+    setToken(userToken);
     setUser(userData);
-    setActiveTab("home"); // Go home first to refresh the view
+    // After login, send them to the Profile tab they were trying to access
+    setActiveTab("profile"); 
   };
 
-  // 🟢 3. LOGOUT: Clears everything and HARD RESETS
-  const onLogout = () => {
-    localStorage.clear();
+  // 🟢 3. ATOMIC LOGOUT
+  // Nukes memory and forces a clean browser slate
+  const onLogout = useCallback(() => {
+    localStorage.removeItem("token");
     setToken(null);
     setUser(null);
     setActiveTab("home");
-    // This is the "kill switch" for Google GSI ghost sessions
+    
     if (window.google?.accounts?.id) {
       window.google.accounts.id.disableAutoSelect();
     }
-    window.location.href = "/"; // Force browser to drop all memory
-  };
+    
+    // Redirect is the only way to be 100% sure Google GSI cache is cleared
+    window.location.href = "/"; 
+  }, []);
 
-  // 🟢 4. SYNC: Fetch user data if token exists but user doesn't
+  // 🟢 4. SESSION RECOVERY
+  // Only runs when the token exists but user data is missing
   useEffect(() => {
     if (token && !user) {
       fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
@@ -42,20 +48,25 @@ export default function App() {
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(data => setUser(data))
       .catch(() => {
+        // If fetch fails, the token is dead. Clean up.
         localStorage.removeItem("token");
         setToken(null);
       });
     }
-  }, [token, user]); // Only run when identity changes
+    
+    // Admin deep-link check
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("admin") === "true") setActiveTab("admin");
+  }, [token, user]);
 
-  // 🟢 5. Determine if we are "Logged In" once per render
   const isLoggedIn = useMemo(() => !!token, [token]);
 
   return (
     <div className="min-h-screen bg-black text-white">
+      {/* 🟢 DYNAMIC PADDING based on footer visibility */}
       <main style={{ paddingBottom: isFooterVisible ? "90px" : "0" }}> 
         
-        {/* HOME: Always visible */}
+        {/* TAB 1: HOME (Public) */}
         {activeTab === "home" && (
           <Home 
             user={user} 
@@ -64,7 +75,7 @@ export default function App() {
           />
         )}
         
-        {/* PROFILE: Atomic Guard */}
+        {/* TAB 2: PROFILE (Guarded) */}
         {activeTab === "profile" && (
           isLoggedIn ? (
             <Profile 
@@ -77,7 +88,7 @@ export default function App() {
           )
         )}
 
-        {/* ADMIN: Atomic Guard */}
+        {/* TAB 3: ADMIN (Double Guarded) */}
         {activeTab === "admin" && (
           isLoggedIn && user?.role === 'admin' ? (
             <AdminUpload />
@@ -87,21 +98,31 @@ export default function App() {
         )}
       </main>
 
-      {/* FOOTER */}
+      {/* 🟢 GLOBAL FOOTER (Always listens to One Brain) */}
       {isFooterVisible && (
         <nav style={navStyle}>
-          <button onClick={() => setActiveTab("home")} style={{...btnStyle, color: activeTab === 'home' ? '#ff3b30' : '#8e8e8e'}}>
-            <HomeIcon size={24} />
+          <button 
+            onClick={() => setActiveTab("home")} 
+            style={{...btnStyle, color: activeTab === 'home' ? '#ff3b30' : '#8e8e8e'}}
+          >
+            <HomeIcon size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
             <span style={labelStyle}>Home</span>
           </button>
 
-          <button onClick={() => setActiveTab("profile")} style={{...btnStyle, color: activeTab === 'profile' ? '#ff3b30' : '#8e8e8e'}}>
-            <User size={24} />
+          <button 
+            onClick={() => setActiveTab("profile")} 
+            style={{...btnStyle, color: activeTab === 'profile' ? '#ff3b30' : '#8e8e8e'}}
+          >
+            <User size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
             <span style={labelStyle}>Profile</span>
           </button>
 
+          {/* Role-based icon display */}
           {user?.role === 'admin' && (
-            <button onClick={() => setActiveTab("admin")} style={{...btnStyle, color: activeTab === 'admin' ? '#ff3b30' : '#8e8e8e'}}>
+            <button 
+              onClick={() => setActiveTab("admin")} 
+              style={{...btnStyle, color: activeTab === 'admin' ? '#ff3b30' : '#8e8e8e'}}
+            >
               <ShieldCheck size={24} />
               <span style={labelStyle}>Admin</span>
             </button>
@@ -112,7 +133,18 @@ export default function App() {
   );
 }
 
-// Styles...
-const navStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', backgroundColor: '#121212', borderTop: '1px solid #222', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 10000 };
-const btnStyle = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', flex: 1 };
+// 🎨 CONSOLIDATED STYLES
+const navStyle = { 
+  position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', 
+  backgroundColor: '#121212', borderTop: '1px solid #222', 
+  display: 'flex', justifyContent: 'space-around', alignItems: 'center', 
+  zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' 
+};
+
+const btnStyle = { 
+  background: 'none', border: 'none', display: 'flex', 
+  flexDirection: 'column', alignItems: 'center', gap: '4px', 
+  cursor: 'pointer', flex: 1 
+};
+
 const labelStyle = { fontSize: '10px', fontWeight: '700' };

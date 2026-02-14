@@ -52,7 +52,7 @@ export default function UserProfile({ user, onLogout }) {
 
   const { data: videosToDisplay, loading, loadMore, emptyTitle, emptyMsg } = getCurrentList();
 
-  // 🟢 SETTINGS VIEW (With Logout Logic)
+  // 🟢 SETTINGS VIEW
   if (currentView === "settings") {
     return (
       <div style={containerStyle}>
@@ -69,13 +69,16 @@ export default function UserProfile({ user, onLogout }) {
           
           <div style={{ height: "1px", background: "#222", margin: "20px 0" }} />
           
-          {/* 🟢 UPDATED LOGOUT BUTTON */}
+          {/* 🟢 ATOMIC LOGOUT HANDLER */}
           <div 
             style={{...settingsItemStyle, color: "#ff3b30", borderBottom: "none"}} 
             onClick={() => {
-            
+              if (window.confirm("Are you sure you want to log out?")) {
+                // 1. Instantly flip local state so we don't "hang" in settings
+                setCurrentView("profile");
+                // 2. Trigger the global logout from App.jsx
                 onLogout(); 
-              
+              }
             }}
           >
             <LogOut size={20} />
@@ -203,7 +206,7 @@ const SettingsItem = ({ icon, label }) => (
   </div>
 );
 
-// 🖌 STYLES
+// 🖌 STYLES (Keep as you have them)
 const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" };
 const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #222", position: "sticky", top: 0, background: "rgba(0,0,0,0.9)", zIndex: 100, backdropFilter: "blur(10px)" };
 const navBarStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid #222" };

@@ -1,88 +1,51 @@
-// File: src/components/Profile.jsx
-import React, { useState, useEffect } from "react";
-import AuthForm from "../components/AuthForm";
+import React, { useEffect } from "react";
 import UserProfile from "../components/UserProfile";
 
-export default function Profile() {
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+// 🟢 Props are now passed from the "Single Source of Truth" in App.jsx
+export default function Profile({ user, onLogout, setHideFooter }) {
 
-  // 🟢 1. RECOVERY & CLEANUP (Kept here to manage global scroll state)
-  useEffect(() => {
-    const token = localStorage.getItem("auth_token");
-    if (token) {
-      fetchProfile(token);
-    } else {
-      setIsLoading(false);
-    }
-
-    // Scroll Logic: Lock for login, Free for dashboard
-    if (user || token) {
-      document.body.style.overflow = "auto";
-      document.body.style.position = "";
-      document.body.style.touchAction = "";
-    } else {
-      document.body.style.overflow = "hidden";
-      document.body.style.touchAction = "none";
-    }
-
-    return () => {
-      document.body.style.overflow = "auto";
-      document.body.style.position = "";
-      document.body.style.touchAction = "";
-    };
-  }, [user]);
-
-  // 🟢 2. ADSTERRA BLOCKER (Global protection for this page)
+  // 🟢 1. ADSTERRA BLOCKER
+  // Keeps your profile clean from intrusive popunders and social bars
   useEffect(() => {
     const zapAds = () => {
-      const adElements = document.querySelectorAll('iframe[id^="container-"], div[id^="container-"], [id*="effectivegatecpm"], .social-bar-container');
+      const adElements = document.querySelectorAll(
+        'iframe[id^="container-"], div[id^="container-"], [id*="effectivegatecpm"], .social-bar-container'
+      );
       adElements.forEach(el => {
         el.style.display = 'none';
         el.style.visibility = 'hidden';
       });
     };
+
     zapAds();
     const observer = new MutationObserver(() => zapAds());
     observer.observe(document.body, { childList: true, subtree: true });
+
     return () => observer.disconnect();
   }, []);
 
-  const fetchProfile = async (token) => {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const userData = await res.json();
-        setUser(userData);
-      } else {
-        localStorage.removeItem("auth_token");
-        setUser(null);
-      }
-    } catch (err) {
-      console.error("Auth Error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // 🟢 2. SCROLL & UI CLEANUP
+  // Ensures that when this page is active, the scroll behavior is normal
+  useEffect(() => {
+    document.body.style.overflow = "auto";
+    document.body.style.position = "";
+    document.body.style.touchAction = "";
 
-  const handleLoginSuccess = (userData, token) => {
-    localStorage.setItem("auth_token", token);
-    setUser(userData);
-  };
+    return () => {
+      // Cleanup if needed when switching tabs
+      document.body.style.overflow = "auto";
+    };
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("auth_token");
-    setUser(null);
-  };
-
-  if (isLoading) return <div style={{ background: "#000", height: "100vh", color: "#fff" }}>Loading...</div>;
-
-  // 🟢 THE DECISION MAKER
-  return user ? (
-    <UserProfile user={user} onLogout={handleLogout} />
-  ) : (
-    <AuthForm onLoginSuccess={handleLoginSuccess} />
+  // 🟢 3. RENDER
+  // We no longer need a "Decision Maker" here. 
+  // App.jsx handles the logic: if user is null, it shows AuthForm; 
+  // if user exists, it shows this Profile component.
+  return (
+    <UserProfile 
+      user={user} 
+      onLogout={onLogout} 
+      setHideFooter={setHideFooter} 
+    />
   );
 }

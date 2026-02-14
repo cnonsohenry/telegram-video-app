@@ -62,17 +62,30 @@
         100% { left: -40%; }
       }
 
-      /* Adsterra Positioning Fix */
-      [id^="container-"][style*="z-index: 2147483647"] {
-        bottom: auto !important;
-        top: 65px !important;             
-        position: fixed !important;       
-      }
+/* Adsterra Positioning: Below Header and Tabs */
+[id^="container-"][style*="z-index: 2147483647"] {
+  bottom: auto !important;
+  /* Adjust this to Header height + Tab height */
+  top: 105px !important;             
+  position: fixed !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  z-index: 90 !important; /* Keep it below Header/Tabs (z-index 100) but above content */
+}
 
-      body.hide-ads [style*="z-index: 2147483647"],
-      body.hide-ads [id^="container-"] {
-        display: none !important;
-      }
+/* Ensure the ad doesn't block clicks on the Tabs or Header */
+header, nav {
+  z-index: 1000 !important;
+}
+
+/* Hide Ads Logic */
+body.hide-ads [style*="z-index: 2147483647"],
+body.hide-ads [id^="container-"] {
+  display: none !important;
+}
     </style>
   </head>
   
@@ -104,6 +117,6 @@
     </script>
 
     <script src="https://pl28640933.effectivegatecpm.com/ef/8f/7e/ef8f7ec30c881245423ab301030a35ab.js" async></script>
-    
+
   </body>
 </html>
