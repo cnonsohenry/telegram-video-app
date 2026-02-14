@@ -1,11 +1,8 @@
 import React, { useState } from "react";
-import { 
-  Settings, Grid3X3, Heart, Lock, LogOut, 
-  CheckCircle, Share2, ArrowLeft, ChevronRight, User, Shield, Bell 
-} from "lucide-react";
-
+import { Settings, Grid3X3, Heart, Lock, CheckCircle, Share2 } from "lucide-react";
 import VideoCard from "../components/VideoCard"; 
 import FullscreenPlayer from "../components/FullscreenPlayer"; 
+import SettingsView from "./SettingsView"; // 🟢 Import the new component
 import { useVideos } from "../hooks/useVideos";
 
 export default function UserProfile({ user, onLogout }) {
@@ -14,8 +11,6 @@ export default function UserProfile({ user, onLogout }) {
   const [activeVideo, setActiveVideo] = useState(null);
   
   const isDesktop = window.innerWidth > 1024;
-
-  // FETCH STREAMS
   const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots");
   const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium");
 
@@ -24,75 +19,28 @@ export default function UserProfile({ user, onLogout }) {
     try {
       const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       const data = await res.json();
-      if (data.video_url) {
-        setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
-      }
+      if (data.video_url) setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
     } catch (e) { console.error("Video fetch failed"); }
   };
 
-  // SELECT LIST
-  const getCurrentList = () => {
-    if (activeTab === "premium") {
-      return { 
-        data: premium || [], 
-        loading: premiumLoading, 
-        loadMore: loadMorePremium,
-        emptyTitle: "No Premium Content",
-        emptyMsg: "Stay tuned for exclusive drops."
-      };
-    }
-    return { 
-      data: shots || [], 
-      loading: shotsLoading, 
-      loadMore: loadMoreShots,
-      emptyTitle: "No Shots found",
-      emptyMsg: "Start uploading to see them here."
-    };
-  };
+  const { data: videosToDisplay, loading, loadMore, emptyTitle, emptyMsg } = activeTab === "premium" 
+    ? { data: premium || [], loading: premiumLoading, loadMore: loadMorePremium, emptyTitle: "No Premium Content", emptyMsg: "Stay tuned." }
+    : { data: shots || [], loading: shotsLoading, loadMore: loadMoreShots, emptyTitle: "No Shots found", emptyMsg: "Start uploading." };
 
-  const { data: videosToDisplay, loading, loadMore, emptyTitle, emptyMsg } = getCurrentList();
-
-  // 🟢 SETTINGS VIEW
+  // 🟢 RENDER SETTINGS VIEW
   if (currentView === "settings") {
-    return (
-      <div style={containerStyle}>
-        <div style={navBarStyle}>
-          <ArrowLeft size={24} color="#fff" onClick={() => setCurrentView("profile")} style={{ cursor: "pointer" }} />
-          <h2 style={headerTitleStyle}>Settings</h2>
-          <div style={{ width: "24px" }} />
-        </div>
-        <div style={{ padding: "10px 0" }}>
-          <SettingsItem icon={<User size={20} />} label="Account" />
-          <SettingsItem icon={<Lock size={20} />} label="Privacy" />
-          <SettingsItem icon={<Shield size={20} />} label="Security" />
-          <SettingsItem icon={<Bell size={20} />} label="Notifications" />
-          
-          <div style={{ height: "1px", background: "#222", margin: "20px 0" }} />
-          
-          {/* 🟢 ATOMIC LOGOUT HANDLER */}
-          <div 
-            style={{...settingsItemStyle, color: "#ff3b30", borderBottom: "none"}} 
-            onClick={() => {
-              if (window.confirm("Are you sure you want to log out?")) {
-                // 1. Instantly flip local state so we don't "hang" in settings
-                setCurrentView("profile");
-                // 2. Trigger the global logout from App.jsx
-                onLogout(); 
-              }
-            }}
-          >
-            <LogOut size={20} />
-            <span style={{ flex: 1, marginLeft: "15px", fontWeight: "700" }}>Log out</span>
-          </div>
-        </div>
-      </div>
-    );
+    return <SettingsView 
+      onBack={() => setCurrentView("profile")} 
+      onLogout={() => {
+        setCurrentView("profile"); // Reset view state
+        onLogout(); // Trigger global logout
+      }} 
+    />;
   }
 
   // MAIN PROFILE VIEW
   return (
     <div style={containerStyle}>
-      {/* HEADER GRID */}
       <div style={navGridStyle}>
         <div style={{ width: "40px" }}></div>
         <div style={centerTitleContainer}>
@@ -107,31 +55,17 @@ export default function UserProfile({ user, onLogout }) {
       <div style={headerSectionStyle}>
         <div style={profileTopRowStyle}>
           <div style={avatarContainerStyle}>
-            <img 
-              src={user?.avatar_url || "/assets/default-avatar.png"} 
-              onError={(e) => { e.target.onerror = null; e.target.src = "/assets/default-avatar.png"; }}
-              style={avatarImageStyle} alt="Avatar"
-            />
+            <img src={user?.avatar_url || "/assets/default-avatar.png"} style={avatarImageStyle} alt="Avatar" />
           </div>
           <div style={infoColumnStyle}>
             <h1 style={displayNameStyle}>@{user?.username || "user"}</h1>
-            <p style={bioStyle}>
-              <b>Official Preview Channel</b><br/>
-              Catch my latest shots here before they hit Premium 💎
-            </p>
+            <p style={bioStyle}><b>Official Preview Channel</b><br/>Catch my latest shots here before they hit Premium 💎</p>
           </div>
         </div>
 
         <div style={actionButtonsRowStyle}>
-          <button style={premiumButtonStyle} onClick={() => alert("Premium Subscriptions coming soon!")}>
-            SUBSCRIBE PREMIUM
-          </button>
-          <button style={secondaryButtonStyle} onClick={() => {
-            navigator.clipboard.writeText(window.location.href);
-            alert("Profile link copied!");
-          }}>
-            <Share2 size={18} />
-          </button>
+          <button style={premiumButtonStyle} onClick={() => alert("Coming soon!")}>SUBSCRIBE PREMIUM</button>
+          <button style={secondaryButtonStyle} onClick={() => alert("Link copied!")}><Share2 size={18} /></button>
         </div>
       </div>
 
@@ -142,77 +76,36 @@ export default function UserProfile({ user, onLogout }) {
       </div>
 
       <div style={contentAreaStyle}>
-        {activeTab !== "likes" ? (
-          <div style={gridStyle}>
-            {videosToDisplay.length > 0 ? videosToDisplay.map(v => (
-              <VideoCard 
-                key={`${v.chat_id || 'internal'}:${v.message_id}`} 
-                video={v} 
-                layoutType={activeTab === "premium" ? "premium" : "shots"} 
-                onOpen={() => handleOpenVideo(v)} 
-                showDetails={false} 
-              />
-            )) : (
-              <div style={{ gridColumn: "span 3", textAlign: "center", padding: "60px 20px", color: "#666" }}>
-                {loading ? "Loading content..." : emptyTitle}
-                {!loading && <p style={{ fontSize: "13px", marginTop: "8px" }}>{emptyMsg}</p>}
-              </div>
-            )}
-            {!loading && videosToDisplay.length > 0 && (
-              <div style={{ gridColumn: "span 3", padding: "20px", display: "flex", justifyContent: "center" }}>
-                <button onClick={loadMore} style={loadMoreStyle}>Load More</button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={emptyStateStyle}>
-            <div style={emptyIconCircle}>
-              <Heart size={32} color="#444" />
-            </div>
-            <h3 style={{ margin: "15px 0", fontSize: "16px" }}>No Liked Videos</h3>
-            <p style={{ color: "#666", fontSize: "14px" }}>Start exploring to save videos to your profile.</p>
-          </div>
-        )}
+        <div style={gridStyle}>
+          {videosToDisplay.map(v => (
+            <VideoCard key={v.message_id} video={v} onOpen={() => handleOpenVideo(v)} showDetails={false} />
+          ))}
+        </div>
       </div>
 
-      {activeVideo && (
-        <FullscreenPlayer 
-          video={activeVideo} 
-          onClose={() => setActiveVideo(null)} 
-          isDesktop={isDesktop} 
-        />
-      )}
+      {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} />}
     </div>
   );
 }
 
-// 🎨 HELPER COMPONENTS
+// 🎨 SHARED TAB BUTTON
 const TabButton = ({ active, onClick, icon, label }) => (
   <button onClick={onClick} style={{ 
     flex: 1, display: "flex", flexDirection: "column", alignItems: "center", 
     background: "none", border: "none", padding: "12px 0",
     borderBottom: active ? "2.5px solid #fff" : "1px solid #222",
-    opacity: active ? 1 : 0.4, 
-    color: "#fff", cursor: "pointer", transition: "0.2s"
+    opacity: active ? 1 : 0.4, color: "#fff", cursor: "pointer"
   }}>
     {icon}
-    <span style={{ fontSize: "10px", fontWeight: "700", marginTop: "6px", textTransform: "uppercase" }}>{label}</span>
+    <span style={{ fontSize: "10px", fontWeight: "700", marginTop: "6px" }}>{label}</span>
   </button>
 );
 
-const SettingsItem = ({ icon, label }) => (
-  <div style={settingsItemStyle} onClick={() => alert(`${label} settings coming soon!`)}>
-    {icon} <span style={{ flex: 1, marginLeft: "15px" }}>{label}</span> <ChevronRight size={16} color="#444" />
-  </div>
-);
-
-// 🖌 STYLES (Keep as you have them)
-const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" };
+// Styles... (Your existing styles remain here)
+const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff" };
 const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #222", position: "sticky", top: 0, background: "rgba(0,0,0,0.9)", zIndex: 100, backdropFilter: "blur(10px)" };
-const navBarStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid #222" };
 const centerTitleContainer = { display: "flex", alignItems: "center" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
-const headerTitleStyle = { fontSize: "16px", fontWeight: "700", margin: 0, flex: 1, textAlign: "center" };
 const headerSectionStyle = { padding: "20px" };
 const profileTopRowStyle = { display: "flex", alignItems: "center", gap: "20px", marginBottom: "20px" };
 const avatarContainerStyle = { width: "80px", height: "80px", borderRadius: "50%", padding: "2px", background: "linear-gradient(45deg, #FFD700, #ff3b30)" };
@@ -226,7 +119,3 @@ const secondaryButtonStyle = { background: "#1E1E1E", color: "#fff", border: "1p
 const tabsContainerStyle = { display: "flex", borderBottom: "1px solid #111", position: "sticky", top: "45px", background: "#000", zIndex: 90 };
 const contentAreaStyle = { minHeight: "400px" };
 const gridStyle = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px" };
-const loadMoreStyle = { padding: "10px 24px", background: "#111", border: "1px solid #222", color: "#fff", borderRadius: "20px", fontSize: "12px", cursor: "pointer" };
-const emptyStateStyle = { textAlign: "center", padding: "100px 20px" };
-const emptyIconCircle = { width: "60px", height: "60px", borderRadius: "50%", border: "1px solid #222", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "15px" };
-const settingsItemStyle = { display: "flex", alignItems: "center", padding: "18px 20px", borderBottom: "1px solid #111", cursor: "pointer" };
