@@ -41,8 +41,8 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
       style={{
         display: "flex", 
         flexDirection: "column",
-        background: "#1c1c1e", 
-        borderRadius: showDetails ? "12px" : "4px", // 🟢 Sharper look for grid
+        background: "#000002", 
+        borderRadius: showDetails ? "0px" : "4px", // 🟢 Sharper look for grid
         overflow: "hidden", 
         width: "100%", 
         cursor: "pointer", 
