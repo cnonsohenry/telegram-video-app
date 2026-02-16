@@ -19,6 +19,7 @@
         -webkit-font-smoothing: antialiased;
       }
 
+      /* Prevent background scroll when splash is active */
       body.no-scroll { overflow: hidden; height: 100dvh; }
 
       #splash-screen {
@@ -35,41 +36,35 @@
       .loader-bar { width: 40%; height: 100%; background: #ffffff; animation: loading-slide 1.5s infinite ease-in-out; position: relative; }
 
       @keyframes loading-slide { 0% { left: -40%; } 50% { left: 100%; } 100% { left: -40%; } }
-      @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+      
+      /* Animation for the TikTok-style Logout Dialog */
+      @keyframes popIn { 
+        0% { transform: scale(0.9); opacity: 0; } 
+        100% { transform: scale(1); opacity: 1; } 
+      }
+    </style>
 
-      /* 🟢 STABLE GITHUB VERSION: Social Bar Positioning */
-      /* This targets the iframe directly as per your stable commit */
-      iframe[id^="container-"][style*="z-index: 2147483647"],
-      div[id^="container-"][style*="z-index: 2147483647"] {
+        <style>
+      /* Targets the Adsterra Social Bar iframe */
+      iframe[id^="container-"][style*="z-index: 2147483647"] {
+        /* 1. Reset bottom positions */
         bottom: auto !important;
-        top: 105px !important; /* Increased to sit below Tabs */
         
-        /* The 'inset' trick: top right bottom left */
-        inset: 105px 0px auto 0px !important;  
+        /* 2. Set to TOP and push down 65px (adjust this to match your nav height) */
+        top: 110px !important;             
+        
+        /* 3. Sync 'inset' to match the top spacing: [top] [right] [bottom] [left] */
+        inset: 110px 0px auto 0px !important;  
         
         position: fixed !important;       
         margin-top: 0px !important;
+        
+        /* Ensure it's centered if it's not full width */
         left: 0 !important;
         right: 0 !important;
         margin-left: auto !important;
         margin-right: auto !important;
-
-        /* 🔥 GPU Fix for Image Patches */
-        transform: translateZ(0) !important;
-        will-change: transform;
-        background-color: transparent !important;
       }
-
-      /* 🟢 Z-INDEX MANAGEMENT */
-      /* Ensure nav stays clickable despite the ad's max z-index */
-      header, nav, .category-tabs {
-        z-index: 1000 !important;
-        position: relative;
-      }
-
-      #root { position: relative; z-index: 1; }
-
-      body.hide-ads [id^="container-"] { display: none !important; }
     </style>
   </head>
   
@@ -93,7 +88,11 @@
           document.body.classList.remove('no-scroll');
         }, 400);
       }
+      
+      // Wait for load + small buffer for React mounting
       window.addEventListener('load', () => setTimeout(removeSplash, 1000));
+      // Emergency fallback in case 'load' event hangs
+      setTimeout(removeSplash, 4500);
     </script>
 
     <script src="https://pl28640933.effectivegatecpm.com/ef/8f/7e/ef8f7ec30c881245423ab301030a35ab.js" async></script>
