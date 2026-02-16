@@ -19,14 +19,14 @@
         -webkit-font-smoothing: antialiased;
       }
 
-      /* Prevent the "Fixed Body" lock-in */
+      /* Prevent background scroll when splash is active */
       body.no-scroll { overflow: hidden; height: 100dvh; }
 
       #splash-screen {
         position: fixed; inset: 0;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         background-color: #000;
-        z-index: 2147483647; /* Must be absolutely top */
+        z-index: 2147483647; 
         transition: opacity 0.4s ease;
       }
 
@@ -36,34 +36,35 @@
       .loader-bar { width: 40%; height: 100%; background: #ffffff; animation: loading-slide 1.5s infinite ease-in-out; position: relative; }
 
       @keyframes loading-slide { 0% { left: -40%; } 50% { left: 100%; } 100% { left: -40%; } }
-      @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+      
+      /* Animation for the TikTok-style Logout Dialog */
+      @keyframes popIn { 
+        0% { transform: scale(0.9); opacity: 0; } 
+        100% { transform: scale(1); opacity: 1; } 
+      }
+    </style>
 
-      /* 🟢 CLEAN ADSTERRA POSITIONING */
-      /* We let the script handle its own z-index but force the location */
-      [id^="container-"][style*="z-index: 2147483647"] {
+        <style>
+      /* Targets the Adsterra Social Bar iframe */
+      iframe[id^="container-"][style*="z-index: 2147483647"] {
+        /* 1. Reset bottom positions */
         bottom: auto !important;
-        top: 105px !important;             
-        position: fixed !important;
+        
+        /* 2. Set to TOP and push down 65px (adjust this to match your nav height) */
+        top: 65px !important;             
+        
+        /* 3. Sync 'inset' to match the top spacing: [top] [right] [bottom] [left] */
+        inset: 65px 0px auto 0px !important;  
+        
+        position: fixed !important;       
+        margin-top: 0px !important;
+        
+        /* Ensure it's centered if it's not full width */
         left: 0 !important;
         right: 0 !important;
-        display: flex !important;
-        justify-content: center !important;
-        /* Remove pointer-events: none; as it breaks some ad scripts */
+        margin-left: auto !important;
+        margin-right: auto !important;
       }
-
-      /* 🟢 COMPONENT RENDERING FIX */
-      /* Ensure your React app has breathing room for the fixed ad */
-      #root {
-        position: relative;
-        z-index: 1;
-      }
-
-      /* High enough to be over content, but below ads if they overlap */
-      header, nav, .sticky-header {
-        z-index: 1000 !important;
-      }
-
-      body.hide-ads [id^="container-"] { display: none !important; }
     </style>
   </head>
   
@@ -87,8 +88,11 @@
           document.body.classList.remove('no-scroll');
         }, 400);
       }
-      // Increased timeout to ensure React components mount before splash hides
+      
+      // Wait for load + small buffer for React mounting
       window.addEventListener('load', () => setTimeout(removeSplash, 1000));
+      // Emergency fallback in case 'load' event hangs
+      setTimeout(removeSplash, 4500);
     </script>
 
     <script src="https://pl28640933.effectivegatecpm.com/ef/8f/7e/ef8f7ec30c881245423ab301030a35ab.js" async></script>

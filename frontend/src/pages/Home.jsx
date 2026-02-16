@@ -10,8 +10,13 @@ import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
+const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
+
 export default function Home({ user, onProfileClick, setHideFooter }) {
-  const [activeTab, setActiveTab] = useState(0); 
+  // 🟢 Randomize the initial category on load
+  const [activeTab, setActiveTab] = useState(() => {
+    return Math.floor(Math.random() * CATEGORIES.length);
+  }); 
   const [activeVideo, setActiveVideo] = useState(null);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
@@ -22,7 +27,6 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
   
   const [viewedCategories, setViewedCategories] = useState(new Set());
 
-  const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
 
