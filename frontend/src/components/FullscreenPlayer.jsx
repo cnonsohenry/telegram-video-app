@@ -14,21 +14,33 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const [isZoomed, setIsZoomed] = useState(false);
   const [showControls, setShowControls] = useState(true); 
 
-  // 🟢 1. NATIVE FULLSCREEN TRIGGER
+  // 🟢 1. UNIVERSAL FULLSCREEN TRIGGER (Android + iPhone)
   useEffect(() => {
     const enterFullscreen = async () => {
       try {
         const elem = containerRef.current;
-        if (elem) {
-          if (elem.requestFullscreen) await elem.requestFullscreen();
-          else if (elem.webkitRequestFullscreen) await elem.webkitRequestFullscreen();
-          else if (elem.msRequestFullscreen) await elem.msRequestFullscreen();
+        const videoElem = videoRef.current;
+        if (!elem || !videoElem) return;
+
+        // Android / Desktop / iPad (Standard)
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } 
+        // iPhone / iOS Safari (Legacy/Video Only)
+        else if (videoElem.webkitEnterFullscreen) {
+          videoElem.webkitEnterFullscreen();
+        } 
+        // Older Safari/Webkit
+        else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
         }
       } catch (err) {
-        console.warn("Fullscreen blocked", err);
+        console.warn("Fullscreen request failed", err);
       }
     };
+
     enterFullscreen();
+
     return () => {
       if (document.fullscreenElement || document.webkitIsFullScreen) {
         if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
@@ -36,22 +48,35 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     };
   }, []);
 
-  // 🟢 2. BACK-BUTTON / EXIT FULLSCREEN LISTENER
+  // 🟢 2. EXIT LISTENER (Handles iPhone "Done" button and Android Back button)
   useEffect(() => {
-    const handleFullscreenChange = () => {
+    const handleExit = () => {
       if (!document.fullscreenElement && !document.webkitIsFullScreen) {
         onClose();
       }
     };
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+    const videoElem = videoRef.current;
+
+    // Standard Events
+    document.addEventListener("fullscreenchange", handleExit);
+    document.addEventListener("webkitfullscreenchange", handleExit);
+    
+    // iPhone Specific: Triggered when the native player is closed
+    if (videoElem) {
+      videoElem.addEventListener("webkitendfullscreen", onClose);
+    }
+
     return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("fullscreenchange", handleExit);
+      document.removeEventListener("webkitfullscreenchange", handleExit);
+      if (videoElem) {
+        videoElem.removeEventListener("webkitendfullscreen", onClose);
+      }
     };
   }, [onClose]);
 
-  // 🟢 3. RESTORED INTERACTION LOGIC (Fixed the ReferenceError)
+  // 🟢 3. INTERACTION LOGIC
   const handleInteraction = (e) => {
     if (e) e.stopPropagation();
     setShowControls(true);
@@ -60,11 +85,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     const DOUBLE_TAP_DELAY = 300;
 
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
-      // Handle Double Tap: Zoom
       setIsZoomed(!isZoomed);
       lastTap.current = 0; 
     } else {
-      // Handle Single Tap: Play/Pause
       lastTap.current = now;
       setTimeout(() => {
         if (lastTap.current === now && videoRef.current) {
@@ -104,6 +127,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   return (
     <div ref={containerRef} style={overlayStyle} onClick={onClose}>
       
+      {/* CONTROLS */}
       <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0 }}>
         <div style={{ ...controlsTransitionStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
           {!isDesktop && (
@@ -203,7 +227,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   );
 }
 
-// 🖌 STYLES (Kept exactly as you had them)
+// 🖌 STYLES
 const overlayStyle = { position: "fixed", inset: 0, backgroundColor: "#000", zIndex: 10000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" };
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", touchAction: "manipulation" };
 const controlsTransitionStyle = { transition: "opacity 0.4s ease-in-out", zIndex: 10006 };
