@@ -3,6 +3,7 @@ import { X, ArrowLeft, Play, Loader2, Maximize, Minimize } from "lucide-react";
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const videoRef = useRef(null);
+  const containerRef = useRef(null); 
   const lastTap = useRef(0);
   const hideTimeout = useRef(null); 
   
@@ -13,46 +14,73 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const [isZoomed, setIsZoomed] = useState(false);
   const [showControls, setShowControls] = useState(true); 
 
+  // 🟢 1. NATIVE FULLSCREEN TRIGGER
   useEffect(() => {
-    if (hideTimeout.current) clearTimeout(hideTimeout.current);
-
-    if (showControls && isPlaying && !isLoading) {
-      hideTimeout.current = setTimeout(() => {
-        setShowControls(false);
-      }, 3000);
-    }
-
-    return () => {
-      if (hideTimeout.current) clearTimeout(hideTimeout.current);
-    };
-  }, [showControls, isPlaying, isLoading]);
-
-  const toggleControls = (e) => {
-    if (e) e.stopPropagation();
-    setShowControls(true); 
-  };
-
-  useEffect(() => {
-    if (videoRef.current && video.video_url) {
-      setIsLoading(true);
-      videoRef.current.load();
-      setShowControls(true);
-      
-      const playPromise = videoRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+    const enterFullscreen = async () => {
+      try {
+        const elem = containerRef.current;
+        if (elem) {
+          if (elem.requestFullscreen) await elem.requestFullscreen();
+          else if (elem.webkitRequestFullscreen) await elem.webkitRequestFullscreen();
+          else if (elem.msRequestFullscreen) await elem.msRequestFullscreen();
+        }
+      } catch (err) {
+        console.warn("Fullscreen blocked", err);
       }
-    }
-  }, [video.video_url]);
-
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden"; 
-    return () => { 
-      document.body.style.overflow = "auto";
-      document.documentElement.style.overflow = "auto";
+    };
+    enterFullscreen();
+    return () => {
+      if (document.fullscreenElement || document.webkitIsFullScreen) {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      }
     };
   }, []);
+
+  // 🟢 2. BACK-BUTTON / EXIT FULLSCREEN LISTENER
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && !document.webkitIsFullScreen) {
+        onClose();
+      }
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, [onClose]);
+
+  // 🟢 3. RESTORED INTERACTION LOGIC (Fixed the ReferenceError)
+  const handleInteraction = (e) => {
+    if (e) e.stopPropagation();
+    setShowControls(true);
+
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+
+    if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+      // Handle Double Tap: Zoom
+      setIsZoomed(!isZoomed);
+      lastTap.current = 0; 
+    } else {
+      // Handle Single Tap: Play/Pause
+      lastTap.current = now;
+      setTimeout(() => {
+        if (lastTap.current === now && videoRef.current) {
+          if (isPlaying) {
+            videoRef.current.pause();
+            setIsPlaying(false);
+            setShowPlayIcon(true);
+          } else {
+            videoRef.current.play();
+            setIsPlaying(true);
+            setTimeout(() => setShowPlayIcon(false), 500);
+          }
+        }
+      }, DOUBLE_TAP_DELAY);
+    }
+  };
 
   const handleTimeUpdate = () => {
     if (videoRef.current) {
@@ -71,40 +99,11 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     setShowControls(true);
   };
 
-  const handleInteraction = (e) => {
-    e.stopPropagation();
-    setShowControls(true);
-
-    const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300;
-
-    if (now - lastTap.current < DOUBLE_TAP_DELAY) {
-      setIsZoomed(!isZoomed);
-      lastTap.current = 0; 
-    } else {
-      lastTap.current = now;
-      setTimeout(() => {
-        if (lastTap.current === now && videoRef.current) {
-          if (isPlaying) {
-            videoRef.current.pause();
-            setIsPlaying(false);
-            setShowPlayIcon(true);
-          } else {
-            videoRef.current.play();
-            setIsPlaying(true);
-            setTimeout(() => setShowPlayIcon(false), 500);
-          }
-        }
-      }, DOUBLE_TAP_DELAY);
-    }
-  };
-
   if (!video) return null;
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
+    <div ref={containerRef} style={overlayStyle} onClick={onClose}>
       
-      {/* 🟢 TOP GRADIENT & CONTROLS */}
       <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0 }}>
         <div style={{ ...controlsTransitionStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
           {!isDesktop && (
@@ -121,11 +120,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
       <div
         style={{
           display: "flex",
-          flexDirection: isDesktop ? "row" : "column",
           width: "100%", 
-          height: isDesktop ? "85vh" : "100dvh", 
+          height: "100%", 
           background: "#000",
-          borderRadius: isDesktop ? "12px" : "0px",
           overflow: "hidden",
           position: "relative",
         }}
@@ -164,10 +161,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             </div>
           )}
 
-          {/* 🟢 BOTTOM GRADIENT (Auto-fades) */}
           <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
 
-          {/* ZOOM BUTTON */}
           <button 
             onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
             style={{ ...zoomToggleButtonStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}
@@ -175,7 +170,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             {isZoomed ? <Minimize size={20} /> : <Maximize size={20} />}
           </button>
 
-          {/* SMART PROGRESS BAR */}
           <div 
             style={{ 
               ...progressWrapperStyle, 
@@ -183,7 +177,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
               left: showControls ? "20px" : "0",
               right: showControls ? "20px" : "0",
             }} 
-            onClick={toggleControls}
           >
              <input 
                type="range" 
@@ -210,23 +203,12 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   );
 }
 
-// 🖌 STYLES
+// 🖌 STYLES (Kept exactly as you had them)
 const overlayStyle = { position: "fixed", inset: 0, backgroundColor: "#000", zIndex: 10000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" };
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", touchAction: "manipulation" };
 const controlsTransitionStyle = { transition: "opacity 0.4s ease-in-out", zIndex: 10006 };
-
-const bottomGradientStyle = {
-  position: "absolute", bottom: 0, left: 0, right: 0, height: "120px",
-  background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)",
-  pointerEvents: "none", transition: "opacity 0.4s ease-in-out", zIndex: 10001
-};
-
-const topGradientStyle = {
-  position: "absolute", top: 0, left: 0, right: 0, height: "100px",
-  background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)",
-  pointerEvents: "none", transition: "opacity 0.4s ease-in-out", zIndex: 10005
-};
-
+const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "120px", background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", transition: "opacity 0.4s ease-in-out", zIndex: 10001 };
+const topGradientStyle = { position: "absolute", top: 0, left: 0, right: 0, height: "100px", background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", transition: "opacity 0.4s ease-in-out", zIndex: 10005 };
 const progressWrapperStyle = { position: "absolute", zIndex: 10002, display: "flex", alignItems: "center", transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
 const rangeInputBaseStyle = { width: "100%", cursor: "pointer", accentColor: "#ff3b30", background: "rgba(255,255,255,0.2)", appearance: "none", outline: "none", transition: "all 0.3s" };
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(255,255,255,0.1)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
