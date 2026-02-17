@@ -5,10 +5,23 @@ import FullscreenPlayer from "../components/FullscreenPlayer";
 import SettingsView from "./SettingsView"; // 🟢 Import the new component
 import { useVideos } from "../hooks/useVideos";
 
-export default function UserProfile({ user, onLogout }) {
+export default function UserProfile({ user, onLogout, setHideFooter }) {
   const [activeTab, setActiveTab] = useState("videos");
   const [currentView, setCurrentView] = useState("profile");
   const [activeVideo, setActiveVideo] = useState(null);
+
+  useEffect(() => {
+    // 🟢 The logic gate
+    if (activeVideo || currentView === "settings") {
+      setHideFooter(true);
+    } else {
+      setHideFooter(false);
+    }
+
+    // Cleanup: Ensure footer returns if the user navigates away 
+    // from the Profile tab entirely
+    return () => setHideFooter(false);
+  }, [activeVideo, currentView, setHideFooter]);
   
   const isDesktop = window.innerWidth > 1024;
   const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots");

@@ -228,7 +228,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 }
 
 // 🖌 STYLES
-const overlayStyle = { position: "fixed", inset: 0, backgroundColor: "#000", zIndex: 10000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" };
+const overlayStyle = { position: "fixed", inset: 0, backgroundColor: "#000", zIndex: 999999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" };
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", touchAction: "manipulation" };
 const controlsTransitionStyle = { transition: "opacity 0.4s ease-in-out", zIndex: 10006 };
 const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "120px", background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", transition: "opacity 0.4s ease-in-out", zIndex: 10001 };
