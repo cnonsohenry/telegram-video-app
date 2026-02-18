@@ -4,6 +4,7 @@ import Profile from "./pages/Profile";
 import AdminUpload from "./pages/AdminUpload";
 import AuthForm from "./components/AuthForm";
 import PitchView from "./components/PitchView"; // 🟢 1. Import the new PitchView
+import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
 export default function App() {
@@ -15,6 +16,12 @@ export default function App() {
   // 🟢 2. PITCH TRACKER
   // Tracks if the user has completed the onboarding slides in this session
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
+
+  // 🟢 AUTOMATIC ZAPPER
+  // Turn ON for profile, admin, or during the pitch. 
+  // Turn OFF (false) for the home page so you can still earn money.
+  const isAdFreeZone = !hasSeenPitch || activeTab === "profile" || activeTab === "admin";
+  useAdZapper(isAdFreeZone);
 
   const onLoginSuccess = (userData, userToken) => {
     localStorage.setItem("token", userToken);

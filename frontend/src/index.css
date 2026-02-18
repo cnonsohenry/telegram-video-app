@@ -1,29 +1,71 @@
 @import "tailwindcss";
 
-/* 🟢 1. Target HTML specifically. This is the root that triggers the browser refresh. */
+/* 🟢 1. MOBILE STABILITY & REFRESH PREVENTION */
 html {
   overscroll-behavior-y: none; /* Strictly disables the "rubber band" refresh */
-  height: 100%; /* Forces the root to fill the screen */
+  height: 100%;
+  width: 100%;
 }
 
 body {
   margin: 0;
   padding: 0;
-  /* 🟢 2. Disable overscroll here too */
   overscroll-behavior-y: none;
   width: 100%;
   height: 100%;
   overflow-x: hidden;
-  background-color: #000; /* Prevents white flash if it does bounce */
+  background-color: #000;
+  /* Smooth scrolling for the grid, but no bounce for the app */
+  -webkit-overflow-scrolling: touch;
 }
 
 #root {
   min-height: 100%;
-  /* 🟢 3. Ensure the React root captures the touch events */
   touch-action: pan-x pan-y; 
 }
 
+/* 🟢 2. GLOBAL UI TWEAKS */
 * {
   -webkit-tap-highlight-color: transparent;
+  /* Prevent accidental text selection during swipes */
   user-select: none;
+}
+
+/* Exception: Allow users to select text and type in inputs! */
+input, textarea, [contenteditable="true"] {
+  user-select: text !important;
+  touch-action: manipulation;
+}
+
+/* 🟢 3. THE AD ZAPPER (CSS SHIELD) */
+/* When 'ad-free-mode' is added to the body via your Hook, these hide instantly */
+body.ad-free-mode iframe[id^="container-"],
+body.ad-free-mode div[id^="container-"],
+body.ad-free-mode [id*="effectivegatecpm"],
+body.ad-free-mode .social-bar-container,
+body.ad-free-mode #at-sharing-guide {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    position: absolute !important;
+    left: -9999px !important;
+}
+
+/* 🟢 4. ANIMATION HELPERS */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.pulse-animation {
+  animation: pulse 2s infinite ease-in-out;
 }
