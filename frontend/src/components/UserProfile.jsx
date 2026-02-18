@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Settings, Grid3X3, Heart, Lock, CheckCircle, Share2 } from "lucide-react";
 import VideoCard from "../components/VideoCard"; 
 import FullscreenPlayer from "../components/FullscreenPlayer"; 
@@ -91,7 +91,12 @@ export default function UserProfile({ user, onLogout, setHideFooter }) {
       <div style={contentAreaStyle}>
         <div style={gridStyle}>
           {videosToDisplay.map(v => (
-            <VideoCard key={v.message_id} video={v} onOpen={() => handleOpenVideo(v)} showDetails={false} />
+            <VideoCard 
+              key={`${v.chat_id}:${v.message_id}`} // 🟢 More unique key
+              video={v} 
+              onOpen={() => handleOpenVideo(v)} 
+              showDetails={false} 
+            />
           ))}
         </div>
       </div>
