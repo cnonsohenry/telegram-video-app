@@ -266,7 +266,7 @@ const overlayStyle = {
   left: 0,
   right: 0,
   bottom: 0,
-  height: "100dvh", // 🟢 Uses the actual visible height on iPhone
+  
   backgroundColor: "#000", 
   zIndex: 999999, 
   display: "flex", 
