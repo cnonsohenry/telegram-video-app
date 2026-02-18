@@ -14,8 +14,26 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const [isZoomed, setIsZoomed] = useState(false);
   const [showControls, setShowControls] = useState(true); 
 
-  // 🟢 1. UNIVERSAL FULLSCREEN TRIGGER (Android + iPhone)
+// 🟢 1. UNIVERSAL FULLSCREEN & DEEP SCROLL LOCK
   useEffect(() => {
+    // A. Store original styles and scroll position
+    const originalStyle = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+      height: document.body.style.height
+    };
+    const scrollY = window.scrollY;
+
+    // B. Apply "Deep Lock" (Fixes iPhone Scrollbar/Stability)
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed"; // Forces iOS to stay still
+    document.body.style.top = `-${scrollY}px`; // Keeps your background spot
+    document.body.style.width = "100%";
+    document.body.style.height = "100dvh"; // Dynamic viewport lock
+
+    // C. Trigger Fullscreen
     const enterFullscreen = async () => {
       try {
         const elem = containerRef.current;
@@ -41,10 +59,24 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
     enterFullscreen();
 
+    // D. Cleanup (Restore everything)
     return () => {
+      // Exit Native Fullscreen if active
       if (document.fullscreenElement || document.webkitIsFullScreen) {
-        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
       }
+
+      // Restore Body Styles
+      document.body.style.overflow = originalStyle.overflow;
+      document.body.style.position = originalStyle.position;
+      document.body.style.top = originalStyle.top;
+      document.body.style.width = originalStyle.width;
+      document.body.style.height = originalStyle.height;
+
+      // Snap back to original scroll position
+      window.scrollTo(0, scrollY);
     };
   }, []);
 
@@ -228,7 +260,20 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 }
 
 // 🖌 STYLES
-const overlayStyle = { position: "fixed", inset: 0, backgroundColor: "#000", zIndex: 999999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" };
+const overlayStyle = { 
+  position: "fixed", 
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  height: "100dvh", // 🟢 Uses the actual visible height on iPhone
+  backgroundColor: "#000", 
+  zIndex: 999999, 
+  display: "flex", 
+  flexDirection: "column",
+  overflow: "hidden", // 🟢 Force-kill any internal scrolling
+  touchAction: "none" // 🟢 Prevents the "pull-to-refresh" or bounce
+};
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", touchAction: "manipulation" };
 const controlsTransitionStyle = { transition: "opacity 0.4s ease-in-out", zIndex: 10006 };
 const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "120px", background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)", pointerEvents: "none", transition: "opacity 0.4s ease-in-out", zIndex: 10001 };
