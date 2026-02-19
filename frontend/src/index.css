@@ -1,8 +1,20 @@
 @import "tailwindcss";
 
-/* 🟢 1. MOBILE STABILITY & REFRESH PREVENTION */
+/* 🟢 1. THEME VARIABLES */
+:root {
+  --primary-color: #ff3b30; /* Default Red */
+  --primary-glow: rgba(255, 59, 48, 0.4);
+}
+
+/* Toggled via SettingsView */
+body.theme-orange {
+  --primary-color: #ff8c00; /* Dark Orange */
+  --primary-glow: rgba(255, 140, 0, 0.4);
+}
+
+/* 🟢 2. MOBILE STABILITY & REFRESH PREVENTION */
 html {
-  overscroll-behavior-y: none; /* Strictly disables the "rubber band" refresh */
+  overscroll-behavior-y: none;
   height: 100%;
   width: 100%;
 }
@@ -15,7 +27,6 @@ body {
   height: 100%;
   overflow-x: hidden;
   background-color: #000;
-  /* Smooth scrolling for the grid, but no bounce for the app */
   -webkit-overflow-scrolling: touch;
 }
 
@@ -24,21 +35,18 @@ body {
   touch-action: pan-x pan-y; 
 }
 
-/* 🟢 2. GLOBAL UI TWEAKS */
+/* 🟢 3. GLOBAL UI TWEAKS */
 * {
   -webkit-tap-highlight-color: transparent;
-  /* Prevent accidental text selection during swipes */
   user-select: none;
 }
 
-/* Exception: Allow users to select text and type in inputs! */
 input, textarea, [contenteditable="true"] {
   user-select: text !important;
   touch-action: manipulation;
 }
 
-/* 🟢 3. THE AD ZAPPER (CSS SHIELD) */
-/* When 'ad-free-mode' is added to the body via your Hook, these hide instantly */
+/* 🟢 4. THE AD ZAPPER (CSS SHIELD) */
 body.ad-free-mode iframe[id^="container-"],
 body.ad-free-mode div[id^="container-"],
 body.ad-free-mode [id*="effectivegatecpm"],
@@ -54,7 +62,7 @@ body.ad-free-mode #at-sharing-guide {
     left: -9999px !important;
 }
 
-/* 🟢 4. ANIMATION HELPERS */
+/* 🟢 5. ANIMATION HELPERS */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }

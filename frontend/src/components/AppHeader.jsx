@@ -15,7 +15,7 @@ export default function AppHeader({
       {isDesktop && (
         <header style={desktopHeaderStyle}>
           <div style={{ userSelect: "none" }}>
-            <h1 style={logoStyle}>NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span></h1>
+            <h1 style={logoStyle}>NAIJA<span style={{ color: "var(--primary-color)" }}>HOMEMADE</span></h1>
           </div>
           
           <div style={{ display: "flex", alignItems: "center", gap: "25px" }}>
@@ -61,7 +61,7 @@ export default function AppHeader({
           ) : (
             <>
               <h1 style={{ color: "#fff", fontSize: "18px", fontWeight: "900", margin: 0 }}>
-                NAIJA<span style={{ color: "#ff0000" }}>HOMEMADE</span>
+                NAIJA<span style={{ color: "var(--primary-color)" }}>HOMEMADE</span>
               </h1>
               <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
                 <Search size={22} color="#fff" onClick={() => setIsMobileSearchVisible(true)} />
@@ -88,6 +88,6 @@ const searchBarStyle = { display: "flex", alignItems: "center", background: "#1c
 const inputStyle = { background: "none", border: "none", color: "#fff", padding: "10px", width: "100%", outline: "none", fontSize: "14px" };
 const profileBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: 0 };
 const avatarStyle = (isDesktop) => ({ width: isDesktop ? "36px" : "30px", height: isDesktop ? "36px" : "30px", borderRadius: "50%", border: "2px solid #ff0000", objectFit: "cover" });
-const loginBadgeStyle = { background: "#ff0000", color: "#fff", padding: "6px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "800" };
+const loginBadgeStyle = { background: "var(--primary-color)", color: "#fff", padding: "6px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "800" };
 const mobileHeaderStyle = { position: "sticky", top: 0, zIndex: 1000, padding: "12px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#000", borderBottom: "1px solid #111" };
 const mobileSearchContainer = { display: "flex", alignItems: "center", flex: 1, background: "#1c1c1e", borderRadius: "8px", padding: "0 10px" };
