@@ -120,20 +120,20 @@ const TabButton = ({ active, onClick, icon, label }) => (
 );
 
 // Styles... (Your existing styles remain here)
-const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff" };
+const containerStyle = { minHeight: "100vh", background: "var(--bg-color)", color: "#fff" };
 const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #222", position: "sticky", top: 0, background: "rgba(0,0,0,0.9)", zIndex: 100, backdropFilter: "blur(10px)" };
 const centerTitleContainer = { display: "flex", alignItems: "center" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
 const headerSectionStyle = { padding: "20px" };
 const profileTopRowStyle = { display: "flex", alignItems: "center", gap: "20px", marginBottom: "20px" };
 const avatarContainerStyle = { width: "80px", height: "80px", borderRadius: "50%", padding: "2px", background: "linear-gradient(45deg, #FFD700, var(--primary-color))" };
-const avatarImageStyle = { width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "2px solid #000" };
+const avatarImageStyle = { width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "2px solid var(--bg-color)" };
 const infoColumnStyle = { flex: 1 };
 const displayNameStyle = { fontSize: "20px", fontWeight: "800", margin: "0 0 4px 0" };
 const bioStyle = { fontSize: "13px", color: "#aaa", margin: 0, lineHeight: "1.4" };
 const actionButtonsRowStyle = { display: "flex", gap: "10px" };
 const premiumButtonStyle = { flex: 1, background: "linear-gradient(45deg, #ff3b30, var(--primary-color))", color: "#fff", border: "none", borderRadius: "8px", padding: "12px", fontWeight: "800", fontSize: "13px", cursor: "pointer" };
 const secondaryButtonStyle = { background: "#1E1E1E", color: "#fff", border: "1px solid #333", borderRadius: "8px", padding: "0 15px", display: "flex", alignItems: "center" };
-const tabsContainerStyle = { display: "flex", borderBottom: "1px solid #111", position: "sticky", top: "45px", background: "#000", zIndex: 90 };
+const tabsContainerStyle = { display: "flex", borderBottom: "1px solid #111", position: "sticky", top: "45px", background: "var(--bg-color)", zIndex: 90 };
 const contentAreaStyle = { minHeight: "400px" };
 const gridStyle = { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px" };

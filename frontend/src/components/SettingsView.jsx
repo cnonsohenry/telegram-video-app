@@ -124,11 +124,11 @@ const toggleThumbStyle = {
 
 // Existing styles...
 const sectionLabelStyle = { fontSize: "12px", color: "#666", textTransform: "uppercase", padding: "20px 20px 10px 20px", fontWeight: "700", letterSpacing: "1px" };
-const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff" };
+const containerStyle = { minHeight: "100vh", background: "var(--bg-color)", color: "#fff" };
 const navBarStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid #222" };
 const headerTitleStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
 const settingsItemStyle = { display: "flex", alignItems: "center", padding: "18px 20px", borderBottom: "1px solid #111", cursor: "pointer" };
-const modalOverlayStyle = { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0, 0, 0, 0.85)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20000, padding: "20px" };
+const modalOverlayStyle = { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "var(--bg-color)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20000, padding: "20px" };
 const dialogBoxStyle = { width: "100%", maxWidth: "300px", backgroundColor: "#1c1c1e", borderRadius: "16px", padding: "24px", textAlign: "center" };
 const dialogTitleStyle = { fontSize: "18px", fontWeight: "800", marginBottom: "8px" };
 const dialogSubStyle = { fontSize: "14px", color: "#8e8e93", marginBottom: "24px" };
