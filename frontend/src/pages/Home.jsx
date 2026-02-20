@@ -212,11 +212,11 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
 }
 
 // 🎨 STYLES (Keep existing constants)
-const mobileBadgeStyle = { position: "absolute", top: "-2px", right: "-6px", width: "8px", height: "8px", background: "#ff3b30", borderRadius: "50%", border: "1.5px solid #000" };
-const desktopBadgeStyle = { width: "7px", height: "7px", background: "#ff3b30", borderRadius: "50%", marginLeft: "10px" };
+const mobileBadgeStyle = { position: "absolute", top: "-2px", right: "-6px", width: "8px", height: "8px", background: "var(--primary-color)", borderRadius: "50%", border: "1.5px solid #000" };
+const desktopBadgeStyle = { width: "7px", height: "7px", background: "var(--primary-color)", borderRadius: "50%", marginLeft: "10px" };
 const mobileNavStyle = { display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 1000, background: "rgba(0,0,0,0.95)", backdropFilter: "blur(15px)", borderBottom: "1px solid #262626" };
-const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "#ff0000", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
+const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
 const sidebarStyle = { width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, zIndex: 100 };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", gap: "15px", padding: "12px 20px", border: "none", color: "#fff", borderRadius: "10px", cursor: "pointer", textAlign: "left" };
 const showMoreButtonStyle = { display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "900", cursor: "pointer" };
-const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "20px", width: "50px", height: "50px", borderRadius: "50%", background: "rgba(255, 0, 0, 0.9)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", cursor: "pointer" };
+const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "20px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", cursor: "pointer" };
