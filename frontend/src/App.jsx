@@ -14,12 +14,11 @@ export default function App() {
   const [isFooterVisible, setIsFooterVisible] = useState(true);
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
 
-  // 🛡️ AD ZAPPER
+  // 🛡️ AD ZAPPER: Auto-toggles based on view
   const isAdFreeZone = !hasSeenPitch || activeTab === "profile" || activeTab === "admin";
   useAdZapper(isAdFreeZone);
 
   // 🟢 1. THEME ENGINE
-  // Helper to toggle CSS class and LocalStorage in sync
   const applyTheme = useCallback((theme) => {
     localStorage.setItem("theme", theme);
     if (theme === "orange") {
@@ -29,7 +28,7 @@ export default function App() {
     }
   }, []);
 
-  // Initialize theme from LocalStorage on mount (for guests)
+  // Init theme on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") || "red";
     applyTheme(savedTheme);
@@ -39,12 +38,7 @@ export default function App() {
     localStorage.setItem("token", userToken);
     setToken(userToken);
     setUser(userData);
-    
-    // 🟢 Sync theme from DB on successful login
-    if (userData.settings?.theme) {
-      applyTheme(userData.settings.theme);
-    }
-    
+    if (userData.settings?.theme) applyTheme(userData.settings.theme);
     setActiveTab("profile"); 
   };
 
@@ -57,7 +51,7 @@ export default function App() {
     window.location.href = "/"; 
   }, []);
 
-  // 🟢 2. SESSION RECOVERY + DB THEME SYNC
+  // 🟢 2. SESSION RECOVERY
   useEffect(() => {
     if (token && !user) {
       fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
@@ -66,10 +60,7 @@ export default function App() {
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(data => {
         setUser(data);
-        // 🟢 If DB has a theme, it overrides LocalStorage
-        if (data.settings?.theme) {
-          applyTheme(data.settings.theme);
-        }
+        if (data.settings?.theme) applyTheme(data.settings.theme);
       })
       .catch(() => {
         localStorage.removeItem("token");
@@ -82,7 +73,7 @@ export default function App() {
 
   const isLoggedIn = useMemo(() => !!token, [token]);
 
-  // GATEKEEPER
+  // GATEKEEPER logic
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
   if (needsPitch) {
@@ -90,19 +81,38 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <main style={{ paddingBottom: isFooterVisible && activeTab !== "admin" ? "90px" : "0" }}> 
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-color)', color: '#fff', overflowX: 'hidden' }}>
+      <main 
+        style={{ 
+          paddingBottom: isFooterVisible && activeTab !== "admin" ? "90px" : "0",
+          position: 'relative',
+          width: '100%',
+          minHeight: '100vh'
+        }}
+      > 
         
-        {activeTab === "home" && (
+        {/* 🟢 HOME TAB (Persistent + Left Slide) */}
+        <div style={{ 
+          ...slideContainerStyle,
+          transform: activeTab === "home" ? "translateX(0)" : "translateX(-100%)",
+          opacity: activeTab === "home" ? 1 : 0,
+          pointerEvents: activeTab === "home" ? "auto" : "none"
+        }}>
           <Home 
             user={user} 
             onProfileClick={() => setActiveTab("profile")}
             setHideFooter={(val) => setIsFooterVisible(!val)}
           />
-        )}
+        </div>
         
-        {activeTab === "profile" && (
-          isLoggedIn ? (
+        {/* 🟢 PROFILE TAB (Persistent + Right Slide) */}
+        <div style={{ 
+          ...slideContainerStyle,
+          transform: activeTab === "profile" ? "translateX(0)" : "translateX(100%)",
+          opacity: activeTab === "profile" ? 1 : 0,
+          pointerEvents: activeTab === "profile" ? "auto" : "none"
+        }}>
+          {isLoggedIn ? (
             <Profile 
               user={user} 
               onLogout={onLogout} 
@@ -110,83 +120,87 @@ export default function App() {
             />
           ) : (
             <AuthForm onLoginSuccess={onLoginSuccess} />
-          )
-        )}
+          )}
+        </div>
 
+        {/* ADMIN OVERLAY */}
         {activeTab === "admin" && (
-          isLoggedIn && user?.role === 'admin' ? (
-            <AdminUpload />
-          ) : (
-            <AuthForm onLoginSuccess={onLoginSuccess} />
-          )
+          <div style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'var(--bg-color)' }}>
+            {isLoggedIn && user?.role === 'admin' ? (
+              <AdminUpload />
+            ) : (
+              <AuthForm onLoginSuccess={onLoginSuccess} />
+            )}
+          </div>
         )}
       </main>
 
-      {/* 🟢 3. THEMED GLOBAL FOOTER */}
-{isFooterVisible && (
-  <nav style={navStyle}>
-    {/* HOME TAB */}
-    <button 
-      onClick={() => setActiveTab("home")} 
-      style={{...btnStyle, color: activeTab === 'home' ? '#ffff' : '#ffff'}}
-    >
-      <HomeIcon 
-        size={24} 
-        strokeWidth={activeTab === 'home' ? 2.5 : 2} 
-        /* 🟢 Fill is 'currentColor' when active, 'none' when inactive */
-        fill={activeTab === 'home' ? 'currentColor' : 'none'} 
-      />
-      <span style={labelStyle}>Home</span>
-    </button>
+      {/* 🟢 GLOBAL FOOTER */}
+      {isFooterVisible && (
+        <nav style={navStyle}>
+          <button 
+            onClick={() => setActiveTab("home")} 
+            style={{...btnStyle, color: activeTab === 'home' ? 'var(--primary-color)' : '#8e8e8e'}}
+          >
+            <HomeIcon 
+              size={24} 
+              strokeWidth={activeTab === 'home' ? 2.5 : 2} 
+              fill={activeTab === 'home' ? 'currentColor' : 'none'}
+            />
+            <span style={labelStyle}>Home</span>
+          </button>
 
-    {/* PROFILE TAB */}
-    <button 
-      onClick={() => setActiveTab("profile")} 
-      style={{...btnStyle, color: activeTab === 'profile' ? '#ffff' : '#ffff'}}
-    >
-      <User 
-        size={24} 
-        strokeWidth={activeTab === 'profile' ? 2.5 : 2} 
-        fill={activeTab === 'profile' ? 'currentColor' : 'none'} 
-      />
-      <span style={labelStyle}>Profile</span>
-    </button>
+          <button 
+            onClick={() => setActiveTab("profile")} 
+            style={{...btnStyle, color: activeTab === 'profile' ? 'var(--primary-color)' : '#8e8e8e'}}
+          >
+            <User 
+              size={24} 
+              strokeWidth={activeTab === 'profile' ? 2.5 : 2} 
+              fill={activeTab === 'profile' ? 'currentColor' : 'none'}
+            />
+            <span style={labelStyle}>Profile</span>
+          </button>
 
-    {/* ADMIN TAB */}
-    {user?.role === 'admin' && (
-      <button 
-        onClick={() => setActiveTab("admin")} 
-        style={{...btnStyle, color: activeTab === 'admin' ? '#ffff' : '#8e8e8e'}}
-      >
-        <ShieldCheck 
-          size={24} 
-          strokeWidth={activeTab === 'admin' ? 2.5 : 2} 
-          fill={activeTab === 'admin' ? 'currentColor' : 'none'} 
-        />
-        <span style={labelStyle}>Admin</span>
-      </button>
-    )}
-  </nav>
-)}
+          {user?.role === 'admin' && (
+            <button 
+              onClick={() => setActiveTab("admin")} 
+              style={{...btnStyle, color: activeTab === 'admin' ? 'var(--primary-color)' : '#8e8e8e'}}
+            >
+              <ShieldCheck 
+                size={24} 
+                strokeWidth={activeTab === 'admin' ? 2.5 : 2} 
+                fill={activeTab === 'admin' ? 'currentColor' : 'none'}
+              />
+              <span style={labelStyle}>Admin</span>
+            </button>
+          )}
+        </nav>
+      )}
     </div>
   );
 }
 
-// 🎨 CONSOLIDATED STYLES
+// 🎨 STYLES
 const navStyle = { 
   position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', 
-  /* Change this from '#121212' to be slightly lighter than the new navy */
-  backgroundColor: '#121212', 
-  backdropFilter: 'blur(40px)', // Glassmorphism looks amazing on that navy background!
+  backgroundColor: 'rgba(0, 0, 0, 0.6)', 
+  backdropFilter: 'blur(20px)', 
+  WebkitBackdropFilter: 'blur(20px)',
   borderTop: '1px solid rgba(255, 255, 255, 0.1)', 
   display: 'flex', justifyContent: 'space-around', alignItems: 'center', 
   zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' 
 };
 
-const btnStyle = { 
-  background: 'none', border: 'none', display: 'flex', 
-  flexDirection: 'column', alignItems: 'center', gap: '4px', 
-  cursor: 'pointer', flex: 1, transition: 'color 0.3s ease' 
-};
-
+const btnStyle = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', flex: 1, transition: 'all 0.3s ease' };
 const labelStyle = { fontSize: '10px', fontWeight: '700' };
+
+const slideContainerStyle = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  width: '100%',
+  minHeight: '100%',
+  transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease',
+  willChange: 'transform, opacity'
+};

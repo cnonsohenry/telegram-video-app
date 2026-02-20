@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
@@ -11,58 +11,101 @@ import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
+const MAX_CACHE_SIZE = 4; // 🟢 Keep memory usage low
 
 export default function Home({ user, onProfileClick, setHideFooter }) {
-  // 🟢 Randomize the initial category on load
-  const [activeTab, setActiveTab] = useState(() => {
-    return Math.floor(Math.random() * CATEGORIES.length);
-  }); 
+  const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * CATEGORIES.length)); 
   const [activeVideo, setActiveVideo] = useState(null);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState("");
-  const [isMobileSearchVisible, setIsMobileSearchVisible] = useState(false);
   const [videoCache, setVideoCache] = useState({});
+  const [cacheOrder, setCacheOrder] = useState([]); // 🟢 Tracks usage for LRU eviction
   const [showScrollTop, setShowScrollTop] = useState(false);
-  
-  const [viewedCategories, setViewedCategories] = useState(new Set());
+  const [isChangingTab, setIsChangingTab] = useState(false); // 🟢 Kill the "Flash"
 
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
-
   const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory);
 
-  // 🟢 FOOTER VISIBILITY LOGIC
-  useEffect(() => {
-    if (activeVideo) {
-      setHideFooter(true); // Tell App.jsx to hide footer
-      document.body.style.overflow = "hidden"; // Prevent background scrolling
-    } else {
-      setHideFooter(false); // Show footer again
-      document.body.style.overflow = "auto";
-    }
-    
-    // Cleanup if component unmounts
-    return () => {
-      document.body.style.overflow = "auto";
-      setHideFooter(false);
-    };
-  }, [activeVideo, setHideFooter]);
+  // 🟢 1. LRU CACHE SETTER
+  const updateCache = useCallback((category, data) => {
+    setVideoCache(prev => {
+      const newCache = { ...prev, [category]: data };
+      const currentKeys = Object.keys(newCache);
 
-  const shouldShowBadge = (index) => {
-    const catName = CATEGORIES[index];
-    if (activeTab === index || viewedCategories.has(catName)) return false;
-    const catVideos = videoCache[catName];
-    if (!catVideos || catVideos.length === 0) return false;
-    const latestUpload = new Date(catVideos[0].created_at).getTime();
-    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
-    return latestUpload > twentyFourHoursAgo;
+      if (currentKeys.length > MAX_CACHE_SIZE) {
+        // Find the oldest category that isn't the current one
+        const lruCategory = cacheOrder.find(cat => cat !== category) || currentKeys[0];
+        delete newCache[lruCategory];
+      }
+      return newCache;
+    });
+
+    setCacheOrder(prev => {
+      const filtered = prev.filter(c => c !== category);
+      return [category, ...filtered].slice(0, MAX_CACHE_SIZE);
+    });
+  }, [cacheOrder]);
+
+  // 🟢 2. DATA FLOW TUNNEL
+  const videosToDisplay = useMemo(() => {
+    if (isChangingTab) return []; // Force blank state on click
+    if (videoCache[currentCategory]) return videoCache[currentCategory];
+    if (loading) return [];
+    return videos;
+  }, [videoCache, currentCategory, loading, videos, isChangingTab]);
+
+  useEffect(() => {
+    if (!loading) setIsChangingTab(false);
+  }, [loading]);
+
+  const handleTabClick = (index) => {
+    if (activeTab === index) {
+      scrollToTop();
+    } else {
+      window.scrollTo(0, 0);
+      setIsChangingTab(true); // 🟢 Instant data blanking
+      setActiveTab(index);
+    }
   };
 
+  // 🟢 3. SYNC FETCH RESULTS
   useEffect(() => {
-    setViewedCategories(prev => new Set(prev).add(currentCategory));
-  }, [currentCategory]);
+    if (!loading && videos?.length > 0) {
+      updateCache(currentCategory, videos);
+    }
+  }, [videos, currentCategory, loading, updateCache]);
 
+  // 🟢 4. SMART NEIGHBORHOOD PRE-FETCH
+  useEffect(() => {
+    if (loading || videos.length === 0) return;
+
+    const prefetch = async () => {
+      const neighbors = [
+        (activeTab + 1) % CATEGORIES.length,
+        (activeTab - 1 + CATEGORIES.length) % CATEGORIES.length
+      ];
+
+      for (const idx of neighbors) {
+        const cat = CATEGORIES[idx];
+        if (!videoCache[cat]) {
+          try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/videos?category=${cat}&limit=12`);
+            if (res.ok) {
+              const data = await res.json();
+              updateCache(cat, data.videos);
+            }
+          } catch (e) { console.error("Prefetch failed", e); }
+        }
+      }
+    };
+
+    const timer = setTimeout(prefetch, 2500);
+    return () => clearTimeout(timer);
+  }, [activeTab, loading, videos, videoCache, updateCache]);
+
+  // Existing standard effects...
   useEffect(() => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 400);
     window.addEventListener("scroll", handleScroll);
@@ -77,10 +120,15 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
   }, []);
 
   useEffect(() => {
-    if (videos && videos.length > 0) {
-      setVideoCache(prev => ({ ...prev, [currentCategory]: videos }));
+    if (activeVideo) {
+      setHideFooter(true);
+      document.body.style.overflow = "hidden";
+    } else {
+      setHideFooter(false);
+      document.body.style.overflow = "auto";
     }
-  }, [videos, currentCategory]);
+    return () => { document.body.style.overflow = "auto"; setHideFooter(false); };
+  }, [activeVideo, setHideFooter]);
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   const handleRefresh = async () => window.location.reload();
@@ -105,13 +153,8 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
       const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       if (!res.ok) throw new Error("Server error");
       const data = await res.json();
-      if (data.video_url) {
-        setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
-      }
-    } catch (e) { 
-      alert(`🚨 Playback Error: ${e.message}`);
-      setActiveVideo(null); 
-    }
+      if (data.video_url) setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
+    } catch (e) { alert(`🚨 Playback Error: ${e.message}`); setActiveVideo(null); }
   };
 
   const TABS = [
@@ -121,10 +164,6 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
     { icon: <Flame size={18} />, label: "TRENDS"}
   ];
 
-  const videosToDisplay = (videoCache[currentCategory] && videoCache[currentCategory].length > 0) 
-    ? videoCache[currentCategory] 
-    : videos;
-
   return (
     <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
       
@@ -133,13 +172,12 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
           {TABS.map((tab, index) => (
             <button 
               key={index} 
-              onClick={() => { if (activeTab === index) scrollToTop(); else setActiveTab(index); }} 
-              style={{ ...desktopTabButtonStyle, background: activeTab === index ? "#1c1c1e" : "none" }}
+              onClick={() => handleTabClick(index)} 
+              style={{ ...desktopTabButtonStyle, background: activeTab === index ? "rgba(255,255,255,0.05)" : "none" }}
             >
               <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "15px" }}>
                  {tab.icon} 
                  <span style={{ fontWeight: "bold" }}>{tab.label}</span>
-                 {shouldShowBadge(index) && <div style={desktopBadgeStyle} />}
               </div>
             </button>
           ))}
@@ -147,31 +185,18 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
       )}
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <div style={{ background: "var(--bg-color)" }}>
-           <AppHeader 
-              isDesktop={isDesktop}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              isMobileSearchVisible={isMobileSearchVisible}
-              setIsMobileSearchVisible={setIsMobileSearchVisible}
-              user={user} 
-              onProfileClick={onProfileClick} 
-            />
-        </div>
+        <AppHeader isDesktop={isDesktop} searchTerm={searchTerm} user={user} onProfileClick={onProfileClick} />
 
         {!isDesktop && (
           <nav style={mobileNavStyle}>
             {TABS.map((tab, index) => (
               <button 
                 key={index} 
-                onClick={() => { if (activeTab === index) scrollToTop(); else setActiveTab(index); }} 
+                onClick={() => handleTabClick(index)} 
                 style={{ flex: 1, padding: "14px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", position: "relative" }}
               >
-                <div style={{ position: "relative" }}>
-                  {tab.icon}
-                  {shouldShowBadge(index) && <div style={mobileBadgeStyle} />}
-                </div>
-                <span style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.5px" }}>{tab.label}</span>
+                <div style={{ position: "relative" }}>{tab.icon}</div>
+                <span style={{ fontSize: "10px", fontWeight: "700" }}>{tab.label}</span>
               </button>
             ))}
             <div style={{ ...indicatorStyle, transform: `translateX(${activeTab * 100}%)` }} />
@@ -181,21 +206,27 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
         <PullToRefresh onRefresh={handleRefresh}>
           <div style={{ display: "flex", flex: 1 }}>
             <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px" }}>
-               <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(200px, 1fr))" : "repeat(2, 1fr)", gap: "10px", alignItems: "start" }}>
+               
+               <div 
+                 key={currentCategory} 
+                 style={{ 
+                   display: "grid", 
+                   gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(200px, 1fr))" : "repeat(2, 1fr)", 
+                   gap: "10px", 
+                   animation: "fadeIn 0.2s ease-out" 
+                 }}
+               >
                   {videosToDisplay.map(v => (
-                    <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} layoutType={currentCategory} onOpen={() => handleOpenVideo(v)} />
+                    <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} onOpen={() => handleOpenVideo(v)} />
                   ))}
+                  
+                  {(loading || isChangingTab) && videosToDisplay.length === 0 && (
+                    [...Array(6)].map((_, i) => <div key={i} style={skeletonSocket} />)
+                  )}
                </div>
-               {loading && videosToDisplay.length === 0 && ( <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>Loading videos...</div> )}
-               {!loading && videosToDisplay.length > 0 && (
-                <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
-               )}
+
+               {(!loading && !isChangingTab) && videosToDisplay.length > 0 && <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>}
             </div>
-            {isDesktop && (
-              <div style={{ flexShrink: 0 }}>
-                <SuggestedSidebar suggestions={sidebarSuggestions} onVideoClick={handleOpenVideo} />
-              </div>
-            )}
           </div>
         </PullToRefresh>
       </div>
@@ -207,16 +238,20 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
       )}
 
       {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} />}
+      
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 0.8; } 100% { opacity: 0.5; } }
+      `}</style>
     </div>
   );
 }
 
-// 🎨 STYLES (Keep existing constants)
-const mobileBadgeStyle = { position: "absolute", top: "-2px", right: "-6px", width: "8px", height: "8px", background: "var(--primary-color)", borderRadius: "50%", border: "1.5px solid var(--bg-color)" };
-const desktopBadgeStyle = { width: "7px", height: "7px", background: "var(--primary-color)", borderRadius: "50%", marginLeft: "10px" };
-const mobileNavStyle = { display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 1000, background: "var(--bg-color)", backdropFilter: "blur(15px)", borderBottom: "1px solid #262626" };
+// 🎨 STYLE CONSTANTS
+const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "8px", animation: "pulse 1.5s infinite" };
+const mobileNavStyle = { display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "var(--bg-color)", backdropFilter: "blur(15px)", borderBottom: "1px solid #262626" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
 const sidebarStyle = { width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, zIndex: 100 };
-const desktopTabButtonStyle = { display: "flex", alignItems: "center", gap: "15px", padding: "12px 20px", border: "none", color: "#fff", borderRadius: "10px", cursor: "pointer", textAlign: "left" };
+const desktopTabButtonStyle = { display: "flex", alignItems: "center", gap: "15px", padding: "12px 20px", border: "none", color: "#fff", borderRadius: "10px", cursor: "pointer", textAlign: "left", width: "100%" };
 const showMoreButtonStyle = { display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "900", cursor: "pointer" };
 const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999, transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", cursor: "pointer" };

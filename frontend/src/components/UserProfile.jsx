@@ -121,7 +121,7 @@ const TabButton = ({ active, onClick, icon, label }) => (
 
 // Styles... (Your existing styles remain here)
 const containerStyle = { minHeight: "100vh", background: "var(--bg-color)", color: "#fff" };
-const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #222", position: "sticky", top: 0, background: "rgba(0,0,0,0.9)", zIndex: 100, backdropFilter: "blur(10px)" };
+const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #222", position: "sticky", top: 0, background: "var(--bg-color)", zIndex: 100, backdropFilter: "blur(10px)" };
 const centerTitleContainer = { display: "flex", alignItems: "center" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
 const headerSectionStyle = { padding: "20px" };

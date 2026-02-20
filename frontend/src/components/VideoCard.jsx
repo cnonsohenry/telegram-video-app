@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Play } from 'lucide-react';
 
-// 🟢 Added showDetails prop (defaults to true)
 export default function VideoCard({ video, onOpen, showDetails = true }) {
   const videoRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isImgLoaded, setIsImgLoaded] = useState(false);
-  const [isVideoReady, setIsVideoReady] = useState(false); // 🟢 New state to track if video is ready
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   const thumbSrc = `${video.thumbnail_url}&w=400`;
 
@@ -29,7 +28,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
       el.play().catch(() => {});
     } else {
       el.pause();
-      setIsVideoReady(false); // Reset when not hovered
+      setIsVideoReady(false);
     }
   }, [isVisible, isHovered]);
 
@@ -42,44 +41,50 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         display: "flex", 
         flexDirection: "column",
         background: "var(--bg-color)", 
-        borderRadius: showDetails ? "0px" : "4px", // 🟢 Sharper look for grid
+        borderRadius: showDetails ? "0px" : "4px",
         overflow: "hidden", 
         width: "100%", 
         cursor: "pointer", 
         position: "relative",
         transition: "transform 0.2s ease",
-        transform: (isHovered && showDetails) ? "scale(1.02)" : "scale(1)"
+        transform: (isHovered && showDetails) ? "scale(1.02)" : "scale(1)",
+        /* 🟢 Performance Optimization: Prevents layout recalculations outside this box */
+        contain: "layout paint",
+        contentVisibility: "auto",
+        minHeight: showDetails ? "350px" : "200px" 
       }}
     >
       <div style={{ 
         position: "relative", 
         width: "100%", 
         aspectRatio: "9/16",
-        background: "var(--bg-color)", 
+        background: "#111", /* Dark base to prevent white flash */
         overflow: "hidden"
       }}>
         
-        {/* Skeleton Loader */}
-        <div style={{
-          position: "absolute", inset: 0, zIndex: 1,
-          background: "linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%)",
-          backgroundSize: "200% 100%",
-          animation: "skeleton-loading 1.5s infinite",
-          opacity: isImgLoaded ? 0 : 1,
-          transition: "opacity 0.4s ease-in-out"
-        }} />
+        {/* Skeleton Loader - 🟢 Only visible if image is truly not in cache */}
+        {!isImgLoaded && (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 1,
+            background: "linear-gradient(90deg, #121212 25%, #1a1a1a 50%, #121212 75%)",
+            backgroundSize: "200% 100%",
+            animation: "skeleton-loading 1.5s infinite"
+          }} />
+        )}
 
-        {/* Thumbnail Image - 🟢 Stays visible under video to prevent black flash */}
+        {/* Thumbnail Image */}
         <img 
           src={thumbSrc} 
           alt={video.caption || "Thumbnail"}
-          loading="lazy"
+          /* 🟢 Eager loading tells browser to prioritize these over everything else */
+          loading="eager"
           onLoad={() => setIsImgLoaded(true)}
           style={{
             width: "100%", height: "100%", objectFit: "cover",
             position: "absolute", inset: 0, zIndex: 2,
-            opacity: isImgLoaded ? 1 : 0, 
-            transition: "opacity 0.4s ease-in-out"
+            /* 🟢 No more 0 opacity blink. If cached, it shows instantly. */
+            opacity: 1, 
+            transition: "opacity 0.2s ease-in"
           }}
         />
 
@@ -88,7 +93,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           ref={videoRef}
           src={video.video_url}
           muted loop playsInline
-          onPlaying={() => setIsVideoReady(true)} // 🟢 Only show when actual playback starts
+          onPlaying={() => setIsVideoReady(true)}
           style={{ 
             width: "100%", height: "100%", objectFit: "cover", 
             position: "absolute", inset: 0, zIndex: 3,
@@ -97,13 +102,13 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           }}
         />
         
-        {/* View Count Badge - 🟢 Respects showDetails */}
+        {/* View Count Badge */}
         {showDetails && (
           <div style={{
             position: "absolute", bottom: 8, left: 8, zIndex: 10, 
             display: "flex", alignItems: "center", gap: 4, 
-            background: "var(--bg-color)", padding: "4px 8px", borderRadius: "100px",
-            backdropFilter: "blur(4px)"
+            background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: "100px",
+            backdropFilter: "blur(8px)"
           }}>
             <Play size={10} fill="#fff" strokeWidth={0} />
             <span style={{ color: "#fff", fontSize: "11px", fontWeight: "700" }}>
@@ -113,9 +118,9 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         )}
       </div>
 
-      {/* 🟢 2. CONDITIONAL DETAILS AREA */}
+      {/* 🟢 FIXED HEIGHT DETAILS AREA to prevent text jump */}
       {showDetails && (
-        <div style={{ padding: "12px", display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "12px", display: "flex", flexDirection: "column", height: "80px" }}>
           <p style={captionTextStyle}>
             {video.caption || "No caption provided"}
           </p>
