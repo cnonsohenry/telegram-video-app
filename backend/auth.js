@@ -19,9 +19,17 @@ const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_change_me";
 
 console.log(`[AUTH] System Start. Google Client ID: ${process.env.GOOGLE_CLIENT_ID ? "✅ Loaded" : "⚠️ MISSING"}`);
 
+// 🟢 2. SECURITY MIDDLEWARE (Anti-Identity-Swap)
+// This ensures that NO part of the authentication flow is EVER cached by a browser, CDN, or proxy.
+router.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 /**
  * 🛡️ MIDDLEWARE: Protects routes by verifying the JWT
- * Attaches the user ID to the request object
  */
 export const authenticateToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -37,7 +45,7 @@ export const authenticateToken = (req, res, next) => {
   }
 };
 
-// 🟢 2. GOOGLE LOGIN (FedCM Ready)
+// 🟢 3. GOOGLE LOGIN (FedCM Ready)
 router.post("/google", async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: "No Google token provided" });
@@ -71,7 +79,7 @@ router.post("/google", async (req, res) => {
   }
 });
 
-// 🟢 3. REGISTER (Email/Password)
+// 🟢 4. REGISTER (Email/Password)
 router.post("/register", async (req, res) => {
   const { email, password, username } = req.body;
   if (!password || password.length < 6) return res.status(400).json({ error: "Password too short" });
@@ -96,7 +104,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// 🟢 4. LOGIN (Email/Password)
+// 🟢 5. LOGIN (Email/Password)
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -120,7 +128,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// 🟢 5. GET PROFILE (Atomic Session Check)
+// 🟢 6. GET PROFILE (Atomic Session Check)
 router.get("/me", authenticateToken, async (req, res) => {
   try {
     const userResult = await pool.query(
@@ -135,7 +143,7 @@ router.get("/me", authenticateToken, async (req, res) => {
   }
 });
 
-// 🟢 6. UPDATE SETTINGS (Theme Sync)
+// 🟢 7. UPDATE SETTINGS (Theme Sync)
 router.patch("/settings", authenticateToken, async (req, res) => {
   const { settings } = req.body; 
   const userId = req.user.id;
