@@ -1,0 +1,18 @@
+-- 🔍 CHECK 1: Find any duplicate Google IDs
+-- (This should return 0 rows. If it returns data, those users are colliding.)
+SELECT google_id, COUNT(*) 
+FROM app_users 
+WHERE google_id IS NOT NULL
+GROUP BY google_id 
+HAVING COUNT(*) > 1;
+
+-- 🔍 CHECK 2: Find any duplicate Emails
+-- (Your unique constraint should prevent this, but it's good to verify.)
+SELECT email, COUNT(*) 
+FROM app_users 
+GROUP BY email 
+HAVING COUNT(*) > 1;
+
+-- 🔍 CHECK 3: Check for "NULL" ID issues
+-- Ensure every user has a valid unique ID and no one is sharing a blank one.
+SELECT id, email, username FROM app_users WHERE id IS NULL;

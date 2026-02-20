@@ -29,20 +29,16 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
   const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory);
 
   // 🟢 1. STABLE CACHE SETTER (Fixed Loop)
-  // Removed cacheOrder from dependencies. We now calculate it inside the setter.
   const updateCache = useCallback((category, data) => {
-    // Update the Cache Order first to determine who gets evicted
     setCacheOrder(prevOrder => {
       const filtered = prevOrder.filter(c => c !== category);
       const newOrder = [category, ...filtered].slice(0, MAX_CACHE_SIZE);
 
-      // Update the Video Cache using the functional update pattern
       setVideoCache(prevCache => {
         const newCache = { ...prevCache, [category]: data };
         const currentKeys = Object.keys(newCache);
 
         if (currentKeys.length > MAX_CACHE_SIZE) {
-          // Identify the category that dropped out of the order list
           const evicted = currentKeys.find(key => !newOrder.includes(key));
           if (evicted) delete newCache[evicted];
         }
@@ -51,9 +47,9 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
 
       return newOrder;
     });
-  }, []); // 🟢 Empty dependencies = Stable function
+  }, []);
 
-  // 🟢 2. DATA FLOW TUNNEL
+  // 🟢 2. DATA TUNNEL (Prevents Data Bleed/Flash)
   const videosToDisplay = useMemo(() => {
     if (isChangingTab) return []; 
     if (videoCache[currentCategory]) return videoCache[currentCategory];
@@ -65,6 +61,7 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
     if (!loading) setIsChangingTab(false);
   }, [loading]);
 
+  // 🟢 3. EVENT HANDLERS
   const handleTabClick = (index) => {
     if (activeTab === index) {
       scrollToTop();
@@ -75,23 +72,55 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
     }
   };
 
-  // 🟢 3. SYNC FETCH RESULTS
+  const handleOpenVideo = useCallback(async (video, e) => {
+    // 🛡️ Safety Check for Event
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    if (!video) return;
+
+    const videoKey = `${video.chat_id}:${video.message_id}`;
+    if (unlockedVideos.has(videoKey)) { playVideo(video); return; }
+    
+    try {
+      openRewardedAd();
+      const nextSet = new Set(unlockedVideos);
+      nextSet.add(videoKey);
+      setUnlockedVideos(nextSet);
+      localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
+      await adReturnWatcher();
+      playVideo(video);
+    } catch (err) { playVideo(video); }
+  }, [unlockedVideos]);
+
+  const playVideo = async (video) => {
+    try {
+      setActiveVideo({ ...video, video_url: null }); 
+      const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+      if (!res.ok) throw new Error("Server error");
+      const data = await res.json();
+      if (data.video_url) {
+        setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
+      }
+    } catch (e) { 
+      alert(`🚨 Playback Error: ${e.message}`); 
+      setActiveVideo(null); 
+    }
+  };
+
+  // 🟢 4. SYNC & PREFETCH
   useEffect(() => {
     if (!loading && videos?.length > 0) {
       updateCache(currentCategory, videos);
     }
   }, [videos, currentCategory, loading, updateCache]);
 
-  // 🟢 4. SMART NEIGHBORHOOD PRE-FETCH
   useEffect(() => {
     if (loading || videos.length === 0) return;
-
     const prefetch = async () => {
-      const neighbors = [
-        (activeTab + 1) % CATEGORIES.length,
-        (activeTab - 1 + CATEGORIES.length) % CATEGORIES.length
-      ];
-
+      const neighbors = [(activeTab + 1) % CATEGORIES.length, (activeTab - 1 + CATEGORIES.length) % CATEGORIES.length];
       for (const idx of neighbors) {
         const cat = CATEGORIES[idx];
         if (!videoCache[cat]) {
@@ -105,12 +134,11 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
         }
       }
     };
-
-    const timer = setTimeout(prefetch, 3000); // Increased delay for stability
+    const timer = setTimeout(prefetch, 3000);
     return () => clearTimeout(timer);
   }, [activeTab, loading, videos, videoCache, updateCache]);
 
-  // Standard effects...
+  // 🟢 5. UI LIFECYCLE
   useEffect(() => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 400);
     window.addEventListener("scroll", handleScroll);
@@ -132,35 +160,14 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
       setHideFooter(false);
       document.body.style.overflow = "auto";
     }
-    return () => { document.body.style.overflow = "auto"; setHideFooter(false); };
+    return () => {
+      document.body.style.overflow = "auto";
+      setHideFooter(false);
+    };
   }, [activeVideo, setHideFooter]);
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   const handleRefresh = async () => window.location.reload();
-
-  const handleOpenVideo = async (video) => {
-    const videoKey = `${video.chat_id}:${video.message_id}`;
-    if (unlockedVideos.has(videoKey)) { playVideo(video); return; }
-    try {
-      openRewardedAd();
-      const nextSet = new Set(unlockedVideos);
-      nextSet.add(videoKey);
-      setUnlockedVideos(nextSet);
-      localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
-      await adReturnWatcher();
-      playVideo(video);
-    } catch (err) { playVideo(video); }
-  };
-
-  const playVideo = async (video) => {
-    try {
-      setActiveVideo({ ...video, video_url: null }); 
-      const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
-      if (!res.ok) throw new Error("Server error");
-      const data = await res.json();
-      if (data.video_url) setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
-    } catch (e) { alert(`🚨 Playback Error: ${e.message}`); setActiveVideo(null); }
-  };
 
   const TABS = [
     { icon: <Play size={18} />, label: "KNACKS"},
@@ -170,8 +177,15 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
   ];
 
   return (
-    <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
+    <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: isDesktop ? "flex" : "block", position: "relative" }}>
       
+      {/* 🟢 6. FULLSCREEN LAYER (High Z-Index Overlay) */}
+      {activeVideo && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 999999, background: "#000" }}>
+          <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} />
+        </div>
+      )}
+
       {isDesktop && (
         <nav style={sidebarStyle}>
           {TABS.map((tab, index) => (
@@ -180,9 +194,8 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
               onClick={() => handleTabClick(index)} 
               style={{ ...desktopTabButtonStyle, background: activeTab === index ? "rgba(255,255,255,0.05)" : "none" }}
             >
-              <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "15px" }}>
-                 {tab.icon} 
-                 <span style={{ fontWeight: "bold" }}>{tab.label}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+                 {tab.icon} <span style={{ fontWeight: "bold" }}>{tab.label}</span>
               </div>
             </button>
           ))}
@@ -200,7 +213,7 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
                 onClick={() => handleTabClick(index)} 
                 style={{ flex: 1, padding: "14px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", position: "relative" }}
               >
-                <div style={{ position: "relative" }}>{tab.icon}</div>
+                {tab.icon}
                 <span style={{ fontSize: "10px", fontWeight: "700" }}>{tab.label}</span>
               </button>
             ))}
@@ -209,40 +222,42 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
         )}
         
         <PullToRefresh onRefresh={handleRefresh}>
-          <div style={{ display: "flex", flex: 1 }}>
-            <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px" }}>
-               
-               <div 
-                 key={currentCategory} 
-                 style={{ 
-                   display: "grid", 
-                   gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(200px, 1fr))" : "repeat(2, 1fr)", 
-                   gap: "10px", 
-                   animation: "fadeIn 0.2s ease-out" 
-                 }}
-               >
-                  {videosToDisplay.map(v => (
-                    <VideoCard key={`${v.chat_id}:${v.message_id}`} video={v} onOpen={() => handleOpenVideo(v)} />
-                  ))}
-                  
-                  {(loading || isChangingTab) && videosToDisplay.length === 0 && (
-                    [...Array(6)].map((_, i) => <div key={i} style={skeletonSocket} />)
-                  )}
-               </div>
-
-               {(!loading && !isChangingTab) && videosToDisplay.length > 0 && <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>}
-            </div>
+          <div style={{ flex: 1, padding: isDesktop ? "40px" : "15px", paddingBottom: "100px" }}>
+             <div 
+               key={currentCategory} 
+               style={{ 
+                 display: "grid", 
+                 gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(200px, 1fr))" : "repeat(2, 1fr)", 
+                 gap: "10px", 
+                 animation: "fadeIn 0.2s ease-out" 
+               }}
+             >
+                {videosToDisplay.map(v => (
+                  <VideoCard 
+                    key={`${v.chat_id}:${v.message_id}`} 
+                    video={v} 
+                    onOpen={(vData, e) => handleOpenVideo(vData, e)} 
+                  />
+                ))}
+                {(loading || isChangingTab) && videosToDisplay.length === 0 && (
+                  [...Array(6)].map((_, i) => <div key={i} style={skeletonSocket} />)
+                )}
+             </div>
+             {(!loading && !isChangingTab) && videosToDisplay.length > 0 && (
+               <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
+             )}
           </div>
         </PullToRefresh>
       </div>
 
       {!isDesktop && (
-        <button onClick={scrollToTop} style={{ ...scrollTopButtonStyle, opacity: showScrollTop ? 1 : 0, transform: showScrollTop ? "translateY(0)" : "translateY(20px)", pointerEvents: showScrollTop ? "auto" : "none" }}>
+        <button 
+          onClick={scrollToTop} 
+          style={{ ...scrollTopButtonStyle, opacity: showScrollTop ? 1 : 0, transform: showScrollTop ? "translateY(0)" : "translateY(20px)", pointerEvents: showScrollTop ? "auto" : "none" }}
+        >
           <ArrowUp size={24} color="#fff" />
         </button>
       )}
-
-      {activeVideo && <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} />}
       
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -252,10 +267,11 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
   );
 }
 
+// 🖌 STYLES
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "8px", animation: "pulse 1.5s infinite" };
 const mobileNavStyle = { display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "var(--bg-color)", backdropFilter: "blur(15px)", borderBottom: "1px solid #262626" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
 const sidebarStyle = { width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, zIndex: 100 };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", gap: "15px", padding: "12px 20px", border: "none", color: "#fff", borderRadius: "10px", cursor: "pointer", textAlign: "left", width: "100%" };
 const showMoreButtonStyle = { display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "900", cursor: "pointer" };
-const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999, transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", cursor: "pointer" };
+const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)", cursor: "pointer" };

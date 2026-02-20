@@ -34,7 +34,8 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
 
   return (
     <div
-      onClick={() => onOpen(video)}
+      /* 🟢 FIXED: Pass the event object (e) to the onOpen handler */
+      onClick={(e) => onOpen(video, e)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
@@ -48,7 +49,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         position: "relative",
         transition: "transform 0.2s ease",
         transform: (isHovered && showDetails) ? "scale(1.02)" : "scale(1)",
-        /* 🟢 Performance Optimization: Prevents layout recalculations outside this box */
         contain: "layout paint",
         contentVisibility: "auto",
         minHeight: showDetails ? "350px" : "200px" 
@@ -58,11 +58,10 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         position: "relative", 
         width: "100%", 
         aspectRatio: "9/16",
-        background: "#111", /* Dark base to prevent white flash */
+        background: "#111", 
         overflow: "hidden"
       }}>
         
-        {/* Skeleton Loader - 🟢 Only visible if image is truly not in cache */}
         {!isImgLoaded && (
           <div style={{
             position: "absolute", inset: 0, zIndex: 1,
@@ -72,23 +71,19 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           }} />
         )}
 
-        {/* Thumbnail Image */}
         <img 
           src={thumbSrc} 
           alt={video.caption || "Thumbnail"}
-          /* 🟢 Eager loading tells browser to prioritize these over everything else */
           loading="eager"
           onLoad={() => setIsImgLoaded(true)}
           style={{
             width: "100%", height: "100%", objectFit: "cover",
             position: "absolute", inset: 0, zIndex: 2,
-            /* 🟢 No more 0 opacity blink. If cached, it shows instantly. */
             opacity: 1, 
             transition: "opacity 0.2s ease-in"
           }}
         />
 
-        {/* Video Preview */}
         <video
           ref={videoRef}
           src={video.video_url}
@@ -102,7 +97,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           }}
         />
         
-        {/* View Count Badge */}
         {showDetails && (
           <div style={{
             position: "absolute", bottom: 8, left: 8, zIndex: 10, 
@@ -118,7 +112,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         )}
       </div>
 
-      {/* 🟢 FIXED HEIGHT DETAILS AREA to prevent text jump */}
       {showDetails && (
         <div style={{ padding: "12px", display: "flex", flexDirection: "column", height: "80px" }}>
           <p style={captionTextStyle}>
