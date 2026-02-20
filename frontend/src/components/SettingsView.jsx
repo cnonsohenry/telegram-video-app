@@ -1,18 +1,43 @@
-import React, { useState, useEffect } from "react";
-import { ArrowLeft, User, Lock, Shield, Bell, LogOut, ChevronRight, Palette, Circle } from "lucide-react";
+import React, { useState } from "react";
+import { ArrowLeft, User, Lock, Shield, Bell, LogOut, ChevronRight, Palette } from "lucide-react";
 
 export default function SettingsView({ onBack, onLogout }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(localStorage.getItem("theme") || "red");
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  // 🟢 THEME TOGGLE LOGIC
-  const toggleTheme = (theme) => {
-    setCurrentTheme(theme);
-    localStorage.setItem("theme", theme);
-    if (theme === "orange") {
+  // 🟢 ENHANCED THEME TOGGLE (With Sliding & DB Sync)
+  const handleThemeChange = async (newTheme) => {
+    if (newTheme === currentTheme) return;
+
+    // 1. Instant UI Logic
+    setCurrentTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    
+    if (newTheme === "orange") {
       document.body.classList.add("theme-orange");
     } else {
       document.body.classList.remove("theme-orange");
+    }
+
+    // 2. Database Sync Logic
+    setIsSyncing(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      await fetch(`${import.meta.env.VITE_API_URL}/api/auth/settings`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ settings: { theme: newTheme } })
+      });
+    } catch (err) {
+      console.error("Theme sync failed", err);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -32,18 +57,18 @@ export default function SettingsView({ onBack, onLogout }) {
         <h3 style={sectionLabelStyle}>Appearance</h3>
         <div style={settingsItemStyle}>
           <Palette size={20} />
-          <span style={{ flex: 1, marginLeft: "15px" }}>Theme</span>
-          <div style={{ display: "flex", gap: "10px" }}>
-            {/* Red Option */}
-            <div 
-              onClick={() => toggleTheme("red")}
-              style={{...colorDotStyle, backgroundColor: "#ff3b30", border: currentTheme === "red" ? "2px solid #fff" : "none"}} 
-            />
-            {/* Orange Option */}
-            <div 
-              onClick={() => toggleTheme("orange")}
-              style={{...colorDotStyle, backgroundColor: "#ff8c00", border: currentTheme === "orange" ? "2px solid #fff" : "none"}} 
-            />
+          <span style={{ flex: 1, marginLeft: "15px" }}>App Theme</span>
+          
+          {/* 🟢 THE SLIDING BAR TOGGLE */}
+          <div 
+            style={toggleTrackStyle} 
+            onClick={() => handleThemeChange(currentTheme === "red" ? "orange" : "red")}
+          >
+            <div style={{
+                ...toggleThumbStyle,
+                transform: currentTheme === "orange" ? "translateX(26px)" : "translateX(0px)",
+                backgroundColor: currentTheme === "orange" ? "#ff8c00" : "#ff3b30"
+            }} />
           </div>
         </div>
 
@@ -65,7 +90,6 @@ export default function SettingsView({ onBack, onLogout }) {
             <h3 style={dialogTitleStyle}>Log out?</h3>
             <p style={dialogSubStyle}>You'll need to sign back in to access your premium content.</p>
             <div style={dialogActionColumn}>
-              {/* Note: using var(--primary-color) here too */}
               <button style={{...dialogLogoutBtn, backgroundColor: "var(--primary-color)"}} onClick={onLogout}>Log out</button>
               <button style={dialogCancelBtn} onClick={() => setShowLogoutConfirm(false)}>Cancel</button>
             </div>
@@ -77,10 +101,29 @@ export default function SettingsView({ onBack, onLogout }) {
 }
 
 // 🖌 STYLES
-const sectionLabelStyle = { fontSize: "12px", color: "#666", textTransform: "uppercase", padding: "20px 20px 10px 20px", fontWeight: "700", letterSpacing: "1px" };
-const colorDotStyle = { width: "24px", height: "24px", borderRadius: "50%", cursor: "pointer", transition: "transform 0.2s" };
+const toggleTrackStyle = {
+  width: "52px",
+  height: "26px",
+  backgroundColor: "#333",
+  borderRadius: "15px",
+  position: "relative",
+  cursor: "pointer",
+  transition: "0.3s"
+};
 
-// Re-using your existing styles...
+const toggleThumbStyle = {
+  width: "22px",
+  height: "22px",
+  borderRadius: "50%",
+  position: "absolute",
+  top: "2px",
+  left: "2px",
+  transition: "0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+  boxShadow: "0 2px 4px rgba(0,0,0,0.3)"
+};
+
+// Existing styles...
+const sectionLabelStyle = { fontSize: "12px", color: "#666", textTransform: "uppercase", padding: "20px 20px 10px 20px", fontWeight: "700", letterSpacing: "1px" };
 const containerStyle = { minHeight: "100vh", background: "#000", color: "#fff" };
 const navBarStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 20px", borderBottom: "1px solid #222" };
 const headerTitleStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };

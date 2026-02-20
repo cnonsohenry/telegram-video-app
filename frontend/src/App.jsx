@@ -3,7 +3,7 @@ import Home from "./pages/Home";
 import Profile from "./pages/Profile";
 import AdminUpload from "./pages/AdminUpload";
 import AuthForm from "./components/AuthForm";
-import PitchView from "./components/PitchView"; // 🟢 1. Import the new PitchView
+import PitchView from "./components/PitchView";
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
@@ -12,21 +12,39 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState("home");
   const [isFooterVisible, setIsFooterVisible] = useState(true);
-  
-  // 🟢 2. PITCH TRACKER
-  // Tracks if the user has completed the onboarding slides in this session
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
 
-  // 🟢 AUTOMATIC ZAPPER
-  // Turn ON for profile, admin, or during the pitch. 
-  // Turn OFF (false) for the home page so you can still earn money.
+  // 🛡️ AD ZAPPER
   const isAdFreeZone = !hasSeenPitch || activeTab === "profile" || activeTab === "admin";
   useAdZapper(isAdFreeZone);
+
+  // 🟢 1. THEME ENGINE
+  // Helper to toggle CSS class and LocalStorage in sync
+  const applyTheme = useCallback((theme) => {
+    localStorage.setItem("theme", theme);
+    if (theme === "orange") {
+      document.body.classList.add("theme-orange");
+    } else {
+      document.body.classList.remove("theme-orange");
+    }
+  }, []);
+
+  // Initialize theme from LocalStorage on mount (for guests)
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") || "red";
+    applyTheme(savedTheme);
+  }, [applyTheme]);
 
   const onLoginSuccess = (userData, userToken) => {
     localStorage.setItem("token", userToken);
     setToken(userToken);
     setUser(userData);
+    
+    // 🟢 Sync theme from DB on successful login
+    if (userData.settings?.theme) {
+      applyTheme(userData.settings.theme);
+    }
+    
     setActiveTab("profile"); 
   };
 
@@ -39,13 +57,20 @@ export default function App() {
     window.location.href = "/"; 
   }, []);
 
+  // 🟢 2. SESSION RECOVERY + DB THEME SYNC
   useEffect(() => {
     if (token && !user) {
       fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => setUser(data))
+      .then(data => {
+        setUser(data);
+        // 🟢 If DB has a theme, it overrides LocalStorage
+        if (data.settings?.theme) {
+          applyTheme(data.settings.theme);
+        }
+      })
       .catch(() => {
         localStorage.removeItem("token");
         setToken(null);
@@ -53,13 +78,11 @@ export default function App() {
     }
     const params = new URLSearchParams(window.location.search);
     if (params.get("admin") === "true") setActiveTab("admin");
-  }, [token, user]);
+  }, [token, user, applyTheme]);
 
   const isLoggedIn = useMemo(() => !!token, [token]);
 
-  // 🟢 3. THE GATEKEEPER LOGIC
-  // If the user is logged out, trying to access Profile/Admin, and hasn't seen the pitch:
-  // We return ONLY the PitchView. This prevents the Main and Footer from ever rendering.
+  // GATEKEEPER
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
   if (needsPitch) {
@@ -86,7 +109,6 @@ export default function App() {
               setHideFooter={(val) => setIsFooterVisible(!val)} 
             />
           ) : (
-            /* Pitch is already handled by Gatekeeper, so we just show Auth here */
             <AuthForm onLoginSuccess={onLoginSuccess} />
           )
         )}
@@ -100,21 +122,30 @@ export default function App() {
         )}
       </main>
 
-      {/* 🟢 GLOBAL FOOTER */}
+      {/* 🟢 3. THEMED GLOBAL FOOTER */}
       {isFooterVisible && (
         <nav style={navStyle}>
-          <button onClick={() => setActiveTab("home")} style={{...btnStyle, color: activeTab === 'home' ? '#ff3b30' : '#8e8e8e'}}>
+          <button 
+            onClick={() => setActiveTab("home")} 
+            style={{...btnStyle, color: activeTab === 'home' ? 'var(--primary-color)' : '#8e8e8e'}}
+          >
             <HomeIcon size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
             <span style={labelStyle}>Home</span>
           </button>
 
-          <button onClick={() => setActiveTab("profile")} style={{...btnStyle, color: activeTab === 'profile' ? '#ff3b30' : '#8e8e8e'}}>
+          <button 
+            onClick={() => setActiveTab("profile")} 
+            style={{...btnStyle, color: activeTab === 'profile' ? 'var(--primary-color)' : '#8e8e8e'}}
+          >
             <User size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
             <span style={labelStyle}>Profile</span>
           </button>
 
           {user?.role === 'admin' && (
-            <button onClick={() => setActiveTab("admin")} style={{...btnStyle, color: activeTab === 'admin' ? '#ff3b30' : '#8e8e8e'}}>
+            <button 
+              onClick={() => setActiveTab("admin")} 
+              style={{...btnStyle, color: activeTab === 'admin' ? 'var(--primary-color)' : '#8e8e8e'}}
+            >
               <ShieldCheck size={24} />
               <span style={labelStyle}>Admin</span>
             </button>
@@ -125,7 +156,7 @@ export default function App() {
   );
 }
 
-// 🎨 STYLES
+// 🎨 CONSOLIDATED STYLES
 const navStyle = { 
   position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', 
   backgroundColor: '#121212', borderTop: '1px solid #222', 
@@ -133,5 +164,10 @@ const navStyle = {
   zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' 
 };
 
-const btnStyle = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', flex: 1 };
+const btnStyle = { 
+  background: 'none', border: 'none', display: 'flex', 
+  flexDirection: 'column', alignItems: 'center', gap: '4px', 
+  cursor: 'pointer', flex: 1, transition: 'color 0.3s ease' 
+};
+
 const labelStyle = { fontSize: '10px', fontWeight: '700' };

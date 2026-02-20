@@ -9,7 +9,7 @@ import crypto from "crypto";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import authRoutes from "./auth.js";
 import multer from "multer";
-import { uploadDirectToStream } from "./scripts/upload_premium.js"; // The script we created earlier
+import { uploadDirectToStream } from "./controllers/upload_premium.js"; // The script we created earlier
 
 
 const { Pool } = pkg;

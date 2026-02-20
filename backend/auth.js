@@ -19,14 +19,30 @@ const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_change_me";
 
 console.log(`[AUTH] System Start. Google Client ID: ${process.env.GOOGLE_CLIENT_ID ? "✅ Loaded" : "⚠️ MISSING"}`);
 
+/**
+ * 🛡️ MIDDLEWARE: Protects routes by verifying the JWT
+ * Attaches the user ID to the request object
+ */
+export const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
+
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = { id: decoded.id }; 
+    next();
+  } catch (err) {
+    res.status(401).json({ error: "Session expired" });
+  }
+};
+
 // 🟢 2. GOOGLE LOGIN (FedCM Ready)
 router.post("/google", async (req, res) => {
   const { token } = req.body;
-
   if (!token) return res.status(400).json({ error: "No Google token provided" });
 
   try {
-    // Verify the Google Token
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -35,25 +51,20 @@ router.post("/google", async (req, res) => {
     const payload = ticket.getPayload();
     const { email, name, picture, sub: googleId } = payload;
 
-    // Upsert User: Handle the case where they might have a local account or just Google
-    // Note: avatar_url is updated every time they log in to keep it fresh
     const userQuery = await pool.query(
       `INSERT INTO app_users (email, username, avatar_url, google_id) 
        VALUES ($1, $2, $3, $4) 
        ON CONFLICT (email) DO UPDATE 
        SET avatar_url = EXCLUDED.avatar_url, 
            google_id = COALESCE(app_users.google_id, EXCLUDED.google_id)
-       RETURNING id, email, username, avatar_url, role`,
+       RETURNING id, email, username, avatar_url, role, settings`,
       [email, name || email.split('@')[0], picture, googleId]
     );
 
     const user = userQuery.rows[0];
-
-    // Issue App's Session Token
     const appToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "30d" });
 
     res.json({ token: appToken, user });
-
   } catch (err) {
     console.error("[GOOGLE AUTH ERROR]", err.message);
     res.status(401).json({ error: "Google Authentication Failed" });
@@ -73,7 +84,7 @@ router.post("/register", async (req, res) => {
     const hash = await bcrypt.hash(password, salt);
 
     const newUser = await pool.query(
-      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url, role",
+      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url, role, settings",
       [email, hash, username || email.split('@')[0], "https://videos.naijahomemade.com/assets/default-avatar.png"]
     );
 
@@ -93,9 +104,8 @@ router.post("/login", async (req, res) => {
     if (userResult.rows.length === 0) return res.status(400).json({ error: "User not found" });
 
     const user = userResult.rows[0];
-
     if (!user.password_hash) {
-      return res.status(400).json({ error: "This account uses Google Login. Please sign in with Google." });
+      return res.status(400).json({ error: "Account uses Google Login. Use Google Sign In." });
     }
 
     const validPass = await bcrypt.compare(password, user.password_hash);
@@ -111,22 +121,40 @@ router.post("/login", async (req, res) => {
 });
 
 // 🟢 5. GET PROFILE (Atomic Session Check)
-router.get("/me", async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
-
-  const token = authHeader.split(" ")[1];
+router.get("/me", authenticateToken, async (req, res) => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
     const userResult = await pool.query(
       "SELECT id, email, username, avatar_url, role, settings FROM app_users WHERE id = $1", 
-      [decoded.id]
+      [req.user.id]
     );
 
-    if (userResult.rows.length === 0) return res.status(401).json({ error: "User not found" });
+    if (userResult.rows.length === 0) return res.status(404).json({ error: "User not found" });
     res.json(userResult.rows[0]);
   } catch (err) {
     res.status(401).json({ error: "Session expired" });
+  }
+});
+
+// 🟢 6. UPDATE SETTINGS (Theme Sync)
+router.patch("/settings", authenticateToken, async (req, res) => {
+  const { settings } = req.body; 
+  const userId = req.user.id;
+
+  if (!settings) return res.status(400).json({ error: "No settings provided" });
+
+  try {
+    const query = `
+      UPDATE app_users 
+      SET settings = COALESCE(settings, '{}'::jsonb) || $1 
+      WHERE id = $2 
+      RETURNING settings;
+    `;
+
+    const result = await pool.query(query, [JSON.stringify(settings), userId]);
+    res.json({ success: true, settings: result.rows[0].settings });
+  } catch (err) {
+    console.error("[SETTINGS ERROR]", err);
+    res.status(500).json({ error: "Failed to sync settings" });
   }
 });
 
