@@ -89,5 +89,5 @@ const inputStyle = { background: "none", border: "none", color: "#fff", padding:
 const profileBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: 0 };
 const avatarStyle = (isDesktop) => ({ width: isDesktop ? "36px" : "30px", height: isDesktop ? "36px" : "30px", borderRadius: "50%", border: "2px solid var(--primary-color)", objectFit: "cover" });
 const loginBadgeStyle = { background: "var(--primary-color)", color: "#fff", padding: "6px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "800" };
-const mobileHeaderStyle = { position: "sticky", top: 0, zIndex: 1000, padding: "12px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg-color)", borderBottom: "1px solid #111" };
+const mobileHeaderStyle = { position: "sticky", top: 0, zIndex: 1000, padding: "12px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg-color)", borderBottom: "2px solid #111" };
 const mobileSearchContainer = { display: "flex", alignItems: "center", flex: 1, background: "#1c1c1e", borderRadius: "8px", padding: "0 10px" };
