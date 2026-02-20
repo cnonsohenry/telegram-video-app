@@ -11,7 +11,7 @@ import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
-const MAX_CACHE_SIZE = 4; // 🟢 Keep memory usage low
+const MAX_CACHE_SIZE = 4;
 
 export default function Home({ user, onProfileClick, setHideFooter }) {
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * CATEGORIES.length)); 
@@ -20,37 +20,42 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [videoCache, setVideoCache] = useState({});
-  const [cacheOrder, setCacheOrder] = useState([]); // 🟢 Tracks usage for LRU eviction
+  const [cacheOrder, setCacheOrder] = useState([]); 
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [isChangingTab, setIsChangingTab] = useState(false); // 🟢 Kill the "Flash"
+  const [isChangingTab, setIsChangingTab] = useState(false);
 
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
   const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory);
 
-  // 🟢 1. LRU CACHE SETTER
+  // 🟢 1. STABLE CACHE SETTER (Fixed Loop)
+  // Removed cacheOrder from dependencies. We now calculate it inside the setter.
   const updateCache = useCallback((category, data) => {
-    setVideoCache(prev => {
-      const newCache = { ...prev, [category]: data };
-      const currentKeys = Object.keys(newCache);
+    // Update the Cache Order first to determine who gets evicted
+    setCacheOrder(prevOrder => {
+      const filtered = prevOrder.filter(c => c !== category);
+      const newOrder = [category, ...filtered].slice(0, MAX_CACHE_SIZE);
 
-      if (currentKeys.length > MAX_CACHE_SIZE) {
-        // Find the oldest category that isn't the current one
-        const lruCategory = cacheOrder.find(cat => cat !== category) || currentKeys[0];
-        delete newCache[lruCategory];
-      }
-      return newCache;
-    });
+      // Update the Video Cache using the functional update pattern
+      setVideoCache(prevCache => {
+        const newCache = { ...prevCache, [category]: data };
+        const currentKeys = Object.keys(newCache);
 
-    setCacheOrder(prev => {
-      const filtered = prev.filter(c => c !== category);
-      return [category, ...filtered].slice(0, MAX_CACHE_SIZE);
+        if (currentKeys.length > MAX_CACHE_SIZE) {
+          // Identify the category that dropped out of the order list
+          const evicted = currentKeys.find(key => !newOrder.includes(key));
+          if (evicted) delete newCache[evicted];
+        }
+        return newCache;
+      });
+
+      return newOrder;
     });
-  }, [cacheOrder]);
+  }, []); // 🟢 Empty dependencies = Stable function
 
   // 🟢 2. DATA FLOW TUNNEL
   const videosToDisplay = useMemo(() => {
-    if (isChangingTab) return []; // Force blank state on click
+    if (isChangingTab) return []; 
     if (videoCache[currentCategory]) return videoCache[currentCategory];
     if (loading) return [];
     return videos;
@@ -65,7 +70,7 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
       scrollToTop();
     } else {
       window.scrollTo(0, 0);
-      setIsChangingTab(true); // 🟢 Instant data blanking
+      setIsChangingTab(true); 
       setActiveTab(index);
     }
   };
@@ -101,11 +106,11 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
       }
     };
 
-    const timer = setTimeout(prefetch, 2500);
+    const timer = setTimeout(prefetch, 3000); // Increased delay for stability
     return () => clearTimeout(timer);
   }, [activeTab, loading, videos, videoCache, updateCache]);
 
-  // Existing standard effects...
+  // Standard effects...
   useEffect(() => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 400);
     window.addEventListener("scroll", handleScroll);
@@ -247,7 +252,6 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
   );
 }
 
-// 🎨 STYLE CONSTANTS
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "8px", animation: "pulse 1.5s infinite" };
 const mobileNavStyle = { display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "var(--bg-color)", backdropFilter: "blur(15px)", borderBottom: "1px solid #262626" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
