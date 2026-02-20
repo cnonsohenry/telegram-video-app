@@ -14,7 +14,7 @@ export default function App() {
   const [isFooterVisible, setIsFooterVisible] = useState(true);
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
 
-  // 🛡️ AD ZAPPER: Auto-toggles based on view
+  // 🛡️ AD ZAPPER
   const isAdFreeZone = !hasSeenPitch || activeTab === "profile" || activeTab === "admin";
   useAdZapper(isAdFreeZone);
 
@@ -28,7 +28,6 @@ export default function App() {
     }
   }, []);
 
-  // Init theme on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") || "red";
     applyTheme(savedTheme);
@@ -73,7 +72,7 @@ export default function App() {
 
   const isLoggedIn = useMemo(() => !!token, [token]);
 
-  // GATEKEEPER logic
+  // GATEKEEPER
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
   if (needsPitch) {
@@ -81,13 +80,22 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-color)', color: '#fff', overflowX: 'hidden' }}>
+    /* 🟢 root div: fixed height to prevent "bounce" space */
+    <div style={{ 
+      height: '100dvh', 
+      width: '100vw', 
+      backgroundColor: 'var(--bg-color)', 
+      color: '#fff', 
+      overflow: 'hidden',
+      position: 'fixed' // Prevents browser chrome from shifting layout
+    }}>
       <main 
         style={{ 
-          paddingBottom: isFooterVisible && activeTab !== "admin" ? "90px" : "0",
           position: 'relative',
           width: '100%',
-          minHeight: '100vh'
+          height: '100%',
+          /* 🟢 Padding matches the footer height exactly */
+          paddingBottom: isFooterVisible && activeTab !== "admin" ? "70px" : "0",
         }}
       > 
         
@@ -125,7 +133,13 @@ export default function App() {
 
         {/* ADMIN OVERLAY */}
         {activeTab === "admin" && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'var(--bg-color)' }}>
+          <div style={{ 
+            position: 'fixed', 
+            inset: 0, 
+            zIndex: 10001, 
+            backgroundColor: 'var(--bg-color)',
+            overflowY: 'auto'
+          }}>
             {isLoggedIn && user?.role === 'admin' ? (
               <AdminUpload />
             ) : (
@@ -181,13 +195,13 @@ export default function App() {
   );
 }
 
-// 🎨 STYLES
+// 🎨 UPDATED STYLES
 const navStyle = { 
   position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', 
-  backgroundColor: 'rgba(0, 0, 0, 0.6)', 
+  backgroundColor: 'rgba(10, 10, 10, 0.8)', // 🟢 Darker for better contrast
   backdropFilter: 'blur(20px)', 
   WebkitBackdropFilter: 'blur(20px)',
-  borderTop: '1px solid rgba(255, 255, 255, 0.1)', 
+  borderTop: '1px solid rgba(255, 255, 255, 0.08)', 
   display: 'flex', justifyContent: 'space-around', alignItems: 'center', 
   zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' 
 };
@@ -200,7 +214,13 @@ const slideContainerStyle = {
   top: 0,
   left: 0,
   width: '100%',
-  minHeight: '100%',
+  /* 🟢 Forces each slide to be exactly as tall as the main area */
+  height: '100%', 
+  overflowY: 'auto',
+  /* 🟢 Prevents background leakage */
+  backgroundColor: 'var(--bg-color)', 
   transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease',
-  willChange: 'transform, opacity'
+  willChange: 'transform, opacity',
+  /* 🟢 Standardizes scrolling for mobile */
+  WebkitOverflowScrolling: 'touch' 
 };
