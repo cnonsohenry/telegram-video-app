@@ -123,35 +123,51 @@ export default function App() {
       </main>
 
       {/* 🟢 3. THEMED GLOBAL FOOTER */}
-      {isFooterVisible && (
-        <nav style={navStyle}>
-          <button 
-            onClick={() => setActiveTab("home")} 
-            style={{...btnStyle, color: activeTab === 'home' ? 'var(--primary-color)' : '#8e8e8e'}}
-          >
-            <HomeIcon size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
-            <span style={labelStyle}>Home</span>
-          </button>
+{isFooterVisible && (
+  <nav style={navStyle}>
+    {/* HOME TAB */}
+    <button 
+      onClick={() => setActiveTab("home")} 
+      style={{...btnStyle, color: activeTab === 'home' ? '#ffff' : '#ffff'}}
+    >
+      <HomeIcon 
+        size={24} 
+        strokeWidth={activeTab === 'home' ? 2.5 : 2} 
+        /* 🟢 Fill is 'currentColor' when active, 'none' when inactive */
+        fill={activeTab === 'home' ? 'currentColor' : 'none'} 
+      />
+      <span style={labelStyle}>Home</span>
+    </button>
 
-          <button 
-            onClick={() => setActiveTab("profile")} 
-            style={{...btnStyle, color: activeTab === 'profile' ? 'var(--primary-color)' : '#8e8e8e'}}
-          >
-            <User size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
-            <span style={labelStyle}>Profile</span>
-          </button>
+    {/* PROFILE TAB */}
+    <button 
+      onClick={() => setActiveTab("profile")} 
+      style={{...btnStyle, color: activeTab === 'profile' ? '#ffff' : '#ffff'}}
+    >
+      <User 
+        size={24} 
+        strokeWidth={activeTab === 'profile' ? 2.5 : 2} 
+        fill={activeTab === 'profile' ? 'currentColor' : 'none'} 
+      />
+      <span style={labelStyle}>Profile</span>
+    </button>
 
-          {user?.role === 'admin' && (
-            <button 
-              onClick={() => setActiveTab("admin")} 
-              style={{...btnStyle, color: activeTab === 'admin' ? 'var(--primary-color)' : '#8e8e8e'}}
-            >
-              <ShieldCheck size={24} />
-              <span style={labelStyle}>Admin</span>
-            </button>
-          )}
-        </nav>
-      )}
+    {/* ADMIN TAB */}
+    {user?.role === 'admin' && (
+      <button 
+        onClick={() => setActiveTab("admin")} 
+        style={{...btnStyle, color: activeTab === 'admin' ? '#ffff' : '#8e8e8e'}}
+      >
+        <ShieldCheck 
+          size={24} 
+          strokeWidth={activeTab === 'admin' ? 2.5 : 2} 
+          fill={activeTab === 'admin' ? 'currentColor' : 'none'} 
+        />
+        <span style={labelStyle}>Admin</span>
+      </button>
+    )}
+  </nav>
+)}
     </div>
   );
 }
