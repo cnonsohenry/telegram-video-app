@@ -3,7 +3,6 @@ import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
-import FullscreenPlayer from "../components/FullscreenPlayer";
 import PullToRefresh from "../components/PullToRefresh"; 
 import { useVideos } from "../hooks/useVideos";
 import { expandApp } from "../utils/telegram";
@@ -13,9 +12,8 @@ import { adReturnWatcher } from "../utils/adReturnWatcher";
 const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
 const MAX_CACHE_SIZE = 4;
 
-export default function Home({ user, onProfileClick, setHideFooter }) {
+export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo }) {
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * CATEGORIES.length)); 
-  const [activeVideo, setActiveVideo] = useState(null);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState("");
@@ -28,7 +26,7 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
   const isDesktop = windowWidth > 1024;
   const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory);
 
-  // 🟢 1. STABLE CACHE SETTER (Fixed Loop)
+  // 🟢 1. STABLE CACHE SETTER
   const updateCache = useCallback((category, data) => {
     setCacheOrder(prevOrder => {
       const filtered = prevOrder.filter(c => c !== category);
@@ -37,19 +35,17 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
       setVideoCache(prevCache => {
         const newCache = { ...prevCache, [category]: data };
         const currentKeys = Object.keys(newCache);
-
         if (currentKeys.length > MAX_CACHE_SIZE) {
           const evicted = currentKeys.find(key => !newOrder.includes(key));
           if (evicted) delete newCache[evicted];
         }
         return newCache;
       });
-
       return newOrder;
     });
   }, []);
 
-  // 🟢 2. DATA TUNNEL (Prevents Data Bleed/Flash)
+  // 🟢 2. DATA TUNNEL
   const videosToDisplay = useMemo(() => {
     if (isChangingTab) return []; 
     if (videoCache[currentCategory]) return videoCache[currentCategory];
@@ -72,8 +68,26 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
     }
   };
 
+  const playVideo = async (video) => {
+    try {
+      // Open player shell immediately (shows global loader)
+      setActiveVideo({ ...video, video_url: null }); 
+      
+      const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+      if (!res.ok) throw new Error("Server error");
+      const data = await res.json();
+      
+      if (data.video_url) {
+        // Update the global player state with the real URL
+        setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
+      }
+    } catch (e) { 
+      setActiveVideo(null); // Close on fail
+      alert(`🚨 Playback Error: ${e.message}`); 
+    }
+  };
+
   const handleOpenVideo = useCallback(async (video, e) => {
-    // 🛡️ Safety Check for Event
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
       e.stopPropagation();
@@ -94,21 +108,6 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
       playVideo(video);
     } catch (err) { playVideo(video); }
   }, [unlockedVideos]);
-
-  const playVideo = async (video) => {
-    try {
-      setActiveVideo({ ...video, video_url: null }); 
-      const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
-      if (!res.ok) throw new Error("Server error");
-      const data = await res.json();
-      if (data.video_url) {
-        setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
-      }
-    } catch (e) { 
-      alert(`🚨 Playback Error: ${e.message}`); 
-      setActiveVideo(null); 
-    }
-  };
 
   // 🟢 4. SYNC & PREFETCH
   useEffect(() => {
@@ -152,20 +151,6 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    if (activeVideo) {
-      setHideFooter(true);
-      document.body.style.overflow = "hidden";
-    } else {
-      setHideFooter(false);
-      document.body.style.overflow = "auto";
-    }
-    return () => {
-      document.body.style.overflow = "auto";
-      setHideFooter(false);
-    };
-  }, [activeVideo, setHideFooter]);
-
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   const handleRefresh = async () => window.location.reload();
 
@@ -179,13 +164,6 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
   return (
     <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: isDesktop ? "flex" : "block", position: "relative" }}>
       
-      {/* 🟢 6. FULLSCREEN LAYER (High Z-Index Overlay) */}
-      {activeVideo && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 999999, background: "#000" }}>
-          <FullscreenPlayer video={activeVideo} onClose={() => setActiveVideo(null)} isDesktop={isDesktop} />
-        </div>
-      )}
-
       {isDesktop && (
         <nav style={sidebarStyle}>
           {TABS.map((tab, index) => (

@@ -4,6 +4,7 @@ import Profile from "./pages/Profile";
 import AdminUpload from "./pages/AdminUpload";
 import AuthForm from "./components/AuthForm";
 import PitchView from "./components/PitchView";
+import FullscreenPlayer from "./components/FullscreenPlayer"; // 🟢 Import player here
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
@@ -13,6 +14,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("home");
   const [isFooterVisible, setIsFooterVisible] = useState(true);
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
+  const [activeVideo, setActiveVideo] = useState(null); // 🟢 LIFTED STATE
 
   // 🛡️ AD ZAPPER
   const isAdFreeZone = !hasSeenPitch || activeTab === "profile" || activeTab === "admin";
@@ -72,6 +74,10 @@ export default function App() {
 
   const isLoggedIn = useMemo(() => !!token, [token]);
 
+  // 🟢 3. FOOTER HIDING LOGIC
+  // If a video is playing, we force the footer to stay hidden
+  const shouldShowFooter = isFooterVisible && !activeVideo;
+
   // GATEKEEPER
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
@@ -80,22 +86,20 @@ export default function App() {
   }
 
   return (
-    /* 🟢 root div: fixed height to prevent "bounce" space */
     <div style={{ 
       height: '100dvh', 
       width: '100vw', 
       backgroundColor: 'var(--bg-color)', 
       color: '#fff', 
       overflow: 'hidden',
-      position: 'fixed' // Prevents browser chrome from shifting layout
+      position: 'fixed' 
     }}>
       <main 
         style={{ 
           position: 'relative',
           width: '100%',
           height: '100%',
-          /* 🟢 Padding matches the footer height exactly */
-          paddingBottom: isFooterVisible && activeTab !== "admin" ? "70px" : "0",
+          paddingBottom: shouldShowFooter && activeTab !== "admin" ? "70px" : "0",
         }}
       > 
         
@@ -110,6 +114,7 @@ export default function App() {
             user={user} 
             onProfileClick={() => setActiveTab("profile")}
             setHideFooter={(val) => setIsFooterVisible(!val)}
+            setActiveVideo={setActiveVideo} // 🟢 Pass setter to Home
           />
         </div>
         
@@ -124,6 +129,7 @@ export default function App() {
             <Profile 
               user={user} 
               onLogout={onLogout} 
+              setActiveVideo={setActiveVideo} // 🟢 Pass setter to Profile
               setHideFooter={(val) => setIsFooterVisible(!val)} 
             />
           ) : (
@@ -149,8 +155,8 @@ export default function App() {
         )}
       </main>
 
-      {/* 🟢 GLOBAL FOOTER */}
-      {isFooterVisible && (
+      {/* 🟢 GLOBAL FOOTER - Rendered as sibling to main */}
+      {shouldShowFooter && (
         <nav style={navStyle}>
           <button 
             onClick={() => setActiveTab("home")} 
@@ -191,6 +197,17 @@ export default function App() {
           )}
         </nav>
       )}
+
+      {/* 🟢 4. GLOBAL PLAYER (Highest Layer) */}
+      {activeVideo && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 999999, background: "#000" }}>
+          <FullscreenPlayer 
+            video={activeVideo} 
+            onClose={() => setActiveVideo(null)} 
+            isDesktop={window.innerWidth > 1024} 
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -198,7 +215,7 @@ export default function App() {
 // 🎨 UPDATED STYLES
 const navStyle = { 
   position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', 
-  backgroundColor: 'rgba(10, 10, 10, 0.8)', // 🟢 Darker for better contrast
+  backgroundColor: 'rgba(10, 10, 10, 0.8)', 
   backdropFilter: 'blur(20px)', 
   WebkitBackdropFilter: 'blur(20px)',
   borderTop: '1px solid rgba(255, 255, 255, 0.08)', 
@@ -214,13 +231,10 @@ const slideContainerStyle = {
   top: 0,
   left: 0,
   width: '100%',
-  /* 🟢 Forces each slide to be exactly as tall as the main area */
   height: '100%', 
   overflowY: 'auto',
-  /* 🟢 Prevents background leakage */
   backgroundColor: 'var(--bg-color)', 
   transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease',
   willChange: 'transform, opacity',
-  /* 🟢 Standardizes scrolling for mobile */
   WebkitOverflowScrolling: 'touch' 
 };
