@@ -126,7 +126,7 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
     : videos;
 
   return (
-    <div style={{ background: "#000", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
+    <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: isDesktop ? "flex" : "block" }}>
       
       {isDesktop && (
         <nav style={sidebarStyle}>
@@ -147,7 +147,7 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
       )}
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <div style={{ background: "#000" }}>
+        <div style={{ background: "var(--bg-color)" }}>
            <AppHeader 
               isDesktop={isDesktop}
               searchTerm={searchTerm}
@@ -212,9 +212,9 @@ export default function Home({ user, onProfileClick, setHideFooter }) {
 }
 
 // 🎨 STYLES (Keep existing constants)
-const mobileBadgeStyle = { position: "absolute", top: "-2px", right: "-6px", width: "8px", height: "8px", background: "var(--primary-color)", borderRadius: "50%", border: "1.5px solid #000" };
+const mobileBadgeStyle = { position: "absolute", top: "-2px", right: "-6px", width: "8px", height: "8px", background: "var(--primary-color)", borderRadius: "50%", border: "1.5px solid var(--bg-color)" };
 const desktopBadgeStyle = { width: "7px", height: "7px", background: "var(--primary-color)", borderRadius: "50%", marginLeft: "10px" };
-const mobileNavStyle = { display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 1000, background: "rgba(0,0,0,0.95)", backdropFilter: "blur(15px)", borderBottom: "1px solid #262626" };
+const mobileNavStyle = { display: "flex", justifyContent: "space-evenly", position: "sticky", top: 0, zIndex: 1000, background: "var(--bg-color)", backdropFilter: "blur(15px)", borderBottom: "1px solid #262626" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
 const sidebarStyle = { width: "240px", height: "100vh", position: "sticky", top: 0, borderRight: "1px solid #262626", padding: "40px 10px", display: "flex", flexDirection: "column", gap: "10px", flexShrink: 0, zIndex: 100 };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", gap: "15px", padding: "12px 20px", border: "none", color: "#fff", borderRadius: "10px", cursor: "pointer", textAlign: "left" };

@@ -159,7 +159,10 @@ export default function App() {
 // 🎨 CONSOLIDATED STYLES
 const navStyle = { 
   position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', 
-  backgroundColor: '#121212', borderTop: '1px solid #222', 
+  /* Change this from '#121212' to be slightly lighter than the new navy */
+  backgroundColor: 'rgba(255, 255, 255, 0.05)', 
+  backdropFilter: 'blur(10px)', // Glassmorphism looks amazing on that navy background!
+  borderTop: '1px solid rgba(255, 255, 255, 0.1)', 
   display: 'flex', justifyContent: 'space-around', alignItems: 'center', 
   zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' 
 };

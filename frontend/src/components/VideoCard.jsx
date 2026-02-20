@@ -41,7 +41,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
       style={{
         display: "flex", 
         flexDirection: "column",
-        background: "#000002", 
+        background: "var(--bg-color)", 
         borderRadius: showDetails ? "0px" : "4px", // 🟢 Sharper look for grid
         overflow: "hidden", 
         width: "100%", 
@@ -55,7 +55,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         position: "relative", 
         width: "100%", 
         aspectRatio: "9/16",
-        background: "#000", 
+        background: "var(--bg-color)", 
         overflow: "hidden"
       }}>
         
@@ -102,7 +102,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           <div style={{
             position: "absolute", bottom: 8, left: 8, zIndex: 10, 
             display: "flex", alignItems: "center", gap: 4, 
-            background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: "100px",
+            background: "var(--bg-color)", padding: "4px 8px", borderRadius: "100px",
             backdropFilter: "blur(4px)"
           }}>
             <Play size={10} fill="#fff" strokeWidth={0} />
