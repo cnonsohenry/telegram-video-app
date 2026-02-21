@@ -5,12 +5,16 @@
   --primary-color: #ff3b30;
   --primary-glow: rgba(255, 59, 48, 0.4);
   --bg-color: #000000;
+  /* 🔴 Red Theme Border: subtle dark gray */
+  --border-color: rgba(255, 255, 255, 0.1); 
 }
 
 body.theme-orange {
   --primary-color: #ff8c00;
   --primary-glow: rgba(255, 140, 0, 0.4);
   --bg-color: #0B0F1A;
+  /* 🟠 Orange Theme Border: lighter and blue-tinted for visibility */
+  --border-color: rgba(255, 255, 255, 0.15); 
 }
 
 /* 🟢 2. WATERPROOF SHELL (Kills Trailing Space) */

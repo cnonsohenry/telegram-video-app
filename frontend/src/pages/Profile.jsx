@@ -168,7 +168,7 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
     background: "none", border: "none", 
     padding: isDesktop ? "15px 0" : "12px 0",
     borderTop: (isDesktop && active) ? "1px solid #fff" : "none",
-    borderBottom: (!isDesktop && active) ? "2px solid #fff" : (!isDesktop ? "1px solid #1a1a1a" : "none"),
+    borderBottom: (!isDesktop && active) ? "2px solid #fff" : (!isDesktop ? "1px solid var(--border-color) : "none"),
     opacity: active ? 1 : 0.4, color: "#fff", cursor: "pointer",
     marginTop: isDesktop ? "-1px" : "0"
   }}>
@@ -180,7 +180,7 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
 // 🖌 STYLES
 const containerStyle = { minHeight: "100%", background: "var(--bg-color)", color: "#fff", position: "relative", overflowX: "hidden" };
 const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%" };
-const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #1a1a1a", position: "sticky", top: 0, background: "var(--bg-color)", zIndex: 100, backdropFilter: "blur(15px)" };
+const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid var(--border-color)", position: "sticky", top: 0, background: "var(--bg-color)", zIndex: 100, backdropFilter: "blur(15px)" };
 const centerTitleContainer = { display: "flex", alignItems: "center" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
 const headerSectionStyle = { display: "flex" };

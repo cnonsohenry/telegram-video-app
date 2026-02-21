@@ -49,7 +49,7 @@ export default function SettingsView({ onBack, onLogout }) {
       <div style={isDesktop ? desktopWrapperStyle : {}}>
         
         {/* 🟢 HEADER */}
-        <div style={{...navBarStyle, borderBottom: isDesktop ? "none" : "1px solid #222"}}>
+        <div style={{...navBarStyle, borderBottom: isDesktop ? "none" : "1px solid var(--border-color)"}}>
           <ArrowLeft 
             size={isDesktop ? 28 : 24} 
             color="#fff" 
@@ -68,7 +68,7 @@ export default function SettingsView({ onBack, onLogout }) {
           <SettingsItem icon={<Lock size={20} />} label="Privacy" isDesktop={isDesktop} />
           
           <h3 style={sectionLabelStyle}>Appearance</h3>
-          <div style={{...settingsItemStyle, borderRadius: isDesktop ? "12px" : "0", borderBottom: isDesktop ? "none" : "1px solid #111", background: isDesktop ? "#121212" : "transparent", marginBottom: isDesktop ? "8px" : "0"}}>
+          <div style={{...settingsItemStyle, borderRadius: isDesktop ? "12px" : "0", borderBottom: isDesktop ? "none" : "1px solid var(--border-color)", background: isDesktop ? "#121212" : "transparent", marginBottom: isDesktop ? "8px" : "0"}}>
             <Palette size={20} />
             <span style={{ flex: 1, marginLeft: "15px" }}>App Theme</span>
             
@@ -124,7 +124,7 @@ const SettingsItem = ({ icon, label, isDesktop }) => (
   <div style={{
     ...settingsItemStyle, 
     borderRadius: isDesktop ? "12px" : "0",
-    borderBottom: isDesktop ? "none" : "1px solid #111",
+    borderBottom: isDesktop ? "none" : "1px solid var(--border-color)",
     background: isDesktop ? "#121212" : "transparent",
     marginBottom: isDesktop ? "8px" : "0"
   }} onClick={() => alert(`${label} coming soon!`)}>
