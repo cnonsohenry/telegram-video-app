@@ -168,7 +168,7 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
     background: "none", border: "none", 
     padding: isDesktop ? "15px 0" : "12px 0",
     borderTop: (isDesktop && active) ? "1px solid #fff" : "none",
-    borderBottom: (!isDesktop && active) ? "2px solid #fff" : (!isDesktop ? "1px solid var(--border-color) : "none"),
+    borderBottom: (!isDesktop && active) ? "2px solid #fff" : (!isDesktop ? "1px solid var(--border-color)" : "none"),
     opacity: active ? 1 : 0.4, color: "#fff", cursor: "pointer",
     marginTop: isDesktop ? "-1px" : "0"
   }}>
