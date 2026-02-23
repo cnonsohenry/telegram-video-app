@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Play } from 'lucide-react';
+import { Play, Share2 } from 'lucide-react';
+import { shareVideo } from "../utils/share"; 
 
 export default function VideoCard({ video, onOpen, showDetails = true }) {
   const videoRef = useRef(null);
@@ -32,9 +33,34 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
     }
   }, [isVisible, isHovered]);
 
+  // 🟢 SEO Schema Generation
+  const schemaData = {
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    "name": video.caption || "Exclusive Video Content",
+    "description": video.caption || "Watch the latest shots and premium videos on our platform.",
+    "thumbnailUrl": [
+      video.thumbnail_url,
+      `${video.thumbnail_url}&w=800`,
+      `${video.thumbnail_url}&w=1200`
+    ],
+    "uploadDate": video.created_at || new Date().toISOString(),
+    "contentUrl": video.video_url, 
+    "embedUrl": `https://videos.naijahomemade.com/video/${video.message_id}`,
+    "interactionStatistic": {
+      "@type": "InteractionCounter",
+      "interactionType": { "@type": "WatchAction" },
+      "userInteractionCount": video.views || 0
+    }
+  };
+
+  const handleShare = (e) => {
+    e.stopPropagation(); 
+    shareVideo(video);
+  };
+
   return (
     <div
-      /* 🟢 FIXED: Pass the event object (e) to the onOpen handler */
       onClick={(e) => onOpen(video, e)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -42,24 +68,29 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         display: "flex", 
         flexDirection: "column",
         background: "var(--bg-color)", 
-        borderRadius: showDetails ? "0px" : "4px",
-        overflow: "hidden", 
+        borderRadius: showDetails ? "12px" : "4px",
         width: "100%", 
         cursor: "pointer", 
         position: "relative",
-        transition: "transform 0.2s ease",
-        transform: (isHovered && showDetails) ? "scale(1.02)" : "scale(1)",
-        contain: "layout paint",
-        contentVisibility: "auto",
-        minHeight: showDetails ? "350px" : "200px" 
+        transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: (isHovered && showDetails) ? "translateY(-4px)" : "translateY(0)",
+        zIndex: isHovered ? 10 : 1, // 🟢 FIX: Ensures hovered cards pop over adjacent cards cleanly
+        // 🔴 REMOVED 'contentVisibility' and 'contain' to fix grid overlap bug
       }}
     >
+      <script 
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaData) }}
+      />
+
       <div style={{ 
         position: "relative", 
         width: "100%", 
         aspectRatio: "9/16",
         background: "#111", 
-        overflow: "hidden"
+        overflow: "hidden",
+        borderRadius: showDetails ? "12px" : "4px",
+        flexShrink: 0 // 🟢 FIX: Prevents the aspect ratio box from squishing
       }}>
         
         {!isImgLoaded && (
@@ -97,15 +128,29 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           }}
         />
         
+        {/* 🟢 Share Button Overlay */}
+        <button 
+          onClick={handleShare}
+          style={{
+            ...actionButtonStyle,
+            top: 10, right: 10,
+            opacity: isHovered ? 1 : 0,
+            transform: isHovered ? "scale(1)" : "scale(0.8)"
+          }}
+        >
+          <Share2 size={16} color="#fff" />
+        </button>
+        
         {showDetails && (
           <div style={{
-            position: "absolute", bottom: 8, left: 8, zIndex: 10, 
-            display: "flex", alignItems: "center", gap: 4, 
-            background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: "100px",
-            backdropFilter: "blur(8px)"
+            position: "absolute", bottom: 10, left: 10, zIndex: 10, 
+            display: "flex", alignItems: "center", gap: 6, 
+            background: "rgba(0,0,0,0.6)", padding: "5px 10px", borderRadius: "100px",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(255,255,255,0.1)"
           }}>
             <Play size={10} fill="#fff" strokeWidth={0} />
-            <span style={{ color: "#fff", fontSize: "11px", fontWeight: "700" }}>
+            <span style={{ color: "#fff", fontSize: "11px", fontWeight: "800" }}>
               {Number(video.views || 0).toLocaleString()}
             </span>
           </div>
@@ -113,7 +158,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
       </div>
 
       {showDetails && (
-        <div style={{ padding: "12px", display: "flex", flexDirection: "column", height: "80px" }}>
+        <div style={{ padding: "12px 4px", display: "flex", flexDirection: "column", flexShrink: 0 }}>
           <p style={captionTextStyle}>
             {video.caption || "No caption provided"}
           </p>
@@ -145,7 +190,23 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
 }
 
 // 🖌 Styles
-const captionTextStyle = { margin: "0 0 6px 0", fontSize: "13px", color: "#fff", lineHeight: "1.3", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "500" };
+const actionButtonStyle = {
+  position: "absolute",
+  zIndex: 15,
+  width: "36px",
+  height: "36px",
+  borderRadius: "50%",
+  background: "rgba(0,0,0,0.5)",
+  backdropFilter: "blur(10px)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
+};
+
+const captionTextStyle = { margin: "0 0 6px 0", fontSize: "14px", color: "#fff", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "600" };
 const userInfoRowStyle = { display: "flex", alignItems: "center", gap: "8px" };
-const avatarWrapperStyle = { width: "22px", height: "22px", borderRadius: "50%", background: "#333", overflow: "hidden", flexShrink: 0 };
-const uploaderNameStyle = { fontSize: "12px", color: "#aaa", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const avatarWrapperStyle = { width: "24px", height: "24px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid #333" };
+const uploaderNameStyle = { fontSize: "12px", color: "#8e8e8e", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };

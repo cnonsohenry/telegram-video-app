@@ -4,7 +4,7 @@ import Profile from "./pages/Profile";
 import AdminUpload from "./pages/AdminUpload";
 import AuthForm from "./components/AuthForm";
 import PitchView from "./components/PitchView";
-import FullscreenPlayer from "./components/FullscreenPlayer"; // 🟢 Import player here
+import FullscreenPlayer from "./components/FullscreenPlayer"; 
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
@@ -14,13 +14,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("home");
   const [isFooterVisible, setIsFooterVisible] = useState(true);
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
-  const [activeVideo, setActiveVideo] = useState(null); // 🟢 LIFTED STATE
+  const [activeVideo, setActiveVideo] = useState(null); 
 
-  // 🛡️ AD ZAPPER
   const isAdFreeZone = !hasSeenPitch || activeTab === "profile" || activeTab === "admin";
   useAdZapper(isAdFreeZone);
 
-  // 🟢 1. THEME ENGINE
   const applyTheme = useCallback((theme) => {
     localStorage.setItem("theme", theme);
     if (theme === "orange") {
@@ -34,6 +32,41 @@ export default function App() {
     const savedTheme = localStorage.getItem("theme") || "red";
     applyTheme(savedTheme);
   }, [applyTheme]);
+
+  // 🟢 NEW: DEEP LINK LISTENER for Shared Videos
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sharedVideoId = params.get("v");
+
+    if (sharedVideoId) {
+      // 1. We don't have the full video object (caption, uploader, etc.), 
+      // so we hit a specialized endpoint to get the video details.
+      const fetchSharedVideo = async () => {
+        try {
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/video/details?message_id=${sharedVideoId}`);
+          if (res.ok) {
+            const videoData = await res.json();
+            // 2. Open the player shell immediately
+            setActiveVideo({ ...videoData, video_url: null });
+            
+            // 3. Now trigger the actual playback URL fetch (like normal clicks do)
+            const playRes = await fetch(`${import.meta.env.VITE_API_URL}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`);
+            if (playRes.ok) {
+              const playData = await playRes.json();
+              setActiveVideo(prev => ({ ...prev, video_url: playData.video_url }));
+            }
+          }
+        } catch (error) {
+          console.error("Failed to load shared video:", error);
+        } finally {
+          // Clean up the URL so refreshing doesn't re-trigger it
+          window.history.replaceState({}, document.title, "/");
+        }
+      };
+      
+      fetchSharedVideo();
+    }
+  }, []); // Runs once on mount
 
   const onLoginSuccess = (userData, userToken) => {
     localStorage.setItem("token", userToken);
@@ -52,7 +85,6 @@ export default function App() {
     window.location.href = "/"; 
   }, []);
 
-  // 🟢 2. SESSION RECOVERY
   useEffect(() => {
     if (token && !user) {
       fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
@@ -74,11 +106,7 @@ export default function App() {
 
   const isLoggedIn = useMemo(() => !!token, [token]);
 
-  // 🟢 3. FOOTER HIDING LOGIC
-  // If a video is playing, we force the footer to stay hidden
   const shouldShowFooter = isFooterVisible && !activeVideo;
-
-  // GATEKEEPER
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
   if (needsPitch) {
@@ -102,8 +130,6 @@ export default function App() {
           paddingBottom: shouldShowFooter && activeTab !== "admin" ? "70px" : "0",
         }}
       > 
-        
-        {/* 🟢 HOME TAB (Persistent + Left Slide) */}
         <div style={{ 
           ...slideContainerStyle,
           transform: activeTab === "home" ? "translateX(0)" : "translateX(-100%)",
@@ -114,11 +140,10 @@ export default function App() {
             user={user} 
             onProfileClick={() => setActiveTab("profile")}
             setHideFooter={(val) => setIsFooterVisible(!val)}
-            setActiveVideo={setActiveVideo} // 🟢 Pass setter to Home
+            setActiveVideo={setActiveVideo}
           />
         </div>
         
-        {/* 🟢 PROFILE TAB (Persistent + Right Slide) */}
         <div style={{ 
           ...slideContainerStyle,
           transform: activeTab === "profile" ? "translateX(0)" : "translateX(100%)",
@@ -129,7 +154,7 @@ export default function App() {
             <Profile 
               user={user} 
               onLogout={onLogout} 
-              setActiveVideo={setActiveVideo} // 🟢 Pass setter to Profile
+              setActiveVideo={setActiveVideo} 
               setHideFooter={(val) => setIsFooterVisible(!val)} 
             />
           ) : (
@@ -137,7 +162,6 @@ export default function App() {
           )}
         </div>
 
-        {/* ADMIN OVERLAY */}
         {activeTab === "admin" && (
           <div style={{ 
             position: 'fixed', 
@@ -155,18 +179,13 @@ export default function App() {
         )}
       </main>
 
-      {/* 🟢 GLOBAL FOOTER - Rendered as sibling to main */}
       {shouldShowFooter && (
         <nav style={navStyle}>
           <button 
             onClick={() => setActiveTab("home")} 
             style={{...btnStyle, color: activeTab === 'home' ? 'var(--primary-color)' : '#8e8e8e'}}
           >
-            <HomeIcon 
-              size={24} 
-              strokeWidth={activeTab === 'home' ? 2.5 : 2} 
-              fill={activeTab === 'home' ? 'currentColor' : 'none'}
-            />
+            <HomeIcon size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} fill={activeTab === 'home' ? 'currentColor' : 'none'} />
             <span style={labelStyle}>Home</span>
           </button>
 
@@ -174,11 +193,7 @@ export default function App() {
             onClick={() => setActiveTab("profile")} 
             style={{...btnStyle, color: activeTab === 'profile' ? 'var(--primary-color)' : '#8e8e8e'}}
           >
-            <User 
-              size={24} 
-              strokeWidth={activeTab === 'profile' ? 2.5 : 2} 
-              fill={activeTab === 'profile' ? 'currentColor' : 'none'}
-            />
+            <User size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} fill={activeTab === 'profile' ? 'currentColor' : 'none'} />
             <span style={labelStyle}>Profile</span>
           </button>
 
@@ -187,18 +202,13 @@ export default function App() {
               onClick={() => setActiveTab("admin")} 
               style={{...btnStyle, color: activeTab === 'admin' ? 'var(--primary-color)' : '#8e8e8e'}}
             >
-              <ShieldCheck 
-                size={24} 
-                strokeWidth={activeTab === 'admin' ? 2.5 : 2} 
-                fill={activeTab === 'admin' ? 'currentColor' : 'none'}
-              />
+              <ShieldCheck size={24} strokeWidth={activeTab === 'admin' ? 2.5 : 2} fill={activeTab === 'admin' ? 'currentColor' : 'none'} />
               <span style={labelStyle}>Admin</span>
             </button>
           )}
         </nav>
       )}
 
-      {/* 🟢 4. GLOBAL PLAYER (Highest Layer) */}
       {activeVideo && (
         <div style={{ position: "fixed", inset: 0, zIndex: 999999, background: "#000" }}>
           <FullscreenPlayer 
@@ -212,29 +222,7 @@ export default function App() {
   );
 }
 
-// 🎨 UPDATED STYLES
-const navStyle = { 
-  position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', 
-  backgroundColor: 'rgba(10, 10, 10, 0.8)', 
-  backdropFilter: 'blur(20px)', 
-  WebkitBackdropFilter: 'blur(20px)',
-  borderTop: '1px solid rgba(255, 255, 255, 0.08)', 
-  display: 'flex', justifyContent: 'space-around', alignItems: 'center', 
-  zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' 
-};
-
+const navStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', backgroundColor: 'rgba(10, 10, 10, 0.8)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' };
 const btnStyle = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', flex: 1, transition: 'all 0.3s ease' };
 const labelStyle = { fontSize: '10px', fontWeight: '700' };
-
-const slideContainerStyle = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  width: '100%',
-  height: '100%', 
-  overflowY: 'auto',
-  backgroundColor: 'var(--bg-color)', 
-  transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease',
-  willChange: 'transform, opacity',
-  WebkitOverflowScrolling: 'touch' 
-};
+const slideContainerStyle = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflowY: 'auto', backgroundColor: 'var(--bg-color)', transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease', willChange: 'transform, opacity', WebkitOverflowScrolling: 'touch' };

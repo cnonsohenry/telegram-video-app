@@ -434,6 +434,30 @@ app.get("/api/videos", async (req, res) => {
 });
 
 /* =====================
+   Video Details Helper (For Shared Links)
+===================== */
+app.get("/api/video/details", async (req, res) => {
+  try {
+    const { message_id } = req.query;
+    if (!message_id) return res.status(400).json({ error: "Missing message_id" });
+
+    const result = await pool.query(`
+      SELECT v.chat_id, v.message_id, v.caption, v.views, v.uploader_id, u.username as uploader_name 
+      FROM videos v 
+      LEFT JOIN users u ON v.uploader_id = u.user_id 
+      WHERE v.message_id = $1 LIMIT 1
+    `, [message_id]);
+
+    if (!result.rows.length) return res.status(404).json({ error: "Video not found" });
+
+    // Send back the basic info (no sensitive URLs yet)
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/* =====================
    UPDATED: Thumbnail (R2 Caching Logic)
 ===================== */
 app.get("/api/thumbnail", async (req, res) => {
@@ -489,6 +513,65 @@ app.get("/api/thumbnail", async (req, res) => {
   } catch (err) {
     console.error("Thumbnail Route Error:", err.message);
     res.status(500).end();
+  }
+});
+
+/* =====================
+   Share Link (UPDATED FOR OPEN GRAPH)
+===================== */
+app.get('/v/:message_id', async (req, res) => {
+  try {
+    const { message_id } = req.params;
+    
+    // 1. Fetch from DB using the actual pool
+    const result = await pool.query(`
+      SELECT v.*, u.username as uploader_name 
+      FROM videos v 
+      LEFT JOIN users u ON v.uploader_id = u.user_id 
+      WHERE v.message_id = $1 LIMIT 1
+    `, [message_id]);
+
+    if (!result.rows.length) return res.redirect('https://naijahomemade.com');
+
+    const video = result.rows[0];
+    const sig = signThumbnail(video.chat_id, video.message_id);
+    
+    // 🟢 Construct the SEO-friendly Thumbnail URL
+    const thumbUrl = video.cloudflare_id 
+      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=600`
+      : `https://media.naijahomemade.com/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+
+    // 2. Send the Meta-rich HTML shell
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${video.caption || "Watch exclusive shots"}</title>
+          <meta charset="utf-8">
+          
+          <meta property="og:type" content="video.other">
+          <meta property="og:site_name" content="Naija Homemade">
+          <meta property="og:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
+          <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
+          <meta property="og:image" content="${thumbUrl}">
+          <meta property="og:url" content="https://videos.naijahomemade.com/v/${message_id}">
+          
+          <meta name="twitter:card" content="summary_large_image">
+          <meta name="twitter:title" content="${video.caption || "Watch Shot"}">
+          <meta name="twitter:image" content="${thumbUrl}">
+
+          <script>
+            window.location.href = "https://naijahomemade.com/?v=${message_id}";
+          </script>
+        </head>
+        <body style="background:#000; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
+          <p>Redirecting to Naija Homemade...</p>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error("Share Link Error:", err.message);
+    res.redirect('https://naijahomemade.com');
   }
 });
 
