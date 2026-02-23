@@ -1,14 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, CheckCircle2, CreditCard, Bitcoin, Lock } from "lucide-react";
 
 export default function PaywallModal({ onClose, user }) {
   const [loading, setLoading] = useState(false);
 
+  // 🟢 Lock background scrolling when modal is open
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = ""; // Restore scrolling on close
+    };
+  }, []);
+
   // 🟢 1. Local Fiat Payment (Paystack)
   const handleFiatPayment = async () => {
     setLoading(true);
     try {
-      // We will create this backend route next. It generates a Paystack link.
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/pay/fiat`, {
         method: "POST",
         headers: {
@@ -19,7 +26,7 @@ export default function PaywallModal({ onClose, user }) {
       const data = await res.json();
       
       if (data.authorization_url) {
-        window.location.href = data.authorization_url; // Redirect to Paystack
+        window.location.href = data.authorization_url; 
       } else {
         alert("Payment initialization failed.");
       }
@@ -31,9 +38,8 @@ export default function PaywallModal({ onClose, user }) {
     }
   };
 
-  // 🟢 2. Crypto Payment (Direct Wallet or NowPayments)
+  // 🟢 2. Crypto Payment 
   const handleCryptoPayment = () => {
-    // You can redirect to a Crypto gateway or show a wallet address
     alert("Crypto payments coming in the next step!");
   };
 
@@ -98,7 +104,8 @@ const Benefit = ({ text }) => (
 
 // 🖌 STYLES
 const overlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999, padding: "20px" };
-const modalStyle = { background: "#0B0F1A", border: "1px solid var(--border-color)", borderRadius: "24px", padding: "30px 20px", width: "100%", maxWidth: "400px", position: "relative", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", animation: "fadeInUp 0.3s ease-out" };
+// 🟢 Added maxHeight and overflowY so the modal itself scrolls internally on tiny devices if needed
+const modalStyle = { background: "#0B0F1A", border: "1px solid var(--border-color)", borderRadius: "24px", padding: "30px 20px", width: "100%", maxWidth: "400px", maxHeight: "90vh", overflowY: "auto", position: "relative", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", animation: "fadeInUp 0.3s ease-out" };
 const closeButtonStyle = { position: "absolute", top: "15px", right: "15px", background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
 const headerStyle = { textAlign: "center", marginBottom: "30px", marginTop: "10px" };
 const iconWrapperStyle = { width: "64px", height: "64px", borderRadius: "50%", background: "rgba(255, 59, 48, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 15px auto" };
