@@ -9,7 +9,7 @@ import crypto from "crypto";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import authRoutes from "./auth.js";
 import multer from "multer";
-import { uploadDirectToStream } from "./controllers/upload_premium.js"; // The script we created earlier
+import { uploadDirectToStream } from "./controllers/upload_premium.js"; 
 
 
 const { Pool } = pkg;
@@ -24,7 +24,7 @@ app.use(cors({
   origin: [
     "https://naijahomemade.com",
     "https://www.naijahomemade.com",
-    "http://localhost:5173" // Keep this for your local dev work
+    "http://localhost:5173" 
   ]
 }));
 
@@ -42,7 +42,7 @@ const pool = new Pool({
 // Configure R2 Client
 const r2 = new S3Client({
   region: "auto",
-  endpoint: process.env.R2_ENDPOINT, // e.g., https://<account_id>.r2.cloudflarestorage.com
+  endpoint: process.env.R2_ENDPOINT, 
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
@@ -187,7 +187,6 @@ app.post("/webhook", async (req, res) => {
 
     // 🟢 NEW: Trigger R2 Upload immediately
     if (thumbFileId) {
-      // We don't 'await' this so the webhook returns 200 to Telegram immediately
       uploadThumbnailToR2(thumbFileId, chatId, messageId);
     }
 
@@ -214,34 +213,24 @@ app.post("/webhook", async (req, res) => {
 /* =====================
    PREMIUM UPLOAD
 ===================== */
-// 🟢 1. Configure Temporary Storage
 const upload = multer({ dest: "uploads/" }); 
 
-/**
- * POST /api/admin/upload-premium
- * Purpose: Manual upload for high-quality videos (>20MB)
- */
 app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) => {
   try {
     const { caption, category, uploader_id } = req.body;
     const videoFile = req.file;
 
-    // Security Check: Ensure only YOU can upload (using your Telegram ID)
     if (!ALLOWED_USERS.includes(Number(uploader_id))) {
       return res.status(403).json({ error: "Unauthorized" });
     }
 
     if (!videoFile) return res.status(400).json({ error: "No video file provided" });
 
-    // 🟢 2. Push to Cloudflare Stream
-    // We pass the path where multer saved the file temporarily
     const cfResult = await uploadDirectToStream(videoFile.path, {
       caption: caption || "Premium Content",
       category: category || "premium"
     });
 
-    // 🟢 3. Save to Database
-    // We create a dummy chat_id/message_id for internal tracking
     const internalId = `premium_${Date.now()}`;
     
     await pool.query(
@@ -250,15 +239,13 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       [
         "internal", 
         internalId, 
-        "none", // No Telegram file_id for direct uploads
+        "none", 
         uploader_id, 
         category || "premium", 
         caption, 
-        cfResult.uid // The Cloudflare Video ID
+        cfResult.uid 
       ]
     );
-
-    // 🟢 4. Cleanup: Delete the temp file from your VPS to save space
 
     fs.unlinkSync(videoFile.path);
 
@@ -277,7 +264,6 @@ app.get("/api/video", async (req, res) => {
     const { chat_id, message_id } = req.query;
     if (!chat_id || !message_id) return res.status(400).json({ error: "Missing parameters" });
 
-    // 1. Fetch video details from DB
     const dbRes = await pool.query(
       `UPDATE videos SET views = views + 1 
        WHERE chat_id=$1 AND message_id=$2 
@@ -291,7 +277,6 @@ app.get("/api/video", async (req, res) => {
 
     const video = dbRes.rows[0];
 
-    // 🟢 2. OPTION A: CLOUDFLARE STREAM (Premium)
     if (video.cloudflare_id && video.cloudflare_id !== "none") {
       const cleanId = video.cloudflare_id.split('?')[0];
       const video_url = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
@@ -299,15 +284,12 @@ app.get("/api/video", async (req, res) => {
       return res.json({ video_url });
     }
 
-    // 🔵 3. OPTION B: TELEGRAM (Regular Videos)
-    // Make sure we actually have a file_id to fetch
     if (!video.file_id || video.file_id === "none") {
        return res.status(400).json({ error: "No video source (Telegram or Cloudflare) found" });
     }
 
     console.log(`[PLAYBACK] Fetching from Telegram: ${video.file_id.substring(0, 10)}...`);
 
-    // Fetch the file path from Telegram API
     const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { 
       params: { file_id: video.file_id } 
     });
@@ -319,13 +301,12 @@ app.get("/api/video", async (req, res) => {
     const filePath = tgRes.data.result.file_path;
     const { exp, sig } = signWorkerUrl(filePath);
 
-    // Construct the Worker URL
+    // 🟢 This correctly stays on media.naijahomemade.com for the Worker
     const workerUrl = `https://media.naijahomemade.com/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}`;
     
     return res.json({ video_url: workerUrl });
 
   } catch (err) {
-    // 🔴 4. Error Logging
     console.error("❌ Video API Error Detail:", err.response?.data || err.message);
     res.status(500).json({ error: "Playback failed", detail: err.message });
   }
@@ -352,10 +333,9 @@ app.get("/api/videos", async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category || "hotties";
     
-    // 🟢 Worker domain for direct thumbnail delivery (Telegram videos)
-    const mediaBaseUrl = "https://media.naijahomemade.com";
+    // 🟢 FIX: Point to the Node.js API server for thumbnails, not the Worker
+    const apiBaseUrl = "https://videos.naijahomemade.com";
 
-    // 1. Fetch Main Grid Videos
     let query;
     let queryValues;
 
@@ -369,7 +349,6 @@ app.get("/api/videos", async (req, res) => {
 
     const videosRes = await pool.query(query, queryValues);
 
-    // 2. Fetch Suggestions ONLY on Page 1
     let suggestions = [];
     if (page === 1) {
       const suggestQuery = `
@@ -386,11 +365,8 @@ app.get("/api/videos", async (req, res) => {
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
 
-    // 🟢 Helper to map video object with SECURE thumbnails
     const mapVideo = (v) => {
-      // 🟢 1. IF CLOUDFLARE: Return direct stream thumbnail
       if (v.cloudflare_id) {
-         // Clean the ID (remove ?tusv2=true if present)
          const cleanId = v.cloudflare_id.split('?')[0];
 
          return {
@@ -401,12 +377,10 @@ app.get("/api/videos", async (req, res) => {
             uploader_id: v.uploader_id,
             uploader_name: v.uploader_name || "Member",
             created_at: v.created_at,
-            // 🟢 USE videodelivery.net (Universal Domain)
             thumbnail_url: `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`
          };
       }
 
-      // 🔵 2. IF TELEGRAM: Use your Worker/R2 logic
       const sig = signThumbnail(v.chat_id, v.message_id);
       return {
         chat_id: v.chat_id,
@@ -416,7 +390,8 @@ app.get("/api/videos", async (req, res) => {
         uploader_id: v.uploader_id,
         uploader_name: v.uploader_name || "Member",
         created_at: v.created_at,
-        thumbnail_url: `${mediaBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`
+        // 🟢 FIX: Using apiBaseUrl to hit Express backend correctly
+        thumbnail_url: `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`
       };
     };
 
@@ -450,7 +425,6 @@ app.get("/api/video/details", async (req, res) => {
 
     if (!result.rows.length) return res.status(404).json({ error: "Video not found" });
 
-    // Send back the basic info (no sensitive URLs yet)
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
@@ -467,7 +441,6 @@ app.get("/api/thumbnail", async (req, res) => {
   const fileName = `thumbs/${chat_id}_${message_id}.jpg`;
 
   try {
-    // 1. Try to get from R2 first
     try {
       const r2Object = await r2.send(new GetObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -481,20 +454,16 @@ app.get("/api/thumbnail", async (req, res) => {
       });
       return r2Object.Body.pipe(res);
     } catch (r2Err) {
-      // If not in R2, proceed to fetch from Telegram
       console.log(`Thumbnail ${fileName} not in R2, fetching from Telegram...`);
     }
 
-    // 2. Fetch thumb_file_id from DB
     const dbRes = await pool.query("SELECT thumb_file_id FROM videos WHERE chat_id=$1 AND message_id=$2", [chat_id, message_id]);
     if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) return res.status(204).end();
 
-    // 3. Download from Telegram
     const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: dbRes.rows[0].thumb_file_id } });
     const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
     const buffer = Buffer.from(imageRes.data);
 
-    // 4. Upload to R2 in the background (Don't await to keep response fast)
     r2.send(new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
       Key: fileName,
@@ -502,7 +471,6 @@ app.get("/api/thumbnail", async (req, res) => {
       ContentType: "image/jpeg"
     })).catch(e => console.error("R2 Upload Failed:", e.message));
 
-    // 5. Send to user
     res.set({
       "Content-Type": "image/jpeg",
       "Cache-Control": "public, max-age=604800, immutable",
@@ -523,7 +491,6 @@ app.get('/v/:message_id', async (req, res) => {
   try {
     const { message_id } = req.params;
     
-    // 1. Fetch from DB using the actual pool
     const result = await pool.query(`
       SELECT v.*, u.username as uploader_name 
       FROM videos v 
@@ -536,12 +503,11 @@ app.get('/v/:message_id', async (req, res) => {
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
     
-    // 🟢 Construct the SEO-friendly Thumbnail URL
+    // 🟢 FIX: Point the SEO thumbnail to videos.naijahomemade.com
     const thumbUrl = video.cloudflare_id 
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=600`
-      : `https://media.naijahomemade.com/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+      : `https://videos.naijahomemade.com/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
 
-    // 2. Send the Meta-rich HTML shell
     res.send(`
       <!DOCTYPE html>
       <html>

@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Settings, Grid3X3, Heart, Lock, CheckCircle, Share2 } from "lucide-react";
 import VideoCard from "../components/VideoCard"; 
 import SettingsView from "../components/SettingsView"; 
+import PaywallModal from "../components/PaywallModal"; // 🟢 Import the Paywall
 import { useVideos } from "../hooks/useVideos";
 
 export default function Profile({ user, onLogout, setHideFooter, setActiveVideo }) {
   const [activeTab, setActiveTab] = useState("videos");
   const [currentView, setCurrentView] = useState("profile");
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
+  const [showPaywall, setShowPaywall] = useState(false); // 🟢 Paywall state
 
   // Handle Resize for layout switching
   useEffect(() => {
@@ -28,11 +30,23 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo 
   const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots");
   const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium");
 
+  // 🟢 Updated open logic with Premium Check
   const handleOpenVideo = useCallback(async (video, e) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
       e.stopPropagation();
     }
+    if (!video) return;
+
+    // 🟢 PREMIUM GATE
+    if (video.category === "premium" || activeTab === "premium") {
+      if (!user || !user.is_premium) {
+        setShowPaywall(true);
+        return;
+      }
+    }
+
+    // Free Content / Unlocked Premium Content
     try {
       setActiveVideo({ ...video, video_url: null }); 
       const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
@@ -43,7 +57,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo 
       console.error("Profile Video Load Error:", err);
       setActiveVideo(null);
     }
-  }, [setActiveVideo]);
+  }, [user, activeTab, setActiveVideo]);
 
   const { data: videosToDisplay, loading, loadMore } = activeTab === "premium" 
     ? { data: premium || [], loading: premiumLoading, loadMore: loadMorePremium }
@@ -113,7 +127,13 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo 
             </div>
 
             <div style={{ ...actionButtonsRowStyle, width: isDesktop ? "fit-content" : "100%" }}>
-              <button style={premiumButtonStyle} onClick={() => alert("Premium Coming Soon")}>SUBSCRIBE PREMIUM</button>
+              {/* 🟢 Also trigger paywall when they click the main profile button */}
+              <button 
+                style={premiumButtonStyle} 
+                onClick={() => (!user || !user.is_premium) ? setShowPaywall(true) : alert("You are already Premium!")}
+              >
+                {user?.is_premium ? "VIP MEMBER" : "SUBSCRIBE PREMIUM"}
+              </button>
               <button style={secondaryButtonStyle} onClick={() => alert("Link Copied")}><Share2 size={18} /></button>
             </div>
           </div>
@@ -124,7 +144,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo 
           ...tabsContainerStyle, 
           justifyContent: isDesktop ? "center" : "space-around",
           gap: isDesktop ? "60px" : "0",
-          borderTop: isDesktop ? "1px solid #222" : "none",
+          borderTop: isDesktop ? "1px solid var(--border-color)" : "none",
           top: isDesktop ? "0" : "48px"
         }}>
           <TabButton isDesktop={isDesktop} active={activeTab === "videos"} onClick={() => setActiveTab("videos")} icon={<Grid3X3 size={isDesktop ? 18 : 24} />} label="POSTS" />
@@ -154,6 +174,14 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo 
           )}
         </div>
       </div>
+
+      {/* 🟢 Render Paywall Modal */}
+      {showPaywall && (
+        <PaywallModal 
+          user={user} 
+          onClose={() => setShowPaywall(false)} 
+        />
+      )}
     </div>
   );
 }

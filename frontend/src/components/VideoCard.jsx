@@ -9,7 +9,10 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
   const [isImgLoaded, setIsImgLoaded] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
 
-  const thumbSrc = `${video.thumbnail_url}&w=400`;
+  // 🟢 FIX 1: Safely construct the thumbnail URL
+  const thumbSrc = video.thumbnail_url 
+    ? (video.thumbnail_url.includes('?') ? `${video.thumbnail_url}&w=400` : `${video.thumbnail_url}?w=400`)
+    : '';
 
   useEffect(() => {
     const el = videoRef.current;
@@ -33,19 +36,18 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
     }
   }, [isVisible, isHovered]);
 
-  // 🟢 SEO Schema Generation
   const schemaData = {
     "@context": "https://schema.org",
     "@type": "VideoObject",
     "name": video.caption || "Exclusive Video Content",
     "description": video.caption || "Watch the latest shots and premium videos on our platform.",
     "thumbnailUrl": [
-      video.thumbnail_url,
-      `${video.thumbnail_url}&w=800`,
-      `${video.thumbnail_url}&w=1200`
+      video.thumbnail_url || "",
+      video.thumbnail_url ? `${video.thumbnail_url}&w=800` : "",
+      video.thumbnail_url ? `${video.thumbnail_url}&w=1200` : ""
     ],
     "uploadDate": video.created_at || new Date().toISOString(),
-    "contentUrl": video.video_url, 
+    "contentUrl": video.video_url || "", 
     "embedUrl": `https://videos.naijahomemade.com/video/${video.message_id}`,
     "interactionStatistic": {
       "@type": "InteractionCounter",
@@ -74,8 +76,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         position: "relative",
         transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
         transform: (isHovered && showDetails) ? "translateY(-4px)" : "translateY(0)",
-        zIndex: isHovered ? 10 : 1, // 🟢 FIX: Ensures hovered cards pop over adjacent cards cleanly
-        // 🔴 REMOVED 'contentVisibility' and 'contain' to fix grid overlap bug
+        zIndex: isHovered ? 10 : 1, 
       }}
     >
       <script 
@@ -90,7 +91,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         background: "#111", 
         overflow: "hidden",
         borderRadius: showDetails ? "12px" : "4px",
-        flexShrink: 0 // 🟢 FIX: Prevents the aspect ratio box from squishing
+        flexShrink: 0 
       }}>
         
         {!isImgLoaded && (
@@ -102,18 +103,25 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           }} />
         )}
 
-        <img 
-          src={thumbSrc} 
-          alt={video.caption || "Thumbnail"}
-          loading="eager"
-          onLoad={() => setIsImgLoaded(true)}
-          style={{
-            width: "100%", height: "100%", objectFit: "cover",
-            position: "absolute", inset: 0, zIndex: 2,
-            opacity: 1, 
-            transition: "opacity 0.2s ease-in"
-          }}
-        />
+        {thumbSrc && (
+          <img 
+            src={thumbSrc} 
+            alt={video.caption || "Thumbnail"}
+            loading="eager"
+            onLoad={() => setIsImgLoaded(true)}
+            // 🟢 FIX 2: Handle broken images gracefully
+            onError={(e) => { 
+              setIsImgLoaded(true); 
+              e.target.style.display = 'none'; 
+            }}
+            style={{
+              width: "100%", height: "100%", objectFit: "cover",
+              position: "absolute", inset: 0, zIndex: 2,
+              opacity: 1, 
+              transition: "opacity 0.2s ease-in"
+            }}
+          />
+        )}
 
         <video
           ref={videoRef}
@@ -128,7 +136,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           }}
         />
         
-        {/* 🟢 Share Button Overlay */}
         <button 
           onClick={handleShare}
           style={{
