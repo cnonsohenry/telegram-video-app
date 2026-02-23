@@ -4,7 +4,6 @@ import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
 import PullToRefresh from "../components/PullToRefresh"; 
-import PaywallModal from "../components/PaywallModal"; // 🟢 Added Paywall Import
 import { useVideos } from "../hooks/useVideos";
 import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
@@ -14,7 +13,7 @@ const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
 const MAX_CACHE_SIZE = 4;
 const AD_FREQUENCY = 3; // 🟢 Show ad every 3rd new video clicked
 
-export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo }) {
+export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * CATEGORIES.length)); 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
@@ -24,7 +23,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isChangingTab, setIsChangingTab] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-  const [showPaywall, setShowPaywall] = useState(false); // 🟢 Added Paywall State
 
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
@@ -297,13 +295,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         </button>
       )}
 
-      {/* 🟢 Paywall Render */}
-      {showPaywall && (
-        <PaywallModal 
-          user={user} 
-          onClose={() => setShowPaywall(false)} 
-        />
-      )}
       
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

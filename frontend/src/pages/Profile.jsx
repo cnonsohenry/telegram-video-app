@@ -2,14 +2,13 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Settings, Grid3X3, Heart, Lock, CheckCircle, Share2 } from "lucide-react";
 import VideoCard from "../components/VideoCard"; 
 import SettingsView from "../components/SettingsView"; 
-import PaywallModal from "../components/PaywallModal"; // 🟢 Import the Paywall
 import { useVideos } from "../hooks/useVideos";
 
-export default function Profile({ user, onLogout, setHideFooter, setActiveVideo }) {
+export default function Profile({ user, onLogout, setHideFooter, setActiveVideo, setShowPaywall }) {
   const [activeTab, setActiveTab] = useState("videos");
   const [currentView, setCurrentView] = useState("profile");
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
-  const [showPaywall, setShowPaywall] = useState(false); // 🟢 Paywall state
+  
 
   // Handle Resize for layout switching
   useEffect(() => {
@@ -174,14 +173,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo 
           )}
         </div>
       </div>
-
-      {/* 🟢 Render Paywall Modal */}
-      {showPaywall && (
-        <PaywallModal 
-          user={user} 
-          onClose={() => setShowPaywall(false)} 
-        />
-      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import AdminUpload from "./pages/AdminUpload";
 import AuthForm from "./components/AuthForm";
 import PitchView from "./components/PitchView";
 import FullscreenPlayer from "./components/FullscreenPlayer"; 
+import PaywallModal from "./components/PaywallModal"; // 🟢 Import Paywall Here
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
@@ -15,6 +16,9 @@ export default function App() {
   const [isFooterVisible, setIsFooterVisible] = useState(true);
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); 
+  
+  // 🟢 1. LIFTED PAYWALL STATE
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const isAdFreeZone = !hasSeenPitch || activeTab === "profile" || activeTab === "admin";
   useAdZapper(isAdFreeZone);
@@ -33,23 +37,18 @@ export default function App() {
     applyTheme(savedTheme);
   }, [applyTheme]);
 
-  // 🟢 NEW: DEEP LINK LISTENER for Shared Videos
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedVideoId = params.get("v");
 
     if (sharedVideoId) {
-      // 1. We don't have the full video object (caption, uploader, etc.), 
-      // so we hit a specialized endpoint to get the video details.
       const fetchSharedVideo = async () => {
         try {
           const res = await fetch(`${import.meta.env.VITE_API_URL}/api/video/details?message_id=${sharedVideoId}`);
           if (res.ok) {
             const videoData = await res.json();
-            // 2. Open the player shell immediately
             setActiveVideo({ ...videoData, video_url: null });
             
-            // 3. Now trigger the actual playback URL fetch (like normal clicks do)
             const playRes = await fetch(`${import.meta.env.VITE_API_URL}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`);
             if (playRes.ok) {
               const playData = await playRes.json();
@@ -59,14 +58,13 @@ export default function App() {
         } catch (error) {
           console.error("Failed to load shared video:", error);
         } finally {
-          // Clean up the URL so refreshing doesn't re-trigger it
           window.history.replaceState({}, document.title, "/");
         }
       };
       
       fetchSharedVideo();
     }
-  }, []); // Runs once on mount
+  }, []);
 
   const onLoginSuccess = (userData, userToken) => {
     localStorage.setItem("token", userToken);
@@ -106,7 +104,7 @@ export default function App() {
 
   const isLoggedIn = useMemo(() => !!token, [token]);
 
-  const shouldShowFooter = isFooterVisible && !activeVideo;
+  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall; // Hide footer if paywall is open
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
   if (needsPitch) {
@@ -136,11 +134,13 @@ export default function App() {
           opacity: activeTab === "home" ? 1 : 0,
           pointerEvents: activeTab === "home" ? "auto" : "none"
         }}>
+          {/* 🟢 2. PASS GETTER/SETTER TO HOME */}
           <Home 
             user={user} 
             onProfileClick={() => setActiveTab("profile")}
             setHideFooter={(val) => setIsFooterVisible(!val)}
             setActiveVideo={setActiveVideo}
+            setShowPaywall={setShowPaywall} 
           />
         </div>
         
@@ -151,11 +151,13 @@ export default function App() {
           pointerEvents: activeTab === "profile" ? "auto" : "none"
         }}>
           {isLoggedIn ? (
+            {/* 🟢 3. PASS GETTER/SETTER TO PROFILE */}
             <Profile 
               user={user} 
               onLogout={onLogout} 
               setActiveVideo={setActiveVideo} 
               setHideFooter={(val) => setIsFooterVisible(!val)} 
+              setShowPaywall={setShowPaywall} 
             />
           ) : (
             <AuthForm onLoginSuccess={onLoginSuccess} />
@@ -207,6 +209,14 @@ export default function App() {
             </button>
           )}
         </nav>
+      )}
+
+      {/* 🟢 4. RENDER GLOBAL PAYWALL MODAL */}
+      {showPaywall && (
+        <PaywallModal 
+          user={user} 
+          onClose={() => setShowPaywall(false)} 
+        />
       )}
 
       {activeVideo && (
