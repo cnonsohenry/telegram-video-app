@@ -5,7 +5,7 @@ import AdminUpload from "./pages/AdminUpload";
 import AuthForm from "./components/AuthForm";
 import PitchView from "./components/PitchView";
 import FullscreenPlayer from "./components/FullscreenPlayer"; 
-import PaywallModal from "./components/PaywallModal"; // 🟢 Import Paywall Here
+import PaywallModal from "./components/PaywallModal"; 
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
@@ -17,7 +17,6 @@ export default function App() {
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); 
   
-  // 🟢 1. LIFTED PAYWALL STATE
   const [showPaywall, setShowPaywall] = useState(false);
 
   const isAdFreeZone = !hasSeenPitch || activeTab === "profile" || activeTab === "admin";
@@ -104,7 +103,7 @@ export default function App() {
 
   const isLoggedIn = useMemo(() => !!token, [token]);
 
-  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall; // Hide footer if paywall is open
+  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall; 
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
   if (needsPitch) {
@@ -134,7 +133,6 @@ export default function App() {
           opacity: activeTab === "home" ? 1 : 0,
           pointerEvents: activeTab === "home" ? "auto" : "none"
         }}>
-          {/* 🟢 2. PASS GETTER/SETTER TO HOME */}
           <Home 
             user={user} 
             onProfileClick={() => setActiveTab("profile")}
@@ -150,8 +148,8 @@ export default function App() {
           opacity: activeTab === "profile" ? 1 : 0,
           pointerEvents: activeTab === "profile" ? "auto" : "none"
         }}>
+          {/* 🟢 MOVED COMMENT OUTSIDE TERNARY TO FIX BUILD ERROR */}
           {isLoggedIn ? (
-            {/* 🟢 3. PASS GETTER/SETTER TO PROFILE */}
             <Profile 
               user={user} 
               onLogout={onLogout} 
@@ -211,7 +209,6 @@ export default function App() {
         </nav>
       )}
 
-      {/* 🟢 4. RENDER GLOBAL PAYWALL MODAL */}
       {showPaywall && (
         <PaywallModal 
           user={user} 
