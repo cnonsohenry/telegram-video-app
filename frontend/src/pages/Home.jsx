@@ -4,6 +4,7 @@ import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
 import PullToRefresh from "../components/PullToRefresh"; 
+import PaywallModal from "../components/PaywallModal"; // 🟢 Added Paywall Import
 import { useVideos } from "../hooks/useVideos";
 import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
@@ -11,6 +12,7 @@ import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
 const MAX_CACHE_SIZE = 4;
+const AD_FREQUENCY = 3; // 🟢 Show ad every 3rd new video clicked
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo }) {
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * CATEGORIES.length)); 
@@ -22,6 +24,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isChangingTab, setIsChangingTab] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false); // 🟢 Added Paywall State
 
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
@@ -80,24 +83,59 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
   };
 
+  // 🟢 HYBRID MONETIZATION & FREQUENCY CAPPING
   const handleOpenVideo = useCallback(async (video, e) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
       e.stopPropagation();
     }
     if (!video) return;
-    const videoKey = `${video.chat_id}:${video.message_id}`;
-    if (unlockedVideos.has(videoKey)) { playVideo(video); return; }
-    try {
-      openRewardedAd();
-      const nextSet = new Set(unlockedVideos);
-      nextSet.add(videoKey);
-      setUnlockedVideos(nextSet);
-      localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
-      await adReturnWatcher();
+
+    // 1. PREMIUM GATE (Paywall)
+    if (video.category === "premium") {
+      if (!user || !user.is_premium) {
+        setShowPaywall(true);
+        return;
+      }
       playVideo(video);
-    } catch (err) { playVideo(video); }
-  }, [unlockedVideos]);
+      return;
+    }
+
+    // 2. FREE GATE (Ads)
+    const videoKey = `${video.chat_id}:${video.message_id}`;
+    
+    // If already unlocked (they watched an ad for this before, or bypassed it), just play
+    if (unlockedVideos.has(videoKey)) { 
+      playVideo(video); 
+      return; 
+    }
+
+    // Read the ad counter from local storage
+    const videosWatchedCount = parseInt(localStorage.getItem("ad_frequency_counter") || "0", 10);
+    const shouldShowAd = videosWatchedCount % AD_FREQUENCY === 0;
+
+    // Increment and save counter for the next click
+    localStorage.setItem("ad_frequency_counter", (videosWatchedCount + 1).toString());
+
+    // Unlock it so they don't get punished for re-clicking the same video later
+    const nextSet = new Set(unlockedVideos);
+    nextSet.add(videoKey);
+    setUnlockedVideos(nextSet);
+    localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
+
+    if (shouldShowAd) {
+      try {
+        openRewardedAd();
+        await adReturnWatcher();
+        playVideo(video);
+      } catch (err) { 
+        playVideo(video); // Failsafe if ad blocker kills the ad
+      }
+    } else {
+      // 🟢 Skip ad, user is in their "cooldown" period
+      playVideo(video);
+    }
+  }, [user, unlockedVideos]);
 
   useEffect(() => {
     if (!loading && videos?.length > 0) {
@@ -155,9 +193,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       
       <div style={{ display: "flex", flex: 1, position: "relative" }}>
         
-        {/* 🟢 LEFT SIDEBAR (Fixed Width Base + Floating Expansion) */}
+        {/* 🟢 LEFT SIDEBAR */}
         {isDesktop && (
-          <div style={{ width: "80px", flexShrink: 0 }}> {/* Static Placeholder to prevent Grid shifting */}
+          <div style={{ width: "80px", flexShrink: 0 }}>
             <nav 
               onMouseEnter={() => setIsSidebarHovered(true)}
               onMouseLeave={() => setIsSidebarHovered(false)}
@@ -174,7 +212,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                   onClick={() => handleTabClick(index)} 
                   style={{ 
                     ...desktopTabButtonStyle, 
-                    /* 🟢 FIX: Highlighting only depends on activeTab, not mouse position */
                     background: activeTab === index ? "rgba(255,255,255,0.12)" : "transparent",
                     color: activeTab === index ? "var(--primary-color)" : "#fff",
                     justifyContent: isSidebarHovered ? "flex-start" : "center",
@@ -195,7 +232,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           </div>
         )}
 
-        {/* 🟢 CENTER FEED (Stable Width) */}
+        {/* 🟢 CENTER FEED */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {!isDesktop && (
             <nav style={mobileNavStyle}>
@@ -239,7 +276,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           </PullToRefresh>
         </div>
 
-        {/* 🟢 RIGHT SIDEBAR (Suggested Contents) */}
+        {/* 🟢 RIGHT SIDEBAR */}
         {isDesktop && (
           <aside style={suggestedSidebarRail}>
             <div style={suggestedHeaderStyle}>
@@ -259,6 +296,14 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           <ArrowUp size={24} color="#fff" />
         </button>
       )}
+
+      {/* 🟢 Paywall Render */}
+      {showPaywall && (
+        <PaywallModal 
+          user={user} 
+          onClose={() => setShowPaywall(false)} 
+        />
+      )}
       
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -272,55 +317,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "12px", animation: "pulse 1.5s infinite" };
 const mobileNavStyle = { display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "var(--bg-color)", backdropFilter: "blur(15px)", borderBottom: "1px solid var(--border-color)" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
-
-const sidebarStyle = { 
-  height: "calc(100vh - 70px)", 
-  position: "fixed", // 🟢 Changed to fixed so it floats over content
-  top: "70px", 
-  left: 0,
-  display: "flex", 
-  flexDirection: "column", 
-  gap: "8px", 
-  zIndex: 110, 
-  transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-  background: "var(--bg-color)",
-  padding: "20px 0"
-};
-
-const desktopTabButtonStyle = { 
-  display: "flex", 
-  alignItems: "center", 
-  border: "none", 
-  borderRadius: "12px", 
-  cursor: "pointer", 
-  width: "calc(100% - 16px)",
-  margin: "0 8px",
-  height: "50px",
-  transition: "all 0.15s ease",
-  outline: "none"
-};
-
-const sidebarLabelStyle = { 
-  fontSize: "15px", 
-  fontWeight: "800", 
-  whiteSpace: "nowrap",
-  fontFamily: "'Inter', sans-serif",
-  letterSpacing: "0.4px",
-  animation: "fadeIn 0.2s ease-in"
-};
-
-const suggestedSidebarRail = { 
-  width: "320px", 
-  height: "calc(100vh - 70px)", 
-  position: "sticky", 
-  top: "70px", 
-  borderLeft: "1px solid var(--border-color)", 
-  padding: "25px 15px",
-  background: "var(--bg-color)",
-  overflowY: "auto",
-  flexShrink: 0
-};
-
+const sidebarStyle = { height: "calc(100vh - 70px)", position: "fixed", top: "70px", left: 0, display: "flex", flexDirection: "column", gap: "8px", zIndex: 110, transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "var(--bg-color)", padding: "20px 0" };
+const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
+const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
+const suggestedSidebarRail = { width: "320px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", borderLeft: "1px solid var(--border-color)", padding: "25px 15px", background: "var(--bg-color)", overflowY: "auto", flexShrink: 0 };
 const suggestedHeaderStyle = { display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" };
 const suggestedTitleStyle = { fontSize: "16px", fontWeight: "900", margin: 0 };
 const showMoreButtonStyle = { display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "14px 40px", borderRadius: "35px", border: "1px solid #333", fontWeight: "900", cursor: "pointer" };
