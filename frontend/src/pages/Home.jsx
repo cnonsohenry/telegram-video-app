@@ -283,9 +283,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
             </div>
             <SuggestedSidebar 
               suggestions={sidebarSuggestions} 
-              onVideoClick={handleOpenVideo} // 🟢 Use handleOpenVideo instead of playVideo so Ads work too!
-              user={user} 
-              setShowPaywall={setShowPaywall} 
+              onVideoClick={(v, e) => handleOpenVideo(v, e)} 
             />
           </aside>
         )}
