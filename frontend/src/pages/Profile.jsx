@@ -38,7 +38,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     if (!video) return;
 
     // 🟢 PREMIUM GATE
-    if (video.category === "premium") {
+    if (video.category === "premium" || activeTab === "premium") {
       if (!user || !user.is_premium) {
         setShowPaywall(true);
         return;
