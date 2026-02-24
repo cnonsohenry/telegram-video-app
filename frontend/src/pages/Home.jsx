@@ -135,6 +135,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
   }, [user, unlockedVideos]);
 
+
   useEffect(() => {
     if (!loading && videos?.length > 0) {
       updateCache(currentCategory, videos);
