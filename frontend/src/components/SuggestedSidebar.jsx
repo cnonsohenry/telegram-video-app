@@ -1,7 +1,18 @@
 import React from "react";
-import { Play } from "lucide-react";
+import { Play, Lock } from "lucide-react"; // 🟢 Added Lock icon
 
-export default function SuggestedSidebar({ suggestions, onVideoClick }) {
+export default function SuggestedSidebar({ suggestions, onVideoClick, user, setShowPaywall }) {
+  
+  // 🟢 Intercept the click to check for Paywall
+  const handleSuggestionClick = (v, e) => {
+    if (v.category === "premium" && (!user || !user.is_premium)) {
+      setShowPaywall(true);
+      return;
+    }
+    // Pass the event forward so your ad/playback logic can use it
+    onVideoClick(v, e); 
+  };
+
   return (
     <aside style={{ 
       width: "380px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", 
@@ -13,14 +24,22 @@ export default function SuggestedSidebar({ suggestions, onVideoClick }) {
         {suggestions.map((v) => (
           <div 
             key={`suggested-${v.chat_id}-${v.message_id}`} 
-            onClick={() => onVideoClick(v)}
+            onClick={(e) => handleSuggestionClick(v, e)}
             style={{ display: "flex", gap: "12px", cursor: "pointer", alignItems: "flex-start", padding: "10px", borderRadius: "10px", transition: "0.2s" }}
             onMouseEnter={(e) => e.currentTarget.style.background = "#1c1c1e"}
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
           >
-            <div style={{ width: "80px", height: "100px", borderRadius: "6px", overflow: "hidden", background: "#111", flexShrink: 0 }}>
+            <div style={{ width: "80px", height: "100px", borderRadius: "6px", overflow: "hidden", background: "#111", flexShrink: 0, position: "relative" }}>
               <img src={v.thumbnail_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" />
+              
+              {/* 🟢 Visual cue for Premium suggestions */}
+              {v.category === "premium" && (
+                <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", padding: "4px", borderRadius: "50%", display: "flex" }}>
+                  <Lock size={10} color="var(--primary-color)" />
+                </div>
+              )}
             </div>
+            
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ color: "#fff", fontSize: "13px", fontWeight: "600", margin: "0 0 4px 0", lineHeight: "1.4", wordWrap: "break-word" }}>
                 {v.caption || "View trending video..."}

@@ -11,7 +11,7 @@ import { adReturnWatcher } from "../utils/adReturnWatcher";
 
 const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
 const MAX_CACHE_SIZE = 4;
-const AD_FREQUENCY = 3; // 🟢 Show ad every 3rd new video clicked
+const AD_FREQUENCY = 5; // 🟢 Show ad every 5th new video clicked
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * CATEGORIES.length)); 
@@ -281,7 +281,12 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
               <Zap size={18} color="var(--primary-color)" fill="var(--primary-color)" />
               <h3 style={suggestedTitleStyle}>Suggested Content</h3>
             </div>
-            <SuggestedSidebar suggestions={sidebarSuggestions} onVideoClick={playVideo} />
+            <SuggestedSidebar 
+              suggestions={sidebarSuggestions} 
+              onVideoClick={handleOpenVideo} // 🟢 Use handleOpenVideo instead of playVideo so Ads work too!
+              user={user} 
+              setShowPaywall={setShowPaywall} 
+            />
           </aside>
         )}
       </div>
