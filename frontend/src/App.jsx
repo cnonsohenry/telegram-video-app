@@ -6,6 +6,7 @@ import AuthForm from "./components/AuthForm";
 import PitchView from "./components/PitchView";
 import FullscreenPlayer from "./components/FullscreenPlayer"; 
 import PaywallModal from "./components/PaywallModal"; 
+import LegalPages from "./pages/LegalPages"; // 🟢 Import the new Legal Shell
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
@@ -18,6 +19,7 @@ export default function App() {
   const [activeVideo, setActiveVideo] = useState(null); 
   
   const [showPaywall, setShowPaywall] = useState(false);
+  const [activeLegalPage, setActiveLegalPage] = useState(null); // 🟢 State for Legal routing
 
   const isAdFreeZone = !hasSeenPitch || activeTab === "profile" || activeTab === "admin";
   useAdZapper(isAdFreeZone);
@@ -97,8 +99,15 @@ export default function App() {
         setToken(null);
       });
     }
+    
+    // 🟢 URL Param checkers for Admin and Legal routing
     const params = new URLSearchParams(window.location.search);
     if (params.get("admin") === "true") setActiveTab("admin");
+    
+    const legalParam = params.get("legal");
+    if (legalParam) {
+      setActiveLegalPage(legalParam);
+    }
   }, [token, user, applyTheme]);
 
   const isLoggedIn = useMemo(() => !!token, [token]);
@@ -148,7 +157,6 @@ export default function App() {
           opacity: activeTab === "profile" ? 1 : 0,
           pointerEvents: activeTab === "profile" ? "auto" : "none"
         }}>
-          {/* 🟢 MOVED COMMENT OUTSIDE TERNARY TO FIX BUILD ERROR */}
           {isLoggedIn ? (
             <Profile 
               user={user} 
@@ -213,6 +221,18 @@ export default function App() {
         <PaywallModal 
           user={user} 
           onClose={() => setShowPaywall(false)} 
+        />
+      )}
+
+      {/* 🟢 LEGAL PAGES OVERLAY */}
+      {activeLegalPage && (
+        <LegalPages 
+          initialPage={activeLegalPage} 
+          onBack={() => {
+            setActiveLegalPage(null);
+            // Clean the URL when they click back so refreshing doesn't keep opening it
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }} 
         />
       )}
 

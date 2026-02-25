@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, User, Lock, Bell, LogOut, ChevronRight, Palette } from "lucide-react";
+import LegalFooter from "./LegalFooter";
 
 export default function SettingsView({ onBack, onLogout }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -115,7 +116,10 @@ export default function SettingsView({ onBack, onLogout }) {
           </div>
         </div>
       )}
+
+      <LegalFooter />
     </div>
+    
   );
 }
 

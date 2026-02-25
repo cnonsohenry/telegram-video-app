@@ -8,10 +8,11 @@ import { useVideos } from "../hooks/useVideos";
 import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
+import LegalFooter from "../components/LegalFooter";
 
 const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
 const MAX_CACHE_SIZE = 4;
-const AD_FREQUENCY = 5; // 🟢 Show ad every 5th new video clicked
+const AD_FREQUENCY = 4; // 🟢 Show ad every 5th new video clicked
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * CATEGORIES.length)); 
@@ -298,6 +299,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           <ArrowUp size={24} color="#fff" />
         </button>
       )}
+
+      <LegalFooter />
 
       
       <style>{`
