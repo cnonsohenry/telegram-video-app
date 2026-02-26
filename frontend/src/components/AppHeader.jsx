@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Search, X, ArrowLeft, Flame, TrendingUp, Play } from "lucide-react";
 
-const SUGGESTED_KEYWORDS = ["Knacks", "Trending", "Lagos Baddies", "New Shots", "Exclusive", "POV"];
+const SUGGESTED_KEYWORDS = ["Knacks", "Trending", "Lagos Baddies", "Exclusive", ];
 
 export default function AppHeader({ 
   isDesktop, searchTerm, setSearchTerm, 
@@ -51,10 +51,7 @@ export default function AppHeader({
           <div style={overlayContentStyle}>
             
             <div style={sectionStyle}>
-              <h3 style={sectionTitleStyle}>
-                <Flame size={16} color="#ff3b30" fill="#ff3b30" /> 
-                You may like
-              </h3>
+
               <div style={keywordGridStyle}>
                 {SUGGESTED_KEYWORDS.map(kw => (
                   <button key={kw} onClick={() => handleKeywordClick(kw)} style={keywordPillStyle}>
@@ -67,7 +64,10 @@ export default function AppHeader({
 
             {suggestions.length > 0 && (
               <div style={sectionStyle}>
-                <h3 style={sectionTitleStyle}>Suggested content</h3>
+                <h3 style={sectionTitleStyle}>
+                <Flame size={16} color="#ff3b30" fill="#ff3b30" /> 
+                You may like
+                </h3>
                 {/* 🟢 Passed isDesktop to dynamically toggle grid vs list */}
                 <div style={suggestedContentGrid(isDesktop)}>
                   {suggestions.slice(0, 6).map(v => (
@@ -168,7 +168,7 @@ const iconBtnStyle = { background: "none", border: "none", padding: 0, cursor: "
 const activeSearchBarStyle = { display: "flex", alignItems: "center", background: "#1c1c1e", borderRadius: "8px", padding: "0 10px", flex: 1, height: "40px" };
 const searchActionBtnStyle = { background: "none", border: "none", color: "var(--primary-color)", fontWeight: "700", fontSize: "14px", cursor: "pointer" };
 const overlayContentStyle = { flex: 1, overflowY: "auto", padding: "20px" };
-const sectionStyle = { marginBottom: "30px" };
+const sectionStyle = { marginBottom: "20px" };
 const sectionTitleStyle = { display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "16px", fontWeight: "800", margin: "0 0 15px 0" };
 const keywordGridStyle = { display: "flex", flexWrap: "wrap", gap: "10px" };
 const keywordPillStyle = { display: "flex", alignItems: "center", gap: "6px", background: "#1c1c1e", color: "#ddd", border: "none", padding: "10px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
@@ -178,26 +178,26 @@ const suggestedContentGrid = (isDesktop) => ({
   display: isDesktop ? "grid" : "flex", 
   flexDirection: isDesktop ? "row" : "column",
   gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(150px, 1fr))" : "none", 
-  gap: "15px" 
+  gap: isDesktop ? "15px" : "0" // 🟢 FIX: Removed the double-gap on mobile
 });
 
 const suggestedVideoItem = (isDesktop) => ({ 
   display: "flex", 
-  flexDirection: isDesktop ? "column" : "row-reverse", // Flips layout on mobile
-  gap: isDesktop ? "8px" : "15px", 
-  alignItems: isDesktop ? "stretch" : "center",
+  flexDirection: isDesktop ? "column" : "row-reverse", 
+  gap: isDesktop ? "8px" : "12px", 
+  alignItems: "center", // 🟢 FIX: Vertically center the text with the thumbnail
   cursor: "pointer",
   width: "100%",
   borderBottom: isDesktop ? "none" : "1px solid #1c1c1e",
-  paddingBottom: isDesktop ? "0" : "15px"
+  padding: isDesktop ? "0" : "12px 0" // 🟢 FIX: Tighter, balanced padding
 });
 
 const suggestedThumbWrapper = (isDesktop) => ({ 
-  width: isDesktop ? "100%" : "65px", 
-  height: isDesktop ? "auto" : "90px",
+  width: isDesktop ? "100%" : "56px", // 🟢 FIX: Slimmer width
+  height: isDesktop ? "auto" : "80px", // 🟢 FIX: Shorter height for a compact row
   aspectRatio: isDesktop ? "9/16" : "auto", 
   background: "#111", 
-  borderRadius: "8px", 
+  borderRadius: isDesktop ? "8px" : "6px", // Slightly sharper corners on small mobile thumbs
   position: "relative", 
   overflow: "hidden",
   flexShrink: 0
@@ -206,6 +206,7 @@ const suggestedThumbWrapper = (isDesktop) => ({
 const suggestedVideoInfo = (isDesktop) => ({ 
   display: "flex", 
   flexDirection: "column",
+  justifyContent: "center",
   flex: 1,
   minWidth: 0
 });
