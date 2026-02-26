@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-export function useVideos(currentCategory) {
+// 🟢 1. Added limit parameter with a default of 12
+export function useVideos(currentCategory, limit = 12) {
   const [videos, setVideos] = useState([]);
   const [sidebarSuggestions, setSidebarSuggestions] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   
-  // 🟢 Ref to prevent race conditions
+  // Ref to prevent race conditions
   const isFetching = useRef(false);
 
-  // 🟢 Main Data Fetcher
+  // Main Data Fetcher
   const fetchData = useCallback(async (targetPage, isNew) => {
     // Prevent overlapping fetches
     if (isFetching.current) return;
@@ -19,7 +20,8 @@ export function useVideos(currentCategory) {
     setLoading(true);
 
     try {
-      let url = `https://videos.naijahomemade.com/api/videos?page=${targetPage}&limit=12&category=${currentCategory}`;
+      // 🟢 2. Dynamically inject the limit into the API request
+      let url = `https://videos.naijahomemade.com/api/videos?page=${targetPage}&limit=${limit}&category=${currentCategory}`;
       if (currentCategory === "trends") url += `&sort=trending`;
       
       const res = await fetch(url);
@@ -41,8 +43,8 @@ export function useVideos(currentCategory) {
           setSidebarSuggestions(data.suggestions);
         }
         
-        // If we got fewer videos than the limit, we reached the end
-        if (data.videos.length < 12) {
+        // 🟢 3. Update pagination check to use the dynamic limit
+        if (data.videos.length < limit) {
             setHasMore(false);
         }
 
@@ -54,9 +56,9 @@ export function useVideos(currentCategory) {
       setLoading(false); 
       isFetching.current = false; 
     }
-  }, [currentCategory]);
+  }, [currentCategory, limit]); // 🟢 4. Added limit to dependency array
 
-  // 🟢 Initial Load Effect (LOOP PROOF)
+  // Initial Load Effect (LOOP PROOF)
   useEffect(() => {
     // Reset state specifically for the new category
     isFetching.current = false; // Reset lock
@@ -67,7 +69,6 @@ export function useVideos(currentCategory) {
     // Trigger the first fetch
     fetchData(1, true);
     
-    // 🟢 cleanup function not strictly needed for fetch, but good practice
   }, [currentCategory, fetchData]);
 
   return { 

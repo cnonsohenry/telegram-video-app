@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp, Zap } from "lucide-react";
+import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
@@ -12,7 +12,7 @@ import LegalFooter from "../components/LegalFooter";
 
 const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
 const MAX_CACHE_SIZE = 4;
-const AD_FREQUENCY = 4; // 🟢 Show ad every 5th new video clicked
+const AD_FREQUENCY = 4;
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * CATEGORIES.length)); 
@@ -27,7 +27,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
-  const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory);
+  
+  const fetchLimit = isDesktop ? 15 : 12;
+  
+  const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory, fetchLimit);
 
   const updateCache = useCallback((category, data) => {
     setCacheOrder(prevOrder => {
@@ -82,7 +85,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
   };
 
-  // 🟢 HYBRID MONETIZATION & FREQUENCY CAPPING
   const handleOpenVideo = useCallback(async (video, e) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
@@ -90,7 +92,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
     if (!video) return;
 
-    // 1. PREMIUM GATE (Paywall)
     if (video.category === "premium") {
       if (!user || !user.is_premium) {
         setShowPaywall(true);
@@ -100,23 +101,18 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       return;
     }
 
-    // 2. FREE GATE (Ads)
     const videoKey = `${video.chat_id}:${video.message_id}`;
     
-    // If already unlocked (they watched an ad for this before, or bypassed it), just play
     if (unlockedVideos.has(videoKey)) { 
       playVideo(video); 
       return; 
     }
 
-    // Read the ad counter from local storage
     const videosWatchedCount = parseInt(localStorage.getItem("ad_frequency_counter") || "0", 10);
     const shouldShowAd = videosWatchedCount % AD_FREQUENCY === 0;
 
-    // Increment and save counter for the next click
     localStorage.setItem("ad_frequency_counter", (videosWatchedCount + 1).toString());
 
-    // Unlock it so they don't get punished for re-clicking the same video later
     const nextSet = new Set(unlockedVideos);
     nextSet.add(videoKey);
     setUnlockedVideos(nextSet);
@@ -128,10 +124,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         await adReturnWatcher();
         playVideo(video);
       } catch (err) { 
-        playVideo(video); // Failsafe if ad blocker kills the ad
+        playVideo(video); 
       }
     } else {
-      // 🟢 Skip ad, user is in their "cooldown" period
       playVideo(video);
     }
   }, [user, unlockedVideos]);
@@ -151,7 +146,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         const cat = CATEGORIES[idx];
         if (!videoCache[cat]) {
           try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/videos?category=${cat}&limit=12`);
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/videos?category=${cat}&limit=${fetchLimit}`);
             if (res.ok) {
               const data = await res.json();
               updateCache(cat, data.videos);
@@ -162,7 +157,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     };
     const timer = setTimeout(prefetch, 3000);
     return () => clearTimeout(timer);
-  }, [activeTab, loading, videos, videoCache, updateCache]);
+  }, [activeTab, loading, videos, videoCache, updateCache, fetchLimit]);
 
   useEffect(() => {
     const handleScroll = () => setShowScrollTop(window.scrollY > 400);
@@ -189,13 +184,28 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   return (
     <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <AppHeader isDesktop={isDesktop} searchTerm={searchTerm} user={user} onProfileClick={onProfileClick} />
+      <AppHeader 
+        isDesktop={isDesktop} 
+        searchTerm={searchTerm} 
+        setSearchTerm={setSearchTerm} 
+        user={user} 
+        onProfileClick={onProfileClick} 
+        suggestions={sidebarSuggestions} // 🟢 Passes the same suggestions as the sidebar
+        onVideoClick={(v, e) => handleOpenVideo(v, e)} // 🟢 Re-uses your ad/paywall logic
+      />
       
+      {/* 🟢 Removed paddingRight hack. Let flexbox handle the natural layout width */}
       <div style={{ display: "flex", flex: 1, position: "relative" }}>
         
-        {/* 🟢 LEFT SIDEBAR */}
         {isDesktop && (
-          <div style={{ width: "80px", flexShrink: 0 }}>
+          <div style={{ 
+            width: "80px", 
+            flexShrink: 0, 
+            position: "sticky", 
+            top: "70px", 
+            height: "calc(100vh - 70px)", 
+            zIndex: 110 
+          }}>
             <nav 
               onMouseEnter={() => setIsSidebarHovered(true)}
               onMouseLeave={() => setIsSidebarHovered(false)}
@@ -232,7 +242,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           </div>
         )}
 
-        {/* 🟢 CENTER FEED */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {!isDesktop && (
             <nav style={mobileNavStyle}>
@@ -266,23 +275,22 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                     />
                   ))}
                   {(loading || isChangingTab) && videosToDisplay.length === 0 && (
-                    [...Array(8)].map((_, i) => <div key={i} style={skeletonSocket} />)
+                    [...Array(fetchLimit)].map((_, i) => <div key={i} style={skeletonSocket} />)
                   )}
                </div>
                {(!loading && !isChangingTab) && videosToDisplay.length > 0 && (
                  <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
                )}
             </div>
+            
+            {videosToDisplay.length > 0 && <LegalFooter />}
+            
           </PullToRefresh>
         </div>
 
-        {/* 🟢 RIGHT SIDEBAR */}
+        {/* 🟢 Removed the repetitive header entirely */}
         {isDesktop && (
-          <aside style={suggestedSidebarRail}>
-            <div style={suggestedHeaderStyle}>
-              <Zap size={18} color="var(--primary-color)" fill="var(--primary-color)" />
-              <h3 style={suggestedTitleStyle}>Suggested Content</h3>
-            </div>
+          <aside style={suggestedSidebarRail} className="custom-scrollbar">
             <SuggestedSidebar 
               suggestions={sidebarSuggestions} 
               onVideoClick={(v, e) => handleOpenVideo(v, e)} 
@@ -300,12 +308,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         </button>
       )}
 
-      <LegalFooter />
-
-      
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 0.8; } 100% { opacity: 0.5; } }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
       `}</style>
     </div>
   );
@@ -315,11 +324,23 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "12px", animation: "pulse 1.5s infinite" };
 const mobileNavStyle = { display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "var(--bg-color)", backdropFilter: "blur(15px)", borderBottom: "1px solid var(--border-color)" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
-const sidebarStyle = { height: "calc(100vh - 70px)", position: "fixed", top: "70px", left: 0, display: "flex", flexDirection: "column", gap: "8px", zIndex: 110, transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "var(--bg-color)", padding: "20px 0" };
+const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", padding: "20px 0" };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
-const suggestedSidebarRail = { width: "320px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", borderLeft: "1px solid var(--border-color)", padding: "25px 15px", background: "var(--bg-color)", overflowY: "auto", flexShrink: 0 };
-const suggestedHeaderStyle = { display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" };
-const suggestedTitleStyle = { fontSize: "16px", fontWeight: "900", margin: 0 };
+
+// 🟢 FIX: Returned padding to 30px so it perfectly matches the grid's top padding.
+// Adjusted top to 70px and height to calc(100vh - 70px) so it sticks cleanly right under the header.
+const suggestedSidebarRail = { 
+  width: "320px", 
+  height: "calc(100vh - 70px)", 
+  position: "sticky", 
+  top: "70px", 
+  borderLeft: "1px solid var(--border-color)", 
+  padding: "30px 15px", 
+  background: "transparent", 
+  overflowY: "auto", 
+  flexShrink: 0 
+};
+
 const showMoreButtonStyle = { display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "14px 40px", borderRadius: "35px", border: "1px solid #333", fontWeight: "900", cursor: "pointer" };
 const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "pointer" };
