@@ -422,25 +422,29 @@ app.get("/api/search", async (req, res) => {
   }
 
   try {
-    // Search both the caption and the uploader's name for the keyword
+    // 🟢 FIX 1: Define the API Base URL for thumbnails
+    const apiBaseUrl = "https://videos.naijahomemade.com"; 
+
+    // 🟢 FIX 2: Added LEFT JOIN to correctly search the user's username
     const searchQuery = `
-      SELECT * FROM videos 
-      WHERE caption ILIKE $1 OR uploader_name ILIKE $1 
-      ORDER BY created_at DESC 
+      SELECT v.*, u.username as uploader_name 
+      FROM videos v 
+      LEFT JOIN users u ON v.uploader_id = u.user_id 
+      WHERE v.caption ILIKE $1 OR u.username ILIKE $1 
+      ORDER BY v.created_at DESC 
       LIMIT 20
     `;
     
     // The % symbols mean "find this word anywhere in the sentence"
     const { rows } = await pool.query(searchQuery, [`%${q}%`]);
 
-    // Map the results using the exact same formatter from your main video route
     const formattedVideos = rows.map(v => {
       let thumbUrl = "";
-      if (v.cloudflare_id) {
+      if (v.cloudflare_id && v.cloudflare_id !== "none") {
          const cleanId = v.cloudflare_id.split('?')[0];
          thumbUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
       } else {
-         const sig = signThumbnail(v.chat_id, v.message_id); // Ensure signThumbnail is accessible
+         const sig = signThumbnail(v.chat_id, v.message_id); 
          thumbUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
       }
 
@@ -459,7 +463,7 @@ app.get("/api/search", async (req, res) => {
 
     res.json({ videos: formattedVideos });
   } catch (error) {
-    console.error("Search API Error:", error);
+    console.error("Search API Error:", error.message);
     res.status(500).json({ error: "Search failed" });
   }
 });
