@@ -13,9 +13,14 @@ export default function AppHeader({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const isLoggedIn = user && (user.id || user.email);
 
-  // 🟢 NEW STATE FOR SEARCH LOGIC
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  
+  // 🟢 NEW STATES FOR PAGINATION
+  const [searchPage, setSearchPage] = useState(1);
+  const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   const [recentSearches, setRecentSearches] = useState(() => {
     try {
       const saved = localStorage.getItem("recent_searches");
@@ -23,46 +28,76 @@ export default function AppHeader({
     } catch { return []; }
   });
 
-  // Lock background scroll when search is open
   useEffect(() => {
     if (isSearchOpen) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
     return () => document.body.style.overflow = "";
   }, [isSearchOpen]);
 
-  // 🟢 DEBOUNCE EFFECT: Auto-search as the user types
+  // DEBOUNCE EFFECT: Auto-search as the user types
   useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults([]);
       setIsSearching(false);
+      setHasMoreResults(false);
       return;
     }
 
     setIsSearching(true);
+    setSearchPage(1); // 🟢 Reset page to 1 when typing a new query
 
     const delayDebounceFn = setTimeout(async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/search?q=${encodeURIComponent(searchTerm)}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/search?q=${encodeURIComponent(searchTerm)}&page=1&limit=12`);
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data.videos || []);
+          setHasMoreResults(data.hasMore); // 🟢 Update "See More" visibility
         }
       } catch (err) {
         console.error("Search fetch failed", err);
       } finally {
         setIsSearching(false);
       }
-    }, 400); // 400ms delay to prevent spamming the server
+    }, 400); 
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
-  const handleKeywordClick = (keyword) => {
-    setSearchTerm(keyword);
-    // Don't close immediately, let them see the results first
+  // 🟢 NEW FUNCTION: Fetch next page of results
+  const loadMoreResults = async () => {
+    if (isLoadingMore || !hasMoreResults) return;
+    
+    setIsLoadingMore(true);
+    const nextPage = searchPage + 1;
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/search?q=${encodeURIComponent(searchTerm)}&page=${nextPage}&limit=12`);
+      if (res.ok) {
+        const data = await res.json();
+        
+        // Append new videos to existing list, avoiding duplicates
+        setSearchResults(prev => {
+          const combined = [...prev, ...(data.videos || [])];
+          const uniqueMap = new Map();
+          combined.forEach(v => uniqueMap.set(v.message_id, v));
+          return Array.from(uniqueMap.values());
+        });
+        
+        setHasMoreResults(data.hasMore);
+        setSearchPage(nextPage);
+      }
+    } catch (err) {
+      console.error("Load more search failed", err);
+    } finally {
+      setIsLoadingMore(false);
+    }
   };
 
-  // 🟢 Save successful searches to history when a video is clicked
+  const handleKeywordClick = (keyword) => {
+    setSearchTerm(keyword);
+  };
+
   const handleExecuteSearch = (video, e) => {
     if (searchTerm.trim()) {
       const currentTerm = searchTerm.trim();
@@ -75,7 +110,7 @@ export default function AppHeader({
   };
 
   const removeRecentSearch = (termToRemove, e) => {
-    e.stopPropagation(); // Prevent clicking the parent button
+    e.stopPropagation(); 
     const updated = recentSearches.filter(s => s !== termToRemove);
     setRecentSearches(updated);
     localStorage.setItem("recent_searches", JSON.stringify(updated));
@@ -83,7 +118,6 @@ export default function AppHeader({
 
   return (
     <>
-      {/* 🟢 TIKTOK-STYLE FULLSCREEN SEARCH OVERLAY */}
       {isSearchOpen && createPortal(
         <div style={searchOverlayStyle}>
           <div style={overlayHeaderStyle}>
@@ -107,10 +141,8 @@ export default function AppHeader({
 
           <div style={overlayContentStyle}>
             
-            {/* 🟢 IF EMPTY: SHOW SUGGESTIONS AND HISTORY */}
             {!searchTerm.trim() ? (
               <>
-                {/* Recent Searches (Only show if there are any) */}
                 {recentSearches.length > 0 && (
                   <div style={sectionStyle}>
                     <h3 style={sectionTitleStyle}>Recent Searches</h3>
@@ -130,7 +162,6 @@ export default function AppHeader({
                   </div>
                 )}
 
-                {/* Suggested Keywords */}
                 <div style={sectionStyle}>
                   <div style={keywordGridStyle}>
                     {SUGGESTED_KEYWORDS.map(kw => (
@@ -142,7 +173,6 @@ export default function AppHeader({
                   </div>
                 </div>
 
-                {/* Default Suggested Videos */}
                 {suggestions.length > 0 && (
                   <div style={sectionStyle}>
                     <h3 style={sectionTitleStyle}>
@@ -179,10 +209,9 @@ export default function AppHeader({
                 )}
               </>
             ) : (
-              // 🟢 IF TYPING: SHOW LIVE SEARCH RESULTS
               <div style={sectionStyle}>
                 <h3 style={sectionTitleStyle}>
-                  {isSearching ? "Searching..." : `Results for "${searchTerm}"`}
+                  {isSearching && searchPage === 1 ? "Searching..." : `Results for "${searchTerm}"`}
                 </h3>
 
                 {searchResults.length === 0 && !isSearching ? (
@@ -192,32 +221,45 @@ export default function AppHeader({
                     <p style={{ margin: "5px 0 0 0", fontSize: "13px" }}>Try searching for a different keyword or uploader.</p>
                   </div>
                 ) : (
-                  <div style={suggestedContentGrid(isDesktop)}>
-                    {searchResults.map(v => (
-                      <div 
-                        key={`search-${v.message_id}`} 
-                        onClick={(e) => handleExecuteSearch(v, e)}
-                        style={suggestedVideoItem(isDesktop)}
+                  <>
+                    <div style={suggestedContentGrid(isDesktop)}>
+                      {searchResults.map(v => (
+                        <div 
+                          key={`search-${v.message_id}`} 
+                          onClick={(e) => handleExecuteSearch(v, e)}
+                          style={suggestedVideoItem(isDesktop)}
+                        >
+                          <div style={suggestedThumbWrapper(isDesktop)}>
+                            <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
+                            {isDesktop && (
+                              <div style={viewsOverlay}>
+                                <Play size={10} fill="#fff" strokeWidth={0} />
+                                {Number(v.views).toLocaleString()}
+                              </div>
+                            )}
+                          </div>
+                          <div style={suggestedVideoInfo(isDesktop)}>
+                            <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
+                            <span style={suggestedUploader}>
+                              @{v.uploader_name} 
+                              {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* 🟢 THE SEE MORE BUTTON */}
+                    {hasMoreResults && !isSearching && (
+                      <button 
+                        onClick={loadMoreResults} 
+                        style={showMoreButtonStyle}
+                        disabled={isLoadingMore}
                       >
-                        <div style={suggestedThumbWrapper(isDesktop)}>
-                          <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
-                          {isDesktop && (
-                            <div style={viewsOverlay}>
-                              <Play size={10} fill="#fff" strokeWidth={0} />
-                              {Number(v.views).toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                        <div style={suggestedVideoInfo(isDesktop)}>
-                          <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
-                          <span style={suggestedUploader}>
-                            @{v.uploader_name} 
-                            {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                        {isLoadingMore ? "Loading..." : "See More"}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -294,11 +336,11 @@ const sectionStyle = { marginBottom: "20px" };
 const sectionTitleStyle = { display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "16px", fontWeight: "800", margin: "0 0 15px 0" };
 const keywordGridStyle = { display: "flex", flexWrap: "wrap", gap: "10px" };
 const keywordPillStyle = { display: "flex", alignItems: "center", gap: "6px", background: "#1c1c1e", color: "#ddd", border: "none", padding: "10px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
-
-// 🟢 New style for Recent Searches
 const recentSearchItemStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", cursor: "pointer", borderBottom: "1px solid #1c1c1e" };
 
-// Dynamic Layout Styles
+// 🟢 Re-used your Home.jsx style for the Load More button
+const showMoreButtonStyle = { display: "block", margin: "30px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "35px", border: "1px solid #333", fontWeight: "800", cursor: "pointer" };
+
 const suggestedContentGrid = (isDesktop) => ({ 
   display: isDesktop ? "grid" : "flex", 
   flexDirection: isDesktop ? "row" : "column",

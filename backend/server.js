@@ -412,31 +412,32 @@ app.get("/api/videos", async (req, res) => {
 
 
 /* =====================
-   SEARCH ENDPOINT
+   SEARCH ENDPOINT (PAGINATED)
 ===================== */
 app.get("/api/search", async (req, res) => {
-  const { q } = req.query;
+  // 🟢 1. Accept page and limit from the frontend, default to page 1, limit 12
+  const { q, page = 1, limit = 12 } = req.query;
   
   if (!q || q.trim() === "") {
-    return res.json({ videos: [] });
+    return res.json({ videos: [], hasMore: false });
   }
 
   try {
-    // 🟢 FIX 1: Define the API Base URL for thumbnails
     const apiBaseUrl = "https://videos.naijahomemade.com"; 
+    // 🟢 2. Calculate offset (how many videos to skip)
+    const offset = (Number(page) - 1) * Number(limit);
 
-    // 🟢 FIX 2: Added LEFT JOIN to correctly search the user's username
+    // 🟢 3. Add LIMIT and OFFSET to the query
     const searchQuery = `
       SELECT v.*, u.username as uploader_name 
       FROM videos v 
       LEFT JOIN users u ON v.uploader_id = u.user_id 
       WHERE v.caption ILIKE $1 OR u.username ILIKE $1 
       ORDER BY v.created_at DESC 
-      LIMIT 20
+      LIMIT $2 OFFSET $3
     `;
     
-    // The % symbols mean "find this word anywhere in the sentence"
-    const { rows } = await pool.query(searchQuery, [`%${q}%`]);
+    const { rows } = await pool.query(searchQuery, [`%${q}%`, limit, offset]);
 
     const formattedVideos = rows.map(v => {
       let thumbUrl = "";
@@ -461,7 +462,11 @@ app.get("/api/search", async (req, res) => {
       };
     });
 
-    res.json({ videos: formattedVideos });
+    // 🟢 4. Return hasMore so React knows if it should show the "See More" button
+    res.json({ 
+      videos: formattedVideos,
+      hasMore: formattedVideos.length === Number(limit) 
+    });
   } catch (error) {
     console.error("Search API Error:", error.message);
     res.status(500).json({ error: "Search failed" });
