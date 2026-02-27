@@ -410,6 +410,60 @@ app.get("/api/videos", async (req, res) => {
   }
 });
 
+
+/* =====================
+   SEARCH ENDPOINT
+===================== */
+app.get("/api/search", async (req, res) => {
+  const { q } = req.query;
+  
+  if (!q || q.trim() === "") {
+    return res.json({ videos: [] });
+  }
+
+  try {
+    // Search both the caption and the uploader's name for the keyword
+    const searchQuery = `
+      SELECT * FROM videos 
+      WHERE caption ILIKE $1 OR uploader_name ILIKE $1 
+      ORDER BY created_at DESC 
+      LIMIT 20
+    `;
+    
+    // The % symbols mean "find this word anywhere in the sentence"
+    const { rows } = await pool.query(searchQuery, [`%${q}%`]);
+
+    // Map the results using the exact same formatter from your main video route
+    const formattedVideos = rows.map(v => {
+      let thumbUrl = "";
+      if (v.cloudflare_id) {
+         const cleanId = v.cloudflare_id.split('?')[0];
+         thumbUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
+      } else {
+         const sig = signThumbnail(v.chat_id, v.message_id); // Ensure signThumbnail is accessible
+         thumbUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
+      }
+
+      return {
+        chat_id: v.chat_id,
+        message_id: v.message_id,
+        views: v.views,
+        caption: v.caption,
+        category: v.category,
+        uploader_id: v.uploader_id,
+        uploader_name: v.uploader_name || "Member",
+        created_at: v.created_at,
+        thumbnail_url: thumbUrl
+      };
+    });
+
+    res.json({ videos: formattedVideos });
+  } catch (error) {
+    console.error("Search API Error:", error);
+    res.status(500).json({ error: "Search failed" });
+  }
+});
+
 /* =====================
    Video Details Helper (For Shared Links)
 ===================== */

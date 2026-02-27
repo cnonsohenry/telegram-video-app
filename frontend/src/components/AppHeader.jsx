@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Search, X, ArrowLeft, Flame, TrendingUp, Play } from "lucide-react";
+import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock } from "lucide-react";
 
-const SUGGESTED_KEYWORDS = ["Knacks", "Trending", "Lagos Baddies", "Exclusive", ];
+const SUGGESTED_KEYWORDS = ["Knacks", "Trending", "Lagos Baddies", "Exclusive"];
 
 export default function AppHeader({ 
   isDesktop, searchTerm, setSearchTerm, 
@@ -13,15 +13,72 @@ export default function AppHeader({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const isLoggedIn = user && (user.id || user.email);
 
+  // 🟢 NEW STATE FOR SEARCH LOGIC
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [recentSearches, setRecentSearches] = useState(() => {
+    try {
+      const saved = localStorage.getItem("recent_searches");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  // Lock background scroll when search is open
   useEffect(() => {
     if (isSearchOpen) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
     return () => document.body.style.overflow = "";
   }, [isSearchOpen]);
 
+  // 🟢 DEBOUNCE EFFECT: Auto-search as the user types
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/search?q=${encodeURIComponent(searchTerm)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.videos || []);
+        }
+      } catch (err) {
+        console.error("Search fetch failed", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400); // 400ms delay to prevent spamming the server
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
   const handleKeywordClick = (keyword) => {
     setSearchTerm(keyword);
-    setIsSearchOpen(false); 
+    // Don't close immediately, let them see the results first
+  };
+
+  // 🟢 Save successful searches to history when a video is clicked
+  const handleExecuteSearch = (video, e) => {
+    if (searchTerm.trim()) {
+      const currentTerm = searchTerm.trim();
+      const updatedSearches = [currentTerm, ...recentSearches.filter(s => s !== currentTerm)].slice(0, 5);
+      setRecentSearches(updatedSearches);
+      localStorage.setItem("recent_searches", JSON.stringify(updatedSearches));
+    }
+    setIsSearchOpen(false);
+    onVideoClick(video, e);
+  };
+
+  const removeRecentSearch = (termToRemove, e) => {
+    e.stopPropagation(); // Prevent clicking the parent button
+    const updated = recentSearches.filter(s => s !== termToRemove);
+    setRecentSearches(updated);
+    localStorage.setItem("recent_searches", JSON.stringify(updated));
   };
 
   return (
@@ -50,53 +107,118 @@ export default function AppHeader({
 
           <div style={overlayContentStyle}>
             
-            <div style={sectionStyle}>
+            {/* 🟢 IF EMPTY: SHOW SUGGESTIONS AND HISTORY */}
+            {!searchTerm.trim() ? (
+              <>
+                {/* Recent Searches (Only show if there are any) */}
+                {recentSearches.length > 0 && (
+                  <div style={sectionStyle}>
+                    <h3 style={sectionTitleStyle}>Recent Searches</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                      {recentSearches.map(term => (
+                        <div key={term} onClick={() => handleKeywordClick(term)} style={recentSearchItemStyle}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <Clock size={16} color="#8e8e8e" />
+                            <span style={{ color: "#ddd", fontSize: "15px" }}>{term}</span>
+                          </div>
+                          <button onClick={(e) => removeRecentSearch(term, e)} style={iconBtnStyle}>
+                            <X size={16} color="#8e8e8e" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-              <div style={keywordGridStyle}>
-                {SUGGESTED_KEYWORDS.map(kw => (
-                  <button key={kw} onClick={() => handleKeywordClick(kw)} style={keywordPillStyle}>
-                    <TrendingUp size={14} color="#8e8e8e" />
-                    {kw}
-                  </button>
-                ))}
-              </div>
-            </div>
+                {/* Suggested Keywords */}
+                <div style={sectionStyle}>
+                  <div style={keywordGridStyle}>
+                    {SUGGESTED_KEYWORDS.map(kw => (
+                      <button key={kw} onClick={() => handleKeywordClick(kw)} style={keywordPillStyle}>
+                        <TrendingUp size={14} color="#8e8e8e" />
+                        {kw}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            {suggestions.length > 0 && (
+                {/* Default Suggested Videos */}
+                {suggestions.length > 0 && (
+                  <div style={sectionStyle}>
+                    <h3 style={sectionTitleStyle}>
+                      <Flame size={16} color="#ff3b30" fill="#ff3b30" /> 
+                      You may like
+                    </h3>
+                    <div style={suggestedContentGrid(isDesktop)}>
+                      {suggestions.slice(0, 6).map(v => (
+                        <div 
+                          key={v.message_id} 
+                          onClick={(e) => handleExecuteSearch(v, e)}
+                          style={suggestedVideoItem(isDesktop)}
+                        >
+                          <div style={suggestedThumbWrapper(isDesktop)}>
+                            <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
+                            {isDesktop && (
+                              <div style={viewsOverlay}>
+                                <Play size={10} fill="#fff" strokeWidth={0} />
+                                {Number(v.views).toLocaleString()}
+                              </div>
+                            )}
+                          </div>
+                          <div style={suggestedVideoInfo(isDesktop)}>
+                            <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
+                            <span style={suggestedUploader}>
+                              @{v.uploader_name} 
+                              {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              // 🟢 IF TYPING: SHOW LIVE SEARCH RESULTS
               <div style={sectionStyle}>
                 <h3 style={sectionTitleStyle}>
-                <Flame size={16} color="#ff3b30" fill="#ff3b30" /> 
-                You may like
+                  {isSearching ? "Searching..." : `Results for "${searchTerm}"`}
                 </h3>
-                {/* 🟢 Passed isDesktop to dynamically toggle grid vs list */}
-                <div style={suggestedContentGrid(isDesktop)}>
-                  {suggestions.slice(0, 6).map(v => (
-                    <div 
-                      key={v.message_id} 
-                      onClick={(e) => { setIsSearchOpen(false); onVideoClick(v, e); }}
-                      style={suggestedVideoItem(isDesktop)}
-                    >
-                      <div style={suggestedThumbWrapper(isDesktop)}>
-                        <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
-                        {/* Hide overlay on mobile so it doesn't block the small thumb */}
-                        {isDesktop && (
-                          <div style={viewsOverlay}>
-                            <Play size={10} fill="#fff" strokeWidth={0} />
-                            {Number(v.views).toLocaleString()}
-                          </div>
-                        )}
+
+                {searchResults.length === 0 && !isSearching ? (
+                  <div style={{ textAlign: "center", padding: "40px 20px", color: "#888" }}>
+                    <Search size={40} color="#333" style={{ marginBottom: "15px" }} />
+                    <p style={{ margin: 0, fontSize: "16px", fontWeight: "600", color: "#ccc" }}>No results found</p>
+                    <p style={{ margin: "5px 0 0 0", fontSize: "13px" }}>Try searching for a different keyword or uploader.</p>
+                  </div>
+                ) : (
+                  <div style={suggestedContentGrid(isDesktop)}>
+                    {searchResults.map(v => (
+                      <div 
+                        key={`search-${v.message_id}`} 
+                        onClick={(e) => handleExecuteSearch(v, e)}
+                        style={suggestedVideoItem(isDesktop)}
+                      >
+                        <div style={suggestedThumbWrapper(isDesktop)}>
+                          <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
+                          {isDesktop && (
+                            <div style={viewsOverlay}>
+                              <Play size={10} fill="#fff" strokeWidth={0} />
+                              {Number(v.views).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                        <div style={suggestedVideoInfo(isDesktop)}>
+                          <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
+                          <span style={suggestedUploader}>
+                            @{v.uploader_name} 
+                            {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
+                          </span>
+                        </div>
                       </div>
-                      <div style={suggestedVideoInfo(isDesktop)}>
-                        <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
-                        <span style={suggestedUploader}>
-                          @{v.uploader_name} 
-                          {/* Add views inline for mobile view */}
-                          {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -173,31 +295,34 @@ const sectionTitleStyle = { display: "flex", alignItems: "center", gap: "8px", c
 const keywordGridStyle = { display: "flex", flexWrap: "wrap", gap: "10px" };
 const keywordPillStyle = { display: "flex", alignItems: "center", gap: "6px", background: "#1c1c1e", color: "#ddd", border: "none", padding: "10px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
 
-// 🟢 Dynamic Layout Styles
+// 🟢 New style for Recent Searches
+const recentSearchItemStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", cursor: "pointer", borderBottom: "1px solid #1c1c1e" };
+
+// Dynamic Layout Styles
 const suggestedContentGrid = (isDesktop) => ({ 
   display: isDesktop ? "grid" : "flex", 
   flexDirection: isDesktop ? "row" : "column",
   gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(150px, 1fr))" : "none", 
-  gap: isDesktop ? "15px" : "0" // 🟢 FIX: Removed the double-gap on mobile
+  gap: isDesktop ? "15px" : "0"
 });
 
 const suggestedVideoItem = (isDesktop) => ({ 
   display: "flex", 
   flexDirection: isDesktop ? "column" : "row-reverse", 
   gap: isDesktop ? "8px" : "12px", 
-  alignItems: "center", // 🟢 FIX: Vertically center the text with the thumbnail
+  alignItems: "center", 
   cursor: "pointer",
   width: "100%",
   borderBottom: isDesktop ? "none" : "1px solid #1c1c1e",
-  padding: isDesktop ? "0" : "12px 0" // 🟢 FIX: Tighter, balanced padding
+  padding: isDesktop ? "0" : "12px 0" 
 });
 
 const suggestedThumbWrapper = (isDesktop) => ({ 
-  width: isDesktop ? "100%" : "56px", // 🟢 FIX: Slimmer width
-  height: isDesktop ? "auto" : "80px", // 🟢 FIX: Shorter height for a compact row
+  width: isDesktop ? "100%" : "56px", 
+  height: isDesktop ? "auto" : "80px", 
   aspectRatio: isDesktop ? "9/16" : "auto", 
   background: "#111", 
-  borderRadius: isDesktop ? "8px" : "6px", // Slightly sharper corners on small mobile thumbs
+  borderRadius: isDesktop ? "8px" : "6px", 
   position: "relative", 
   overflow: "hidden",
   flexShrink: 0
