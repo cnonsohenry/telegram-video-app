@@ -16,7 +16,9 @@ export default function AppHeader({
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   
-  // 🟢 NEW STATES FOR PAGINATION
+  // 🟢 NEW: State to track if the user has explicitly hit "Search"
+  const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
+  
   const [searchPage, setSearchPage] = useState(1);
   const [hasMoreResults, setHasMoreResults] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -34,25 +36,25 @@ export default function AppHeader({
     return () => document.body.style.overflow = "";
   }, [isSearchOpen]);
 
-  // DEBOUNCE EFFECT: Auto-search as the user types
   useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults([]);
       setIsSearching(false);
       setHasMoreResults(false);
+      setHasSubmittedSearch(false); // Reset submitted state when empty
       return;
     }
 
     setIsSearching(true);
-    setSearchPage(1); // 🟢 Reset page to 1 when typing a new query
+    setSearchPage(1); 
 
     const delayDebounceFn = setTimeout(async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/search?q=${encodeURIComponent(searchTerm)}&page=1&limit=12`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/search?q=${encodeURIComponent(searchTerm)}&page=1&limit=15`);
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data.videos || []);
-          setHasMoreResults(data.hasMore); // 🟢 Update "See More" visibility
+          setHasMoreResults(data.hasMore);
         }
       } catch (err) {
         console.error("Search fetch failed", err);
@@ -64,7 +66,6 @@ export default function AppHeader({
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
-  // 🟢 NEW FUNCTION: Fetch next page of results
   const loadMoreResults = async () => {
     if (isLoadingMore || !hasMoreResults) return;
     
@@ -72,18 +73,15 @@ export default function AppHeader({
     const nextPage = searchPage + 1;
     
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/search?q=${encodeURIComponent(searchTerm)}&page=${nextPage}&limit=12`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/search?q=${encodeURIComponent(searchTerm)}&page=${nextPage}&limit=15`);
       if (res.ok) {
         const data = await res.json();
-        
-        // Append new videos to existing list, avoiding duplicates
         setSearchResults(prev => {
           const combined = [...prev, ...(data.videos || [])];
           const uniqueMap = new Map();
           combined.forEach(v => uniqueMap.set(v.message_id, v));
           return Array.from(uniqueMap.values());
         });
-        
         setHasMoreResults(data.hasMore);
         setSearchPage(nextPage);
       }
@@ -96,15 +94,31 @@ export default function AppHeader({
 
   const handleKeywordClick = (keyword) => {
     setSearchTerm(keyword);
+    setHasSubmittedSearch(true); // Treat clicking a keyword pill as a submitted search
+    saveSearchHistory(keyword);
+  };
+
+  // 🟢 Helper to save search history
+  const saveSearchHistory = (term) => {
+    if (!term.trim()) return;
+    const currentTerm = term.trim();
+    const updatedSearches = [currentTerm, ...recentSearches.filter(s => s !== currentTerm)].slice(0, 5);
+    setRecentSearches(updatedSearches);
+    localStorage.setItem("recent_searches", JSON.stringify(updatedSearches));
+  };
+
+  // 🟢 Handle explicit search submission (Enter key or Search button)
+  const handleSearchSubmit = () => {
+    if (searchTerm.trim()) {
+      setHasSubmittedSearch(true);
+      saveSearchHistory(searchTerm);
+    } else {
+      setIsSearchOpen(false);
+    }
   };
 
   const handleExecuteSearch = (video, e) => {
-    if (searchTerm.trim()) {
-      const currentTerm = searchTerm.trim();
-      const updatedSearches = [currentTerm, ...recentSearches.filter(s => s !== currentTerm)].slice(0, 5);
-      setRecentSearches(updatedSearches);
-      localStorage.setItem("recent_searches", JSON.stringify(updatedSearches));
-    }
+    saveSearchHistory(searchTerm);
     setIsSearchOpen(false);
     onVideoClick(video, e);
   };
@@ -131,12 +145,19 @@ export default function AppHeader({
                 type="text" 
                 placeholder="Search shots..." 
                 value={searchTerm} 
-                onChange={(e) => setSearchTerm(e.target.value)} 
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setHasSubmittedSearch(false); // 🟢 Revert to suggestions when user resumes typing
+                }} 
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSearchSubmit(); // 🟢 Trigger submit on Enter
+                }}
                 style={inputStyle} 
               />
               {searchTerm && <X size={16} color="#8e8e8e" style={{ cursor: "pointer" }} onClick={() => setSearchTerm("")} />}
             </div>
-            <button onClick={() => setIsSearchOpen(false)} style={searchActionBtnStyle}>Search</button>
+            {/* 🟢 Trigger submit on button click */}
+            <button onClick={handleSearchSubmit} style={searchActionBtnStyle}>Search</button>
           </div>
 
           <div style={overlayContentStyle}>
@@ -181,11 +202,7 @@ export default function AppHeader({
                     </h3>
                     <div style={suggestedContentGrid(isDesktop)}>
                       {suggestions.slice(0, 6).map(v => (
-                        <div 
-                          key={v.message_id} 
-                          onClick={(e) => handleExecuteSearch(v, e)}
-                          style={suggestedVideoItem(isDesktop)}
-                        >
+                        <div key={v.message_id} onClick={(e) => handleExecuteSearch(v, e)} style={suggestedVideoItem(isDesktop)}>
                           <div style={suggestedThumbWrapper(isDesktop)}>
                             <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
                             {isDesktop && (
@@ -222,35 +239,52 @@ export default function AppHeader({
                   </div>
                 ) : (
                   <>
-                    <div style={suggestedContentGrid(isDesktop)}>
-                      {searchResults.map(v => (
-                        <div 
-                          key={`search-${v.message_id}`} 
-                          onClick={(e) => handleExecuteSearch(v, e)}
-                          style={suggestedVideoItem(isDesktop)}
-                        >
-                          <div style={suggestedThumbWrapper(isDesktop)}>
-                            <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
-                            {isDesktop && (
+                    {/* 🟢 DYNAMIC RENDER: List if typing, Grid if submitted */}
+                    {!hasSubmittedSearch ? (
+                      <div style={suggestedContentGrid(isDesktop)}>
+                        {searchResults.slice(0, 8).map(v => (
+                          <div key={`live-${v.message_id}`} onClick={(e) => handleExecuteSearch(v, e)} style={suggestedVideoItem(isDesktop)}>
+                            <div style={suggestedThumbWrapper(isDesktop)}>
+                              <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
+                              {isDesktop && (
+                                <div style={viewsOverlay}>
+                                  <Play size={10} fill="#fff" strokeWidth={0} />
+                                  {Number(v.views).toLocaleString()}
+                                </div>
+                              )}
+                            </div>
+                            <div style={suggestedVideoInfo(isDesktop)}>
+                              <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
+                              <span style={suggestedUploader}>
+                                @{v.uploader_name} 
+                                {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      // 🟢 SUBMITTED GRID VIEW (2 on mobile, 5 on desktop)
+                      <div style={submittedContentGrid(isDesktop)}>
+                        {searchResults.map(v => (
+                          <div key={`grid-${v.message_id}`} onClick={(e) => handleExecuteSearch(v, e)} style={submittedVideoItem}>
+                            <div style={submittedThumbWrapper}>
+                              <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
                               <div style={viewsOverlay}>
                                 <Play size={10} fill="#fff" strokeWidth={0} />
                                 {Number(v.views).toLocaleString()}
                               </div>
-                            )}
+                            </div>
+                            <div style={submittedVideoInfo}>
+                              <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
+                              <span style={suggestedUploader}>@{v.uploader_name}</span>
+                            </div>
                           </div>
-                          <div style={suggestedVideoInfo(isDesktop)}>
-                            <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
-                            <span style={suggestedUploader}>
-                              @{v.uploader_name} 
-                              {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                     
-                    {/* 🟢 THE SEE MORE BUTTON */}
-                    {hasMoreResults && !isSearching && (
+                    {hasMoreResults && !isSearching && hasSubmittedSearch && (
                       <button 
                         onClick={loadMoreResults} 
                         style={showMoreButtonStyle}
@@ -337,48 +371,20 @@ const sectionTitleStyle = { display: "flex", alignItems: "center", gap: "8px", c
 const keywordGridStyle = { display: "flex", flexWrap: "wrap", gap: "10px" };
 const keywordPillStyle = { display: "flex", alignItems: "center", gap: "6px", background: "#1c1c1e", color: "#ddd", border: "none", padding: "10px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
 const recentSearchItemStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", cursor: "pointer", borderBottom: "1px solid #1c1c1e" };
-
-// 🟢 Re-used your Home.jsx style for the Load More button
 const showMoreButtonStyle = { display: "block", margin: "30px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "35px", border: "1px solid #333", fontWeight: "800", cursor: "pointer" };
 
-const suggestedContentGrid = (isDesktop) => ({ 
-  display: isDesktop ? "grid" : "flex", 
-  flexDirection: isDesktop ? "row" : "column",
-  gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(150px, 1fr))" : "none", 
-  gap: isDesktop ? "15px" : "0"
-});
-
-const suggestedVideoItem = (isDesktop) => ({ 
-  display: "flex", 
-  flexDirection: isDesktop ? "column" : "row-reverse", 
-  gap: isDesktop ? "8px" : "12px", 
-  alignItems: "center", 
-  cursor: "pointer",
-  width: "100%",
-  borderBottom: isDesktop ? "none" : "1px solid #1c1c1e",
-  padding: isDesktop ? "0" : "12px 0" 
-});
-
-const suggestedThumbWrapper = (isDesktop) => ({ 
-  width: isDesktop ? "100%" : "56px", 
-  height: isDesktop ? "auto" : "80px", 
-  aspectRatio: isDesktop ? "9/16" : "auto", 
-  background: "#111", 
-  borderRadius: isDesktop ? "8px" : "6px", 
-  position: "relative", 
-  overflow: "hidden",
-  flexShrink: 0
-});
-
-const suggestedVideoInfo = (isDesktop) => ({ 
-  display: "flex", 
-  flexDirection: "column",
-  justifyContent: "center",
-  flex: 1,
-  minWidth: 0
-});
-
+// Live Suggestion Styles (List view)
+const suggestedContentGrid = (isDesktop) => ({ display: isDesktop ? "grid" : "flex", flexDirection: isDesktop ? "row" : "column", gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(150px, 1fr))" : "none", gap: isDesktop ? "15px" : "0" });
+const suggestedVideoItem = (isDesktop) => ({ display: "flex", flexDirection: isDesktop ? "column" : "row-reverse", gap: isDesktop ? "8px" : "12px", alignItems: "center", cursor: "pointer", width: "100%", borderBottom: isDesktop ? "none" : "1px solid #1c1c1e", padding: isDesktop ? "0" : "12px 0" });
+const suggestedThumbWrapper = (isDesktop) => ({ width: isDesktop ? "100%" : "56px", height: isDesktop ? "auto" : "80px", aspectRatio: isDesktop ? "9/16" : "auto", background: "#111", borderRadius: isDesktop ? "8px" : "6px", position: "relative", overflow: "hidden", flexShrink: 0 });
+const suggestedVideoInfo = (isDesktop) => ({ display: "flex", flexDirection: "column", justifyContent: "center", flex: 1, minWidth: 0 });
 const suggestedThumb = { width: "100%", height: "100%", objectFit: "cover" };
 const viewsOverlay = { position: "absolute", bottom: "6px", left: "6px", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", padding: "4px 8px", borderRadius: "4px", color: "#fff", fontSize: "10px", fontWeight: "800", display: "flex", alignItems: "center", gap: "4px" };
 const suggestedCaption = { color: "#fff", fontSize: "14px", fontWeight: "600", margin: "0 0 6px 0", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.4" };
 const suggestedUploader = { color: "#8e8e8e", fontSize: "12px", fontWeight: "500" };
+
+// 🟢 NEW: Submitted Grid Styles (Like Home.jsx)
+const submittedContentGrid = (isDesktop) => ({ display: "grid", gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(2, 1fr)", gap: isDesktop ? "20px" : "10px", animation: "fadeIn 0.3s ease-out" });
+const submittedVideoItem = { display: "flex", flexDirection: "column", gap: "8px", cursor: "pointer", width: "100%" };
+const submittedThumbWrapper = { width: "100%", aspectRatio: "9/16", background: "#111", borderRadius: "12px", position: "relative", overflow: "hidden" };
+const submittedVideoInfo = { display: "flex", flexDirection: "column" };
