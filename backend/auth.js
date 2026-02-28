@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pkg from "pg";
 import { OAuth2Client } from "google-auth-library";
+import { z } from "zod"; // 🟢 IMPORT ZOD
 
 const { Pool } = pkg;
 const router = express.Router();
@@ -20,7 +21,6 @@ const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_change_me";
 console.log(`[AUTH] System Start. Google Client ID: ${process.env.GOOGLE_CLIENT_ID ? "✅ Loaded" : "⚠️ MISSING"}`);
 
 // 🟢 2. SECURITY MIDDLEWARE (Anti-Identity-Swap)
-// This ensures that NO part of the authentication flow is EVER cached by a browser, CDN, or proxy.
 router.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -28,9 +28,6 @@ router.use((req, res, next) => {
   next();
 });
 
-/**
- * 🛡️ MIDDLEWARE: Protects routes by verifying the JWT
- */
 export const authenticateToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
@@ -45,10 +42,40 @@ export const authenticateToken = (req, res, next) => {
   }
 };
 
-// 🟢 3. GOOGLE LOGIN (FedCM Ready)
+/* =====================
+   VALIDATION SCHEMAS
+===================== */
+const googleSchema = z.object({
+  token: z.string().min(1, "Google token is required"),
+});
+
+const registerSchema = z.object({
+  email: z.string().email("Invalid email format").max(255, "Email is too long"),
+  password: z.string().min(6, "Password must be at least 6 characters").max(100, "Password is too long"),
+  username: z.string().max(30, "Username must be under 30 characters").optional(),
+});
+
+const loginSchema = z.object({
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(1, "Password is required"), // Just need to ensure it's a non-empty string for login
+});
+
+// .strict() prevents users from passing undocumented keys to bloat your database
+const settingsSchema = z.object({
+  settings: z.object({
+    theme: z.enum(["red", "orange", "dark", "light"]).optional(),
+    // Add any future settings keys here
+  }).strict("Invalid settings payload") 
+});
+
+
+// 🟢 3. GOOGLE LOGIN
 router.post("/google", async (req, res) => {
-  const { token } = req.body;
-  if (!token) return res.status(400).json({ error: "No Google token provided" });
+  // Validate request body
+  const parsed = googleSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+
+  const { token } = parsed.data;
 
   try {
     const ticket = await googleClient.verifyIdToken({
@@ -81,11 +108,13 @@ router.post("/google", async (req, res) => {
 
 // 🟢 4. REGISTER (Email/Password)
 router.post("/register", async (req, res) => {
-  const { email, password, username } = req.body;
-  if (!password || password.length < 6) return res.status(400).json({ error: "Password too short" });
+  const parsed = registerSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+
+  const { email, password, username } = parsed.data;
 
   try {
-    const userCheck = await pool.query("SELECT * FROM app_users WHERE email = $1", [email]);
+    const userCheck = await pool.query("SELECT id FROM app_users WHERE email = $1", [email]);
     if (userCheck.rows.length > 0) return res.status(400).json({ error: "Email already exists" });
 
     const salt = await bcrypt.genSalt(10);
@@ -106,7 +135,11 @@ router.post("/register", async (req, res) => {
 
 // 🟢 5. LOGIN (Email/Password)
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+
+  const { email, password } = parsed.data;
+
   try {
     const userResult = await pool.query("SELECT * FROM app_users WHERE email = $1", [email]);
     if (userResult.rows.length === 0) return res.status(400).json({ error: "User not found" });
@@ -128,7 +161,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// 🟢 6. GET PROFILE (Atomic Session Check)
+// 🟢 6. GET PROFILE
 router.get("/me", authenticateToken, async (req, res) => {
   try {
     const userResult = await pool.query(
@@ -145,10 +178,11 @@ router.get("/me", authenticateToken, async (req, res) => {
 
 // 🟢 7. UPDATE SETTINGS (Theme Sync)
 router.patch("/settings", authenticateToken, async (req, res) => {
-  const { settings } = req.body; 
-  const userId = req.user.id;
+  const parsed = settingsSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid settings payload" });
 
-  if (!settings) return res.status(400).json({ error: "No settings provided" });
+  const { settings } = parsed.data; 
+  const userId = req.user.id;
 
   try {
     const query = `

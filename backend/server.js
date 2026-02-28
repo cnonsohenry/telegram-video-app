@@ -11,7 +11,8 @@ import crypto from "crypto";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import authRoutes from "./auth.js";
 import multer from "multer";
-import { uploadDirectToStream } from "./controllers/upload_premium.js"; 
+import { uploadDirectToStream } from "./controllers/upload_premium.js";
+import { z } from "zod"; 
 
 
 const { Pool } = pkg;
@@ -440,22 +441,39 @@ app.get("/api/videos", async (req, res) => {
 
 
 /* =====================
-   SEARCH ENDPOINT (PAGINATED)
+   SEARCH ENDPOINT (PAGINATED & VALIDATED)
 ===================== */
+
+// 🟢 1. Define strict validation rules for the query parameters
+const searchSchema = z.object({
+  q: z.string().trim().max(100, "Search query is too long").optional().default(""), // Caps at 100 chars
+  page: z.coerce.number().int().positive().default(1), // Forces into a positive whole number
+  limit: z.coerce.number().int().positive().max(50).default(12), // Caps limit at 50 to prevent DB DoS attacks
+});
+
 app.get("/api/search", async (req, res) => {
-  // 🟢 1. Accept page and limit from the frontend, default to page 1, limit 12
-  const { q, page = 1, limit = 12 } = req.query;
+  // 🟢 2. Pass incoming query through Zod
+  const parsed = searchSchema.safeParse(req.query);
   
-  if (!q || q.trim() === "") {
+  if (!parsed.success) {
+    // Instantly reject bad data before it touches your DB logic
+    return res.status(400).json({ error: parsed.error.errors[0].message });
+  }
+
+  // 🟢 3. Extract the safely parsed and coerced variables
+  const { q, page, limit } = parsed.data;
+  
+  // If search is empty, return empty early
+  if (!q) {
     return res.json({ videos: [], hasMore: false });
   }
 
   try {
     const apiBaseUrl = "https://videos.naijahomemade.com"; 
-    // 🟢 2. Calculate offset (how many videos to skip)
-    const offset = (Number(page) - 1) * Number(limit);
+    
+    // 🟢 4. Safely calculate offset without needing Number() casting
+    const offset = (page - 1) * limit;
 
-    // 🟢 3. Add LIMIT and OFFSET to the query
     const searchQuery = `
       SELECT v.*, u.username as uploader_name 
       FROM videos v 
@@ -490,10 +508,10 @@ app.get("/api/search", async (req, res) => {
       };
     });
 
-    // 🟢 4. Return hasMore so React knows if it should show the "See More" button
+    // 🟢 5. Return hasMore safely using the validated limit number
     res.json({ 
       videos: formattedVideos,
-      hasMore: formattedVideos.length === Number(limit) 
+      hasMore: formattedVideos.length === limit 
     });
   } catch (error) {
     console.error("Search API Error:", error.message);
