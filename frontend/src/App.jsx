@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
 import AdminUpload from "./pages/AdminUpload";
@@ -6,7 +6,7 @@ import AuthForm from "./components/AuthForm";
 import PitchView from "./components/PitchView";
 import FullscreenPlayer from "./components/FullscreenPlayer"; 
 import PaywallModal from "./components/PaywallModal"; 
-import LegalPages from "./pages/LegalPages"; // 🟢 Import the new Legal Shell
+import LegalPages from "./pages/LegalPages"; 
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
@@ -17,11 +17,17 @@ export default function App() {
   const [isFooterVisible, setIsFooterVisible] = useState(true);
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); 
-  
   const [showPaywall, setShowPaywall] = useState(false);
-  const [activeLegalPage, setActiveLegalPage] = useState(null); // 🟢 State for Legal routing
+  const [activeLegalPage, setActiveLegalPage] = useState(null); 
 
-  const isAdFreeZone = !hasSeenPitch || activeTab === "profile" || activeTab === "admin";
+  // 🟢 FIX: Define auth and viewing states BEFORE the zapper hook
+  const isLoggedIn = !!token;
+  const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
+
+  // 🟢 FIX: AdFreeZone now correctly pauses ads during Pitch, Videos, Paywalls, Legal Pages, and Auth'd Tabs.
+  // It no longer accidentally destroys ads on the Home page!
+  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || !!activeVideo || showPaywall || !!activeLegalPage;
+  
   useAdZapper(isAdFreeZone);
 
   const applyTheme = useCallback((theme) => {
@@ -100,7 +106,6 @@ export default function App() {
       });
     }
     
-    // 🟢 URL Param checkers for Admin and Legal routing
     const params = new URLSearchParams(window.location.search);
     if (params.get("admin") === "true") setActiveTab("admin");
     
@@ -110,11 +115,9 @@ export default function App() {
     }
   }, [token, user, applyTheme]);
 
-  const isLoggedIn = useMemo(() => !!token, [token]);
-
   const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall; 
-  const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
+  // 🟢 Pitch is rendered safely after all hooks
   if (needsPitch) {
     return <PitchView onComplete={() => setHasSeenPitch(true)} />;
   }
@@ -224,13 +227,11 @@ export default function App() {
         />
       )}
 
-      {/* 🟢 LEGAL PAGES OVERLAY */}
       {activeLegalPage && (
         <LegalPages 
           initialPage={activeLegalPage} 
           onBack={() => {
             setActiveLegalPage(null);
-            // Clean the URL when they click back so refreshing doesn't keep opening it
             window.history.replaceState({}, document.title, window.location.pathname);
           }} 
         />
