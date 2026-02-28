@@ -1,5 +1,7 @@
 import "dotenv/config";
 import express from "express";
+import statusMonitor from "express-status-monitor";
+import basicAuth from "express-basic-auth";
 import axios from "axios";
 import cors from "cors";
 import fs from "fs";
@@ -26,6 +28,32 @@ app.use(cors({
     "https://www.naijahomemade.com",
     "http://localhost:5173" 
   ]
+}));
+
+/* =====================
+   SERVER MONITORING (SECURED)
+===================== */
+// 1. Lock down the /status route with a username and password
+app.use("/status", basicAuth({
+  users: { 'admin': process.env.ADMIN_PASSWORD }, // Change this password!
+  challenge: true,
+  unauthorizedResponse: 'Access Denied: Admins Only'
+}));
+
+// 2. Initialize the status monitor
+app.use(statusMonitor({
+  title: 'Naija Homemade Server Status',
+  path: '/status',
+  spans: [{
+    interval: 1,            // Every second
+    retention: 60           // Keep 60 data points in memory
+  }, {
+    interval: 5,            // Every 5 seconds
+    retention: 60
+  }, {
+    interval: 15,           // Every 15 seconds
+    retention: 60
+  }]
 }));
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
