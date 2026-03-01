@@ -4,19 +4,22 @@ import { ArrowLeft, Shield, FileText, Lock, AlertTriangle, Eye, Globe, UserCheck
 // 🟢 Import your separate text files here
 import Terms from "./legal/Terms";
 import Compliance2257 from "./legal/Compliance2257";
+import AboutUs from "./legal/AboutUs";
+import DMCA from "./legal/DMCA";
+import Privacy from "./legal/Privacy";
+import Cookies from "./legal/Cookies";
+import HTMLSitemap from "./legal/HTMLSitemap";
 // import Privacy from "./legal/Privacy";
 // import DMCA from "./legal/DMCA";
 // ... import the rest as you create them
 
 const LEGAL_TABS = [
-  { id: "info", label: "Information", icon: <Globe size={18} /> },
+  { id: "about", label: "About Us", icon: <Globe size={18} /> },
   { id: "terms", label: "Terms & Conditions", icon: <FileText size={18} /> },
   { id: "privacy", label: "Privacy Notice", icon: <Lock size={18} /> },
   { id: "cookies", label: "Cookie Notice", icon: <Eye size={18} /> },
   { id: "dmca", label: "DMCA", icon: <Shield size={18} /> },
   { id: "2257", label: "18 U.S.C. 2257", icon: <UserCheck size={18} /> },
-  { id: "law-enforcement", label: "Notice to Law Enforcement", icon: <Scale size={18} /> },
-  { id: "accessibility", label: "Accessibility", icon: <AlertTriangle size={18} /> },
   { id: "sitemap", label: "Sitemap", icon: <Globe size={18} /> }
 ];
 
@@ -36,6 +39,11 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
     switch (activePage) {
       case "terms": return <Terms />;
       case "2257": return <Compliance2257 />;
+      case "about": return <AboutUs />;
+      case "dmca": return <DMCA />;
+      case "privacy": return <Privacy />;
+      case "cookies": return <Cookies />;
+      case "sitemap": return <HTMLSitemap />;
       // case "privacy": return <Privacy />;
       // case "dmca": return <DMCA />;
       // Add the rest of your cases here as you build the files

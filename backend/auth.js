@@ -73,7 +73,10 @@ const settingsSchema = z.object({
 router.post("/google", async (req, res) => {
   // Validate request body
   const parsed = googleSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+  if (!parsed.success) {
+    // 🟢 FIX: Optional chaining applied
+    return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid input" });
+  }
 
   const { token } = parsed.data;
 
@@ -109,7 +112,10 @@ router.post("/google", async (req, res) => {
 // 🟢 4. REGISTER (Email/Password)
 router.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+  if (!parsed.success) {
+    // 🟢 FIX: Optional chaining applied
+    return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid input" });
+  }
 
   const { email, password, username } = parsed.data;
 
@@ -136,7 +142,10 @@ router.post("/register", async (req, res) => {
 // 🟢 5. LOGIN (Email/Password)
 router.post("/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+  if (!parsed.success) {
+    // 🟢 FIX: Optional chaining applied
+    return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid input" });
+  }
 
   const { email, password } = parsed.data;
 
@@ -179,7 +188,10 @@ router.get("/me", authenticateToken, async (req, res) => {
 // 🟢 7. UPDATE SETTINGS (Theme Sync)
 router.patch("/settings", authenticateToken, async (req, res) => {
   const parsed = settingsSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Invalid settings payload" });
+  if (!parsed.success) {
+    // 🟢 FIX: Optional chaining applied
+    return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid settings payload" });
+  }
 
   const { settings } = parsed.data; 
   const userId = req.user.id;

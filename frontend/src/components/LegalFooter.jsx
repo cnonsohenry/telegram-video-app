@@ -4,14 +4,13 @@ export default function LegalFooter() {
   return (
     <footer style={footerStyle}>
       <div style={linkRowStyle}>
-        <a href="/?legal=info" style={linkStyle}>Information</a>
+        <a href="/?legal=about" style={linkStyle}>About Us</a>
         <a href="/?legal=terms" style={linkStyle}>Terms & Conditions</a>
         <a href="/?legal=privacy" style={linkStyle}>Privacy Notice</a>
         <a href="/?legal=cookies" style={linkStyle}>Cookie Notice</a>
         <a href="/?legal=dmca" style={linkStyle}>DMCA</a>
         <a href="/?legal=2257" style={linkStyle}>18 U.S.C. 2257</a>
-        <a href="/?legal=law-enforcement" style={linkStyle}>Law Enforcement</a>
-        <a href="/?legal=accessibility" style={linkStyle}>Accessibility</a>
+        <a href="/?legal=sitemap" style={linkStyle}>Site Map</a>
       </div>
       <p style={copyrightStyle}>&copy; {new Date().getFullYear()} Naija Homemade. All rights reserved.</p>
     </footer>

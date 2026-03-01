@@ -456,8 +456,9 @@ app.get("/api/search", async (req, res) => {
   const parsed = searchSchema.safeParse(req.query);
   
   if (!parsed.success) {
-    // Instantly reject bad data before it touches your DB logic
-    return res.status(400).json({ error: parsed.error.errors[0].message });
+    // 🟢 FIX: Safely extract the error message using optional chaining to prevent undefined crashes
+    const errorMessage = parsed.error?.issues?.[0]?.message || "Invalid search parameters";
+    return res.status(400).json({ error: errorMessage });
   }
 
   // 🟢 3. Extract the safely parsed and coerced variables
@@ -678,6 +679,55 @@ app.get("/api/avatar", async (req, res) => {
     });
     res.send(Buffer.from(imageRes.data));
   } catch (err) {
+    res.status(500).end();
+  }
+});
+
+/* =====================
+   SEO: DYNAMIC XML SITEMAP
+===================== */
+app.get("/sitemap.xml", async (req, res) => {
+  try {
+    // 1. Fetch the latest 10,000 videos from the database
+    const { rows } = await pool.query(
+      `SELECT message_id, created_at FROM videos ORDER BY created_at DESC LIMIT 10000`
+    );
+
+    // 2. Start building the XML string
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+
+    // 3. Add your static core pages
+    const staticPages = [
+      { url: "https://naijahomemade.com/", priority: "1.0", freq: "always" },
+    ];
+
+    staticPages.forEach(page => {
+      xml += `  <url>\n`;
+      xml += `    <loc>${page.url}</loc>\n`;
+      xml += `    <changefreq>${page.freq}</changefreq>\n`;
+      xml += `    <priority>${page.priority}</priority>\n`;
+      xml += `  </url>\n`;
+    });
+
+    // 4. Loop through database and add every single video
+    rows.forEach(video => {
+      xml += `  <url>\n`;
+      // 🟢 Point to your /v/ route so Google reads your OpenGraph meta tags!
+      xml += `    <loc>https://videos.naijahomemade.com/v/${video.message_id}</loc>\n`;
+      xml += `    <lastmod>${new Date(video.created_at).toISOString()}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.8</priority>\n`;
+      xml += `  </url>\n`;
+    });
+
+    xml += `</urlset>`;
+
+    // 5. Send back as official XML
+    res.header("Content-Type", "application/xml");
+    res.send(xml);
+  } catch (error) {
+    console.error("Sitemap generation failed:", error);
     res.status(500).end();
   }
 });
