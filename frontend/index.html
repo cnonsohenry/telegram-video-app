@@ -25,7 +25,7 @@
       /* 🟢 18+ Age Gate Styles */
       #age-gate {
         position: fixed; inset: 0;
-        display: none; /* Controlled by JS below to prevent flash */
+        display: none; 
         flex-direction: column; align-items: center; justify-content: center;
         background-color: #000;
         z-index: 2147483647; 
@@ -153,33 +153,43 @@
       </div>
     </div>
 
-    <script>
-      (function() {
-        const ageGate = document.getElementById('age-gate');
-        const isVerified = localStorage.getItem('ageVerified');
-        
-        if (isVerified === 'true') {
-          // User already verified, hide gate and allow scrolling
-          ageGate.style.display = 'none';
-          document.body.classList.remove('no-scroll');
-        } else {
-          // Show gate, keep scrolling locked
-          ageGate.style.display = 'flex';
-        }
-      })();
-    </script>
-
     <div id="root"></div>
 
     <script type="module" src="/src/main.jsx"></script>
 
     <script>
+      // 🟢 1. Helper function to inject the ad script safely
+      function loadAdNetwork() {
+        const script = document.createElement('script');
+        script.src = "https://pl28640933.effectivegatecpm.com/ef/8f/7e/ef8f7ec30c881245423ab301030a35ab.js";
+        script.async = true;
+        document.body.appendChild(script);
+      }
+
+      // 🟢 2. Check Verification Status on Load
+      (function() {
+        const ageGate = document.getElementById('age-gate');
+        const isVerified = localStorage.getItem('ageVerified');
+        
+        if (isVerified === 'true') {
+          // Hide gate, allow scroll, AND load ads
+          ageGate.style.display = 'none';
+          document.body.classList.remove('no-scroll');
+          loadAdNetwork(); 
+        } else {
+          // Show gate, DO NOT load ads yet
+          ageGate.style.display = 'flex';
+        }
+      })();
+
+      // 🟢 3. Handle User Clicking "Enter"
       document.getElementById('btn-enter').addEventListener('click', () => {
         const ageGate = document.getElementById('age-gate');
-        // Save verification state locally
         localStorage.setItem('ageVerified', 'true');
         
-        // Fade out animation
+        // Load the ad network the moment they verify
+        loadAdNetwork();
+        
         ageGate.style.opacity = '0';
         setTimeout(() => {
           ageGate.style.display = 'none';
@@ -187,12 +197,10 @@
         }, 300);
       });
 
+      // Handle User Clicking "Exit"
       document.getElementById('btn-exit').addEventListener('click', () => {
-        // Redirect underage users away from the site
         window.location.href = 'https://www.google.com';
       });
     </script>
-
-    <script src="https://pl28640933.effectivegatecpm.com/ef/8f/7e/ef8f7ec30c881245423ab301030a35ab.js" async></script>
   </body>
 </html>
