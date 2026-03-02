@@ -463,11 +463,7 @@ app.get("/api/search", async (req, res) => {
 
   // 🟢 3. Extract the safely parsed and coerced variables
   const { q, page, limit } = parsed.data;
-  
-  // If search is empty, return empty early
-  if (!q) {
-    return res.json({ videos: [], hasMore: false });
-  }
+
 
   try {
     const apiBaseUrl = "https://videos.naijahomemade.com"; 
