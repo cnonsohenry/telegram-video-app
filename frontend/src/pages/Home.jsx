@@ -3,7 +3,6 @@ import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
-import PullToRefresh from "../components/PullToRefresh"; 
 import { useVideos } from "../hooks/useVideos";
 import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
@@ -12,7 +11,7 @@ import LegalFooter from "../components/LegalFooter";
 
 const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
 const MAX_CACHE_SIZE = 4;
-const AD_FREQUENCY = 4;
+const AD_FREQUENCY = 3;
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * CATEGORIES.length)); 
@@ -259,7 +258,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
             </nav>
           )}
           
-          <PullToRefresh onRefresh={handleRefresh}>
+
             <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
                <div style={{ 
                  display: "grid", 
@@ -284,8 +283,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
             </div>
             
             {videosToDisplay.length > 0 && <LegalFooter />}
-            
-          </PullToRefresh>
+
         </div>
 
         {/* 🟢 Removed the repetitive header entirely */}
