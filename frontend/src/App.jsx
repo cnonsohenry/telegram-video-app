@@ -250,7 +250,17 @@ export default function App() {
   );
 }
 
-const navStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', backgroundColor: 'rgba(10, 10, 10, 0.8)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' };
+const navStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', backgroundColor: '#0a0a0a', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' };
 const btnStyle = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', flex: 1, transition: 'all 0.3s ease' };
 const labelStyle = { fontSize: '10px', fontWeight: '700' };
-const slideContainerStyle = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflowY: 'auto', backgroundColor: 'var(--bg-color)', transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease', willChange: 'transform, opacity', WebkitOverflowScrolling: 'touch' };
+// 🟢 FIX: Added translateZ(0) and backfaceVisibility to force GPU rendering
+const slideContainerStyle = { 
+  position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+  overflowY: 'auto', backgroundColor: 'var(--bg-color)', 
+  transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease', 
+  willChange: 'transform, opacity', 
+  WebkitOverflowScrolling: 'touch',
+  transform: 'translateZ(0)', // Force GPU
+  WebkitBackfaceVisibility: 'hidden', // Stop flickering
+  backfaceVisibility: 'hidden'
+};

@@ -358,7 +358,7 @@ const inputStyle = { background: "none", border: "none", color: "#fff", padding:
 const profileBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: 0 };
 const avatarStyle = (isDesktop) => ({ width: isDesktop ? "36px" : "30px", height: isDesktop ? "36px" : "30px", borderRadius: "50%", border: "2px solid var(--primary-color)", objectFit: "cover" });
 const loginBadgeStyle = { background: "var(--primary-color)", color: "#fff", padding: "6px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "800" };
-const mobileHeaderStyle = { position: "sticky", top: 0, zIndex: 100, padding: "12px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", borderBottom: "1px solid #262626" };
+const mobileHeaderStyle = { position: "sticky", top: 0, zIndex: 100, padding: "12px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0a0a0a", borderBottom: "1px solid #262626" };
 
 const searchOverlayStyle = { position: "fixed", inset: 0, zIndex: 999999, background: "var(--bg-color)", display: "flex", flexDirection: "column", animation: "fadeIn 0.2s ease-out" };
 const overlayHeaderStyle = { display: "flex", alignItems: "center", gap: "12px", padding: "15px", borderBottom: "1px solid #222" };
