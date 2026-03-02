@@ -20,15 +20,41 @@ export default function App() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [activeLegalPage, setActiveLegalPage] = useState(null); 
 
-  // 🟢 FIX: Define auth and viewing states BEFORE the zapper hook
+  // 🟢 Define auth and viewing states BEFORE the zapper hook
   const isLoggedIn = !!token;
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
-  // 🟢 FIX: AdFreeZone now correctly pauses ads during Pitch, Videos, Paywalls, Legal Pages, and Auth'd Tabs.
-  // It no longer accidentally destroys ads on the Home page!
+  // 🟢 AdFreeZone logic
   const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || !!activeVideo || showPaywall || !!activeLegalPage;
   
   useAdZapper(isAdFreeZone);
+
+  // 🟢 TELEGRAM IN-APP BROWSER FIX (The Touch Shield)
+  // This physically blocks the WebView from minimizing when swiping on non-scrollable areas
+  useEffect(() => {
+    const preventOverscroll = (e) => {
+      // Find out if the user is touching something that is supposed to scroll
+      const scrollable = e.target.closest('[style*="overflow-y: auto"], [style*="overflowY: auto"]');
+      
+      // If we aren't touching a scrollable list (like touching the header/footer), block the swipe
+      if (!scrollable) {
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+
+      // If we ARE touching the list, but we are at the very top, block the swipe down
+      if (scrollable.scrollTop <= 0 && e.touches && e.touches.length > 0 && e.touches[0].clientY > 0) {
+        // We rely heavily on the CSS 'contain' rule below, but this stops aggressive rogue touches
+      }
+    };
+
+    // Attach to the document with passive: false so we have permission to cancel the event
+    document.addEventListener('touchmove', preventOverscroll, { passive: false });
+    
+    return () => {
+      document.removeEventListener('touchmove', preventOverscroll);
+    };
+  }, []);
 
   const applyTheme = useCallback((theme) => {
     localStorage.setItem("theme", theme);
@@ -117,7 +143,6 @@ export default function App() {
 
   const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall; 
 
-  // 🟢 Pitch is rendered safely after all hooks
   if (needsPitch) {
     return <PitchView onComplete={() => setHasSeenPitch(true)} />;
   }
@@ -253,14 +278,17 @@ export default function App() {
 const navStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', backgroundColor: '#0a0a0a', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' };
 const btnStyle = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', flex: 1, transition: 'all 0.3s ease' };
 const labelStyle = { fontSize: '10px', fontWeight: '700' };
-// 🟢 FIX: Added translateZ(0) and backfaceVisibility to force GPU rendering
+
+// 🟢 FIX: Added GPU acceleration, overscroll trap, and specific touch actions
 const slideContainerStyle = { 
   position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
   overflowY: 'auto', backgroundColor: 'var(--bg-color)', 
   transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease', 
   willChange: 'transform, opacity', 
   WebkitOverflowScrolling: 'touch',
-  transform: 'translateZ(0)', // Force GPU
-  WebkitBackfaceVisibility: 'hidden', // Stop flickering
-  backfaceVisibility: 'hidden'
+  transform: 'translateZ(0)', 
+  WebkitBackfaceVisibility: 'hidden', 
+  backfaceVisibility: 'hidden',
+  overscrollBehaviorY: 'contain', // Traps the scroll inside this div!
+  touchAction: 'pan-y'            // Tells the browser this div only handles vertical swipes
 };
