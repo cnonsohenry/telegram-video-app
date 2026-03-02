@@ -680,20 +680,25 @@ app.get("/api/avatar", async (req, res) => {
 });
 
 /* =====================
-   SEO: DYNAMIC XML SITEMAP
+   SEO: DYNAMIC GOOGLE VIDEO SITEMAP
 ===================== */
 app.get("/sitemap.xml", async (req, res) => {
   try {
-    // 1. Fetch the latest 10,000 videos from the database
+    // 1. Fetch message_id, created_at, AND caption for SEO
     const { rows } = await pool.query(
-      `SELECT message_id, created_at FROM videos ORDER BY created_at DESC LIMIT 10000`
+      `SELECT message_id, created_at, caption, cloudflare_id FROM videos ORDER BY created_at DESC LIMIT 10000`
     );
 
-    // 2. Start building the XML string
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+    // 2. Helper to prevent special characters from breaking the XML format
+    const escapeXML = (str) => {
+      if (!str) return "NaijaHomemade Video";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    };
 
-    // 3. Add your static core pages
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    // 🟢 3. Added the Google Video namespace here
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n`;
+
     const staticPages = [
       { url: "https://naijahomemade.com/", priority: "1.0", freq: "always" },
     ];
@@ -706,20 +711,38 @@ app.get("/sitemap.xml", async (req, res) => {
       xml += `  </url>\n`;
     });
 
-    // 4. Loop through database and add every single video
+    const apiBaseUrl = "https://videos.naijahomemade.com";
+
     rows.forEach(video => {
+      const safeCaption = escapeXML(video.caption);
+      
+      // We need a thumbnail for Google. 
+      // Note: Telegram signed URLs expire, so Googlebot can't read them days later. 
+      // We use Cloudflare if available, otherwise fallback to your site's logo.
+      let thumbUrl = `${apiBaseUrl}/assets/default-avatar.png`; 
+      if (video.cloudflare_id && video.cloudflare_id !== "none") {
+         const cleanId = video.cloudflare_id.split('?')[0];
+         thumbUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
+      }
+
       xml += `  <url>\n`;
-      // 🟢 Point to your /v/ route so Google reads your OpenGraph meta tags!
-      xml += `    <loc>https://videos.naijahomemade.com/v/${video.message_id}</loc>\n`;
+      xml += `    <loc>${apiBaseUrl}/v/${video.message_id}</loc>\n`;
       xml += `    <lastmod>${new Date(video.created_at).toISOString()}</lastmod>\n`;
       xml += `    <changefreq>weekly</changefreq>\n`;
       xml += `    <priority>0.8</priority>\n`;
+      
+      // 🟢 4. The Google Video Block (Feeds directly into Google Video Search)
+      xml += `    <video:video>\n`;
+      xml += `      <video:thumbnail_loc>${thumbUrl}</video:thumbnail_loc>\n`;
+      xml += `      <video:title>${safeCaption}</video:title>\n`;
+      xml += `      <video:description>${safeCaption}</video:description>\n`;
+      xml += `    </video:video>\n`;
+      
       xml += `  </url>\n`;
     });
 
     xml += `</urlset>`;
 
-    // 5. Send back as official XML
     res.header("Content-Type", "application/xml");
     res.send(xml);
   } catch (error) {
