@@ -71,8 +71,14 @@ export default function App() {
   }, [applyTheme]);
 
   useEffect(() => {
+    // 1. Check for query parameter (/?v=1847)
     const params = new URLSearchParams(window.location.search);
-    const sharedVideoId = params.get("v");
+    let sharedVideoId = params.get("v");
+
+    // 🟢 2. FIX: Check for clean path from the sitemap (/v/1847)
+    if (!sharedVideoId && window.location.pathname.startsWith('/v/')) {
+      sharedVideoId = window.location.pathname.split('/')[2];
+    }
 
     if (sharedVideoId) {
       const fetchSharedVideo = async () => {
@@ -91,6 +97,7 @@ export default function App() {
         } catch (error) {
           console.error("Failed to load shared video:", error);
         } finally {
+          // Clean up the URL in the browser bar after the video loads
           window.history.replaceState({}, document.title, "/");
         }
       };
