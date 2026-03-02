@@ -9,7 +9,7 @@ export default function HTMLSitemap() {
     const fetchVideos = async () => {
       // 🟢 1. Build the URL safely
       const baseUrl = import.meta.env.VITE_API_URL || "https://videos.naijahomemade.com";
-      const targetUrl = `${baseUrl}/api/search?q=&limit=100`;
+      const targetUrl = `${baseUrl}/api/search?q=&limit=50`;
       
       console.log("Sitemap trying to fetch from:", targetUrl); // 👀 Check your browser console!
 
