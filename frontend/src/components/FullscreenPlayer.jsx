@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-// 🟢 IMPORTED PAUSE
 import { X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, Share2, Download, Check } from "lucide-react";
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
@@ -8,7 +7,10 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const lastTap = useRef(0);
   const hideTimeout = useRef(null); 
   
-  const [isPlaying, setIsPlaying] = useState(true);
+  // 🟢 1. Initialize to false. We let the video 'onPlay' event switch this to true.
+  // This ensures if a mobile browser blocks autoplay, the Play button will be visible!
+  const [isPlaying, setIsPlaying] = useState(false); 
+  
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -22,7 +24,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     
     hideTimeout.current = setTimeout(() => {
       setIsPlaying(playing => {
-        if (playing) setShowControls(false); // Only hides if playing
+        if (playing) setShowControls(false); 
         return playing;
       });
     }, 3000);
@@ -43,17 +45,14 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     const DOUBLE_TAP_DELAY = 300;
 
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
-      // DOUBLE TAP: Toggle Zoom
       setIsZoomed(z => !z);
       lastTap.current = 0; 
       resetHideTimer();
     } else {
-      // SINGLE TAP
       lastTap.current = now;
       setTimeout(() => {
         if (lastTap.current === now && videoRef.current) {
           if (!isDesktop) {
-            // 🟢 MOBILE FIX: Tap only toggles the controls UI, it does NOT pause
             setShowControls(prev => {
               if (!prev) {
                 resetHideTimer();
@@ -63,7 +62,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
               return false;
             });
           } else {
-            // DESKTOP: Click pauses/plays like normal desktop video players
             resetHideTimer();
             if (videoRef.current.paused) {
               videoRef.current.play().catch(() => {});
@@ -161,6 +159,18 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     enterFullscreen();
     resetHideTimer();
 
+    // 🟢 2. Explicitly handle strict mobile browser Autoplay Blocks
+    if (videoRef.current) {
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((error) => {
+          console.warn("Autoplay blocked by mobile browser. Waiting for user interaction.");
+          setIsPlaying(false); 
+          setShowControls(true);
+        });
+      }
+    }
+
     return () => {
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       document.body.style.overflow = originalStyle.overflow;
@@ -212,7 +222,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             }}
           />
 
-          {/* 🟢 NEW CENTER PLAY/PAUSE BUTTON */}
           {(!isLoading && (showControls || !isPlaying)) && (
             <button
               onClick={handleTogglePlay}
@@ -301,7 +310,7 @@ const rangeInputBaseStyle = { width: "100%", cursor: "pointer", accentColor: "va
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
 
-// 🟢 NEW CENTER CONTROL STYLES
+// 🟢 CENTER CONTROL STYLES
 const centerControlStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "transparent", border: "none", cursor: "pointer", zIndex: 10005, transition: "opacity 0.3s ease", display: "flex", alignItems: "center", justifyContent: "center" };
 const centerIconCircleStyle = { background: "rgba(0,0,0,0.4)", borderRadius: "50%", padding: "20px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" };
 
