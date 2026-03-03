@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Play, Share2 } from 'lucide-react';
-import { shareVideo } from "../utils/share"; 
+import { Play } from 'lucide-react';
 
 export default function VideoCard({ video, onOpen, showDetails = true }) {
   const videoRef = useRef(null);
@@ -9,7 +8,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
   const [isImgLoaded, setIsImgLoaded] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
 
-  // 🟢 FIX 1: Safely construct the thumbnail URL
   const thumbSrc = video.thumbnail_url 
     ? (video.thumbnail_url.includes('?') ? `${video.thumbnail_url}&w=400` : `${video.thumbnail_url}?w=400`)
     : '';
@@ -36,31 +34,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
     }
   }, [isVisible, isHovered]);
 
-  const schemaData = {
-    "@context": "https://schema.org",
-    "@type": "VideoObject",
-    "name": video.caption || "Exclusive Video Content",
-    "description": video.caption || "Watch the latest shots and premium videos on our platform.",
-    "thumbnailUrl": [
-      video.thumbnail_url || "",
-      video.thumbnail_url ? `${video.thumbnail_url}&w=800` : "",
-      video.thumbnail_url ? `${video.thumbnail_url}&w=1200` : ""
-    ],
-    "uploadDate": video.created_at || new Date().toISOString(),
-    "contentUrl": video.video_url || "", 
-    "embedUrl": `https://videos.naijahomemade.com/video/${video.message_id}`,
-    "interactionStatistic": {
-      "@type": "InteractionCounter",
-      "interactionType": { "@type": "WatchAction" },
-      "userInteractionCount": video.views || 0
-    }
-  };
-
-  const handleShare = (e) => {
-    e.stopPropagation(); 
-    shareVideo(video);
-  };
-
   return (
     <div
       onClick={(e) => onOpen(video, e)}
@@ -79,11 +52,8 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         zIndex: isHovered ? 10 : 1, 
       }}
     >
-      <script 
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaData) }}
-      />
-
+      {/* 🟢 Schema JSON completely removed from here! */}
+      
       <div style={{ 
         position: "relative", 
         width: "100%", 
@@ -109,7 +79,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
             alt={video.caption || "Thumbnail"}
             loading="eager"
             onLoad={() => setIsImgLoaded(true)}
-            // 🟢 FIX 2: Handle broken images gracefully
             onError={(e) => { 
               setIsImgLoaded(true); 
               e.target.style.display = 'none'; 
@@ -135,18 +104,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
             transition: "opacity 0.3s ease"
           }}
         />
-        
-        <button 
-          onClick={handleShare}
-          style={{
-            ...actionButtonStyle,
-            top: 10, right: 10,
-            opacity: isHovered ? 1 : 0,
-            transform: isHovered ? "scale(1)" : "scale(0.8)"
-          }}
-        >
-          <Share2 size={16} color="#fff" />
-        </button>
         
         {showDetails && (
           <div style={{
@@ -197,22 +154,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
 }
 
 // 🖌 Styles
-const actionButtonStyle = {
-  position: "absolute",
-  zIndex: 15,
-  width: "36px",
-  height: "36px",
-  borderRadius: "50%",
-  background: "rgba(0,0,0,0.5)",
-  backdropFilter: "blur(10px)",
-  border: "1px solid rgba(255,255,255,0.1)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
-};
-
 const captionTextStyle = { margin: "0 0 6px 0", fontSize: "14px", color: "#fff", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "600" };
 const userInfoRowStyle = { display: "flex", alignItems: "center", gap: "8px" };
 const avatarWrapperStyle = { width: "24px", height: "24px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid #333" };

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { X, ArrowLeft, Play, Loader2, Maximize, Minimize } from "lucide-react";
+import { X, ArrowLeft, Play, Loader2, Maximize, Minimize, Share2, Download, Check } from "lucide-react";
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const videoRef = useRef(null);
@@ -13,15 +13,14 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const [progress, setProgress] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showControls, setShowControls] = useState(true); 
+  const [copied, setCopied] = useState(false); // 🟢 Track if share link was copied
+  const [isDownloading, setIsDownloading] = useState(false); // 🟢 Track download state
 
-  // 🟢 1. DEFINE FUNCTIONS FIRST
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
     if (hideTimeout.current) clearTimeout(hideTimeout.current);
     
-    // Only set the timer if the video is actually playing
     hideTimeout.current = setTimeout(() => {
-      // Use functional update to check latest isPlaying state
       setIsPlaying(playing => {
         if (playing) setShowControls(false);
         return playing;
@@ -61,7 +60,58 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     }
   };
 
-  // 🟢 2. EFFECTS (After function definitions)
+  // 🟢 SHARE LOGIC
+  const handleShare = async (e) => {
+    e.stopPropagation();
+    resetHideTimer();
+    const shareUrl = `https://naijahomemade.com/v/${video.message_id}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Naija Homemade',
+          text: video.caption || 'Watch this video on Naija Homemade',
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.log("Native share cancelled or failed", err);
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // 🟢 DOWNLOAD LOGIC
+  const handleDownload = async (e) => {
+    e.stopPropagation();
+    resetHideTimer();
+    if (isDownloading) return;
+    
+    setIsDownloading(true);
+    try {
+      // Fetch the video as a blob to force the browser to download instead of play
+      const response = await fetch(video.video_url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `naijahomemade-${video.message_id}.mp4`; // Set a clean filename
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download failed:", err);
+      alert("Download failed. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   useEffect(() => {
     const originalStyle = {
       overflow: document.body.style.overflow,
@@ -102,11 +152,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   return (
     <div ref={containerRef} style={overlayStyle} onClick={onClose}>
-      
-      {/* 🔴 Top Gradient (Still fades out for a cleaner look) */}
       <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />
 
-      {/* 🔴 Persistent Back/Close Buttons (No opacity toggles applied here) */}
       {!isDesktop ? (
         <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ ...mobileBackButtonStyle, zIndex: 10006 }}>
           <ArrowLeft size={28} />
@@ -117,7 +164,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         </button>
       )}
 
-      {/* Video Stage */}
       <div style={stageStyle} onClick={(e) => e.stopPropagation()}>
         <div onClick={handleInteraction} style={videoWrapperStyle}>
           {isLoading && (
@@ -148,21 +194,42 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             </div>
           )}
 
-          {/* Bottom UI */}
           <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
 
-          <button 
-            onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); resetHideTimer(); }}
-            style={{ ...zoomToggleButtonStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}
-          >
-            {isZoomed ? <Minimize size={20} /> : <Maximize size={20} />}
-          </button>
+          {/* 🟢 RIGHT SIDE ACTION BUTTONS CONTAINER */}
+          <div style={{ ...actionButtonsContainerStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
+            
+            {/* Share Button */}
+            <button onClick={handleShare} style={actionButtonStyle}>
+              <div style={iconCircleStyle}>
+                {copied ? <Check size={20} color="#4ade80" /> : <Share2 size={20} />}
+              </div>
+              <span style={actionLabelStyle}>{copied ? "Copied!" : "Share"}</span>
+            </button>
+
+            {/* Download Button */}
+            <button onClick={handleDownload} style={actionButtonStyle}>
+              <div style={iconCircleStyle}>
+                {isDownloading ? <Loader2 size={20} className="spin-animation" /> : <Download size={20} />}
+              </div>
+              <span style={actionLabelStyle}>Save</span>
+            </button>
+
+            {/* Zoom Button (Moved into the stack for alignment) */}
+            <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); resetHideTimer(); }} style={actionButtonStyle}>
+               <div style={iconCircleStyle}>
+                 {isZoomed ? <Minimize size={20} /> : <Maximize size={20} />}
+               </div>
+               <span style={actionLabelStyle}>{isZoomed ? "Fit" : "Fill"}</span>
+            </button>
+            
+          </div>
 
           <div style={{ 
               ...progressWrapperStyle, 
               bottom: showControls ? "max(30px, env(safe-area-inset-bottom))" : "10px",
               padding: showControls ? "0 20px" : "0",
-              opacity: 1 // Keep progress visible but mini when controls hide
+              opacity: 1 
           }}>
              <input 
                type="range" min="0" max="100" step="0.1"
@@ -194,17 +261,21 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   );
 }
 
-// 🖌 STYLES (Kept exactly as you had them)
+// 🖌 STYLES
 const overlayStyle = { position: "fixed", inset: 0, height: "100dvh", backgroundColor: "#000", zIndex: 999999, display: "flex", flexDirection: "column", overflow: "hidden", touchAction: "none" };
 const stageStyle = { display: "flex", width: "100%", height: "100%", background: "#000", position: "relative" };
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" };
 const loaderContainerStyle = { position: "absolute", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" };
-const controlsTransitionStyle = { transition: "opacity 0.4s ease", zIndex: 10006, width: "100%", height: "100%", position: "relative" }; // You can delete this variable if unused elsewhere now!
 const topGradientStyle = { position: "absolute", top: 0, left: 0, right: 0, height: "120px", background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)", zIndex: 10005, transition: "opacity 0.4s ease" };
 const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "140px", background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.4s ease", pointerEvents: "none" };
 const progressWrapperStyle = { position: "absolute", left: 0, right: 0, zIndex: 10002, transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
 const rangeInputBaseStyle = { width: "100%", cursor: "pointer", accentColor: "var(--primary-color)", background: "rgba(255,255,255,0.2)", appearance: "none", outline: "none" };
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
-const zoomToggleButtonStyle = { position: "absolute", right: "20px", bottom: "100px", background: "rgba(0,0,0,0.5)", color: "#fff", border: "none", borderRadius: "10px", width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", zIndex: 10005 };
 const playIconOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "rgba(0,0,0,0.5)", borderRadius: "50%", padding: "20px", pointerEvents: "none", zIndex: 5 };
+
+// 🟢 NEW STYLES FOR THE RIGHT-SIDE ACTION BAR
+const actionButtonsContainerStyle = { position: "absolute", right: "15px", bottom: "80px", display: "flex", flexDirection: "column", gap: "20px", zIndex: 10005, transition: "opacity 0.4s ease", alignItems: "center" };
+const actionButtonStyle = { background: "transparent", border: "none", color: "#fff", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: 0 };
+const iconCircleStyle = { background: "rgba(0,0,0,0.5)", width: "45px", height: "45px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
+const actionLabelStyle = { fontSize: "11px", fontWeight: "600", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
