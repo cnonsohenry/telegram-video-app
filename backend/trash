@@ -1,0 +1,114 @@
+/* =====================
+   Share Link (UPDATED FOR TWITTER PLAYER CARD)
+===================== */
+app.get('/v/:message_id', async (req, res) => {
+  try {
+    const { message_id } = req.params;
+
+    const result = await pool.query(`
+      SELECT v.*, u.username as uploader_name 
+      FROM videos v 
+      LEFT JOIN users u ON v.uploader_id = u.user_id 
+      WHERE v.message_id = $1 LIMIT 1
+    `, [message_id]);
+
+    if (!result.rows.length) return res.redirect('https://naijahomemade.com');
+
+    const video = result.rows[0];
+    const sig = signThumbnail(video.chat_id, video.message_id);
+
+    const thumbUrl = video.cloudflare_id && video.cloudflare_id !== "none"
+      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
+      : `https://videos.naijahomemade.com/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+
+    // The URL Twitter will load inside the iframe
+    const embedUrl = \`https://videos.naijahomemade.com/embed/\${message_id}\`;
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${video.caption || "Watch exclusive shots"}</title>
+          <meta charset="utf-8">
+
+          <meta property="og:type" content="video.other">
+          <meta property="og:site_name" content="Naija Homemade">
+          <meta property="og:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
+          <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
+          <meta property="og:image" content="${thumbUrl}">
+          <meta property="og:image:width" content="720">
+          <meta property="og:image:height" content="1280">
+          <meta property="og:url" content="https://videos.naijahomemade.com/v/${message_id}">
+
+          <meta name="twitter:card" content="player">
+          <meta name="twitter:title" content="${video.caption || "Watch Shot"}">
+          <meta name="twitter:description" content="Watch high-quality homegrown shots on our platform.">
+          <meta name="twitter:image" content="${thumbUrl}">
+          <meta name="twitter:player" content="${embedUrl}">
+          <meta name="twitter:player:width" content="720">
+          <meta name="twitter:player:height" content="1280">
+
+          <script>
+            // Still redirect normal humans to the React app!
+            window.location.href = "https://naijahomemade.com/?v=${message_id}";
+          </script>
+        </head>
+        <body style="background:#000; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
+          <p>Redirecting to Naija Homemade...</p>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error("Share Link Error:", err.message);
+    res.redirect('https://naijahomemade.com');
+  }
+});
+
+/* =====================
+   TWITTER EMBED IFRAME
+===================== */
+app.get('/embed/:message_id', async (req, res) => {
+  try {
+    const { message_id } = req.params;
+    const result = await pool.query(`SELECT * FROM videos WHERE message_id = $1 LIMIT 1`, [message_id]);
+
+    if (!result.rows.length) return res.status(404).send("Video not found");
+    const video = result.rows[0];
+
+    // If it's Cloudflare, we can just use their built-in iframe player!
+    if (video.cloudflare_id && video.cloudflare_id !== "none") {
+      const cleanId = video.cloudflare_id.split('?')[0];
+      return res.redirect(\`https://customer-${process.env.CF_CUSTOMER_ID || 'your-cf-id'}.cloudflarestream.com/\${cleanId}/iframe?autoplay=true&poster=\${encodeURIComponent(\`https://videodelivery.net/\${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=1280\`)}\`);
+      // Wait, doing a redirect for an iframe might be iffy for Twitter.
+    }
+
+    // If not Cloudflare (or if we just want a unified HTML5 player)
+    // Note: Twitter strictly requires the iframe to be on HTTPS and not have frame-busting scripts.
+    const videoUrl = \`https://videos.naijahomemade.com/api/video?chat_id=\${video.chat_id}&message_id=\${video.message_id}\`;
+    const thumbUrl = video.cloudflare_id && video.cloudflare_id !== "none"
+      ? \`https://videodelivery.net/\${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280\`
+      : \`https://videos.naijahomemade.com/api/thumbnail?chat_id=\${video.chat_id}&message_id=\${video.message_id}&sig=\${signThumbnail(video.chat_id, video.message_id)}\`;
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+            video { width: 100%; height: 100%; object-fit: contain; }
+          </style>
+        </head>
+        <body>
+          <video controls autoplay playsinline poster="${thumbUrl}">
+            <source src="${videoUrl}" type="video/mp4">
+          </video>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error("Embed Error:", err.message);
+    res.status(500).send("Server Error");
+  }
+});

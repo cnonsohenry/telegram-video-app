@@ -593,7 +593,7 @@ app.get("/api/thumbnail", async (req, res) => {
 });
 
 /* =====================
-   Share Link (UPDATED FOR OPEN GRAPH PORTRAIT FIX)
+   Share Link (UPGRADED TO TWITTER PLAYER)
 ===================== */
 app.get('/v/:message_id', async (req, res) => {
   try {
@@ -611,7 +611,6 @@ app.get('/v/:message_id', async (req, res) => {
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
     
-    // 🟢 FIX: We increase the height request to 1280 to ensure crisp portrait quality
     const thumbUrl = video.cloudflare_id 
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
       : `https://videos.naijahomemade.com/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
@@ -628,28 +627,77 @@ app.get('/v/:message_id', async (req, res) => {
           <meta property="og:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
           <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
           <meta property="og:image" content="${thumbUrl}">
-          
           <meta property="og:image:width" content="720">
           <meta property="og:image:height" content="1280">
-          
           <meta property="og:url" content="https://videos.naijahomemade.com/v/${message_id}">
           
-          <meta name="twitter:card" content="summary_large_image">
+          <meta name="twitter:card" content="player">
+          <meta name="twitter:site" content="@NaijaHomemade">
           <meta name="twitter:title" content="${video.caption || "Watch Shot"}">
+          <meta name="twitter:description" content="Watch high-quality homegrown shots on our platform.">
           <meta name="twitter:image" content="${thumbUrl}">
+          
+          <meta name="twitter:player" content="https://videos.naijahomemade.com/embed/${message_id}">
+          <meta name="twitter:player:width" content="720">
+          <meta name="twitter:player:height" content="1280">
 
           <script>
+            // Humans get instantly redirected to your React App!
             window.location.href = "https://naijahomemade.com/?v=${message_id}";
           </script>
         </head>
-        <body style="background:#000; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
-          <p>Redirecting to Naija Homemade...</p>
-        </body>
+        <body style="background:#000; color:#fff;"></body>
       </html>
     `);
   } catch (err) {
     console.error("Share Link Error:", err.message);
     res.redirect('https://naijahomemade.com');
+  }
+});
+
+/* =====================
+   Twitter IFRAME Embed Player
+===================== */
+app.get('/embed/:message_id', async (req, res) => {
+  try {
+    const { message_id } = req.params;
+    
+    const result = await pool.query(`
+      SELECT chat_id, message_id, cloudflare_id FROM videos WHERE message_id = $1 LIMIT 1
+    `, [message_id]);
+
+    if (!result.rows.length) return res.status(404).send("Video not found");
+
+    const video = result.rows[0];
+    const sig = signThumbnail(video.chat_id, video.message_id);
+    
+    // Grab the thumbnail for the player poster
+    const thumbUrl = video.cloudflare_id 
+      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
+      : `https://videos.naijahomemade.com/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+
+    // Grab the stream URL (we use your existing streaming wrapper)
+    const streamUrl = `https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`;
+
+    // 🟢 Send back a perfectly styled, 100% width/height blank video player just for Twitter
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+          <style>
+            body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; }
+            video { width: 100%; height: 100%; object-fit: contain; }
+          </style>
+        </head>
+        <body>
+          <video src="${streamUrl}" controls playsinline autoplay muted poster="${thumbUrl}"></video>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send("Error loading embed");
   }
 });
 
