@@ -662,6 +662,10 @@ app.get('/embed/:message_id', async (req, res) => {
   try {
     const { message_id } = req.params;
     
+    // 🟢 FIX: Lower the shields! Tell the browser it is explicitly allowed to be embedded on Twitter
+    res.removeHeader('X-Frame-Options');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://twitter.com https://x.com;");
+
     const result = await pool.query(`
       SELECT chat_id, message_id, cloudflare_id FROM videos WHERE message_id = $1 LIMIT 1
     `, [message_id]);
@@ -671,15 +675,12 @@ app.get('/embed/:message_id', async (req, res) => {
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
     
-    // Grab the thumbnail for the player poster
     const thumbUrl = video.cloudflare_id 
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
       : `https://videos.naijahomemade.com/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
 
-    // Grab the stream URL (we use your existing streaming wrapper)
     const streamUrl = `https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`;
 
-    // 🟢 Send back a perfectly styled, 100% width/height blank video player just for Twitter
     res.send(`
       <!DOCTYPE html>
       <html>
