@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { X, ArrowLeft, Play, Loader2, Maximize, Minimize, Share2, Download, Check } from "lucide-react";
+// 🟢 IMPORTED PAUSE
+import { X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, Share2, Download, Check } from "lucide-react";
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const videoRef = useRef(null);
@@ -8,13 +9,12 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const hideTimeout = useRef(null); 
   
   const [isPlaying, setIsPlaying] = useState(true);
-  const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showControls, setShowControls] = useState(true); 
-  const [copied, setCopied] = useState(false); // 🟢 Track if share link was copied
-  const [isDownloading, setIsDownloading] = useState(false); // 🟢 Track download state
+  const [copied, setCopied] = useState(false); 
+  const [isDownloading, setIsDownloading] = useState(false); 
 
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
@@ -22,7 +22,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     
     hideTimeout.current = setTimeout(() => {
       setIsPlaying(playing => {
-        if (playing) setShowControls(false);
+        if (playing) setShowControls(false); // Only hides if playing
         return playing;
       });
     }, 3000);
@@ -38,29 +38,56 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   const handleInteraction = (e) => {
     if (e) e.stopPropagation();
-    resetHideTimer();
 
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
 
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+      // DOUBLE TAP: Toggle Zoom
       setIsZoomed(z => !z);
       lastTap.current = 0; 
+      resetHideTimer();
     } else {
+      // SINGLE TAP
       lastTap.current = now;
       setTimeout(() => {
         if (lastTap.current === now && videoRef.current) {
-          if (videoRef.current.paused) {
-            videoRef.current.play().catch(() => {});
+          if (!isDesktop) {
+            // 🟢 MOBILE FIX: Tap only toggles the controls UI, it does NOT pause
+            setShowControls(prev => {
+              if (!prev) {
+                resetHideTimer();
+                return true;
+              }
+              if (hideTimeout.current) clearTimeout(hideTimeout.current);
+              return false;
+            });
           } else {
-            videoRef.current.pause();
+            // DESKTOP: Click pauses/plays like normal desktop video players
+            resetHideTimer();
+            if (videoRef.current.paused) {
+              videoRef.current.play().catch(() => {});
+            } else {
+              videoRef.current.pause();
+            }
           }
         }
       }, DOUBLE_TAP_DELAY);
     }
   };
 
-  // 🟢 SHARE LOGIC
+  const handleTogglePlay = (e) => {
+    e.stopPropagation();
+    resetHideTimer();
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  };
+
   const handleShare = async (e) => {
     e.stopPropagation();
     resetHideTimer();
@@ -74,17 +101,15 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
           url: shareUrl,
         });
       } catch (err) {
-        console.log("Native share cancelled or failed", err);
+        console.log("Native share cancelled", err);
       }
     } else {
-      // Fallback: Copy to clipboard
       navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  // 🟢 DOWNLOAD LOGIC
   const handleDownload = async (e) => {
     e.stopPropagation();
     resetHideTimer();
@@ -92,14 +117,13 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     
     setIsDownloading(true);
     try {
-      // Fetch the video as a blob to force the browser to download instead of play
       const response = await fetch(video.video_url);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `naijahomemade-${video.message_id}.mp4`; // Set a clean filename
+      link.download = `naijahomemade-${video.message_id}.mp4`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -179,8 +203,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             onTimeUpdate={handleTimeUpdate}
             onWaiting={() => setIsLoading(true)}
             onCanPlay={() => setIsLoading(false)}
-            onPlay={() => { setIsPlaying(true); setShowPlayIcon(false); }}
-            onPause={() => { setIsPlaying(false); setShowPlayIcon(true); }}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
             style={{ 
                 width: "100%", height: "100%", 
                 objectFit: isZoomed ? "cover" : "contain",
@@ -188,41 +212,45 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             }}
           />
 
-          {(!isPlaying || showPlayIcon) && !isLoading && (
-            <div style={playIconOverlayStyle}>
-              <Play size={40} fill="white" color="white" />
-            </div>
+          {/* 🟢 NEW CENTER PLAY/PAUSE BUTTON */}
+          {(!isLoading && (showControls || !isPlaying)) && (
+            <button
+              onClick={handleTogglePlay}
+              style={{
+                ...centerControlStyle,
+                opacity: (showControls || !isPlaying) ? 1 : 0,
+                pointerEvents: (showControls || !isPlaying) ? "auto" : "none"
+              }}
+            >
+              <div style={centerIconCircleStyle}>
+                {isPlaying ? <Pause size={36} fill="white" color="white" /> : <Play size={36} fill="white" color="white" />}
+              </div>
+            </button>
           )}
 
           <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
 
-          {/* 🟢 RIGHT SIDE ACTION BUTTONS CONTAINER */}
           <div style={{ ...actionButtonsContainerStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
-            
-            {/* Share Button */}
             <button onClick={handleShare} style={actionButtonStyle}>
-              <div style={iconCircleStyle}>
+              <div style={sideIconCircleStyle}>
                 {copied ? <Check size={20} color="#4ade80" /> : <Share2 size={20} />}
               </div>
               <span style={actionLabelStyle}>{copied ? "Copied!" : "Share"}</span>
             </button>
 
-            {/* Download Button */}
             <button onClick={handleDownload} style={actionButtonStyle}>
-              <div style={iconCircleStyle}>
+              <div style={sideIconCircleStyle}>
                 {isDownloading ? <Loader2 size={20} className="spin-animation" /> : <Download size={20} />}
               </div>
               <span style={actionLabelStyle}>Save</span>
             </button>
 
-            {/* Zoom Button (Moved into the stack for alignment) */}
             <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); resetHideTimer(); }} style={actionButtonStyle}>
-               <div style={iconCircleStyle}>
+               <div style={sideIconCircleStyle}>
                  {isZoomed ? <Minimize size={20} /> : <Maximize size={20} />}
                </div>
                <span style={actionLabelStyle}>{isZoomed ? "Fit" : "Fill"}</span>
             </button>
-            
           </div>
 
           <div style={{ 
@@ -264,7 +292,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 // 🖌 STYLES
 const overlayStyle = { position: "fixed", inset: 0, height: "100dvh", backgroundColor: "#000", zIndex: 999999, display: "flex", flexDirection: "column", overflow: "hidden", touchAction: "none" };
 const stageStyle = { display: "flex", width: "100%", height: "100%", background: "#000", position: "relative" };
-const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" };
+const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
 const loaderContainerStyle = { position: "absolute", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" };
 const topGradientStyle = { position: "absolute", top: 0, left: 0, right: 0, height: "120px", background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)", zIndex: 10005, transition: "opacity 0.4s ease" };
 const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "140px", background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.4s ease", pointerEvents: "none" };
@@ -272,10 +300,12 @@ const progressWrapperStyle = { position: "absolute", left: 0, right: 0, zIndex: 
 const rangeInputBaseStyle = { width: "100%", cursor: "pointer", accentColor: "var(--primary-color)", background: "rgba(255,255,255,0.2)", appearance: "none", outline: "none" };
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
-const playIconOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "rgba(0,0,0,0.5)", borderRadius: "50%", padding: "20px", pointerEvents: "none", zIndex: 5 };
 
-// 🟢 NEW STYLES FOR THE RIGHT-SIDE ACTION BAR
+// 🟢 NEW CENTER CONTROL STYLES
+const centerControlStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "transparent", border: "none", cursor: "pointer", zIndex: 10005, transition: "opacity 0.3s ease", display: "flex", alignItems: "center", justifyContent: "center" };
+const centerIconCircleStyle = { background: "rgba(0,0,0,0.4)", borderRadius: "50%", padding: "20px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" };
+
 const actionButtonsContainerStyle = { position: "absolute", right: "15px", bottom: "80px", display: "flex", flexDirection: "column", gap: "20px", zIndex: 10005, transition: "opacity 0.4s ease", alignItems: "center" };
 const actionButtonStyle = { background: "transparent", border: "none", color: "#fff", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: 0 };
-const iconCircleStyle = { background: "rgba(0,0,0,0.5)", width: "45px", height: "45px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
+const sideIconCircleStyle = { background: "rgba(0,0,0,0.5)", width: "45px", height: "45px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
 const actionLabelStyle = { fontSize: "11px", fontWeight: "600", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
