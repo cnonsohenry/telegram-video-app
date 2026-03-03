@@ -593,7 +593,7 @@ app.get("/api/thumbnail", async (req, res) => {
 });
 
 /* =====================
-   Share Link (UPDATED FOR OPEN GRAPH)
+   Share Link (UPDATED FOR OPEN GRAPH PORTRAIT FIX)
 ===================== */
 app.get('/v/:message_id', async (req, res) => {
   try {
@@ -611,9 +611,9 @@ app.get('/v/:message_id', async (req, res) => {
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
     
-    // 🟢 FIX: Point the SEO thumbnail to videos.naijahomemade.com
+    // 🟢 FIX: We increase the height request to 1280 to ensure crisp portrait quality
     const thumbUrl = video.cloudflare_id 
-      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=600`
+      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
       : `https://videos.naijahomemade.com/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
 
     res.send(`
@@ -628,6 +628,10 @@ app.get('/v/:message_id', async (req, res) => {
           <meta property="og:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
           <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
           <meta property="og:image" content="${thumbUrl}">
+          
+          <meta property="og:image:width" content="720">
+          <meta property="og:image:height" content="1280">
+          
           <meta property="og:url" content="https://videos.naijahomemade.com/v/${message_id}">
           
           <meta name="twitter:card" content="summary_large_image">
