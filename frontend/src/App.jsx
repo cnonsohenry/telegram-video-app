@@ -19,41 +19,36 @@ export default function App() {
   const [activeVideo, setActiveVideo] = useState(null); 
   const [showPaywall, setShowPaywall] = useState(false);
   const [activeLegalPage, setActiveLegalPage] = useState(null); 
+  
+  // 🟢 1. NEW STATE: Track if the video was opened via a shared link
+  const [isSharedVideoView, setIsSharedVideoView] = useState(false);
 
-  // 🟢 Define auth and viewing states BEFORE the zapper hook
   const isLoggedIn = !!token;
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
-  // 🟢 AdFreeZone logic
-  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || !!activeVideo || showPaywall || !!activeLegalPage;
+  // 🟢 2. UPDATED ZAPPER LOGIC: 
+  // Zap ads IF a video is active AND it is NOT a shared video view.
+  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView);
   
   useAdZapper(isAdFreeZone);
 
-  // 🟢 TELEGRAM IN-APP BROWSER FIX (The Touch Shield)
-  // This physically blocks the WebView from minimizing when swiping on non-scrollable areas
+  // TELEGRAM IN-APP BROWSER FIX
   useEffect(() => {
     const preventOverscroll = (e) => {
-      // Find out if the user is touching something that is supposed to scroll
       const scrollable = e.target.closest('[style*="overflow-y: auto"], [style*="overflowY: auto"]');
       
-      // If we aren't touching a scrollable list (like touching the header/footer), block the swipe
       if (!scrollable) {
         if (e.cancelable) e.preventDefault();
         return;
       }
 
-      // If we ARE touching the list, but we are at the very top, block the swipe down
       if (scrollable.scrollTop <= 0 && e.touches && e.touches.length > 0 && e.touches[0].clientY > 0) {
-        // We rely heavily on the CSS 'contain' rule below, but this stops aggressive rogue touches
+        // Handled mostly by CSS contain
       }
     };
 
-    // Attach to the document with passive: false so we have permission to cancel the event
     document.addEventListener('touchmove', preventOverscroll, { passive: false });
-    
-    return () => {
-      document.removeEventListener('touchmove', preventOverscroll);
-    };
+    return () => document.removeEventListener('touchmove', preventOverscroll);
   }, []);
 
   const applyTheme = useCallback((theme) => {
@@ -71,16 +66,17 @@ export default function App() {
   }, [applyTheme]);
 
   useEffect(() => {
-    // 1. Check for query parameter (/?v=1847)
     const params = new URLSearchParams(window.location.search);
     let sharedVideoId = params.get("v");
 
-    // 🟢 2. FIX: Check for clean path from the sitemap (/v/1847)
     if (!sharedVideoId && window.location.pathname.startsWith('/v/')) {
       sharedVideoId = window.location.pathname.split('/')[2];
     }
 
     if (sharedVideoId) {
+      // 🟢 3. Mark this session as a Shared Video View so ads are allowed to show
+      setIsSharedVideoView(true);
+      
       const fetchSharedVideo = async () => {
         try {
           const res = await fetch(`${import.meta.env.VITE_API_URL}/api/video/details?message_id=${sharedVideoId}`);
@@ -97,7 +93,6 @@ export default function App() {
         } catch (error) {
           console.error("Failed to load shared video:", error);
         } finally {
-          // Clean up the URL in the browser bar after the video loads
           window.history.replaceState({}, document.title, "/");
         }
       };
@@ -273,7 +268,11 @@ export default function App() {
         <div style={{ position: "fixed", inset: 0, zIndex: 999999, background: "#000" }}>
           <FullscreenPlayer 
             video={activeVideo} 
-            onClose={() => setActiveVideo(null)} 
+            onClose={() => {
+              // 🟢 4. RESET on close, so if they keep browsing normally, ads stay hidden on videos!
+              setActiveVideo(null);
+              setIsSharedVideoView(false); 
+            }} 
             isDesktop={window.innerWidth > 1024} 
           />
         </div>
@@ -286,7 +285,6 @@ const navStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70p
 const btnStyle = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', flex: 1, transition: 'all 0.3s ease' };
 const labelStyle = { fontSize: '10px', fontWeight: '700' };
 
-// 🟢 FIX: Added GPU acceleration, overscroll trap, and specific touch actions
 const slideContainerStyle = { 
   position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
   overflowY: 'auto', backgroundColor: 'var(--bg-color)', 
@@ -296,6 +294,6 @@ const slideContainerStyle = {
   transform: 'translateZ(0)', 
   WebkitBackfaceVisibility: 'hidden', 
   backfaceVisibility: 'hidden',
-  overscrollBehaviorY: 'contain', // Traps the scroll inside this div!
-  touchAction: 'pan-y'            // Tells the browser this div only handles vertical swipes
+  overscrollBehaviorY: 'contain', 
+  touchAction: 'pan-y'            
 };
