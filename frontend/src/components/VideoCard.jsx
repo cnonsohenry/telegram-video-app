@@ -52,8 +52,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         zIndex: isHovered ? 10 : 1, 
       }}
     >
-      {/* 🟢 Schema JSON completely removed from here! */}
-      
       <div style={{ 
         position: "relative", 
         width: "100%", 
@@ -95,6 +93,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         <video
           ref={videoRef}
           src={video.video_url}
+          preload="none" /* 🟢 THE MAGIC FIX: Stops network traffic jams! */
           muted loop playsInline
           onPlaying={() => setIsVideoReady(true)}
           style={{ 
