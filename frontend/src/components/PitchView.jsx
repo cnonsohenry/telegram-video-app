@@ -1,6 +1,22 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 
+// 🟢 THE MAGIC FIX: Preload images immediately when the file is parsed by the browser.
+// This guarantees zero lag or blank screens when the user swipes!
+const slides = [
+  { title: "CATCH THE SHOTS", description: "Sneak peeks of your favorite creators before the main drop.", image: "/assets/slide4.jpg" },
+  { title: "PREMIUM ACCESS", description: "Unlock exclusive full-length videos and 4K content.", image: "/assets/slide2.jpg" },
+  { title: "JOIN THE HUB", description: "Connect with the biggest hub for homegrown talent.", image: "/assets/slide3.jpg" }
+];
+
+// Execute preloading instantly
+if (typeof window !== "undefined") {
+  slides.forEach(slide => {
+    const img = new Image();
+    img.src = slide.image;
+  });
+}
+
 export default function PitchView({ onComplete }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
@@ -9,22 +25,15 @@ export default function PitchView({ onComplete }) {
   const touchEndX = useRef(null);
   const minSwipeDistance = 50;
 
-  const slides = [
-    { title: "CATCH THE SHOTS", description: "Sneak peeks of your favorite creators before the main drop.", image: "/assets/slide4.jpg" },
-    { title: "PREMIUM ACCESS", description: "Unlock exclusive full-length videos and 4K content.", image: "/assets/slide2.jpg" },
-    { title: "JOIN THE HUB", description: "Connect with the biggest hub for homegrown talent.", image: "/assets/slide3.jpg" }
-  ];
-
   const nextSlide = useCallback(() => {
     if (currentSlide < slides.length - 1) setCurrentSlide(currentSlide + 1);
     else onComplete();
-  }, [currentSlide, slides.length, onComplete]);
+  }, [currentSlide, onComplete]);
 
   const prevSlide = useCallback(() => {
     if (currentSlide > 0) setCurrentSlide(currentSlide - 1);
   }, [currentSlide]);
 
-  // 🟢 RESPONSIVE & KEYBOARD LISTENERS
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth > 1024);
     const handleKeyDown = (e) => {
@@ -41,7 +50,6 @@ export default function PitchView({ onComplete }) {
     };
   }, [nextSlide, prevSlide, onComplete]);
 
-  // SWIPE HANDLERS (Mobile)
   const onTouchStart = (e) => { touchEndX.current = null; touchStartX.current = e.targetTouches[0].clientX; };
   const onTouchMove = (e) => { touchEndX.current = e.targetTouches[0].clientX; };
   const onTouchEnd = () => {
@@ -55,7 +63,6 @@ export default function PitchView({ onComplete }) {
     <div style={pitchContainerStyle}>
       <button onClick={onComplete} style={skipButton}>Skip</button>
       
-      {/* 🟢 DESKTOP ARROW NAVIGATION */}
       {isDesktop && (
         <>
           {currentSlide > 0 && (
@@ -70,7 +77,8 @@ export default function PitchView({ onComplete }) {
         onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
       >
         {slides.map((s, i) => (
-          <div key={i} style={{...slideUnit, backgroundImage: `url(${s.image})`}}>
+          // 🟢 CSS UPDATE: Added willChange to force the GPU to handle the sliding animations
+          <div key={i} style={{...slideUnit, backgroundImage: `url(${s.image})`, willChange: "transform" }}>
             <div style={{
               ...slideOverlay,
               justifyContent: isDesktop ? "center" : "flex-end",
@@ -104,17 +112,24 @@ export default function PitchView({ onComplete }) {
           {currentSlide === slides.length - 1 ? "Get Started" : "Next"} <ChevronRight size={20} />
         </button>
       </div>
+      
+      {/* Ensure the pulse animation is defined */}
+      <style>{`
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulseBtn { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .pulse-animation { animation: pulseBtn 2s infinite ease-in-out; }
+      `}</style>
     </div>
   );
 }
 
 // 🖌 STYLES
 const pitchContainerStyle = { height: "100dvh", background: "#000", position: "fixed", inset: 0, zIndex: 20000, overflow: "hidden" };
-const sliderWrapper = { display: "flex", width: "100%", height: "100%", transition: "transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)", willChange: "transform" };
+const sliderWrapper = { display: "flex", width: "100%", height: "100%", transition: "transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)", willChange: "transform" }; // Sped up the transition slightly for a snappier feel
 const slideUnit = { minWidth: "100%", height: "100%", backgroundSize: "cover", backgroundPosition: "center", position: "relative" };
 const slideOverlay = { position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 100%)", display: "flex", flexDirection: "column" };
 const skipButton = { position: "absolute", top: "max(30px, env(safe-area-inset-top))", right: "20px", background: "rgba(0,0,0,0.5)", border: "none", color: "#fff", padding: "10px 20px", borderRadius: "20px", fontSize: "14px", fontWeight: "700", zIndex: 20005, backdropFilter: "blur(10px)", cursor: "pointer" };
-const textFadeIn = { animation: "fadeInUp 0.8s ease-out forwards" };
+const textFadeIn = { animation: "fadeInUp 0.6s ease-out forwards" };
 const pitchTitle = { fontWeight: "900", color: "#fff", marginBottom: "16px", letterSpacing: "-2px" };
 const pitchDesc = { color: "rgba(255,255,255,0.9)", lineHeight: "1.6" };
 const pitchFooter = { position: "absolute", bottom: 0, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "30px", zIndex: 20002 };

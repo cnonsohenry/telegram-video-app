@@ -20,17 +20,45 @@ export default function App() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [activeLegalPage, setActiveLegalPage] = useState(null); 
   
-  // 🟢 1. NEW STATE: Track if the video was opened via a shared link
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
 
   const isLoggedIn = !!token;
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
-  // 🟢 2. UPDATED ZAPPER LOGIC: 
-  // Zap ads IF a video is active AND it is NOT a shared video view.
+  // 🟢 AdFreeZone logic explicitly includes needsPitch (PitchView) and !!activeLegalPage (LegalPages)
   const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView);
   
   useAdZapper(isAdFreeZone);
+
+  // 🟢 NUCLEAR AD BLOCKER: Physically hides stubborn Adsterra body injections via CSS
+  useEffect(() => {
+    const styleId = "nuclear-ad-blocker";
+    let styleEl = document.getElementById(styleId);
+    
+    if (isAdFreeZone) {
+      if (!styleEl) {
+        styleEl = document.createElement("style");
+        styleEl.id = styleId;
+        // Targets generic Adsterra container patterns and iframe overlays
+        styleEl.innerHTML = `
+          div[id^="container-"], 
+          iframe[src*="adsterra"], 
+          iframe[src*="topcreativeformat"],
+          .adsterra-social-bar,
+          .adsterra-wrapper { 
+            display: none !important; 
+            opacity: 0 !important; 
+            pointer-events: none !important; 
+            visibility: hidden !important; 
+            z-index: -9999 !important;
+          }
+        `;
+        document.head.appendChild(styleEl);
+      }
+    } else {
+      if (styleEl) styleEl.remove();
+    }
+  }, [isAdFreeZone]);
 
   // TELEGRAM IN-APP BROWSER FIX
   useEffect(() => {
@@ -74,7 +102,6 @@ export default function App() {
     }
 
     if (sharedVideoId) {
-      // 🟢 3. Mark this session as a Shared Video View so ads are allowed to show
       setIsSharedVideoView(true);
       
       const fetchSharedVideo = async () => {
@@ -269,7 +296,6 @@ export default function App() {
           <FullscreenPlayer 
             video={activeVideo} 
             onClose={() => {
-              // 🟢 4. RESET on close, so if they keep browsing normally, ads stay hidden on videos!
               setActiveVideo(null);
               setIsSharedVideoView(false); 
             }} 
