@@ -16,25 +16,45 @@ export default function AdminUpload() {
   const [twitterStatus, setTwitterStatus] = useState("idle"); 
   const [pipelineRoute, setPipelineRoute] = useState("direct"); 
 
-  // 🟢 THE TERMINATOR: Locks scroll and permanently deletes ads every 500ms
+  // 🟢 AGGRESSIVE SCROLL LOCK & AD TERMINATOR
   useEffect(() => {
-    // Lock the background app from scrolling
+    // 1. Capture current scroll position so we don't lose it
+    const scrollY = window.scrollY;
+    
+    // 2. Lock the entire document (forces iOS/Telegram to obey)
+    document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
 
     const nukeAds = () => {
-      // Find and physically delete any Adsterra elements that try to inject themselves
       const ads = document.querySelectorAll('iframe[src*="adsterra"], div[id^="container-"], .adsterra-social-bar, [id*="effectivegatecpm"], .adsterra-wrapper');
       ads.forEach(ad => ad.remove());
     };
 
-    nukeAds(); // Fire immediately
-    const adKillerInterval = setInterval(nukeAds, 500); // Keep firing every half second
+    nukeAds(); 
+    const adKillerInterval = setInterval(nukeAds, 500); 
 
     return () => {
-      document.body.style.overflow = ""; // Restore scroll when we close the admin panel
+      // 3. Restore everything exactly how it was when the component unmounts
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      window.scrollTo(0, scrollY);
+      
       clearInterval(adKillerInterval);
     };
   }, []);
+
+  // 🟢 GUARANTEED CLOSE FUNCTION
+  const handleClose = () => {
+    // Strip ?admin=true from the URL and force the browser to completely reload the root page
+    window.history.replaceState({}, document.title, "/");
+    window.location.reload();
+  };
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -122,13 +142,12 @@ export default function AdminUpload() {
     }
   };
 
-  // 🟢 REACT PORTAL: This forces the component to render totally outside App.jsx, covering everything perfectly!
   return ReactDOM.createPortal(
     <div style={containerStyle}>
       
-      {/* Quick Escape Button */}
+      {/* 🟢 GUARANTEED CLOSE BUTTON */}
       <button 
-        onClick={() => window.location.href = "/"} 
+        onClick={handleClose} 
         style={closeButtonStyle}
       >
         <X size={28} />
@@ -253,14 +272,12 @@ export default function AdminUpload() {
         <style>{`
           .spin { animation: spin 1s linear infinite; }
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          
-          /* Hides the scrollbar inside the card for a cleaner app feel */
           .admin-card::-webkit-scrollbar { display: none; }
           .admin-card { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
       </div>
     </div>,
-    document.body // 🟢 This mounts it directly to the root body element
+    document.body
   );
 }
 
