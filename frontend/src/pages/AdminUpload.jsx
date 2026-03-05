@@ -1,22 +1,46 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link } from "lucide-react";
 
 export default function AdminUpload() {
   const [uploadMode, setUploadMode] = useState("local"); 
 
-  // 🟢 Shared States (Needed for BOTH local and Twitter)
   const [adminId, setAdminId] = useState(""); 
   const [category, setCategory] = useState("premium");
 
-  // Local Upload States
   const [file, setFile] = useState(null);
   const [caption, setCaption] = useState("");
   const [status, setStatus] = useState("idle"); 
 
-  // Twitter Import States
   const [twitterUrl, setTwitterUrl] = useState("");
   const [twitterStatus, setTwitterStatus] = useState("idle"); 
-  const [pipelineRoute, setPipelineRoute] = useState("direct"); // 'direct' or 'telethon'
+  const [pipelineRoute, setPipelineRoute] = useState("direct"); 
+
+  // 🟢 ISOLATED AD ZAPPER: Guarantees zero ads pop up while uploading
+  useEffect(() => {
+    const styleId = "admin-upload-ad-blocker";
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement("style");
+      styleEl.id = styleId;
+      styleEl.innerHTML = `
+        div[id^="container-"], 
+        iframe[src*="adsterra"], 
+        iframe[src*="topcreativeformat"],
+        .adsterra-social-bar,
+        .adsterra-wrapper { 
+          display: none !important; 
+          opacity: 0 !important; 
+          pointer-events: none !important; 
+          visibility: hidden !important; 
+          z-index: -9999 !important;
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+    return () => {
+      const el = document.getElementById(styleId);
+      if (el) el.remove();
+    };
+  }, []);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -70,7 +94,6 @@ export default function AdminUpload() {
 
     setTwitterStatus("processing");
 
-    // 🟢 Route traffic based on the selected pipeline
     const endpoint = pipelineRoute === "direct" 
         ? "https://videos.naijahomemade.com/twitter-api/import-twitter-direct"
         : "https://videos.naijahomemade.com/twitter-api/import-twitter-telethon";
@@ -107,7 +130,7 @@ export default function AdminUpload() {
 
   return (
     <div style={containerStyle}>
-      <div style={cardStyle}>
+      <div style={cardStyle} className="admin-card">
         <div style={headerStyle}>
           <h2 style={{ margin: 0, fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
             {uploadMode === "local" ? <Video color="#ff3b30" /> : <Twitter color="#1DA1F2" />} 
@@ -133,7 +156,6 @@ export default function AdminUpload() {
           </button>
         </div>
 
-        {/* 🟢 SHARED INPUTS: Admin ID & Category apply to both upload modes! */}
         <div style={formStyle}>
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Your Telegram ID</label>
@@ -156,7 +178,6 @@ export default function AdminUpload() {
 
         <hr style={{ border: "none", borderTop: "1px solid #333", margin: "20px 0" }} />
 
-        {/* LOCAL UPLOAD SPECIFIC FIELDS */}
         {uploadMode === "local" && (
           <form onSubmit={handleUpload} style={formStyle}>
             <div style={inputGroupStyle}>
@@ -191,11 +212,8 @@ export default function AdminUpload() {
           </form>
         )}
 
-        {/* TWITTER IMPORT SPECIFIC FIELDS */}
         {uploadMode === "twitter" && (
           <form onSubmit={handleTwitterImport} style={formStyle}>
-            
-            {/* 🟢 NEW PIPELINE SELECTOR */}
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Routing Pipeline</label>
               <select value={pipelineRoute} onChange={(e) => setPipelineRoute(e.target.value)} style={inputStyle}>
@@ -231,6 +249,10 @@ export default function AdminUpload() {
         <style>{`
           .spin { animation: spin 1s linear infinite; }
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          
+          /* Hides the scrollbar inside the card for a cleaner app feel */
+          .admin-card::-webkit-scrollbar { display: none; }
+          .admin-card { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
       </div>
     </div>
@@ -238,8 +260,10 @@ export default function AdminUpload() {
 }
 
 // 🎨 DARK THEME STYLES
-const containerStyle = { minHeight: "100vh", background: "#000", display: "flex", alignItems: "center", justifyItems: "center", padding: "20px", color: "#fff", fontFamily: "sans-serif", paddingBottom: "100px" };
-const cardStyle = { width: "100%", maxWidth: "400px", margin: "0 auto", background: "#1c1c1e", borderRadius: "16px", padding: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.5)", border: "1px solid #333" };
+// 🟢 FIX: position: fixed and zIndex: 999999 perfectly overlays the Home/Profile footer. overflow: hidden prevents page scrolling.
+const containerStyle = { position: "fixed", inset: 0, zIndex: 999999, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", color: "#fff", fontFamily: "sans-serif", overflow: "hidden" };
+// 🟢 FIX: maxHeight and overflowY: auto ensure the card scrolls internally if the phone screen is very small, without scrolling the main page
+const cardStyle = { width: "100%", maxWidth: "400px", maxHeight: "95dvh", overflowY: "auto", margin: "0 auto", background: "#1c1c1e", borderRadius: "16px", padding: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.5)", border: "1px solid #333" };
 const headerStyle = { marginBottom: "20px", textAlign: "center" };
 const tabsContainerStyle = { display: "flex", gap: "10px", marginBottom: "24px", background: "#121212", padding: "4px", borderRadius: "10px" };
 const tabStyle = { flex: 1, padding: "10px", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
