@@ -25,17 +25,19 @@ export default function App() {
   const isLoggedIn = !!token;
   const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
 
-  // 🟢 AdFreeZone logic explicitly includes activeTab === "admin"
+  // 🟢 AdFreeZone logic
   const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView);
   
   useAdZapper(isAdFreeZone);
 
-  // 🟢 NUCLEAR AD BLOCKER
+  // 🟢 ABSOLUTE NUCLEAR AD BLOCKER (CSS + JS TERMINATOR)
   useEffect(() => {
     const styleId = "nuclear-ad-blocker";
     let styleEl = document.getElementById(styleId);
-    
+    let adKillerInterval; // Define the interval variable
+
     if (isAdFreeZone) {
+      // 1. Inject aggressive CSS rules
       if (!styleEl) {
         styleEl = document.createElement("style");
         styleEl.id = styleId;
@@ -44,19 +46,45 @@ export default function App() {
           iframe[src*="adsterra"], 
           iframe[src*="topcreativeformat"],
           .adsterra-social-bar,
-          .adsterra-wrapper { 
+          .adsterra-wrapper,
+          [id*="effectivegatecpm"],
+          div[style*="z-index: 2147483647"],
+          div[style*="z-index: 2147483646"] { 
             display: none !important; 
             opacity: 0 !important; 
             pointer-events: none !important; 
             visibility: hidden !important; 
             z-index: -9999 !important;
+            width: 0 !important;
+            height: 0 !important;
           }
         `;
         document.head.appendChild(styleEl);
       }
+
+      // 2. Start the physical Terminator Interval
+      const nukeAds = () => {
+        const ads = document.querySelectorAll('iframe[src*="adsterra"], div[id^="container-"], .adsterra-social-bar, [id*="effectivegatecpm"], .adsterra-wrapper');
+        ads.forEach(ad => ad.remove());
+        
+        // Remove sneaky padding/margins Adsterra adds to the body to push content down
+        if (document.body.style.paddingTop) document.body.style.paddingTop = "";
+        if (document.body.style.marginTop) document.body.style.marginTop = "";
+      };
+
+      nukeAds(); // Fire immediately
+      adKillerInterval = setInterval(nukeAds, 400); // Fire every 400ms relentlessly
+
     } else {
+      // Clean up when we go back to the Home feed (where ads are allowed)
       if (styleEl) styleEl.remove();
+      if (adKillerInterval) clearInterval(adKillerInterval);
     }
+
+    // Cleanup on unmount or dependency change
+    return () => {
+      if (adKillerInterval) clearInterval(adKillerInterval);
+    };
   }, [isAdFreeZone]);
 
   // TELEGRAM IN-APP BROWSER FIX
@@ -161,7 +189,6 @@ export default function App() {
     }
   }, [token, user, applyTheme]);
 
-  // 🟢 FIX: Hide the footer completely if we are on the Admin tab!
   const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin"; 
 
   if (needsPitch) {
@@ -221,12 +248,12 @@ export default function App() {
           )}
         </div>
 
-        {/* 🟢 ADMIN PORTAL (Only mounts when activeTab is "admin") */}
+        {/* 🟢 ADMIN PORTAL */}
         {activeTab === "admin" && (
           <AdminUpload 
             onClose={() => {
-              window.history.replaceState({}, document.title, "/"); // Silently clears /?admin=true from URL
-              setActiveTab("home"); // Instantly returns to the Home view
+              window.history.replaceState({}, document.title, "/"); 
+              setActiveTab("home"); 
             }} 
           />
         )}
