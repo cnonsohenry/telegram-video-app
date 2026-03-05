@@ -2,21 +2,22 @@ import React, { useState } from "react";
 import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link } from "lucide-react";
 
 export default function AdminUpload() {
-  // 🟢 Mode State: Toggle between Local File and Twitter Import
-  const [uploadMode, setUploadMode] = useState("local"); // "local" or "twitter"
+  const [uploadMode, setUploadMode] = useState("local"); 
 
-  // 🟢 Local Upload States
-  const [file, setFile] = useState(null);
-  const [caption, setCaption] = useState("");
+  // 🟢 Shared States (Needed for BOTH local and Twitter)
   const [adminId, setAdminId] = useState(""); 
   const [category, setCategory] = useState("premium");
+
+  // Local Upload States
+  const [file, setFile] = useState(null);
+  const [caption, setCaption] = useState("");
   const [status, setStatus] = useState("idle"); 
 
-  // 🟢 Twitter Import States
+  // Twitter Import States
   const [twitterUrl, setTwitterUrl] = useState("");
-  const [twitterStatus, setTwitterStatus] = useState("idle"); // idle, processing, success, error
+  const [twitterStatus, setTwitterStatus] = useState("idle"); 
+  const [pipelineRoute, setPipelineRoute] = useState("direct"); // 'direct' or 'telethon'
 
-  // --- LOCAL UPLOAD HANDLERS ---
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -62,19 +63,27 @@ export default function AdminUpload() {
     }
   };
 
-  // --- TWITTER IMPORT HANDLERS ---
   const handleTwitterImport = async (e) => {
     e.preventDefault();
     if (!twitterUrl) return alert("Please enter a Twitter URL");
+    if (!adminId) return alert("Please enter your Admin Telegram ID");
 
     setTwitterStatus("processing");
 
+    // 🟢 Route traffic based on the selected pipeline
+    const endpoint = pipelineRoute === "direct" 
+        ? "https://videos.naijahomemade.com/twitter-api/import-twitter-direct"
+        : "https://videos.naijahomemade.com/twitter-api/import-twitter-telethon";
+
     try {
-      // 🟢 Calls the FastAPI server via your Nginx reverse proxy
-      const res = await fetch("https://videos.naijahomemade.com/twitter-api/import-twitter", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: twitterUrl }),
+        body: JSON.stringify({ 
+          url: twitterUrl,
+          admin_id: adminId,
+          category: category 
+        }),
       });
 
       const data = await res.json();
@@ -109,7 +118,6 @@ export default function AdminUpload() {
           </p>
         </div>
 
-        {/* 🟢 TABS */}
         <div style={tabsContainerStyle}>
           <button 
             onClick={() => setUploadMode("local")} 
@@ -125,18 +133,32 @@ export default function AdminUpload() {
           </button>
         </div>
 
-        {/* 🟢 LOCAL FILE UPLOAD FORM */}
+        {/* 🟢 SHARED INPUTS: Admin ID & Category apply to both upload modes! */}
+        <div style={formStyle}>
+          <div style={inputGroupStyle}>
+            <label style={labelStyle}>Your Telegram ID</label>
+            <input 
+              type="text" placeholder="e.g. 1881815190" value={adminId}
+              onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required
+            />
+          </div>
+
+          <div style={inputGroupStyle}>
+            <label style={labelStyle}>Category</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
+              <option value="premium">💎 Premium</option>
+              <option value="hotties">🔥 Hotties</option>
+              <option value="knacks">🍆 Knacks</option>
+              <option value="trends">📈 Trends</option>
+            </select>
+          </div>
+        </div>
+
+        <hr style={{ border: "none", borderTop: "1px solid #333", margin: "20px 0" }} />
+
+        {/* LOCAL UPLOAD SPECIFIC FIELDS */}
         {uploadMode === "local" && (
           <form onSubmit={handleUpload} style={formStyle}>
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>Your Telegram ID</label>
-              <input 
-                type="text" placeholder="e.g. 1881815190" value={adminId}
-                onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required
-              />
-              <span style={{ fontSize: "10px", color: "#555" }}>Must match ALLOWED_USERS in backend</span>
-            </div>
-
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Caption</label>
               <input 
@@ -145,23 +167,12 @@ export default function AdminUpload() {
               />
             </div>
 
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>Category</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
-                <option value="premium">💎 Premium</option>
-                <option value="hotties">🔥 Hotties</option>
-                <option value="knacks">🍆 Knacks</option>
-                <option value="trends">📈 Trends</option>
-              </select>
-            </div>
-
             <div style={fileDropStyle}>
               <input type="file" accept="video/*" onChange={handleFileChange} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
               {file ? (
                 <div style={{ textAlign: "center", color: "#20D5EC" }}>
                   <FileVideo size={32} style={{ marginBottom: "8px" }} />
                   <div style={{ fontSize: "14px", fontWeight: "600" }}>{file.name}</div>
-                  <div style={{ fontSize: "12px", color: "#666" }}>{(file.size / 1024 / 1024).toFixed(2)} MB</div>
                 </div>
               ) : (
                 <div style={{ textAlign: "center", color: "#666" }}>
@@ -180,9 +191,19 @@ export default function AdminUpload() {
           </form>
         )}
 
-        {/* 🟢 TWITTER IMPORT FORM */}
+        {/* TWITTER IMPORT SPECIFIC FIELDS */}
         {uploadMode === "twitter" && (
           <form onSubmit={handleTwitterImport} style={formStyle}>
+            
+            {/* 🟢 NEW PIPELINE SELECTOR */}
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Routing Pipeline</label>
+              <select value={pipelineRoute} onChange={(e) => setPipelineRoute(e.target.value)} style={inputStyle}>
+                <option value="direct">⚡ Direct to Cloudflare</option>
+                <option value="telethon">🤖 Send to Telegram Bot</option>
+              </select>
+            </div>
+
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Twitter / X Link</label>
               <div style={{ position: "relative" }}>
@@ -196,7 +217,6 @@ export default function AdminUpload() {
                   required
                 />
               </div>
-              <span style={{ fontSize: "10px", color: "#555" }}>Video will automatically upload to Telegram.</span>
             </div>
 
             <button 
@@ -218,7 +238,7 @@ export default function AdminUpload() {
 }
 
 // 🎨 DARK THEME STYLES
-const containerStyle = { minHeight: "100vh", background: "#000", display: "flex", alignItems: "center", justifyItems: "center", padding: "20px", color: "#fff", fontFamily: "sans-serif" };
+const containerStyle = { minHeight: "100vh", background: "#000", display: "flex", alignItems: "center", justifyItems: "center", padding: "20px", color: "#fff", fontFamily: "sans-serif", paddingBottom: "100px" };
 const cardStyle = { width: "100%", maxWidth: "400px", margin: "0 auto", background: "#1c1c1e", borderRadius: "16px", padding: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.5)", border: "1px solid #333" };
 const headerStyle = { marginBottom: "20px", textAlign: "center" };
 const tabsContainerStyle = { display: "flex", gap: "10px", marginBottom: "24px", background: "#121212", padding: "4px", borderRadius: "10px" };

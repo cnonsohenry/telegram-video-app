@@ -17,7 +17,7 @@ import { z } from "zod";
 
 const { Pool } = pkg;
 
-const ALLOWED_USERS = [1881815190, 993163169, 5806906139];
+const ALLOWED_USERS = [1881815190, 993163169, 5806906139, 5441995861];
 const agent = new https.Agent({ family: 4 });
 
 const app = express();
