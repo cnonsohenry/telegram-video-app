@@ -23,7 +23,8 @@ export default function App() {
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
 
   const isLoggedIn = !!token;
-  const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
+  // 🟢 FIX: The Pitch is now only for the Profile tab. Admin goes straight to the Auth Form!
+const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
 
   const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView);
   
