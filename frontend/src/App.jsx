@@ -23,9 +23,9 @@ export default function App() {
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
 
   const isLoggedIn = !!token;
-  // 🟢 FIX: The Pitch is now only for the Profile tab. Admin goes straight to the Auth Form!
-const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
+  const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
 
+  // 🟢 AdFreeZone logic explicitly includes activeTab === "admin"
   const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView);
   
   useAdZapper(isAdFreeZone);
@@ -161,7 +161,8 @@ const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
     }
   }, [token, user, applyTheme]);
 
-  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall; 
+  // 🟢 FIX: Hide the footer completely if we are on the Admin tab!
+  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin"; 
 
   if (needsPitch) {
     return <PitchView onComplete={() => setHasSeenPitch(true)} />;
@@ -181,7 +182,6 @@ const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
           position: 'relative',
           width: '100%',
           height: '100%',
-          // 🟢 FIX: Ensure bottom padding is consistently applied so Admin page isn't hidden under the nav bar
           paddingBottom: shouldShowFooter ? "70px" : "0",
         }}
       > 
@@ -221,13 +221,14 @@ const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
           )}
         </div>
 
-        {/* 🟢 ADMIN SLIDE (No login required! Accessed directly via /?admin=true) */}
+        {/* 🟢 ADMIN SLIDE */}
         <div style={{ 
           ...slideContainerStyle,
+          overflowY: 'hidden', // 🟢 FIX: Locks the screen from scrolling to make it feel like a fixed dashboard
           transform: activeTab === "admin" ? "translateX(0)" : "translateX(100%)",
           opacity: activeTab === "admin" ? 1 : 0,
           pointerEvents: activeTab === "admin" ? "auto" : "none",
-          zIndex: 100 // Ensure it sits cleanly on top when active
+          zIndex: 100 
         }}>
           <AdminUpload />
         </div>
