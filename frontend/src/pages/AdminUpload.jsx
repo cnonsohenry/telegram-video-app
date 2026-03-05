@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link } from "lucide-react";
+import ReactDOM from "react-dom";
+import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link, X } from "lucide-react";
 
 export default function AdminUpload() {
   const [uploadMode, setUploadMode] = useState("local"); 
@@ -15,30 +16,23 @@ export default function AdminUpload() {
   const [twitterStatus, setTwitterStatus] = useState("idle"); 
   const [pipelineRoute, setPipelineRoute] = useState("direct"); 
 
-  // 🟢 ISOLATED AD ZAPPER: Guarantees zero ads pop up while uploading
+  // 🟢 THE TERMINATOR: Locks scroll and permanently deletes ads every 500ms
   useEffect(() => {
-    const styleId = "admin-upload-ad-blocker";
-    if (!document.getElementById(styleId)) {
-      const styleEl = document.createElement("style");
-      styleEl.id = styleId;
-      styleEl.innerHTML = `
-        div[id^="container-"], 
-        iframe[src*="adsterra"], 
-        iframe[src*="topcreativeformat"],
-        .adsterra-social-bar,
-        .adsterra-wrapper { 
-          display: none !important; 
-          opacity: 0 !important; 
-          pointer-events: none !important; 
-          visibility: hidden !important; 
-          z-index: -9999 !important;
-        }
-      `;
-      document.head.appendChild(styleEl);
-    }
+    // Lock the background app from scrolling
+    document.body.style.overflow = "hidden";
+
+    const nukeAds = () => {
+      // Find and physically delete any Adsterra elements that try to inject themselves
+      const ads = document.querySelectorAll('iframe[src*="adsterra"], div[id^="container-"], .adsterra-social-bar, [id*="effectivegatecpm"], .adsterra-wrapper');
+      ads.forEach(ad => ad.remove());
+    };
+
+    nukeAds(); // Fire immediately
+    const adKillerInterval = setInterval(nukeAds, 500); // Keep firing every half second
+
     return () => {
-      const el = document.getElementById(styleId);
-      if (el) el.remove();
+      document.body.style.overflow = ""; // Restore scroll when we close the admin panel
+      clearInterval(adKillerInterval);
     };
   }, []);
 
@@ -128,8 +122,18 @@ export default function AdminUpload() {
     }
   };
 
-  return (
+  // 🟢 REACT PORTAL: This forces the component to render totally outside App.jsx, covering everything perfectly!
+  return ReactDOM.createPortal(
     <div style={containerStyle}>
+      
+      {/* Quick Escape Button */}
+      <button 
+        onClick={() => window.location.href = "/"} 
+        style={closeButtonStyle}
+      >
+        <X size={28} />
+      </button>
+
       <div style={cardStyle} className="admin-card">
         <div style={headerStyle}>
           <h2 style={{ margin: 0, fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
@@ -255,15 +259,15 @@ export default function AdminUpload() {
           .admin-card { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
       </div>
-    </div>
+    </div>,
+    document.body // 🟢 This mounts it directly to the root body element
   );
 }
 
 // 🎨 DARK THEME STYLES
-// 🟢 FIX: position: fixed and zIndex: 999999 perfectly overlays the Home/Profile footer. overflow: hidden prevents page scrolling.
-const containerStyle = { position: "fixed", inset: 0, zIndex: 999999, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", color: "#fff", fontFamily: "sans-serif", overflow: "hidden" };
-// 🟢 FIX: maxHeight and overflowY: auto ensure the card scrolls internally if the phone screen is very small, without scrolling the main page
-const cardStyle = { width: "100%", maxWidth: "400px", maxHeight: "95dvh", overflowY: "auto", margin: "0 auto", background: "#1c1c1e", borderRadius: "16px", padding: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.5)", border: "1px solid #333" };
+const containerStyle = { position: "fixed", inset: 0, zIndex: 99999999, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", color: "#fff", fontFamily: "sans-serif", touchAction: "none" };
+const closeButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", right: "20px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "8px", borderRadius: "50%", cursor: "pointer", zIndex: 100000000, display: "flex", alignItems: "center", justifyContent: "center" };
+const cardStyle = { width: "100%", maxWidth: "400px", maxHeight: "90dvh", overflowY: "auto", margin: "0 auto", background: "#1c1c1e", borderRadius: "16px", padding: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.5)", border: "1px solid #333", position: "relative" };
 const headerStyle = { marginBottom: "20px", textAlign: "center" };
 const tabsContainerStyle = { display: "flex", gap: "10px", marginBottom: "24px", background: "#121212", padding: "4px", borderRadius: "10px" };
 const tabStyle = { flex: 1, padding: "10px", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
