@@ -221,18 +221,15 @@ const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
           )}
         </div>
 
-        {/* 🟢 ADMIN SLIDE (Perfectly integrated with the slide logic) */}
+        {/* 🟢 ADMIN SLIDE (No login required! Accessed directly via /?admin=true) */}
         <div style={{ 
           ...slideContainerStyle,
           transform: activeTab === "admin" ? "translateX(0)" : "translateX(100%)",
           opacity: activeTab === "admin" ? 1 : 0,
-          pointerEvents: activeTab === "admin" ? "auto" : "none"
+          pointerEvents: activeTab === "admin" ? "auto" : "none",
+          zIndex: 100 // Ensure it sits cleanly on top when active
         }}>
-          {isLoggedIn && user?.role === 'admin' ? (
-            <AdminUpload />
-          ) : (
-            <AuthForm onLoginSuccess={onLoginSuccess} />
-          )}
+          <AdminUpload />
         </div>
       </main>
 
