@@ -221,17 +221,15 @@ export default function App() {
           )}
         </div>
 
-        {/* 🟢 ADMIN SLIDE */}
-        <div style={{ 
-          ...slideContainerStyle,
-          overflowY: 'hidden', // 🟢 FIX: Locks the screen from scrolling to make it feel like a fixed dashboard
-          transform: activeTab === "admin" ? "translateX(0)" : "translateX(100%)",
-          opacity: activeTab === "admin" ? 1 : 0,
-          pointerEvents: activeTab === "admin" ? "auto" : "none",
-          zIndex: 100 
-        }}>
-          <AdminUpload />
-        </div>
+        {/* 🟢 ADMIN PORTAL (Only mounts when activeTab is "admin") */}
+        {activeTab === "admin" && (
+          <AdminUpload 
+            onClose={() => {
+              window.history.replaceState({}, document.title, "/"); // Silently clears /?admin=true from URL
+              setActiveTab("home"); // Instantly returns to the Home view
+            }} 
+          />
+        )}
       </main>
 
       {/* 🟢 NAVIGATION FOOTER */}

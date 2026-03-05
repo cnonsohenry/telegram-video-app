@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link, X } from "lucide-react";
 
-export default function AdminUpload() {
+// 🟢 FIX: Accept the onClose prop from App.jsx
+export default function AdminUpload({ onClose }) {
   const [uploadMode, setUploadMode] = useState("local"); 
 
   const [adminId, setAdminId] = useState(""); 
@@ -18,10 +19,8 @@ export default function AdminUpload() {
 
   // 🟢 AGGRESSIVE SCROLL LOCK & AD TERMINATOR
   useEffect(() => {
-    // 1. Capture current scroll position so we don't lose it
     const scrollY = window.scrollY;
     
-    // 2. Lock the entire document (forces iOS/Telegram to obey)
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
     document.body.style.position = "fixed";
@@ -37,7 +36,6 @@ export default function AdminUpload() {
     const adKillerInterval = setInterval(nukeAds, 500); 
 
     return () => {
-      // 3. Restore everything exactly how it was when the component unmounts
       document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
       document.body.style.position = "";
@@ -48,13 +46,6 @@ export default function AdminUpload() {
       clearInterval(adKillerInterval);
     };
   }, []);
-
-  // 🟢 GUARANTEED CLOSE FUNCTION
-  const handleClose = () => {
-    // Strip ?admin=true from the URL and force the browser to completely reload the root page
-    window.history.replaceState({}, document.title, "/");
-    window.location.reload();
-  };
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -145,9 +136,9 @@ export default function AdminUpload() {
   return ReactDOM.createPortal(
     <div style={containerStyle}>
       
-      {/* 🟢 GUARANTEED CLOSE BUTTON */}
+      {/* 🟢 CONNECTED CLOSE BUTTON */}
       <button 
-        onClick={handleClose} 
+        onClick={onClose} 
         style={closeButtonStyle}
       >
         <X size={28} />
