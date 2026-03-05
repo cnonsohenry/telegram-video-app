@@ -25,12 +25,11 @@ export default function App() {
   const isLoggedIn = !!token;
   const needsPitch = !isLoggedIn && (activeTab === "profile" || activeTab === "admin") && !hasSeenPitch;
 
-  // 🟢 AdFreeZone logic explicitly includes needsPitch (PitchView) and !!activeLegalPage (LegalPages)
   const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView);
   
   useAdZapper(isAdFreeZone);
 
-  // 🟢 NUCLEAR AD BLOCKER: Physically hides stubborn Adsterra body injections via CSS
+  // 🟢 NUCLEAR AD BLOCKER
   useEffect(() => {
     const styleId = "nuclear-ad-blocker";
     let styleEl = document.getElementById(styleId);
@@ -39,7 +38,6 @@ export default function App() {
       if (!styleEl) {
         styleEl = document.createElement("style");
         styleEl.id = styleId;
-        // Targets generic Adsterra container patterns and iframe overlays
         styleEl.innerHTML = `
           div[id^="container-"], 
           iframe[src*="adsterra"], 
@@ -64,17 +62,11 @@ export default function App() {
   useEffect(() => {
     const preventOverscroll = (e) => {
       const scrollable = e.target.closest('[style*="overflow-y: auto"], [style*="overflowY: auto"]');
-      
       if (!scrollable) {
         if (e.cancelable) e.preventDefault();
         return;
       }
-
-      if (scrollable.scrollTop <= 0 && e.touches && e.touches.length > 0 && e.touches[0].clientY > 0) {
-        // Handled mostly by CSS contain
-      }
     };
-
     document.addEventListener('touchmove', preventOverscroll, { passive: false });
     return () => document.removeEventListener('touchmove', preventOverscroll);
   }, []);
@@ -103,7 +95,6 @@ export default function App() {
 
     if (sharedVideoId) {
       setIsSharedVideoView(true);
-      
       const fetchSharedVideo = async () => {
         try {
           const res = await fetch(`${import.meta.env.VITE_API_URL}/api/video/details?message_id=${sharedVideoId}`);
@@ -123,7 +114,6 @@ export default function App() {
           window.history.replaceState({}, document.title, "/");
         }
       };
-      
       fetchSharedVideo();
     }
   }, []);
@@ -190,9 +180,11 @@ export default function App() {
           position: 'relative',
           width: '100%',
           height: '100%',
-          paddingBottom: shouldShowFooter && activeTab !== "admin" ? "70px" : "0",
+          // 🟢 FIX: Ensure bottom padding is consistently applied so Admin page isn't hidden under the nav bar
+          paddingBottom: shouldShowFooter ? "70px" : "0",
         }}
       > 
+        {/* 🟢 HOME SLIDE */}
         <div style={{ 
           ...slideContainerStyle,
           transform: activeTab === "home" ? "translateX(0)" : "translateX(-100%)",
@@ -208,9 +200,10 @@ export default function App() {
           />
         </div>
         
+        {/* 🟢 PROFILE SLIDE */}
         <div style={{ 
           ...slideContainerStyle,
-          transform: activeTab === "profile" ? "translateX(0)" : "translateX(100%)",
+          transform: activeTab === "profile" ? "translateX(0)" : (activeTab === "home" ? "translateX(100%)" : "translateX(-100%)"),
           opacity: activeTab === "profile" ? 1 : 0,
           pointerEvents: activeTab === "profile" ? "auto" : "none"
         }}>
@@ -227,23 +220,22 @@ export default function App() {
           )}
         </div>
 
-        {activeTab === "admin" && (
-          <div style={{ 
-            position: 'fixed', 
-            inset: 0, 
-            zIndex: 10001, 
-            backgroundColor: 'var(--bg-color)',
-            overflowY: 'auto'
-          }}>
-            {isLoggedIn && user?.role === 'admin' ? (
-              <AdminUpload />
-            ) : (
-              <AuthForm onLoginSuccess={onLoginSuccess} />
-            )}
-          </div>
-        )}
+        {/* 🟢 ADMIN SLIDE (Perfectly integrated with the slide logic) */}
+        <div style={{ 
+          ...slideContainerStyle,
+          transform: activeTab === "admin" ? "translateX(0)" : "translateX(100%)",
+          opacity: activeTab === "admin" ? 1 : 0,
+          pointerEvents: activeTab === "admin" ? "auto" : "none"
+        }}>
+          {isLoggedIn && user?.role === 'admin' ? (
+            <AdminUpload />
+          ) : (
+            <AuthForm onLoginSuccess={onLoginSuccess} />
+          )}
+        </div>
       </main>
 
+      {/* 🟢 NAVIGATION FOOTER */}
       {shouldShowFooter && (
         <nav style={navStyle}>
           <button 
@@ -274,11 +266,9 @@ export default function App() {
         </nav>
       )}
 
+      {/* 🟢 MODALS & OVERLAYS */}
       {showPaywall && (
-        <PaywallModal 
-          user={user} 
-          onClose={() => setShowPaywall(false)} 
-        />
+        <PaywallModal user={user} onClose={() => setShowPaywall(false)} />
       )}
 
       {activeLegalPage && (
@@ -307,6 +297,7 @@ export default function App() {
   );
 }
 
+// 🖌 STYLES
 const navStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', backgroundColor: '#0a0a0a', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' };
 const btnStyle = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', flex: 1, transition: 'all 0.3s ease' };
 const labelStyle = { fontSize: '10px', fontWeight: '700' };
