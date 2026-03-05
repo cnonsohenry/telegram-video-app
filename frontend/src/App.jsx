@@ -248,7 +248,9 @@ export default function App() {
           )}
         </div>
 
-        {/* 🟢 ADMIN PORTAL */}
+        
+      </main>
+      {/* 🟢 ADMIN PORTAL */}
         {activeTab === "admin" && (
           <AdminUpload 
             onClose={() => {
@@ -257,7 +259,6 @@ export default function App() {
             }} 
           />
         )}
-      </main>
 
       {/* 🟢 NAVIGATION FOOTER */}
       {shouldShowFooter && (
