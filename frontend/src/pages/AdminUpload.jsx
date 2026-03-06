@@ -232,8 +232,9 @@ export default function AdminUpload({ onClose }) {
                 <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
                   {/* EDIT THESE TO MATCH YOUR ACTUAL CHANNELS */}
                   <option value="@mini_video_app_bot">🤖 Main Bot (@mini_video_app_bot)</option>
-                  <option value="@your_public_channel">📢 Backup Channel</option>
-                  <option value="-1001234567890">🔒 VIP Group (Use ID)</option>
+                  <option value="-1001547669083">NaijaHomemade Backup</option>
+                  <option value="-1001539197699">NaijaHomemade Channel</option>
+                  <option value="-1003814827178">VIP Premiun Mar 06</option>
                 </select>
               </div>
             )}
