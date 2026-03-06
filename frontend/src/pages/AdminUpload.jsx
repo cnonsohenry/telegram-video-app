@@ -15,7 +15,7 @@ export default function AdminUpload({ onClose }) {
   const [twitterStatus, setTwitterStatus] = useState("idle"); 
   const [pipelineRoute, setPipelineRoute] = useState("direct"); 
 
-  // 🟢 AGGRESSIVE SCROLL LOCK ONLY (Ad killing is safely handled by App.jsx now)
+  // 🟢 AGGRESSIVE SCROLL LOCK ONLY 
   useEffect(() => {
     const scrollY = window.scrollY;
     
@@ -83,7 +83,6 @@ export default function AdminUpload({ onClose }) {
   const handleTwitterImport = async (e) => {
     e.preventDefault();
     if (!twitterUrl) return alert("Please enter a Twitter URL");
-    if (!adminId) return alert("Please enter your Admin Telegram ID");
 
     setTwitterStatus("processing");
 
@@ -97,7 +96,7 @@ export default function AdminUpload({ onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           url: twitterUrl,
-          admin_id: adminId,
+          admin_id: "fastapi_engine", // 🟢 Backend knows it came from your secure python server
           category: category 
         }),
       });
@@ -121,7 +120,6 @@ export default function AdminUpload({ onClose }) {
     }
   };
 
-  // 🟢 NO MORE PORTAL. Just a standard React Component.
   return (
     <div style={containerStyle}>
       <button onClick={onClose} style={closeButtonStyle}>
@@ -154,15 +152,8 @@ export default function AdminUpload({ onClose }) {
           </button>
         </div>
 
+        {/* 🟢 CATEGORY (Shared by both modes) */}
         <div style={formStyle}>
-          <div style={inputGroupStyle}>
-            <label style={labelStyle}>Your Telegram ID</label>
-            <input 
-              type="text" placeholder="e.g. 1881815190" value={adminId}
-              onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required
-            />
-          </div>
-
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Category</label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
@@ -176,8 +167,19 @@ export default function AdminUpload({ onClose }) {
 
         <hr style={{ border: "none", borderTop: "1px solid #333", margin: "20px 0" }} />
 
+        {/* 🟢 LOCAL UPLOAD SPECIFIC FIELDS */}
         {uploadMode === "local" && (
           <form onSubmit={handleUpload} style={formStyle}>
+            
+            {/* 🟢 TELEGRAM ID ONLY SHOWS HERE NOW */}
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Your Telegram ID</label>
+              <input 
+                type="text" placeholder="e.g. 1881815190" value={adminId}
+                onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required
+              />
+            </div>
+
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Caption</label>
               <input 
@@ -210,6 +212,7 @@ export default function AdminUpload({ onClose }) {
           </form>
         )}
 
+        {/* 🟢 TWITTER IMPORT SPECIFIC FIELDS */}
         {uploadMode === "twitter" && (
           <form onSubmit={handleTwitterImport} style={formStyle}>
             <div style={inputGroupStyle}>
