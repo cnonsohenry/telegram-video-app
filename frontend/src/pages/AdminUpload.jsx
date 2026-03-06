@@ -14,8 +14,10 @@ export default function AdminUpload({ onClose }) {
   const [twitterUrl, setTwitterUrl] = useState("");
   const [twitterStatus, setTwitterStatus] = useState("idle"); 
   const [pipelineRoute, setPipelineRoute] = useState("direct"); 
+  
+  // 🟢 NEW: State to hold the chosen Telegram destination
+  const [telegramDest, setTelegramDest] = useState("@mini_video_app_bot"); 
 
-  // 🟢 AGGRESSIVE SCROLL LOCK ONLY 
   useEffect(() => {
     const scrollY = window.scrollY;
     
@@ -96,8 +98,9 @@ export default function AdminUpload({ onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           url: twitterUrl,
-          admin_id: "fastapi_engine", // 🟢 Backend knows it came from your secure python server
-          category: category 
+          admin_id: "fastapi_engine", 
+          category: category,
+          telegram_dest: telegramDest // 🟢 Pass the destination dynamically to FastAPI
         }),
       });
 
@@ -171,7 +174,6 @@ export default function AdminUpload({ onClose }) {
         {uploadMode === "local" && (
           <form onSubmit={handleUpload} style={formStyle}>
             
-            {/* 🟢 TELEGRAM ID ONLY SHOWS HERE NOW */}
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Your Telegram ID</label>
               <input 
@@ -222,6 +224,19 @@ export default function AdminUpload({ onClose }) {
                 <option value="telethon">🤖 Send to Telegram Bot</option>
               </select>
             </div>
+
+            {/* 🟢 DYNAMIC DESTINATION DROPDOWN (Only visible if Telethon is selected) */}
+            {pipelineRoute === "telethon" && (
+              <div style={inputGroupStyle}>
+                <label style={labelStyle}>Telegram Destination</label>
+                <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
+                  {/* EDIT THESE TO MATCH YOUR ACTUAL CHANNELS */}
+                  <option value="@mini_video_app_bot">🤖 Main Bot (@mini_video_app_bot)</option>
+                  <option value="@your_public_channel">📢 Backup Channel</option>
+                  <option value="-1001234567890">🔒 VIP Group (Use ID)</option>
+                </select>
+              </div>
+            )}
 
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Twitter / X Link</label>
