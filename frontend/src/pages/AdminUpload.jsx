@@ -1,21 +1,27 @@
 import React, { useState, useEffect } from "react";
-import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link, X } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link, X, Send } from "lucide-react";
 
 export default function AdminUpload({ onClose }) {
   const [uploadMode, setUploadMode] = useState("local"); 
 
-  // 🟢 Automatically defaults to your primary Admin ID so you don't even have to click it!
   const [adminId, setAdminId] = useState("1881815190"); 
   const [category, setCategory] = useState("premium");
 
+  // Local State
   const [file, setFile] = useState(null);
   const [caption, setCaption] = useState("");
   const [status, setStatus] = useState("idle"); 
 
+  // Twitter State
   const [twitterUrl, setTwitterUrl] = useState("");
   const [twitterStatus, setTwitterStatus] = useState("idle"); 
   const [pipelineRoute, setPipelineRoute] = useState("direct"); 
   
+  // Telegram Import State
+  const [telegramUrl, setTelegramUrl] = useState("");
+  const [telegramStatus, setTelegramStatus] = useState("idle"); 
+
+  // Shared Dest State
   const [telegramDest, setTelegramDest] = useState("@mini_video_app_bot"); 
 
   useEffect(() => {
@@ -98,7 +104,7 @@ export default function AdminUpload({ onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           url: twitterUrl,
-          admin_id: adminId, // 🟢 Sends the ID selected in the new dropdown
+          admin_id: adminId, 
           category: category,
           telegram_dest: telegramDest 
         }),
@@ -123,6 +129,42 @@ export default function AdminUpload({ onClose }) {
     }
   };
 
+  const handleTelegramImport = async (e) => {
+    e.preventDefault();
+    if (!telegramUrl) return alert("Please enter a Telegram Link");
+
+    setTelegramStatus("processing");
+
+    try {
+      const res = await fetch("https://videos.naijahomemade.com/twitter-api/import-telegram-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          url: telegramUrl,
+          category: category,
+          telegram_dest: telegramDest 
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setTelegramStatus("success");
+        setTimeout(() => {
+          setTelegramStatus("idle");
+          setTelegramUrl("");
+        }, 3000);
+      } else {
+        setTelegramStatus("error");
+        alert(data.detail || "Import failed. Check the URL.");
+      }
+    } catch (err) {
+      setTelegramStatus("error");
+      console.error("Telegram Import error:", err);
+      alert("Network Error: Is the FastAPI server running?");
+    }
+  };
+
   return (
     <div style={containerStyle}>
       <button onClick={onClose} style={closeButtonStyle}>
@@ -132,7 +174,7 @@ export default function AdminUpload({ onClose }) {
       <div style={cardStyle} className="admin-card">
         <div style={headerStyle}>
           <h2 style={{ margin: 0, fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-            {uploadMode === "local" ? <Video color="#ff3b30" /> : <Twitter color="#1DA1F2" />} 
+            {uploadMode === "local" ? <Video color="#ff3b30" /> : uploadMode === "twitter" ? <Twitter color="#1DA1F2" /> : <Send color="#0088cc" />} 
             Admin Upload
           </h2>
           <p style={{ margin: "5px 0 0", fontSize: "12px", color: "#888" }}>
@@ -143,30 +185,33 @@ export default function AdminUpload({ onClose }) {
         <div style={tabsContainerStyle}>
           <button 
             onClick={() => setUploadMode("local")} 
-            style={{ ...tabStyle, background: uploadMode === "local" ? "#333" : "transparent", color: uploadMode === "local" ? "#fff" : "#666" }}
+            style={{ ...tabStyle, padding: "8px", background: uploadMode === "local" ? "#333" : "transparent", color: uploadMode === "local" ? "#fff" : "#666" }}
           >
-            Local File
+            Local
           </button>
           <button 
             onClick={() => setUploadMode("twitter")} 
-            style={{ ...tabStyle, background: uploadMode === "twitter" ? "#1DA1F220" : "transparent", color: uploadMode === "twitter" ? "#1DA1F2" : "#666" }}
+            style={{ ...tabStyle, padding: "8px", background: uploadMode === "twitter" ? "#1DA1F220" : "transparent", color: uploadMode === "twitter" ? "#1DA1F2" : "#666" }}
           >
-            Twitter Import
+            Twitter
+          </button>
+          <button 
+            onClick={() => setUploadMode("telegram")} 
+            style={{ ...tabStyle, padding: "8px", background: uploadMode === "telegram" ? "#0088cc20" : "transparent", color: uploadMode === "telegram" ? "#0088cc" : "#666" }}
+          >
+            Telegram
           </button>
         </div>
 
-        {/* 🟢 SHARED INPUTS (Visible for both Local and Twitter) */}
+        {/* 🟢 SHARED INPUTS (Visible across all modes) */}
         <div style={formStyle}>
           
-          {/* 🟢 NEW: Admin ID Dropdown */}
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Your Admin ID</label>
             <select value={adminId} onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required>
               <option value="" disabled>Select your Admin ID</option>
               <option value="1881815190">Main Admin (1881815190)</option>
               <option value="5441995861">Mamsuazulu (5441995861)</option>
-              {/* Feel free to add more co-admins here! */}
-              {/* <option value="123456789">🛡️ Backup Admin (123456789)</option> */}
             </select>
           </div>
 
@@ -188,7 +233,6 @@ export default function AdminUpload({ onClose }) {
         {/* 🟢 LOCAL UPLOAD SPECIFIC FIELDS */}
         {uploadMode === "local" && (
           <form onSubmit={handleUpload} style={formStyle}>
-            
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Caption</label>
               <input 
@@ -232,7 +276,7 @@ export default function AdminUpload({ onClose }) {
               </select>
             </div>
 
-            {/* 🟢 DYNAMIC DESTINATION DROPDOWN (Only visible if Telethon is selected) */}
+            {/* DYNAMIC DESTINATION DROPDOWN */}
             {pipelineRoute === "telethon" && (
               <div style={inputGroupStyle}>
                 <label style={labelStyle}>Telegram Destination</label>
@@ -269,6 +313,43 @@ export default function AdminUpload({ onClose }) {
           </form>
         )}
 
+        {/* 🟢 TELEGRAM IMPORT SPECIFIC FIELDS */}
+        {uploadMode === "telegram" && (
+          <form onSubmit={handleTelegramImport} style={formStyle}>
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Telegram Destination</label>
+              <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
+                <option value="@mini_video_app_bot">🤖 Main Bot (@mini_video_app_bot)</option>
+                <option value="-1001547669083">NaijaHomemade Backup</option>
+                <option value="-1001539197699">NaijaHomemade Channel</option>
+                <option value="-1003814827178">VIP Premiun Mar 06</option>
+              </select>
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Telegram Post Link</label>
+              <div style={{ position: "relative" }}>
+                <Send size={18} color="#888" style={{ position: "absolute", left: "12px", top: "12px" }} />
+                <input 
+                  type="url" 
+                  placeholder="https://t.me/channelname/123" 
+                  value={telegramUrl}
+                  onChange={(e) => setTelegramUrl(e.target.value)}
+                  style={{ ...inputStyle, paddingLeft: "40px" }}
+                  required
+                />
+              </div>
+            </div>
+
+            <button 
+              type="submit" disabled={telegramStatus === "processing"}
+              style={{ ...buttonStyle, background: telegramStatus === "processing" ? "#333" : telegramStatus === "success" ? "#4cd964" : telegramStatus === "error" ? "#ff3b30" : "#0088cc" }}
+            >
+              {telegramStatus === "processing" ? <><Loader2 className="spin" size={18} /> Downloading & Forwarding...</> : telegramStatus === "success" ? <><CheckCircle size={18} /> Successfully Forwarded!</> : telegramStatus === "error" ? <><AlertCircle size={18} /> Import Failed.</> : "Forward Video"}
+            </button>
+          </form>
+        )}
+
         <style>{`
           .spin { animation: spin 1s linear infinite; }
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -286,7 +367,7 @@ const closeButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-i
 const cardStyle = { width: "100%", maxWidth: "400px", maxHeight: "90dvh", overflowY: "auto", margin: "0 auto", background: "#1c1c1e", borderRadius: "16px", padding: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.5)", border: "1px solid #333", position: "relative" };
 const headerStyle = { marginBottom: "20px", textAlign: "center" };
 const tabsContainerStyle = { display: "flex", gap: "10px", marginBottom: "24px", background: "#121212", padding: "4px", borderRadius: "10px" };
-const tabStyle = { flex: 1, padding: "10px", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
+const tabStyle = { flex: 1, padding: "8px", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
 const formStyle = { display: "flex", flexDirection: "column", gap: "20px" };
 const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "8px" };
 const labelStyle = { fontSize: "12px", fontWeight: "700", color: "#888", textTransform: "uppercase" };
