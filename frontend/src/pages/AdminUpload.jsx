@@ -4,7 +4,8 @@ import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, L
 export default function AdminUpload({ onClose }) {
   const [uploadMode, setUploadMode] = useState("local"); 
 
-  const [adminId, setAdminId] = useState(""); 
+  // 🟢 Automatically defaults to your primary Admin ID so you don't even have to click it!
+  const [adminId, setAdminId] = useState("1881815190"); 
   const [category, setCategory] = useState("premium");
 
   const [file, setFile] = useState(null);
@@ -15,7 +16,6 @@ export default function AdminUpload({ onClose }) {
   const [twitterStatus, setTwitterStatus] = useState("idle"); 
   const [pipelineRoute, setPipelineRoute] = useState("direct"); 
   
-  // 🟢 NEW: State to hold the chosen Telegram destination
   const [telegramDest, setTelegramDest] = useState("@mini_video_app_bot"); 
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function AdminUpload({ onClose }) {
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!file) return alert("Please select a video file");
-    if (!adminId) return alert("Please enter your Admin Telegram ID");
+    if (!adminId) return alert("Please select your Admin Telegram ID");
 
     setStatus("uploading");
 
@@ -98,9 +98,9 @@ export default function AdminUpload({ onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           url: twitterUrl,
-          admin_id: "fastapi_engine", 
+          admin_id: adminId, // 🟢 Sends the ID selected in the new dropdown
           category: category,
-          telegram_dest: telegramDest // 🟢 Pass the destination dynamically to FastAPI
+          telegram_dest: telegramDest 
         }),
       });
 
@@ -155,8 +155,20 @@ export default function AdminUpload({ onClose }) {
           </button>
         </div>
 
-        {/* 🟢 CATEGORY (Shared by both modes) */}
+        {/* 🟢 SHARED INPUTS (Visible for both Local and Twitter) */}
         <div style={formStyle}>
+          
+          {/* 🟢 NEW: Admin ID Dropdown */}
+          <div style={inputGroupStyle}>
+            <label style={labelStyle}>Your Admin ID</label>
+            <select value={adminId} onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required>
+              <option value="" disabled>Select your Admin ID</option>
+              <option value="1881815190">👑 Main Admin (1881815190)</option>
+              {/* Feel free to add more co-admins here! */}
+              {/* <option value="123456789">🛡️ Backup Admin (123456789)</option> */}
+            </select>
+          </div>
+
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Category</label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
@@ -174,14 +186,6 @@ export default function AdminUpload({ onClose }) {
         {uploadMode === "local" && (
           <form onSubmit={handleUpload} style={formStyle}>
             
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>Your Telegram ID</label>
-              <input 
-                type="text" placeholder="e.g. 1881815190" value={adminId}
-                onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required
-              />
-            </div>
-
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Caption</label>
               <input 
@@ -230,7 +234,6 @@ export default function AdminUpload({ onClose }) {
               <div style={inputGroupStyle}>
                 <label style={labelStyle}>Telegram Destination</label>
                 <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
-                  {/* EDIT THESE TO MATCH YOUR ACTUAL CHANNELS */}
                   <option value="@mini_video_app_bot">🤖 Main Bot (@mini_video_app_bot)</option>
                   <option value="-1001547669083">NaijaHomemade Backup</option>
                   <option value="-1001539197699">NaijaHomemade Channel</option>
