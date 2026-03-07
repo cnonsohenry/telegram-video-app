@@ -163,7 +163,8 @@ export default function AdminUpload({ onClose }) {
             <label style={labelStyle}>Your Admin ID</label>
             <select value={adminId} onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required>
               <option value="" disabled>Select your Admin ID</option>
-              <option value="1881815190">👑 Main Admin (1881815190)</option>
+              <option value="1881815190">Main Admin (1881815190)</option>
+              <option value="5441995861">Mamsuazulu (5441995861)</option>
               {/* Feel free to add more co-admins here! */}
               {/* <option value="123456789">🛡️ Backup Admin (123456789)</option> */}
             </select>
@@ -172,10 +173,12 @@ export default function AdminUpload({ onClose }) {
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Category</label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
-              <option value="premium">💎 Premium</option>
-              <option value="hotties">🔥 Hotties</option>
-              <option value="knacks">🍆 Knacks</option>
-              <option value="trends">📈 Trends</option>
+              <option value="premium">Premium</option>
+              <option value="hotties">Hotties</option>
+              <option value="knacks">Knacks</option>
+              <option value="trends">Trends</option>
+              <option value="shots">Shots</option>
+              <option value="baddies">Baddies</option>
             </select>
           </div>
         </div>
