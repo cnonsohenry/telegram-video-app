@@ -79,16 +79,16 @@ export default function PaywallModal({ onClose, user }) {
           setTimeout(() => window.location.reload(), 3000);
         } else if (data.status === 'pending') {
           attempts++;
-          setTimeout(poll, 15000); // Wait 15 seconds and ask Python again
+          setTimeout(poll, 30000); // Wait 15 seconds and ask Python again
         } else {
           // Fallback for unexpected errors
           attempts++;
-          setTimeout(poll, 15000);
+          setTimeout(poll, 30000);
         }
       } catch (err) {
         console.error("Polling error:", err);
         attempts++;
-        setTimeout(poll, 15000);
+        setTimeout(poll, 30000);
       }
     };
 
