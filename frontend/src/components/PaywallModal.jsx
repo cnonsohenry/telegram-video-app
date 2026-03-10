@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, ArrowLeft } from "lucide-react";
 
 const PACKAGES = [
-  { id: '1_month', label: '1 Month', price: 15000, priceText: '₦15,000' },
+  { id: '1_month', label: '1 Month', price: 1500, priceText: '₦1,500' },
   { id: '2_months', label: '2 Months', price: 25000, priceText: '₦25,000' },
   { id: '1_year', label: '1 Year', price: 125000, priceText: '₦125,000' }
 ];
