@@ -12,6 +12,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3
 import authRoutes from "./auth.js";
 import multer from "multer";
 import { uploadDirectToStream } from "./controllers/upload_premium.js";
+import { verifyPayment } from "./controllers/payment.js";
 import { z } from "zod"; 
 
 
@@ -85,6 +86,7 @@ async function initDatabase() {
   let retries = 5;
   while (retries) {
     try {
+      // 1. Telegram Uploaders/Admins
       await pool.query(`
         CREATE TABLE IF NOT EXISTS users (
           user_id BIGINT PRIMARY KEY,
@@ -94,6 +96,27 @@ async function initDatabase() {
         )
       `);
 
+      // 2. The Website Consumers (Matching your exact schema)
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS app_users (
+          id SERIAL PRIMARY KEY,
+          username VARCHAR(50) UNIQUE,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          password_hash TEXT,
+          avatar_url TEXT DEFAULT '/assets/default-avatar.png',
+          role VARCHAR(20) DEFAULT 'user',
+          created_at TIMESTAMP DEFAULT NOW(),
+          settings JSONB DEFAULT '{}'::jsonb,
+          google_id VARCHAR(255) UNIQUE
+        )
+      `);
+
+      // 🟢 Safely inject the premium flag into your existing app_users table
+      await pool.query(`
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
+      `);
+
+      // 3. The Video Content
       await pool.query(`
         CREATE TABLE IF NOT EXISTS videos (
           id SERIAL PRIMARY KEY,
@@ -105,12 +128,26 @@ async function initDatabase() {
           category TEXT DEFAULT 'hotties',
           caption TEXT,
           views BIGINT DEFAULT 0,
+          cloudflare_id TEXT,
+          status TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(chat_id, message_id)
         )
       `);
+
+      // 4. The Payment Ledger
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS transactions (
+          id SERIAL PRIMARY KEY,
+          app_user_id INTEGER REFERENCES app_users(id),
+          sender_name TEXT NOT NULL,
+          expected_amount NUMERIC NOT NULL,
+          status TEXT DEFAULT 'PENDING',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
       
-      console.log("✅ Database initialized (Users & Videos)");
+      console.log("✅ Database initialized (Admins, App_Users, Videos & Transactions)");
       break;
     } catch (err) {
       retries--;
@@ -133,6 +170,11 @@ function signWorkerUrl(filePath) {
    AUTH
 ===================== */
 app.use("/api/auth", authRoutes);
+
+/* =====================
+   PAYMENT VERIFICATION BRIDGE
+===================== */
+app.post("/api/verify-payment", (req, res) => verifyPayment(req, res, pool));
 
 /* =====================
    HELPER: Upload Thumbnail to R2
