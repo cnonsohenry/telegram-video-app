@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Eye, EyeOff, Loader2, Check, X, AlertCircle } from "lucide-react";
 
-// 🟢 NEW: The highly interactive Floating Label Input Component
+// 🟢 UPDATED: Floating Label Input Component with Neutral Gray Focus States
 const FloatingInput = ({ label, type = "text", value, onChange, rightIcon, statusColor, ...props }) => {
   const [isFocused, setIsFocused] = useState(false);
   
-  // The label is "active" if the user is typing OR if there is already text inside
   const active = isFocused || value.length > 0;
 
-  // Determine the border color based on focus or error states
+  // 🟢 THE FIX: Resting state is dark gray (#333), focused state is light gray (#777)
   let borderColor = "#333";
   if (statusColor) borderColor = statusColor;
-  else if (isFocused) borderColor = "var(--primary-color)";
+  else if (isFocused) borderColor = "#777"; 
 
   return (
     <div style={{ position: "relative", width: "100%" }}>
@@ -21,10 +20,11 @@ const FloatingInput = ({ label, type = "text", value, onChange, rightIcon, statu
         top: active ? "10px" : "50%",
         transform: active ? "none" : "translateY(-50%)",
         fontSize: active ? "11px" : "15px",
-        color: active ? (isFocused ? "var(--primary-color)" : "#8e8e93") : "#8e8e93",
+        // 🟢 Label turns silver instead of red when focused
+        color: active ? (isFocused ? "#ccc" : "#8e8e93") : "#8e8e93",
         fontWeight: active ? "700" : "400",
-        pointerEvents: "none", // Ensures clicks pass right through to the input
-        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)" // Buttery smooth animation
+        pointerEvents: "none", 
+        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)" 
       }}>
         {label}
       </label>
@@ -39,14 +39,14 @@ const FloatingInput = ({ label, type = "text", value, onChange, rightIcon, statu
           background: "var(--bg-color)",
           border: `1.5px solid ${borderColor}`,
           borderRadius: "30px",
-          padding: "22px 45px 8px 20px", // Bottom padding is smaller to make room for the top label
+          padding: "22px 45px 8px 20px", 
           color: "#fff",
           fontSize: "15px",
           outline: "none",
           boxSizing: "border-box",
           transition: "border-color 0.2s, box-shadow 0.2s",
-          // Adds a subtle outer glow when focused
-          boxShadow: isFocused && !statusColor ? `0 0 0 3px rgba(255, 59, 48, 0.15)` : "none"
+          // 🟢 Changed the red glow to a sleek, subtle white glow
+          boxShadow: isFocused && !statusColor ? `0 0 0 3px rgba(255, 255, 255, 0.08)` : "none"
         }}
         {...props}
       />
@@ -293,7 +293,7 @@ const loginContainerStyle = { height: "100dvh", background: "var(--bg-color)", d
 const contentWrapper = { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%" };
 const innerContainer = { width: "100%", maxWidth: "350px", display: "flex", flexDirection: "column", alignItems: "center", padding: "20px" };
 const logoStyle = { fontSize: "18px", marginBottom: "15px", color: "#fff", fontWeight: "900", letterSpacing: "-1px", };
-const formStyle = { width: "100%", display: "flex", flexDirection: "column", gap: "12px" }; // 🟢 Increased gap slightly to accommodate the floating layout
+const formStyle = { width: "100%", display: "flex", flexDirection: "column", gap: "12px" }; 
 const loginButtonStyle = { background: "var(--primary-color)", color: "#fff", border: "none", borderRadius: "30px", padding: "16px", fontSize: "15px", fontWeight: "800", marginTop: "10px", cursor: "pointer", transition: "opacity 0.2s" };
 const eyeButtonStyle = { background: "none", border: "none", color: "#666", display: "flex", cursor: "pointer", padding: "5px" };
 const dividerContainer = { width: "100%", display: "flex", alignItems: "center", margin: "20px 0", gap: "15px" };
