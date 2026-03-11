@@ -17,7 +17,12 @@ export const createCryptoPayment = async (req, res, pool) => {
       return res.status(500).json({ success: false, error: "Server configuration error" });
     }
 
-    // 1. Log the transaction in your database so we have an 'order_id'
+    // 🟢 THE FIX: Convert Naira to USD so NOWPayments understands the value!
+    // Adjust this rate to whatever you want your crypto buyers to pay.
+    const exchangeRate = 1500; 
+    const amount_usd = (amount_ngn / exchangeRate).toFixed(2); 
+
+    // 1. Log the transaction in your database 
     const txRes = await pool.query(
       `INSERT INTO transactions (app_user_id, sender_name, expected_amount, status) 
        VALUES ($1, $2, $3, 'PENDING') RETURNING id`,
@@ -25,12 +30,12 @@ export const createCryptoPayment = async (req, res, pool) => {
     );
     const orderId = txRes.rows[0].id;
 
-    // 2. Ask NOWPayments to generate a unique wallet address
+    // 2. Ask NOWPayments to generate a unique wallet address using USD
     const npRes = await axios.post(
       "https://api.nowpayments.io/v1/payment",
       {
-        price_amount: amount_ngn,
-        price_currency: "ngn", 
+        price_amount: amount_usd,      // Sends "10.00"
+        price_currency: "usd",         // Tells them it is USD
         pay_currency: crypto_currency, 
         order_id: orderId.toString(),
         order_description: `Premium Upgrade for User ${app_user_id}`,
@@ -55,7 +60,17 @@ export const createCryptoPayment = async (req, res, pool) => {
     });
 
   } catch (error) {
-    console.error("NOWPayments Create Error:", error.response?.data || error.message);
+    const npError = error.response?.data;
+    console.error("NOWPayments Create Error:", npError || error.message);
+    
+    // Catch the minimum amount error and give a helpful message
+    if (npError && npError.code === 'AMOUNT_MINIMAL_ERROR') {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Package amount is too low for this coin's network fees. Please select USDT." 
+      });
+    }
+
     res.status(500).json({ success: false, error: "Failed to generate crypto address" });
   }
 };
