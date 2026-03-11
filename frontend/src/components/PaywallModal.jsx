@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, ArrowLeft, Copy, QrCode, ShieldCheck, Wallet } from "lucide-react";
 
+// 🟢 THE NEW DUAL-PRICING PACKAGES
 const PACKAGES = [
-  { id: '1_month', label: '1 Month', price: 15000, priceText: '₦15,000' },
-  { id: '2_months', label: '2 Months', price: 25000, priceText: '₦25,000' },
-  { id: '1_year', label: '1 Year', price: 125000, priceText: '₦125,000' }
+  { id: '1_month', label: '1 Month', price: 15000, priceText: '₦15,000', priceUsd: 15, textUsd: '$15' },
+  { id: '2_months', label: '2 Months', price: 25000, priceText: '₦25,000', priceUsd: 25, textUsd: '$25' },
+  { id: '1_year', label: '1 Year', price: 125000, priceText: '₦125,000', priceUsd: 120, textUsd: '$120' }
 ];
 
 const BANK_DETAILS = {
@@ -71,7 +72,7 @@ export default function PaywallModal({ onClose, user }) {
           body: JSON.stringify({
             app_user_id: user?.id, 
             sender_name: senderName,
-            amount: selectedPackage.price
+            amount: selectedPackage.price // Fiat sends NGN
           })
         });
         
@@ -114,7 +115,7 @@ export default function PaywallModal({ onClose, user }) {
         },
         body: JSON.stringify({
           app_user_id: user?.id,
-          amount_ngn: selectedPackage.price,
+          amount_usd: selectedPackage.priceUsd, // 🟢 Crypto now sends exactly the USD amount
           crypto_currency: coin
         })
       });
@@ -216,7 +217,10 @@ export default function PaywallModal({ onClose, user }) {
                     style={packageCardStyle}
                   >
                     <span style={{ fontWeight: "700", color: "#fff" }}>{pkg.label}</span>
-                    <span style={{ fontWeight: "900", color: "var(--primary-color)" }}>{pkg.priceText}</span>
+                    <span style={{ fontWeight: "900", color: "var(--primary-color)" }}>
+                      {/* 🟢 Dynamically show USD or NGN based on their selection */}
+                      {selectedMethod === 'crypto' ? pkg.textUsd : pkg.priceText}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -372,7 +376,6 @@ export default function PaywallModal({ onClose, user }) {
         <style>{`
           @keyframes spin { 100% { transform: rotate(360deg); } }
           @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-          /* Custom scrollbar for webkit browsers to keep it clean */
           ::-webkit-scrollbar { width: 6px; }
           ::-webkit-scrollbar-track { background: transparent; }
           ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
@@ -391,18 +394,13 @@ const Benefit = ({ text }) => (
 
 // 🖌 UI STYLES
 const overlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999, padding: "20px" };
-
-// 🟢 FIX: The Modal is now a strict Flexbox with a locked maximum height of 650px.
 const modalStyle = { background: "#0B0F1A", border: "1px solid var(--border-color)", borderRadius: "24px", width: "100%", maxWidth: "400px", height: "90vh", maxHeight: "650px", display: "flex", flexDirection: "column", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", animation: "fadeInUp 0.3s ease-out", padding: "20px" };
 
 const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexShrink: 0 };
 const iconButtonStyle = { background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
 
-// 🟢 FIX: The content area stretches to fill the space and scrolls internally if content overflows
 const contentContainerStyle = { flex: 1, overflowY: "auto", overflowX: "hidden", paddingRight: "5px", display: "flex", flexDirection: "column" };
 const centerFlexStyle = { display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" };
-
-// 🟢 FIX: The anchored footer sits permanently at the bottom
 const footerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "15px", marginTop: "15px", borderTop: "1px solid rgba(255,255,255,0.05)", flexShrink: 0 };
 
 const headerStyle = { textAlign: "center", marginBottom: "25px" };

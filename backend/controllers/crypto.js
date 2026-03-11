@@ -6,9 +6,10 @@ import crypto from "crypto";
 // ==========================================
 export const createCryptoPayment = async (req, res, pool) => {
   try {
-    const { app_user_id, amount_ngn, crypto_currency } = req.body; 
+    // 🟢 We now accept 'amount_usd' directly from the React frontend
+    const { app_user_id, amount_usd, crypto_currency } = req.body; 
 
-    if (!app_user_id || !amount_ngn || !crypto_currency) {
+    if (!app_user_id || !amount_usd || !crypto_currency) {
       return res.status(400).json({ success: false, error: "Missing required fields" });
     }
 
@@ -17,16 +18,11 @@ export const createCryptoPayment = async (req, res, pool) => {
       return res.status(500).json({ success: false, error: "Server configuration error" });
     }
 
-    // 🟢 THE FIX: Convert Naira to USD so NOWPayments understands the value!
-    // Adjust this rate to whatever you want your crypto buyers to pay.
-    const exchangeRate = 1500; 
-    const amount_usd = (amount_ngn / exchangeRate).toFixed(2); 
-
-    // 1. Log the transaction in your database 
+    // 1. Log the transaction in your database
     const txRes = await pool.query(
       `INSERT INTO transactions (app_user_id, sender_name, expected_amount, status) 
        VALUES ($1, $2, $3, 'PENDING') RETURNING id`,
-      [app_user_id, 'CRYPTO', amount_ngn]
+      [app_user_id, 'CRYPTO', amount_usd] // Saving the USD amount in the DB
     );
     const orderId = txRes.rows[0].id;
 
@@ -34,7 +30,7 @@ export const createCryptoPayment = async (req, res, pool) => {
     const npRes = await axios.post(
       "https://api.nowpayments.io/v1/payment",
       {
-        price_amount: amount_usd,      // Sends "10.00"
+        price_amount: amount_usd,      // e.g., "15"
         price_currency: "usd",         // Tells them it is USD
         pay_currency: crypto_currency, 
         order_id: orderId.toString(),
@@ -63,7 +59,6 @@ export const createCryptoPayment = async (req, res, pool) => {
     const npError = error.response?.data;
     console.error("NOWPayments Create Error:", npError || error.message);
     
-    // Catch the minimum amount error and give a helpful message
     if (npError && npError.code === 'AMOUNT_MINIMAL_ERROR') {
       return res.status(400).json({ 
         success: false, 
