@@ -3,7 +3,7 @@ import { X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, ArrowLeft, Copy, Q
 
 // 🟢 THE NEW DUAL-PRICING PACKAGES
 const PACKAGES = [
-  { id: '1_month', label: '1 Month', price: 15000, priceText: '₦15,000', priceUsd: 15, textUsd: '$15' },
+  { id: '1_month', label: '1 Month', price: 15000, priceText: '₦15,000', priceUsd: 19, textUsd: '$19' },
   { id: '2_months', label: '2 Months', price: 25000, priceText: '₦25,000', priceUsd: 25, textUsd: '$25' },
   { id: '1_year', label: '1 Year', price: 125000, priceText: '₦125,000', priceUsd: 120, textUsd: '$120' }
 ];
