@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, ArrowLeft, Copy, QrCode, ShieldCheck, Wallet } from "lucide-react";
 
-// 🟢 THE NEW DUAL-PRICING PACKAGES
+// 🟢 Dual-Pricing Packages
 const PACKAGES = [
   { id: '1_month', label: '1 Month', price: 15000, priceText: '₦15,000', priceUsd: 19, textUsd: '$19' },
   { id: '2_months', label: '2 Months', price: 25000, priceText: '₦25,000', priceUsd: 25, textUsd: '$25' },
-  { id: '1_year', label: '1 Year', price: 125000, priceText: '₦125,000', priceUsd: 120, textUsd: '$120' }
+  { id: '1_year', label: '1 Year', price: 125000, priceText: '₦125,000', priceUsd: 95, textUsd: '$95' }
 ];
 
 const BANK_DETAILS = {
@@ -19,12 +19,10 @@ export default function PaywallModal({ onClose, user }) {
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [senderName, setSenderName] = useState("");
   
-  // Fiat Polling States
   const [verifying, setVerifying] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState(null); 
   const [timer, setTimer] = useState(600); 
 
-  // Crypto States
   const [generatingCrypto, setGeneratingCrypto] = useState(false);
   const [cryptoPaymentDetails, setCryptoPaymentDetails] = useState(null);
   const [copiedField, setCopiedField] = useState(null); 
@@ -72,7 +70,7 @@ export default function PaywallModal({ onClose, user }) {
           body: JSON.stringify({
             app_user_id: user?.id, 
             sender_name: senderName,
-            amount: selectedPackage.price // Fiat sends NGN
+            amount: selectedPackage.price
           })
         });
         
@@ -115,7 +113,7 @@ export default function PaywallModal({ onClose, user }) {
         },
         body: JSON.stringify({
           app_user_id: user?.id,
-          amount_usd: selectedPackage.priceUsd, // 🟢 Crypto now sends exactly the USD amount
+          amount_usd: selectedPackage.priceUsd, 
           crypto_currency: coin
         })
       });
@@ -156,7 +154,6 @@ export default function PaywallModal({ onClose, user }) {
     <div style={overlayStyle}>
       <div style={modalStyle}>
         
-        {/* === TOP ACTION BAR === */}
         <div style={topBarStyle}>
           {!verifying && verifyStatus !== "success" && selectedMethod && (
             <button onClick={resetState} style={iconButtonStyle}>
@@ -171,7 +168,6 @@ export default function PaywallModal({ onClose, user }) {
           )}
         </div>
 
-        {/* === SCROLLABLE CONTENT AREA === */}
         <div style={contentContainerStyle}>
           
           {/* STATE 1: INITIAL SELECTION */}
@@ -218,7 +214,6 @@ export default function PaywallModal({ onClose, user }) {
                   >
                     <span style={{ fontWeight: "700", color: "#fff" }}>{pkg.label}</span>
                     <span style={{ fontWeight: "900", color: "var(--primary-color)" }}>
-                      {/* 🟢 Dynamically show USD or NGN based on their selection */}
                       {selectedMethod === 'crypto' ? pkg.textUsd : pkg.priceText}
                     </span>
                   </button>
@@ -254,16 +249,32 @@ export default function PaywallModal({ onClose, user }) {
             </div>
           )}
 
-          {/* STATE 3B: CRYPTO FLOW */}
+          {/* STATE 3B: CRYPTO FLOW WITH GRID */}
           {selectedMethod === 'crypto' && selectedPackage && !cryptoPaymentDetails && !generatingCrypto && (
             <div style={transferDetailsBox}>
-               <h3 style={{color: "#fff", textAlign: "center", marginBottom: "15px", marginTop: "0"}}>Select Cryptocurrency</h3>
-               <button onClick={() => generateCryptoAddress('usdttrc20')} style={{...payButtonStyle, background: "#26A17B", marginBottom: "10px"}}>
-                  USDT (TRC-20 Network)
-               </button>
-               <button onClick={() => generateCryptoAddress('btc')} style={{...payButtonStyle, background: "#F7931A"}}>
-                  Bitcoin (BTC)
-               </button>
+               <h3 style={{color: "#fff", textAlign: "center", marginBottom: "15px", marginTop: "0", fontSize: "18px"}}>Select Cryptocurrency</h3>
+               
+               {/* 🟢 NEW: CSS Grid for Crypto Buttons */}
+               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                 <button onClick={() => generateCryptoAddress('usdttrc20')} style={{...cryptoGridButtonStyle, background: "#26A17B"}}>
+                    USDT (TRC-20)
+                 </button>
+                 <button onClick={() => generateCryptoAddress('btc')} style={{...cryptoGridButtonStyle, background: "#F7931A"}}>
+                    Bitcoin (BTC)
+                 </button>
+                 <button onClick={() => generateCryptoAddress('eth')} style={{...cryptoGridButtonStyle, background: "#627EEA"}}>
+                    Ethereum (ETH)
+                 </button>
+                 <button onClick={() => generateCryptoAddress('ltc')} style={{...cryptoGridButtonStyle, background: "#345D9D"}}>
+                    Litecoin (LTC)
+                 </button>
+                 <button onClick={() => generateCryptoAddress('bnbbsc')} style={{...cryptoGridButtonStyle, background: "#F3BA2F", color: "#000"}}>
+                    BNB (BSC)
+                 </button>
+                 <button onClick={() => generateCryptoAddress('ton')} style={{...cryptoGridButtonStyle, background: "#0098EA"}}>
+                    Toncoin (TON)
+                 </button>
+               </div>
             </div>
           )}
 
@@ -360,7 +371,6 @@ export default function PaywallModal({ onClose, user }) {
           )}
         </div>
 
-        {/* === ANCHORED FOOTER === */}
         <div style={footerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#8e8e93", fontSize: "12px" }}>
             <ShieldCheck size={14} color="#34C759" />
@@ -416,3 +426,6 @@ const transferDetailsBox = { background: "rgba(255,255,255,0.02)", border: "1px 
 const infoBoxStyle = { background: "rgba(0,0,0,0.3)", padding: "15px", borderRadius: "10px", fontSize: "14px", color: "#ccc", display: "flex", flexDirection: "column", gap: "8px", fontFamily: "monospace" };
 const inputStyle = { width: "100%", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.5)", color: "#fff", fontSize: "16px", outline: "none", boxSizing: "border-box" };
 const copyBtnStyle = { background: "rgba(255,255,255,0.1)", border: "none", padding: "8px", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+
+// 🟢 NEW: Compact button style for the 2-column grid
+const cryptoGridButtonStyle = { display: "flex", alignItems: "center", justifyContent: "center", width: "100%", padding: "12px 10px", borderRadius: "10px", color: "#fff", border: "none", fontSize: "14px", fontWeight: "700", cursor: "pointer", transition: "transform 0.2s" };
