@@ -13,6 +13,7 @@ import authRoutes from "./auth.js";
 import multer from "multer";
 import { uploadDirectToStream } from "./controllers/upload_premium.js";
 import { verifyPayment } from "./controllers/payment.js";
+import { createCryptoPayment, cryptoWebhook } from "./controllers/crypto.js";
 import { z } from "zod"; 
 
 
@@ -172,9 +173,14 @@ function signWorkerUrl(filePath) {
 app.use("/api/auth", authRoutes);
 
 /* =====================
-   PAYMENT VERIFICATION BRIDGE
+   PAYMENT & CRYPTO BRIDGES
 ===================== */
+// 1. Bank Transfer AI Engine
 app.post("/api/verify-payment", (req, res) => verifyPayment(req, res, pool));
+
+// 2. NOWPayments Crypto Engine
+app.post("/api/crypto/create", (req, res) => createCryptoPayment(req, res, pool));
+app.post("/api/crypto/webhook", (req, res) => cryptoWebhook(req, res, pool));
 
 /* =====================
    HELPER: Upload Thumbnail to R2
