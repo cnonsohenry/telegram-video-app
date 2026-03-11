@@ -46,18 +46,30 @@ export const authenticateToken = (req, res, next) => {
    VALIDATION SCHEMAS
 ===================== */
 const googleSchema = z.object({
-  token: z.string().min(1, "Google token is required"),
+  token: z.string().min(1, { message: "Google token is required" }),
 });
 
 const registerSchema = z.object({
-  email: z.string().email("Invalid email format").max(255, "Email is too long"),
-  password: z.string().min(6, "Password must be at least 6 characters").max(100, "Password is too long"),
-  username: z.string().max(30, "Username must be under 30 characters").optional(),
+  email: z.string()
+    .email({ message: "Invalid email format" })
+    .max(255, { message: "Email is too long" }),
+  password: z.string()
+    .min(6, { message: "Password must be at least 6 characters" })
+    .max(100, { message: "Password is too long" }),
+  
+  // 🟢 THE FIX: Strict username validation with updated Zod syntax
+  username: z.string()
+    .min(3, { message: "Username must be at least 3 characters" })
+    .max(30, { message: "Username must be under 30 characters" })
+    .regex(/^[a-zA-Z0-9_-]+$/, { message: "Username can only contain letters, numbers, underscores, and hyphens." })
+    .optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email format"),
-  password: z.string().min(1, "Password is required"), // Just need to ensure it's a non-empty string for login
+  email: z.string()
+    .email({ message: "Invalid email format" }),
+  password: z.string()
+    .min(1, { message: "Password is required" }), 
 });
 
 // .strict() prevents users from passing undocumented keys to bloat your database
@@ -65,7 +77,7 @@ const settingsSchema = z.object({
   settings: z.object({
     theme: z.enum(["red", "orange", "dark", "light"]).optional(),
     // Add any future settings keys here
-  }).strict("Invalid settings payload") 
+  }).strict({ message: "Invalid settings payload" }) 
 });
 
 
@@ -74,7 +86,6 @@ router.post("/google", async (req, res) => {
   // Validate request body
   const parsed = googleSchema.safeParse(req.body);
   if (!parsed.success) {
-    // 🟢 FIX: Optional chaining applied
     return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid input" });
   }
 
@@ -113,7 +124,6 @@ router.post("/google", async (req, res) => {
 router.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    // 🟢 FIX: Optional chaining applied
     return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid input" });
   }
 
@@ -143,7 +153,6 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
-    // 🟢 FIX: Optional chaining applied
     return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid input" });
   }
 
@@ -189,7 +198,6 @@ router.get("/me", authenticateToken, async (req, res) => {
 router.patch("/settings", authenticateToken, async (req, res) => {
   const parsed = settingsSchema.safeParse(req.body);
   if (!parsed.success) {
-    // 🟢 FIX: Optional chaining applied
     return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid settings payload" });
   }
 
@@ -209,6 +217,27 @@ router.patch("/settings", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error("[SETTINGS ERROR]", err);
     res.status(500).json({ error: "Failed to sync settings" });
+  }
+});
+
+// 🟢 8. CHECK USERNAME AVAILABILITY
+router.get("/check-username", async (req, res) => {
+  const { username } = req.query;
+  
+  // Basic sanity check
+  if (!username || username.length < 3) {
+    return res.json({ available: false });
+  }
+
+  try {
+    // LOWER() ensures 'John' and 'john' are treated as the same taken name
+    const result = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [username]);
+    
+    // If it found 0 rows, the username is available!
+    res.json({ available: result.rows.length === 0 });
+  } catch (err) {
+    console.error("[USERNAME CHECK ERROR]", err);
+    res.status(500).json({ error: "Failed to check username" });
   }
 });
 
