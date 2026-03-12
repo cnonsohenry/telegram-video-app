@@ -291,6 +291,12 @@ export default function PaywallModal({ onClose, user }) {
                  <button onClick={() => generateCryptoAddress('usdttrc20')} style={{...cryptoGridButtonStyle, background: "#26A17B"}}>
                     USDT (TRC-20)
                  </button>
+                 
+                 {/* 🟢 NEW: USDT on Binance Smart Chain */}
+                 <button onClick={() => generateCryptoAddress('usdtbsc')} style={{...cryptoGridButtonStyle, background: "#26A17B"}}>
+                    USDT (BSC)
+                 </button>
+                 
                  <button onClick={() => generateCryptoAddress('btc')} style={{...cryptoGridButtonStyle, background: "#F7931A"}}>
                     Bitcoin (BTC)
                  </button>
@@ -303,7 +309,8 @@ export default function PaywallModal({ onClose, user }) {
                  <button onClick={() => generateCryptoAddress('bnbbsc')} style={{...cryptoGridButtonStyle, background: "#F3BA2F", color: "#000"}}>
                     BNB (BSC)
                  </button>
-                 <button onClick={() => generateCryptoAddress('ton')} style={{...cryptoGridButtonStyle, background: "#0098EA"}}>
+                 {/* 🟢 I made Toncoin span both columns at the bottom so it looks perfectly symmetrical! */}
+                 <button onClick={() => generateCryptoAddress('ton')} style={{...cryptoGridButtonStyle, background: "#0098EA", gridColumn: "span 2"}}>
                     Toncoin (TON)
                  </button>
                </div>
