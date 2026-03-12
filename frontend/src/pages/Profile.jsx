@@ -84,58 +84,75 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           </div>
         )}
 
-        {/* 🟢 USER IDENTITY SECTION (Instagram Style) */}
-        <div style={{ 
-          ...headerSectionStyle, 
-          flexDirection: isDesktop ? "row" : "column",
-          alignItems: isDesktop ? "flex-start" : "stretch",
-          gap: isDesktop ? "80px" : "20px",
-          padding: isDesktop ? "40px 20px" : "20px"
-        }}>
-          <div style={{ 
-            ...avatarContainerStyle, 
-            width: isDesktop ? "150px" : "80px", 
-            height: isDesktop ? "150px" : "80px" 
+        {/* 🟢 USER IDENTITY SECTION (Compact Mobile Layout) */}
+        <div style={{ padding: isDesktop ? "40px 20px" : "20px" }}>
+          
+          {/* Top Row: Avatar on left, Info on right */}
+          <div style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: isDesktop ? "80px" : "15px"
           }}>
-            <img 
-              src={user?.avatar_url || "/assets/default-avatar.png"} 
-              style={avatarImageStyle} 
-              alt="Avatar" 
-              onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-            />
-          </div>
+            
+            <div style={{
+              ...avatarContainerStyle,
+              width: isDesktop ? "150px" : "80px",
+              height: isDesktop ? "150px" : "80px"
+            }}>
+              <img
+                src={user?.avatar_url || "/assets/default-avatar.png"}
+                style={avatarImageStyle}
+                alt="Avatar"
+                onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+              />
+            </div>
 
-          <div style={infoColumnStyle}>
-            <div style={{ display: "flex", alignItems: "center", gap: "20px", marginBottom: "20px" }}>
-              <h1 style={{ ...displayNameStyle, fontSize: isDesktop ? "28px" : "20px" }}>
-                @{user?.username || "user"}
-              </h1>
+            <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                <h1 style={{ ...displayNameStyle, fontSize: isDesktop ? "28px" : "16px", fontWeight: isDesktop ? "300" : "700" }}>
+                  @{user?.username || "user"}
+                </h1>
+                {isDesktop && (
+                  <div style={{ display: "flex", gap: "10px", marginLeft: "14px" }}>
+                     <button style={desktopEditBtnStyle} onClick={() => setCurrentView("settings")}>Edit Profile</button>
+                     <Settings size={24} color="#fff" onClick={() => setCurrentView("settings")} style={{ cursor: "pointer" }} />
+                  </div>
+                )}
+              </div>
+
+              <p style={{ ...bioStyle, fontSize: isDesktop ? "16px" : "12px", color: "#ccc", lineHeight: "1.4" }}>
+                <b style={{ color: "#fff" }}>Official Preview Channel</b><br/>
+                Catch my latest shots here before they hit Premium 💎
+              </p>
+
+              {/* Desktop buttons render inside the info column */}
               {isDesktop && (
-                <div style={{ display: "flex", gap: "10px" }}>
-                   <button style={desktopEditBtnStyle} onClick={() => setCurrentView("settings")}>Edit Profile</button>
-                   <Settings size={24} color="#fff" onClick={() => setCurrentView("settings")} style={{ cursor: "pointer" }} />
+                <div style={{ ...actionButtonsRowStyle, width: "fit-content", marginTop: "20px" }}>
+                  <button
+                    style={premiumButtonStyle}
+                    onClick={() => (!user || !user.is_premium) ? setShowPaywall(true) : alert("You are already Premium!")}
+                  >
+                    {user?.is_premium ? "VIP MEMBER" : "SUBSCRIBE PREMIUM"}
+                  </button>
+                  <button style={secondaryButtonStyle} onClick={() => alert("Link Copied")}><Share2 size={18} /></button>
                 </div>
               )}
             </div>
+          </div>
 
-            <div style={{ marginBottom: "20px" }}>
-              <p style={{ ...bioStyle, fontSize: isDesktop ? "16px" : "13px" }}>
-                <b>Official Preview Channel</b><br/>
-                Catch my latest shots here before they hit Premium 💎
-              </p>
-            </div>
-
-            <div style={{ ...actionButtonsRowStyle, width: isDesktop ? "fit-content" : "100%" }}>
-              {/* 🟢 Also trigger paywall when they click the main profile button */}
-              <button 
-                style={premiumButtonStyle} 
+          {/* 🟢 MOBILE ACTION BUTTONS (Placed directly under the row) */}
+          {!isDesktop && (
+            <div style={{ ...actionButtonsRowStyle, width: "100%", marginTop: "15px" }}>
+              <button
+                style={{ ...premiumButtonStyle, flex: 1, padding: "8px 16px", fontSize: "13px" }}
                 onClick={() => (!user || !user.is_premium) ? setShowPaywall(true) : alert("You are already Premium!")}
               >
                 {user?.is_premium ? "VIP MEMBER" : "SUBSCRIBE PREMIUM"}
               </button>
-              <button style={secondaryButtonStyle} onClick={() => alert("Link Copied")}><Share2 size={18} /></button>
+              <button style={{ ...secondaryButtonStyle, padding: "0 15px" }} onClick={() => alert("Link Copied")}><Share2 size={18} /></button>
             </div>
-          </div>
+          )}
         </div>
 
         {/* 🟢 TABS NAV */}
@@ -202,12 +219,10 @@ const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%"
 const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid var(--border-color)", position: "sticky", top: 0, background: "var(--bg-color)", zIndex: 100, backdropFilter: "blur(15px)" };
 const centerTitleContainer = { display: "flex", alignItems: "center" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
-const headerSectionStyle = { display: "flex" };
 const avatarContainerStyle = { borderRadius: "50%", padding: "4px", background: "linear-gradient(45deg, #FFD700, var(--primary-color))", flexShrink: 0 };
 const avatarImageStyle = { width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "4px solid #000" };
-const infoColumnStyle = { flex: 1 };
 const displayNameStyle = { fontWeight: "300", margin: 0, color: "#fff" };
-const bioStyle = { color: "#fff", margin: 0, lineHeight: "1.5" };
+const bioStyle = { margin: 0, lineHeight: "1.5" };
 const actionButtonsRowStyle = { display: "flex", gap: "10px" };
 const premiumButtonStyle = { background: "var(--primary-color)", color: "#fff", border: "none", borderRadius: "8px", padding: "10px 24px", fontWeight: "800", fontSize: "14px", cursor: "pointer" };
 const secondaryButtonStyle = { background: "#1a1a1a", color: "#fff", border: "1px solid #333", borderRadius: "8px", padding: "0 15px", display: "flex", alignItems: "center" };
