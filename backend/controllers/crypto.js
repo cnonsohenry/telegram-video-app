@@ -116,3 +116,20 @@ export const cryptoWebhook = async (req, res, pool) => {
     res.status(500).send("Server Error");
   }
 };
+
+// ==========================================
+// 3. CHECK TRANSACTION STATUS (For React Polling)
+// ==========================================
+export const checkCryptoTransaction = async (req, res, pool) => {
+  try {
+    const { order_id } = req.params;
+    const tx = await pool.query("SELECT status FROM transactions WHERE id = $1", [order_id]);
+    
+    if (tx.rows.length === 0) return res.status(404).json({ error: "Transaction not found" });
+    
+    res.json({ success: true, status: tx.rows[0].status });
+  } catch (error) {
+    console.error("Status Check Error:", error.message);
+    res.status(500).json({ error: "Server error" });
+  }
+};

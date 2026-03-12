@@ -26,12 +26,16 @@ export default function PaywallModal({ onClose, user }) {
   const [generatingCrypto, setGeneratingCrypto] = useState(false);
   const [cryptoPaymentDetails, setCryptoPaymentDetails] = useState(null);
   const [copiedField, setCopiedField] = useState(null); 
+  
+  // 🟢 NEW: Track if the user has clicked "I Have Paid" on the crypto screen
+  const [cryptoPaidClicked, setCryptoPaidClicked] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
 
+  // FIAT POLLING COUNTDOWN
   useEffect(() => {
     let interval;
     if (verifying && timer > 0) {
@@ -42,6 +46,34 @@ export default function PaywallModal({ onClose, user }) {
     }
     return () => clearInterval(interval);
   }, [verifying, timer]);
+
+  // 🟢 UPDATED: CRYPTO POLLING ENGINE (Only starts AFTER they click the button)
+  useEffect(() => {
+    let cryptoInterval;
+    
+    if (cryptoPaymentDetails && cryptoPaidClicked && verifyStatus !== "success") {
+      const checkStatus = async () => {
+        try {
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/crypto/status/${cryptoPaymentDetails.order_id}`);
+          const data = await res.json();
+          
+          if (data.success && data.status === 'APPROVED') {
+            setVerifyStatus("success");
+            clearInterval(cryptoInterval);
+            // Auto-refresh the page to unlock content after 3 seconds
+            setTimeout(() => window.location.reload(), 3000);
+          }
+        } catch (err) {
+          console.error("Crypto polling error:", err);
+        }
+      };
+
+      // Check immediately on click, then every 10 seconds
+      checkStatus();
+      cryptoInterval = setInterval(checkStatus, 10000); 
+    }
+    return () => clearInterval(cryptoInterval);
+  }, [cryptoPaymentDetails, cryptoPaidClicked, verifyStatus]);
 
   // ==========================================
   // BANK TRANSFER POLLING ENGINE
@@ -148,6 +180,7 @@ export default function PaywallModal({ onClose, user }) {
     setSelectedMethod(null); 
     setSelectedPackage(null);
     setCryptoPaymentDetails(null);
+    setCryptoPaidClicked(false); // Reset the button state
   };
 
   return (
@@ -254,7 +287,6 @@ export default function PaywallModal({ onClose, user }) {
             <div style={transferDetailsBox}>
                <h3 style={{color: "#fff", textAlign: "center", marginBottom: "15px", marginTop: "0", fontSize: "18px"}}>Select Cryptocurrency</h3>
                
-               {/* 🟢 NEW: CSS Grid for Crypto Buttons */}
                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                  <button onClick={() => generateCryptoAddress('usdttrc20')} style={{...cryptoGridButtonStyle, background: "#26A17B"}}>
                     USDT (TRC-20)
@@ -286,7 +318,7 @@ export default function PaywallModal({ onClose, user }) {
              </div>
           )}
 
-          {cryptoPaymentDetails && (
+          {cryptoPaymentDetails && verifyStatus !== "success" && (
             <div style={{...transferDetailsBox, padding: "15px"}}>
               <div style={{ textAlign: "center", marginBottom: "10px" }}>
                 <QrCode size={24} color="#8e8e93" style={{marginBottom: "5px"}}/>
@@ -327,9 +359,17 @@ export default function PaywallModal({ onClose, user }) {
                  />
               </div>
 
-              <div style={{ background: "rgba(247, 147, 26, 0.1)", border: "1px solid rgba(247, 147, 26, 0.2)", padding: "10px", borderRadius: "10px", fontSize: "12px", color: "#f7931a", textAlign: "center", lineHeight: "1.4" }}>
-                 Crypto takes 5-15 mins to confirm. You can close this window after sending.
-              </div>
+              {/* 🟢 NEW: Toggle between "I Have Paid" button and the Polling Spinner */}
+              {!cryptoPaidClicked ? (
+                <button onClick={() => setCryptoPaidClicked(true)} style={{...payButtonStyle, background: "var(--primary-color)", marginTop: "15px"}}>
+                  I Have Paid
+                </button>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", background: "rgba(247, 147, 26, 0.1)", border: "1px solid rgba(247, 147, 26, 0.2)", padding: "12px", borderRadius: "10px", marginTop: "15px" }}>
+                   <Loader2 size={18} color="#f7931a" style={{ animation: "spin 1.5s linear infinite" }} />
+                   <span style={{ fontSize: "13px", color: "#f7931a", fontWeight: "600", letterSpacing: "0.5px" }}>Awaiting blockchain confirmation...</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -426,6 +466,4 @@ const transferDetailsBox = { background: "rgba(255,255,255,0.02)", border: "1px 
 const infoBoxStyle = { background: "rgba(0,0,0,0.3)", padding: "15px", borderRadius: "10px", fontSize: "14px", color: "#ccc", display: "flex", flexDirection: "column", gap: "8px", fontFamily: "monospace" };
 const inputStyle = { width: "100%", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.5)", color: "#fff", fontSize: "16px", outline: "none", boxSizing: "border-box" };
 const copyBtnStyle = { background: "rgba(255,255,255,0.1)", border: "none", padding: "8px", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
-
-// 🟢 NEW: Compact button style for the 2-column grid
 const cryptoGridButtonStyle = { display: "flex", alignItems: "center", justifyContent: "center", width: "100%", padding: "12px 10px", borderRadius: "10px", color: "#fff", border: "none", fontSize: "14px", fontWeight: "700", cursor: "pointer", transition: "transform 0.2s" };
