@@ -106,7 +106,7 @@ router.post("/google", async (req, res) => {
        ON CONFLICT (email) DO UPDATE 
        SET avatar_url = EXCLUDED.avatar_url, 
            google_id = COALESCE(app_users.google_id, EXCLUDED.google_id)
-       RETURNING id, email, username, avatar_url, role, settings`,
+       RETURNING id, email, username, avatar_url, role, settings, is_premium`, // 🟢 ADDED THIS
       [email, name || email.split('@')[0], picture, googleId]
     );
 
@@ -137,7 +137,7 @@ router.post("/register", async (req, res) => {
     const hash = await bcrypt.hash(password, salt);
 
     const newUser = await pool.query(
-      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url, role, settings",
+      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url, role, settings, is_premium", // 🟢 ADDED THIS
       [email, hash, username || email.split('@')[0], "https://videos.naijahomemade.com/assets/default-avatar.png"]
     );
 
@@ -183,7 +183,7 @@ router.post("/login", async (req, res) => {
 router.get("/me", authenticateToken, async (req, res) => {
   try {
     const userResult = await pool.query(
-      "SELECT id, email, username, avatar_url, role, settings FROM app_users WHERE id = $1", 
+      "SELECT id, email, username, avatar_url, role, settings, is_premium FROM app_users WHERE id = $1", // 🟢 ADDED THIS 
       [req.user.id]
     );
 
