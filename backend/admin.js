@@ -4,14 +4,13 @@
 ===================== */
 import express from "express";
 import pkg from "pg";
-import { authenticateToken } from "./auth.js"; // We reuse your existing token checker
+import { authenticateToken } from "./auth.js"; 
 
 const { Pool } = pkg;
 const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // 🟢 1. THE BOUNCER: Admin-Only Middleware
-// This runs AFTER authenticateToken, so we already know who they are.
 const isAdmin = async (req, res, next) => {
   try {
     const userQuery = await pool.query("SELECT role FROM app_users WHERE id = $1", [req.user.id]);
@@ -29,12 +28,17 @@ router.get("/stats", authenticateToken, isAdmin, async (req, res) => {
   try {
     const totalUsers = await pool.query("SELECT COUNT(*) FROM app_users");
     const premiumUsers = await pool.query("SELECT COUNT(*) FROM app_users WHERE is_premium = true");
-    const totalRevenue = await pool.query("SELECT SUM(amount_usd) FROM transactions WHERE status = 'APPROVED'");
-    const pendingCrypto = await pool.query("SELECT COUNT(*) FROM transactions WHERE status = 'WAITING'");
+    
+    // 🟢 FIX 1: Use 'expected_amount' which matches your server.js schema
+    const totalRevenue = await pool.query("SELECT SUM(expected_amount) FROM transactions WHERE status = 'APPROVED'");
+    
+    // 🟢 FIX 2: Includes 'PENDING' since that is the default status in your schema
+    const pendingCrypto = await pool.query("SELECT COUNT(*) FROM transactions WHERE status = 'WAITING' OR status = 'PENDING'");
 
     res.json({
       total_users: parseInt(totalUsers.rows[0].count),
       premium_users: parseInt(premiumUsers.rows[0].count),
+      // Send it back as total_revenue_usd so the React dashboard accepts it perfectly
       total_revenue_usd: parseFloat(totalRevenue.rows[0].sum || 0).toFixed(2),
       pending_crypto_orders: parseInt(pendingCrypto.rows[0].count)
     });
@@ -44,7 +48,7 @@ router.get("/stats", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// 🟢 3. GET ALL USERS (For the User Management Table)
+// 🟢 3. GET ALL USERS
 router.get("/users", authenticateToken, isAdmin, async (req, res) => {
   try {
     const users = await pool.query(`
@@ -63,10 +67,17 @@ router.get("/users", authenticateToken, isAdmin, async (req, res) => {
 // 🟢 4. GET RECENT TRANSACTIONS
 router.get("/transactions", authenticateToken, isAdmin, async (req, res) => {
   try {
+    // 🟢 FIX 3: Use 'app_user_id' for the JOIN (matches server.js)
+    // 🟢 FIX 4: Alias expected_amount -> amount, and provide a fallback for payment_method so React doesn't crash!
     const tx = await pool.query(`
-      SELECT t.*, u.username, u.email 
+      SELECT 
+        t.*, 
+        t.expected_amount AS amount, 
+        COALESCE(t.status, 'PENDING') AS payment_method, 
+        u.username, 
+        u.email 
       FROM transactions t
-      LEFT JOIN app_users u ON t.user_id = u.id
+      LEFT JOIN app_users u ON t.app_user_id = u.id
       ORDER BY t.created_at DESC 
       LIMIT 50
     `);

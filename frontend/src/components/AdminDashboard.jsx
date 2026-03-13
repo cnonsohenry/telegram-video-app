@@ -178,7 +178,7 @@ export default function AdminDashboard({ user, onLogout }) {
                           <td style={{ fontWeight: "700" }}>
                              ${tx.amount_usd} <span style={{ fontSize: "12px", color: "#8e8e93" }}>({tx.crypto_amount} {tx.crypto_currency.toUpperCase()})</span>
                           </td>
-                          <td>{tx.payment_method.toUpperCase()}</td>
+                          <td>{tx.payment_method?.toUpperCase() || 'TRANSFER'}</td>
                           <td>
                             {tx.status === 'APPROVED' && <span style={{...badgeStyle, background: "rgba(52,199,89,0.1)", color: "#34C759"}}>Approved</span>}
                             {tx.status === 'WAITING' && <span style={{...badgeStyle, background: "rgba(243,186,47,0.1)", color: "#F3BA2F"}}>Waiting</span>}
