@@ -88,4 +88,62 @@ router.get("/transactions", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
+// 🟢 5. GET ALL VIDEOS (For Content Library)
+router.get("/all-videos", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const videos = await pool.query(`
+      SELECT id, chat_id, message_id, caption, category, views, cloudflare_id 
+      FROM videos 
+      ORDER BY created_at DESC 
+      LIMIT 200
+    `);
+    
+    // Auto-generate thumbnails for the grid
+    const formatted = videos.rows.map(v => ({
+      ...v,
+      thumbnail_url: v.cloudflare_id && v.cloudflare_id !== "none" 
+        ? `https://videodelivery.net/${v.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=600`
+        : `https://videos.naijahomemade.com/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
+    }));
+    
+    res.json(formatted);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch videos" });
+  }
+});
+
+// 🟢 6. UPDATE VIDEO (Edit Caption/Category)
+router.put("/video/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { caption, category } = req.body;
+    await pool.query(
+      "UPDATE videos SET caption = $1, category = $2 WHERE id = $3",
+      [caption, category, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Update failed" });
+  }
+});
+
+// 🟢 7. DELETE VIDEO
+router.delete("/video/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM videos WHERE id = $1", [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Delete failed" });
+  }
+});
+
+// 🟢 8. DELETE USER
+router.delete("/user/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM app_users WHERE id = $1", [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Delete failed" });
+  }
+});
+
 export default router;

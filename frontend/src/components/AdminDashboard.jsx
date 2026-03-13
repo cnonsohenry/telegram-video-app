@@ -1,246 +1,279 @@
 import React, { useState, useEffect } from "react";
-import { LayoutDashboard, Users, CreditCard, LogOut, TrendingUp, ShieldCheck, Clock, RefreshCw, UploadCloud } from "lucide-react";
-import AdminUpload from "./AdminUpload"; // 🟢 IMPORT UPLOAD COMPONENT
+import { Search, Filter, Edit3, Trash2, X, Play, ShieldCheck, User, Video, ChevronDown, Check, AlertTriangle, LogOut } from "lucide-react";
 
 export default function AdminDashboard({ user, onLogout }) {
-  const [activeTab, setActiveTab] = useState("overview");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [activeView, setActiveView] = useState("videos"); // 'videos' or 'users'
+  const [searchQuery, setSearchQuery] = useState("");
   
-  // 🟢 NEW: State to trigger the Upload Modal
-  const [showUploadModal, setShowUploadModal] = useState(false);
-
   // Data States
-  const [stats, setStats] = useState({ total_users: 0, premium_users: 0, total_revenue_usd: 0, pending_crypto_orders: 0 });
-  const [usersList, setUsersList] = useState([]);
-  const [transactions, setTransactions] = useState([]);
+  const [videos, setVideos] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // Fetch Data based on Active Tab
+  // Modal States
+  const [editingVideo, setEditingVideo] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
+  const [deleteWarning, setDeleteWarning] = useState(null);
+
+  // 🟢 1. FETCH DATA ON LOAD
   const fetchData = async () => {
     setLoading(true);
-    setError("");
     try {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem("token")}` };
-      const baseUrl = import.meta.env.VITE_API_URL;
-
-      if (activeTab === "overview") {
-        const res = await fetch(`${baseUrl}/api/admin/stats`, { headers });
-        if (!res.ok) throw new Error("Not authorized or server error");
-        const data = await res.json();
-        setStats(data);
-      } else if (activeTab === "users") {
-        const res = await fetch(`${baseUrl}/api/admin/users`, { headers });
-        if (!res.ok) throw new Error("Failed to fetch users");
-        setUsersList(await res.json());
-      } else if (activeTab === "transactions") {
-        const res = await fetch(`${baseUrl}/api/admin/transactions`, { headers });
-        if (!res.ok) throw new Error("Failed to fetch transactions");
-        setTransactions(await res.json());
-      }
+      const endpoint = activeView === 'videos' ? '/api/admin/all-videos' : '/api/admin/users';
+      const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, { headers });
+      const data = await res.json();
+      
+      if (activeView === 'videos') setVideos(data);
+      else setUsers(data);
     } catch (err) {
-      setError(err.message);
+      console.error("Failed to fetch:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+  useEffect(() => { fetchData(); }, [activeView]);
 
-  // Security Check
-  if (!user || user.role !== 'admin') {
-    return (
-      <div style={errorScreenStyle}>
-        <ShieldCheck size={64} color="#ff3b30" style={{ marginBottom: "20px" }} />
-        <h2>Access Denied</h2>
-        <p>You do not have administrative privileges.</p>
-        <button onClick={onLogout} style={logoutBtnStyle}>Go Back</button>
-      </div>
-    );
-  }
+  // 🟢 2. INSTANT SEARCH FILTER
+  const filteredVideos = videos.filter(v => 
+    v.caption?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    v.category?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  // 🟢 RENDER UPLOAD MODAL OVER EVERYTHING
-  if (showUploadModal) {
-    return <AdminUpload onClose={() => setShowUploadModal(false)} />;
-  }
+  const filteredUsers = users.filter(u => 
+    u.username?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // 🟢 3. UPDATE VIDEO API CALL
+  const handleUpdateVideo = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/video/${editingVideo.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({ caption: editingVideo.caption, category: editingVideo.category })
+      });
+
+      if (res.ok) {
+        // Update the UI instantly without refreshing the page
+        setVideos(videos.map(v => v.id === editingVideo.id ? editingVideo : v));
+        setEditingVideo(null); // Close the modal
+      } else {
+        alert("Failed to update video.");
+      }
+    } catch (err) {
+      console.error("Update error:", err);
+    }
+  };
+
+  // 🟢 4. DELETE ITEM API CALL
+  const handleDeleteItem = async () => {
+    try {
+      const endpoint = deleteWarning.type === 'video' 
+        ? `/api/admin/video/${deleteWarning.id}` 
+        : `/api/admin/user/${deleteWarning.id}`;
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem("token")}` }
+      });
+
+      if (res.ok) {
+        // Remove it from the UI instantly
+        if (deleteWarning.type === 'video') {
+          setVideos(videos.filter(v => v.id !== deleteWarning.id));
+        } else {
+          setUsers(users.filter(u => u.id !== deleteWarning.id));
+        }
+        setDeleteWarning(null); // Close the modal
+      } else {
+        alert("Failed to delete item.");
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
+  };
 
   return (
-    <div style={dashboardContainerStyle}>
-      {/* 🟢 SIDEBAR */}
-      <div style={sidebarStyle}>
-        <div>
-          <h2 style={logoStyle}>NAIJA<span style={{ color: "var(--primary-color)" }}>ADMIN</span></h2>
-          <div style={{ marginTop: "40px", display: "flex", flexDirection: "column", gap: "10px" }}>
-            <SidebarBtn active={activeTab === "overview"} onClick={() => setActiveTab("overview")} icon={<LayoutDashboard size={20} />} label="Overview" />
-            <SidebarBtn active={activeTab === "users"} onClick={() => setActiveTab("users")} icon={<Users size={20} />} label="Users" />
-            <SidebarBtn active={activeTab === "transactions"} onClick={() => setActiveTab("transactions")} icon={<CreditCard size={20} />} label="Transactions" />
+    <div style={containerStyle}>
+      
+      {/* 🎬 TOP NAV */}
+      <div style={topNavStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: "30px" }}>
+          <h1 style={logoStyle}>STUDIO<span style={{color: "var(--primary-color)"}}>CTRL</span></h1>
+          <div style={tabContainerStyle}>
+            <button onClick={() => setActiveView("videos")} style={activeView === "videos" ? activeTabStyle : inactiveTabStyle}>
+              <Video size={18} /> Content Library
+            </button>
+            <button onClick={() => setActiveView("users")} style={activeView === "users" ? activeTabStyle : inactiveTabStyle}>
+              <User size={18} /> Audience
+            </button>
           </div>
         </div>
-        <button onClick={onLogout} style={logoutBtnStyle}>
-          <LogOut size={20} /> Exit Admin
-        </button>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+          <div style={searchBarStyle}>
+            <Search size={18} color="#8e8e93" />
+            <input 
+              type="text" 
+              placeholder={`Search ${activeView}...`} 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={searchInputStyle}
+            />
+          </div>
+          <button onClick={onLogout} style={exitBtnStyle}>
+            <LogOut size={18} /> Exit
+          </button>
+        </div>
       </div>
 
-      {/* 🟢 MAIN CONTENT */}
-      <div style={mainContentStyle}>
-        <div style={topBarStyle}>
-          <h1 style={{ margin: 0, fontSize: "24px" }}>
-            {activeTab === 'overview' && 'Dashboard Overview'}
-            {activeTab === 'users' && 'User Management'}
-            {activeTab === 'transactions' && 'Transaction History'}
-          </h1>
-          
-          {/* 🟢 TOP ACTIONS BAR */}
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button onClick={() => setShowUploadModal(true)} style={uploadBtnStyle}>
-              <UploadCloud size={18} />
-              Upload Video
-            </button>
-            <button onClick={fetchData} style={refreshBtnStyle} disabled={loading}>
-              <RefreshCw size={18} style={{ animation: loading ? "spin 1s linear infinite" : "none" }} />
-              Refresh
-            </button>
+      <div style={contentAreaStyle}>
+        
+        {loading && <div style={{textAlign: "center", color: "#8e8e93", marginTop: "50px"}}>Loading data...</div>}
+
+        {/* 🎬 VIDEO GRID (Content Library) */}
+        {!loading && activeView === "videos" && (
+          <div style={videoGridStyle}>
+            {filteredVideos.map(video => (
+              <div key={video.id} style={videoCardStyle} className="video-card">
+                <img src={video.thumbnail_url || '/assets/default-avatar.png'} alt="thumb" style={videoThumbStyle} />
+                <div className="video-overlay" style={videoOverlayStyle}>
+                  <h3 style={{ margin: "0 0 5px 0", fontSize: "14px", fontWeight: "700" }}>{video.caption || "Untitled"}</h3>
+                  <p style={{ margin: "0 0 15px 0", fontSize: "12px", color: "#ccc" }}>{video.views} views • {video.category}</p>
+                  
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button onClick={() => setEditingVideo(video)} style={actionBtnStyle}><Edit3 size={16} /> Edit</button>
+                    <button onClick={() => setDeleteWarning({ type: 'video', id: video.id, name: video.caption })} style={{...actionBtnStyle, background: "rgba(255, 59, 48, 0.2)", color: "#ff3b30"}}>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
 
-        {error && <div style={errorBannerStyle}>{error}</div>}
+        {/* 👤 USER DATA TABLE (Audience) */}
+        {!loading && activeView === "users" && (
+          <div style={tableWrapperStyle}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Email</th>
+                  <th>Tier</th>
+                  <th>Role</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map(u => (
+                  <tr key={u.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <td style={{ display: "flex", alignItems: "center", gap: "10px", padding: "15px" }}>
+                      <img src={u.avatar_url} alt="" style={{ width: "32px", height: "32px", borderRadius: "50%" }} />
+                      <span style={{ fontWeight: "600", color: "#fff" }}>{u.username}</span>
+                    </td>
+                    <td style={{ padding: "15px", color: "#ccc" }}>{u.email}</td>
+                    <td style={{ padding: "15px" }}>
+                      {u.is_premium ? <span style={premiumBadge}>Premium</span> : <span style={freeBadge}>Free</span>}
+                    </td>
+                    <td style={{ padding: "15px", textTransform: "capitalize", color: u.role === 'admin' ? '#ff453a' : '#8e8e93' }}>{u.role}</td>
+                    <td style={{ padding: "15px", display: "flex", gap: "10px" }}>
+                       <button onClick={() => setDeleteWarning({ type: 'user', id: u.id, name: u.username })} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={18} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-        <div style={contentAreaStyle}>
-          {loading ? (
-            <div style={centerFlex}>
-              <RefreshCw size={40} color="var(--primary-color)" style={{ animation: "spin 1s linear infinite" }} />
-              <p style={{ color: "#8e8e93", marginTop: "15px" }}>Loading data...</p>
+      {/* 🔴 EDIT VIDEO MODAL */}
+      {editingVideo && (
+        <div style={modalOverlayStyle}>
+          <form onSubmit={handleUpdateVideo} style={modalBoxStyle}>
+            <div style={modalHeaderStyle}>
+              <h2 style={{margin: 0}}>Edit Content</h2>
+              <X size={24} cursor="pointer" color="#8e8e93" onClick={() => setEditingVideo(null)} />
             </div>
-          ) : (
-            <>
-              {/* TAB 1: OVERVIEW */}
-              {activeTab === "overview" && (
-                <div style={gridStatsStyle}>
-                  <StatCard title="Total Revenue" value={`$${stats.total_revenue_usd}`} icon={<TrendingUp size={24} color="#34C759" />} bg="rgba(52, 199, 89, 0.1)" />
-                  <StatCard title="Total Users" value={stats.total_users} icon={<Users size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
-                  <StatCard title="Premium Members" value={stats.premium_users} icon={<ShieldCheck size={24} color="var(--primary-color)" />} bg="rgba(247, 147, 26, 0.1)" />
-                  <StatCard title="Pending Crypto" value={stats.pending_crypto_orders} icon={<Clock size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
-                </div>
-              )}
-
-              {/* TAB 2: USERS TABLE */}
-              {activeTab === "users" && (
-                <div style={tableContainerStyle}>
-                  <table style={tableStyle}>
-                    <thead>
-                      <tr>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Status</th>
-                        <th>Role</th>
-                        <th>Joined Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {usersList.map(u => (
-                        <tr key={u.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                          <td style={{ fontWeight: "600", color: "#fff" }}>{u.username}</td>
-                          <td style={{ color: "#8e8e93" }}>{u.email}</td>
-                          <td>
-                            {u.is_premium ? (
-                              <span style={{...badgeStyle, background: "rgba(247,147,26,0.1)", color: "var(--primary-color)"}}>Premium</span>
-                            ) : (
-                              <span style={{...badgeStyle, background: "rgba(255,255,255,0.05)", color: "#8e8e93"}}>Free</span>
-                            )}
-                          </td>
-                          <td style={{ textTransform: "capitalize" }}>{u.role}</td>
-                          <td style={{ color: "#8e8e93" }}>{new Date(u.created_at).toLocaleDateString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* TAB 3: TRANSACTIONS TABLE */}
-              {activeTab === "transactions" && (
-                <div style={tableContainerStyle}>
-                  <table style={tableStyle}>
-                    <thead>
-                      <tr>
-                        <th>User</th>
-                        <th>Amount</th>
-                        <th>Method</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transactions.map(tx => (
-                        <tr key={tx.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                          <td style={{ fontWeight: "600", color: "#fff" }}>{tx.username || tx.email || "Unknown"}</td>
-                          <td style={{ fontWeight: "700" }}>
-                             ${tx.amount_usd} <span style={{ fontSize: "12px", color: "#8e8e93" }}>({tx.crypto_amount} {tx.crypto_currency.toUpperCase()})</span>
-                          </td>
-                          <td>{tx.payment_method?.toUpperCase() || 'TRANSFER'}</td>
-                          <td>
-                            {tx.status === 'APPROVED' && <span style={{...badgeStyle, background: "rgba(52,199,89,0.1)", color: "#34C759"}}>Approved</span>}
-                            {tx.status === 'WAITING' && <span style={{...badgeStyle, background: "rgba(243,186,47,0.1)", color: "#F3BA2F"}}>Waiting</span>}
-                            {tx.status === 'FAILED' && <span style={{...badgeStyle, background: "rgba(255,59,48,0.1)", color: "#ff3b30"}}>Failed</span>}
-                          </td>
-                          <td style={{ color: "#8e8e93", fontSize: "13px" }}>{new Date(tx.created_at).toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
+            <div style={inputGroupStyle}>
+              <label style={{fontSize: "12px", color: "#8e8e93"}}>CAPTION / TITLE</label>
+              <input type="text" value={editingVideo.caption} onChange={e => setEditingVideo({...editingVideo, caption: e.target.value})} style={formInputStyle} />
+            </div>
+            <div style={inputGroupStyle}>
+              <label style={{fontSize: "12px", color: "#8e8e93"}}>CATEGORY</label>
+              <select value={editingVideo.category} onChange={e => setEditingVideo({...editingVideo, category: e.target.value})} style={formInputStyle}>
+                <option value="hotties">Hotties</option>
+                <option value="baddies">Baddies</option>
+                <option value="premium">Premium</option>
+              </select>
+            </div>
+            <button type="submit" style={saveBtnStyle}>Save Changes</button>
+          </form>
         </div>
-      </div>
+      )}
+
+      {/* 🔴 DANGER MODAL (DELETE CONFIRMATION) */}
+      {deleteWarning && (
+        <div style={modalOverlayStyle}>
+          <div style={{...modalBoxStyle, textAlign: "center", maxWidth: "350px"}}>
+            <AlertTriangle size={48} color="#ff3b30" style={{ margin: "0 auto 15px auto" }} />
+            <h2 style={{ margin: "0 0 10px 0" }}>Delete {deleteWarning.type}?</h2>
+            <p style={{ color: "#8e8e93", fontSize: "14px", marginBottom: "20px" }}>
+              Are you sure you want to permanently delete <strong>{deleteWarning.name}</strong>? This cannot be undone.
+            </p>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => setDeleteWarning(null)} style={{ flex: 1, padding: "12px", background: "#333", border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>Cancel</button>
+              <button onClick={handleDeleteItem} style={{ flex: 1, padding: "12px", background: "#ff3b30", border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔴 GLOBAL CSS FOR HOVER EFFECTS */}
       <style>{`
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-        th { text-align: left; padding: 15px; color: #8e8e93; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        td { padding: 15px; font-size: 14px; }
+        .video-card { position: relative; overflow: hidden; border-radius: 8px; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; background: #1a1a1a; aspect-ratio: 9/16; }
+        .video-card:hover { transform: scale(1.05); z-index: 10; box-shadow: 0 20px 40px rgba(0,0,0,0.8); border: 2px solid var(--primary-color); }
+        .video-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, transparent 100%); display: flex; flexDirection: column; justify-content: flex-end; padding: 15px; opacity: 0; transition: opacity 0.3s; }
+        .video-card:hover .video-overlay { opacity: 1; }
+        th { text-align: left; padding: 15px; color: #8e8e93; font-size: 13px; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); }
       `}</style>
     </div>
   );
 }
 
-// 🎨 SUB-COMPONENTS
-const SidebarBtn = ({ active, onClick, icon, label }) => (
-  <button onClick={onClick} style={{
-    display: "flex", alignItems: "center", gap: "12px", width: "100%", padding: "12px 16px", borderRadius: "10px", border: "none", cursor: "pointer", fontSize: "15px", fontWeight: "600", transition: "all 0.2s",
-    background: active ? "rgba(247, 147, 26, 0.1)" : "transparent",
-    color: active ? "var(--primary-color)" : "#8e8e93"
-  }}>
-    {icon} {label}
-  </button>
-);
-
-const StatCard = ({ title, value, icon, bg }) => (
-  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", padding: "24px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-    <div>
-      <div style={{ color: "#8e8e93", fontSize: "14px", fontWeight: "600", marginBottom: "8px" }}>{title}</div>
-      <div style={{ color: "#fff", fontSize: "32px", fontWeight: "900" }}>{value}</div>
-    </div>
-    <div style={{ background: bg, padding: "12px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      {icon}
-    </div>
-  </div>
-);
-
 // 🖌 UI STYLES
-const dashboardContainerStyle = { display: "flex", height: "100dvh", width: "100vw", background: "#050505", color: "#fff", position: "absolute", zIndex: 999999, top: 0, left: 0 };
-const sidebarStyle = { width: "260px", background: "#0a0a0a", borderRight: "1px solid rgba(255,255,255,0.05)", padding: "30px 20px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
-const logoStyle = { margin: 0, fontSize: "20px", fontWeight: "900", letterSpacing: "-1px", color: "#fff" };
-const mainContentStyle = { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" };
-const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "30px 40px", borderBottom: "1px solid rgba(255,255,255,0.05)" };
-const contentAreaStyle = { flex: 1, overflowY: "auto", padding: "40px" };
-const gridStatsStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px" };
-const tableContainerStyle = { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", overflow: "hidden" };
+const containerStyle = { minHeight: "100dvh", width: "100vw", background: "#141414", color: "#fff", display: "flex", flexDirection: "column", position: "absolute", zIndex: 999999, top: 0, left: 0 };
+const topNavStyle = { position: "sticky", top: 0, zIndex: 100, background: "rgba(20,20,20,0.9)", backdropFilter: "blur(20px)", padding: "20px 40px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.05)" };
+const logoStyle = { margin: 0, fontSize: "24px", fontWeight: "900", letterSpacing: "-1px" };
+const tabContainerStyle = { display: "flex", gap: "20px" };
+const inactiveTabStyle = { background: "transparent", border: "none", color: "#e5e5e5", fontSize: "16px", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", opacity: 0.6, transition: "opacity 0.2s" };
+const activeTabStyle = { ...inactiveTabStyle, opacity: 1, textShadow: "0 0 10px rgba(255,255,255,0.3)" };
+const searchBarStyle = { display: "flex", alignItems: "center", gap: "10px", background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)", padding: "8px 16px", borderRadius: "30px", width: "300px" };
+const searchInputStyle = { background: "transparent", border: "none", color: "#fff", outline: "none", width: "100%", fontSize: "14px" };
+const exitBtnStyle = { display: "flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.05)", border: "none", color: "#fff", padding: "10px 16px", borderRadius: "30px", cursor: "pointer", fontSize: "14px", fontWeight: "600" };
+const contentAreaStyle = { padding: "40px", flex: 1, overflowY: "auto" };
+const videoGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "20px" };
+const videoThumbStyle = { width: "100%", height: "100%", objectFit: "cover" };
+const videoOverlayStyle = { position: "absolute", bottom: 0, left: 0, right: 0, padding: "15px", display: "flex", flexDirection: "column" };
+const actionBtnStyle = { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "8px", background: "rgba(255,255,255,0.2)", backdropFilter: "blur(5px)", border: "none", color: "#fff", borderRadius: "6px", cursor: "pointer", fontWeight: "600", fontSize: "13px" };
+const tableWrapperStyle = { background: "#1a1a1a", borderRadius: "12px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.05)" };
 const tableStyle = { width: "100%", borderCollapse: "collapse" };
-const badgeStyle = { padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "700" };
-const logoutBtnStyle = { display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", background: "rgba(255,255,255,0.05)", color: "#fff", border: "none", padding: "14px", borderRadius: "10px", fontWeight: "600", cursor: "pointer" };
-const refreshBtnStyle = { display: "flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", padding: "10px 16px", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "600" };
-const uploadBtnStyle = { display: "flex", alignItems: "center", gap: "8px", background: "var(--primary-color)", color: "#fff", border: "none", padding: "10px 16px", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "700" };
-const errorScreenStyle = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100dvh", width: "100vw", background: "#050505", color: "#fff", position: "absolute", zIndex: 999999, top: 0, left: 0 };
-const errorBannerStyle = { background: "rgba(255, 59, 48, 0.1)", color: "#ff3b30", padding: "15px 40px", borderBottom: "1px solid rgba(255, 59, 48, 0.2)" };
-const centerFlex = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%" };
+const premiumBadge = { background: "rgba(247,147,26,0.1)", color: "var(--primary-color)", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "700" };
+const freeBadge = { background: "rgba(255,255,255,0.05)", color: "#8e8e93", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "700" };
+const iconBtnStyle = { background: "rgba(255,255,255,0.05)", border: "none", color: "#fff", padding: "8px", borderRadius: "8px", cursor: "pointer" };
+
+// Modal Styles
+const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999999 };
+const modalBoxStyle = { background: "#141414", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "16px", padding: "30px", width: "100%", maxWidth: "450px" };
+const modalHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px" };
+const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" };
+const formInputStyle = { background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", padding: "12px", borderRadius: "8px", color: "#fff", fontSize: "15px", outline: "none" };
+const saveBtnStyle = { width: "100%", background: "var(--primary-color)", color: "#fff", border: "none", padding: "14px", borderRadius: "8px", fontWeight: "700", fontSize: "16px", cursor: "pointer", marginTop: "10px" };
