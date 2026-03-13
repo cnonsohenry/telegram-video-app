@@ -269,6 +269,7 @@ const tableStyle = { width: "100%", borderCollapse: "collapse" };
 const premiumBadge = { background: "rgba(247,147,26,0.1)", color: "var(--primary-color)", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "700" };
 const freeBadge = { background: "rgba(255,255,255,0.05)", color: "#8e8e93", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "700" };
 const iconBtnStyle = { background: "rgba(255,255,255,0.05)", border: "none", color: "#fff", padding: "8px", borderRadius: "8px", cursor: "pointer" };
+const videoCardStyle = { position: "relative", overflow: "hidden", borderRadius: "8px", background: "#1a1a1a", aspectRatio: "9/16", cursor: "pointer" };
 
 // Modal Styles
 const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999999 };
