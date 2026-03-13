@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
-import AdminDashboard from "./pages/AdminDashboard"; // 🟢 IMPORT DASHBOARD
-import AdminUpload from "./pages/AdminUpload";
+import AdminDashboard from "./components/AdminDashboard"; // 🟢 IMPORT DASHBOARD
 import AuthForm from "./components/AuthForm";
 import PitchView from "./components/PitchView";
 import FullscreenPlayer from "./components/FullscreenPlayer"; 
