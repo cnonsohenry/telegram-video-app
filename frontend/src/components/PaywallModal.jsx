@@ -369,7 +369,7 @@ export default function PaywallModal({ onClose, user }) {
               {/* 🟢 NEW: Toggle between "I Have Paid" button and the Polling Spinner */}
               {!cryptoPaidClicked ? (
                 <button onClick={() => setCryptoPaidClicked(true)} style={{...payButtonStyle, background: "var(--primary-color)", marginTop: "15px"}}>
-                  I Have Paid
+                  Tap here after payment
                 </button>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", background: "rgba(247, 147, 26, 0.1)", border: "1px solid rgba(247, 147, 26, 0.2)", padding: "12px", borderRadius: "10px", marginTop: "15px" }}>

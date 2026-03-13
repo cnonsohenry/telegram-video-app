@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
+import AdminDashboard from "./pages/AdminDashboard"; // 🟢 IMPORT DASHBOARD
 import AdminUpload from "./pages/AdminUpload";
 import AuthForm from "./components/AuthForm";
 import PitchView from "./components/PitchView";
@@ -34,10 +35,9 @@ export default function App() {
   useEffect(() => {
     const styleId = "nuclear-ad-blocker";
     let styleEl = document.getElementById(styleId);
-    let adKillerInterval; // Define the interval variable
+    let adKillerInterval; 
 
     if (isAdFreeZone) {
-      // 1. Inject aggressive CSS rules
       if (!styleEl) {
         styleEl = document.createElement("style");
         styleEl.id = styleId;
@@ -62,26 +62,22 @@ export default function App() {
         document.head.appendChild(styleEl);
       }
 
-      // 2. Start the physical Terminator Interval
       const nukeAds = () => {
         const ads = document.querySelectorAll('iframe[src*="adsterra"], div[id^="container-"], .adsterra-social-bar, [id*="effectivegatecpm"], .adsterra-wrapper');
         ads.forEach(ad => ad.remove());
         
-        // Remove sneaky padding/margins Adsterra adds to the body to push content down
         if (document.body.style.paddingTop) document.body.style.paddingTop = "";
         if (document.body.style.marginTop) document.body.style.marginTop = "";
       };
 
-      nukeAds(); // Fire immediately
-      adKillerInterval = setInterval(nukeAds, 400); // Fire every 400ms relentlessly
+      nukeAds(); 
+      adKillerInterval = setInterval(nukeAds, 400); 
 
     } else {
-      // Clean up when we go back to the Home feed (where ads are allowed)
       if (styleEl) styleEl.remove();
       if (adKillerInterval) clearInterval(adKillerInterval);
     }
 
-    // Cleanup on unmount or dependency change
     return () => {
       if (adKillerInterval) clearInterval(adKillerInterval);
     };
@@ -247,18 +243,18 @@ export default function App() {
             <AuthForm onLoginSuccess={onLoginSuccess} />
           )}
         </div>
-
-        
       </main>
-      {/* 🟢 ADMIN PORTAL */}
-        {activeTab === "admin" && (
-          <AdminUpload 
-            onClose={() => {
-              window.history.replaceState({}, document.title, "/"); 
-              setActiveTab("home"); 
-            }} 
-          />
-        )}
+
+      {/* 🟢 ADMIN DASHBOARD PORTAL */}
+      {activeTab === "admin" && (
+        <AdminDashboard 
+          user={user}
+          onLogout={() => {
+            window.history.replaceState({}, document.title, "/"); 
+            setActiveTab("home"); 
+          }} 
+        />
+      )}
 
       {/* 🟢 NAVIGATION FOOTER */}
       {shouldShowFooter && (

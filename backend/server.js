@@ -9,6 +9,7 @@ import pkg from "pg";
 import https from "https";
 import crypto from "crypto";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import adminRoutes from "./admin.js";
 import authRoutes from "./auth.js";
 import multer from "multer";
 import { uploadDirectToStream } from "./controllers/upload_premium.js";
@@ -171,6 +172,11 @@ function signWorkerUrl(filePath) {
    AUTH
 ===================== */
 app.use("/api/auth", authRoutes);
+
+/* =====================
+   ADMIN CONTROL
+===================== */
+app.use("/api/admin", adminRoutes);
 
 /* =====================
    PAYMENT & CRYPTO BRIDGES
