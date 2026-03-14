@@ -132,7 +132,20 @@ export default function AdminDashboard({ user, onLogout }) {
     } catch (err) { console.error(err); }
   };
 
-  if (!user || user.role !== 'admin') return <div style={errorScreenStyle}>Access Denied</div>;
+  // 🟢 FIXED: Updated Access Denied Screen with proper layout and Return button
+  if (!user || user.role !== 'admin') {
+    return (
+      <div style={errorScreenStyle}>
+        <ShieldCheck size={64} color="#ff3b30" style={{ marginBottom: "20px" }} />
+        <h2 style={{ margin: "0 0 10px 0", color: "#fff", fontSize: "28px" }}>Access Denied</h2>
+        <p style={{ color: "#8e8e93", marginBottom: "30px", fontSize: "16px" }}>You need administrator privileges to view this portal.</p>
+        <button onClick={onLogout} style={goBackBtnStyle}>
+          Return to Home
+        </button>
+      </div>
+    );
+  }
+
   if (showUploadModal) return <AdminUpload onClose={() => setShowUploadModal(false)} />;
 
   return (
@@ -401,7 +414,10 @@ const logoutBtnStyle = { display: "flex", alignItems: "center", justifyContent: 
 const refreshBtnStyle = { display: "flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", padding: "10px 16px", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "600" };
 const uploadBtnStyle = { display: "flex", alignItems: "center", gap: "8px", background: "var(--primary-color)", color: "#fff", border: "none", padding: "10px 16px", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "700" };
 const centerFlex = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%" };
-const errorScreenStyle = { display: "flex", alignItems: "center", justifyContent: "center", height: "100dvh", width: "100vw", background: "#050505", color: "#ff3b30", fontSize: "24px" };
+
+// 🟢 FIXED: Updated Error/Access Denied Screen Styles
+const errorScreenStyle = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100dvh", width: "100vw", background: "#050505", color: "#ff3b30", position: "absolute", zIndex: 999999, top: 0, left: 0 };
+const goBackBtnStyle = { background: "#fff", color: "#000", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "700", cursor: "pointer", fontSize: "15px", transition: "transform 0.2s" };
 
 // Modal Styles
 const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999999 };
