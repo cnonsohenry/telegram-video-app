@@ -224,7 +224,7 @@ async function uploadThumbnailToR2(thumbFileId, chatId, messageId) {
 }
 
 /* =====================
-   Webhook (Updated with R2 Sync)
+   Webhook (Updated with Album Inheritance & R2 Sync)
 ===================== */
 app.post("/webhook", async (req, res) => {
   try {
@@ -262,30 +262,44 @@ app.post("/webhook", async (req, res) => {
     else if (rawCaption.toLowerCase().includes("#shots")) category = "shots";
     else if (rawCaption.toLowerCase().includes("#hotties")) category = "hotties";
 
-    const cleanCaption = rawCaption.replace(/#\w+/g, "").trim();
+    let cleanCaption = rawCaption.replace(/#\w+/g, "").trim();
 
     const chatId = (message.forward_from_chat?.id ?? message.chat.id).toString();
     const messageId = (message.forward_from_message_id ?? message.message_id).toString();
+    const mediaGroupId = message.media_group_id || null;
+
+    // 🟢 THE FIX: Album Sibling Inheritance
+    // If this video has no caption but belongs to a group, copy the caption/category from the first video in the DB!
+    if (mediaGroupId && !rawCaption) {
+      const siblingRes = await pool.query(
+        `SELECT category, caption FROM videos WHERE media_group_id = $1 LIMIT 1`,
+        [mediaGroupId]
+      );
+      if (siblingRes.rows.length > 0) {
+        category = siblingRes.rows[0].category;
+        cleanCaption = siblingRes.rows[0].caption;
+        console.log(`🔗 Inherited category '${category}' for grouped video ${messageId}`);
+      }
+    }
     
-    // Identify Thumbnail
     const thumb = media.thumb || media.thumbs?.[0] || media.thumbnail || null;
     const thumbFileId = thumb?.file_id || null;
 
-    // 🟢 NEW: Trigger R2 Upload immediately
     if (thumbFileId) {
       uploadThumbnailToR2(thumbFileId, chatId, messageId);
     }
 
     await pool.query(
-      `INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id, uploader_id, category, caption)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id, uploader_id, category, caption, media_group_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (chat_id, message_id) 
        DO UPDATE SET 
           thumb_file_id = EXCLUDED.thumb_file_id,
           category = EXCLUDED.category,
           caption = EXCLUDED.caption,
-          uploader_id = EXCLUDED.uploader_id`,
-      [chatId, messageId, media.file_id, thumbFileId, userId, category, cleanCaption]
+          uploader_id = EXCLUDED.uploader_id,
+          media_group_id = EXCLUDED.media_group_id`,
+      [chatId, messageId, media.file_id, thumbFileId, userId, category, cleanCaption, mediaGroupId]
     );
 
     res.sendStatus(200);

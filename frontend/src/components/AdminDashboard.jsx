@@ -322,6 +322,8 @@ export default function AdminDashboard({ user, onLogout }) {
                   <select value={editingItem.data.category} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, category: e.target.value}})} style={formInputStyle}>
                     <option value="hotties">Hotties</option>
                     <option value="baddies">Baddies</option>
+                    <option value="knacks">Knacks</option>
+                    <option value="shots">Shots</option>
                     <option value="premium">Premium</option>
                   </select>
                 </div>
