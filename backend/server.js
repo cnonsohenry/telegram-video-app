@@ -464,7 +464,7 @@ app.get("/api/videos", async (req, res) => {
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
 
-    // 🟢 BASE MAPPER: Formats a single video row
+    // 🟢 BASE MAPPER
     const mapVideo = (v) => {
       let thumbnailUrl = "";
       if (v.cloudflare_id) {
@@ -485,11 +485,11 @@ app.get("/api/videos", async (req, res) => {
         uploader_name: v.uploader_name || "Member",
         created_at: v.created_at,
         thumbnail_url: thumbnailUrl,
-        media_group_id: v.media_group_id || null // 🟢 Ensure the group ID is included
+        media_group_id: v.media_group_id || null
       };
     };
 
-    // 🟢 BUNDLING ENGINE: Groups albums together automatically
+    // 🟢 FIXED BUNDLING ENGINE: Breaks the circular loop
     const bundleVideos = (rows) => {
       const bundled = [];
       const groupMap = new Map();
@@ -497,18 +497,20 @@ app.get("/api/videos", async (req, res) => {
       for (const row of rows) {
         const video = mapVideo(row);
 
-        // If it belongs to a group and isn't marked as "none"
         if (video.media_group_id && video.media_group_id !== 'none') {
           if (groupMap.has(video.media_group_id)) {
-            // We already have the cover video for this group. Tuck this one inside it.
-            const coverVideo = groupMap.get(video.media_group_id);
-            coverVideo.sub_videos.push(video);
+            // Add to existing group
+            groupMap.get(video.media_group_id).sub_videos.push(video);
           } else {
-            // This is the first video of the group. It becomes the Cover Video.
-            video.is_group = true;
-            video.sub_videos = [video]; // Put itself as the first item in the playlist
-            groupMap.set(video.media_group_id, video);
-            bundled.push(video);
+            // 🟢 THE FIX: Create a clean "Cover" object that wraps the video, 
+            // preventing the original video from referencing itself.
+            const coverVideo = {
+              ...video,
+              is_group: true,
+              sub_videos: [video] 
+            };
+            groupMap.set(video.media_group_id, coverVideo);
+            bundled.push(coverVideo);
           }
         } else {
           // Normal, standalone video
@@ -523,7 +525,6 @@ app.get("/api/videos", async (req, res) => {
       page,
       limit,
       total,
-      // 🟢 Run the raw rows through our new bundling engine
       videos: bundleVideos(videosRes.rows),
       suggestions: bundleVideos(suggestions)
     });
