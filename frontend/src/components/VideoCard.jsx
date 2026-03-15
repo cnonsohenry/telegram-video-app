@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Play } from 'lucide-react';
+import { Play, Copy } from 'lucide-react'; // 🟢 Added 'Copy' icon
 
 export default function VideoCard({ video, onOpen, showDetails = true }) {
   const videoRef = useRef(null);
@@ -93,7 +93,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         <video
           ref={videoRef}
           src={video.video_url}
-          preload="none" /* 🟢 THE MAGIC FIX: Stops network traffic jams! */
+          preload="none" 
           muted loop playsInline
           onPlaying={() => setIsVideoReady(true)}
           style={{ 
@@ -104,6 +104,25 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           }}
         />
         
+        {/* 🟢 THE GROUP ICON: Shows up top-right if video.is_group is true */}
+        {video.is_group && (
+          <div style={{
+            position: "absolute",
+            top: "10px",
+            right: "10px",
+            background: "rgba(0,0,0,0.6)",
+            padding: "6px",
+            borderRadius: "8px",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 11 // Stays above the video layer
+          }}>
+            <Copy size={16} color="#fff" />
+          </div>
+        )}
+
         {showDetails && (
           <div style={{
             position: "absolute", bottom: 10, left: 10, zIndex: 10, 

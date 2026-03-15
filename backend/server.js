@@ -410,7 +410,7 @@ function signThumbnail(chatId, messageId) {
 }
 
 /* =====================
-   List videos (With Signed Thumbnails & Cloudflare Support)
+   List videos (With Signed Thumbnails, Cloudflare & Grouping)
 ===================== */
 app.get("/api/videos", async (req, res) => {
   try {
@@ -419,7 +419,6 @@ app.get("/api/videos", async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category || "hotties";
     
-    // 🟢 FIX: Point to the Node.js API server for thumbnails, not the Worker
     const apiBaseUrl = "https://videos.naijahomemade.com";
 
     let query;
@@ -451,24 +450,17 @@ app.get("/api/videos", async (req, res) => {
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
 
+    // 🟢 BASE MAPPER: Formats a single video row
     const mapVideo = (v) => {
+      let thumbnailUrl = "";
       if (v.cloudflare_id) {
          const cleanId = v.cloudflare_id.split('?')[0];
-
-         return {
-            chat_id: v.chat_id,
-            message_id: v.message_id,
-            views: v.views,
-            caption: v.caption,
-            category: v.category,
-            uploader_id: v.uploader_id,
-            uploader_name: v.uploader_name || "Member",
-            created_at: v.created_at,
-            thumbnail_url: `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`
-         };
+         thumbnailUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
+      } else {
+         const sig = signThumbnail(v.chat_id, v.message_id);
+         thumbnailUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
       }
 
-      const sig = signThumbnail(v.chat_id, v.message_id);
       return {
         chat_id: v.chat_id,
         message_id: v.message_id,
@@ -478,24 +470,54 @@ app.get("/api/videos", async (req, res) => {
         uploader_id: v.uploader_id,
         uploader_name: v.uploader_name || "Member",
         created_at: v.created_at,
-        // 🟢 FIX: Using apiBaseUrl to hit Express backend correctly
-        thumbnail_url: `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`
+        thumbnail_url: thumbnailUrl,
+        media_group_id: v.media_group_id || null // 🟢 Ensure the group ID is included
       };
+    };
+
+    // 🟢 BUNDLING ENGINE: Groups albums together automatically
+    const bundleVideos = (rows) => {
+      const bundled = [];
+      const groupMap = new Map();
+
+      for (const row of rows) {
+        const video = mapVideo(row);
+
+        // If it belongs to a group and isn't marked as "none"
+        if (video.media_group_id && video.media_group_id !== 'none') {
+          if (groupMap.has(video.media_group_id)) {
+            // We already have the cover video for this group. Tuck this one inside it.
+            const coverVideo = groupMap.get(video.media_group_id);
+            coverVideo.sub_videos.push(video);
+          } else {
+            // This is the first video of the group. It becomes the Cover Video.
+            video.is_group = true;
+            video.sub_videos = [video]; // Put itself as the first item in the playlist
+            groupMap.set(video.media_group_id, video);
+            bundled.push(video);
+          }
+        } else {
+          // Normal, standalone video
+          video.is_group = false;
+          bundled.push(video);
+        }
+      }
+      return bundled;
     };
 
     res.json({
       page,
       limit,
       total,
-      videos: videosRes.rows.map(mapVideo),
-      suggestions: suggestions.map(mapVideo)
+      // 🟢 Run the raw rows through our new bundling engine
+      videos: bundleVideos(videosRes.rows),
+      suggestions: bundleVideos(suggestions)
     });
   } catch (err) {
     console.error("DB Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
 
 /* =====================
    SEARCH ENDPOINT (PAGINATED & VALIDATED)

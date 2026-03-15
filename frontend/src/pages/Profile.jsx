@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Settings, Grid3X3, Heart, Lock, CheckCircle, Share2 } from "lucide-react";
+import { Settings, Grid3X3, Heart, Lock, CheckCircle, Share2, ArrowLeft } from "lucide-react"; // 🟢 Added ArrowLeft
 import VideoCard from "../components/VideoCard"; 
 import SettingsView from "../components/SettingsView"; 
 import { useVideos } from "../hooks/useVideos";
@@ -9,6 +9,8 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
   const [currentView, setCurrentView] = useState("profile");
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
   
+  // 🟢 NEW: State to track if we are viewing a specific group of videos
+  const [activeGroup, setActiveGroup] = useState(null);
 
   // Handle Resize for layout switching
   useEffect(() => {
@@ -26,16 +28,32 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     return () => setHideFooter(false);
   }, [currentView, setHideFooter]);
 
+  // 🟢 NEW: Reset the active group if the user changes tabs
+  useEffect(() => {
+    setActiveGroup(null);
+  }, [activeTab]);
+
   const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots");
   const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium");
 
-  // 🟢 Updated open logic with Premium Check
+  // 🟢 Updated open logic to handle Groups
   const handleOpenVideo = useCallback(async (video, e) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
       e.stopPropagation();
     }
     if (!video) return;
+
+    // 🟢 IF IT'S A GROUP: Open the folder view instead of playing!
+    if (video.is_group && !activeGroup) {
+      setActiveGroup({
+        title: video.caption || "Collection",
+        videos: video.sub_videos || [video]
+      });
+      // Scroll slightly down to focus on the new grid
+      window.scrollTo({ top: isDesktop ? 300 : 200, behavior: "smooth" });
+      return;
+    }
 
     // 🟢 PREMIUM GATE
     if (video.category === "premium" || activeTab === "premium") {
@@ -56,11 +74,14 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
       console.error("Profile Video Load Error:", err);
       setActiveVideo(null);
     }
-  }, [user, activeTab, setActiveVideo]);
+  }, [user, activeTab, setActiveVideo, activeGroup, isDesktop]); // 🟢 Added dependencies
 
-  const { data: videosToDisplay, loading, loadMore } = activeTab === "premium" 
+  const { data: rawVideosToDisplay, loading, loadMore } = activeTab === "premium" 
     ? { data: premium || [], loading: premiumLoading, loadMore: loadMorePremium }
     : { data: shots || [], loading: shotsLoading, loadMore: loadMoreShots };
+
+  // 🟢 Determine what array to actually render (The full feed OR the selected group)
+  const videosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
 
   if (currentView === "settings") {
     return <SettingsView onBack={() => setCurrentView("profile")} onLogout={onLogout} />;
@@ -70,7 +91,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     <div style={{ ...containerStyle, padding: isDesktop ? "30px 20px" : "0" }}>
       <div style={isDesktop ? desktopInnerWrapper : {}}>
         
-        {/* 🟢 TOP NAV (Mobile Only) */}
+        {/* TOP NAV (Mobile Only) */}
         {!isDesktop && (
           <div style={navGridStyle}>
             <div style={{ width: "40px" }}></div>
@@ -84,22 +105,11 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           </div>
         )}
 
-        {/* 🟢 USER IDENTITY SECTION (Compact Mobile Layout) */}
+        {/* USER IDENTITY SECTION */}
         <div style={{ padding: isDesktop ? "40px 20px" : "20px" }}>
-          
-          {/* Top Row: Avatar on left, Info on right */}
-          <div style={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            gap: isDesktop ? "80px" : "15px"
-          }}>
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: isDesktop ? "80px" : "15px" }}>
             
-            <div style={{
-              ...avatarContainerStyle,
-              width: isDesktop ? "150px" : "80px",
-              height: isDesktop ? "150px" : "80px"
-            }}>
+            <div style={{ ...avatarContainerStyle, width: isDesktop ? "150px" : "80px", height: isDesktop ? "150px" : "80px" }}>
               <img
                 src={user?.avatar_url || "/assets/default-avatar.png"}
                 style={avatarImageStyle}
@@ -126,7 +136,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
                 Catch my latest shots here before they hit Premium 💎
               </p>
 
-              {/* Desktop buttons render inside the info column */}
               {isDesktop && (
                 <div style={{ ...actionButtonsRowStyle, width: "fit-content", marginTop: "20px" }}>
                   <button
@@ -141,7 +150,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
             </div>
           </div>
 
-          {/* 🟢 MOBILE ACTION BUTTONS (Placed directly under the row) */}
           {!isDesktop && (
             <div style={{ ...actionButtonsRowStyle, width: "100%", marginTop: "15px" }}>
               <button
@@ -155,7 +163,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           )}
         </div>
 
-        {/* 🟢 TABS NAV */}
+        {/* TABS NAV */}
         <div style={{ 
           ...tabsContainerStyle, 
           justifyContent: isDesktop ? "center" : "space-around",
@@ -168,8 +176,20 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           <TabButton isDesktop={isDesktop} active={activeTab === "likes"} onClick={() => setActiveTab("likes")} icon={<Heart size={isDesktop ? 18 : 24} />} label="LIKED" />
         </div>
 
-        {/* 🟢 VIDEO GRID */}
+        {/* VIDEO GRID */}
         <div style={contentAreaStyle}>
+          
+          {/* 🟢 NEW: Group Header & Back Button (Only visible when viewing a group) */}
+          {activeGroup && (
+            <div style={groupHeaderStyle}>
+              <button onClick={() => setActiveGroup(null)} style={backButtonStyle}>
+                <ArrowLeft size={20} />
+                <span>Back</span>
+              </button>
+              <span style={groupTitleStyle}>{activeGroup.videos.length} clips in collection</span>
+            </div>
+          )}
+
           <div style={{ 
             ...gridStyle, 
             gridTemplateColumns: isDesktop ? "repeat(3, 1fr)" : "repeat(3, 1fr)",
@@ -184,8 +204,9 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
               />
             ))}
           </div>
-          {loading && <div style={loaderStyle}>Refreshing shots...</div>}
-          {!loading && videosToDisplay.length > 0 && (
+          
+          {loading && !activeGroup && <div style={loaderStyle}>Refreshing shots...</div>}
+          {!loading && !activeGroup && rawVideosToDisplay.length > 0 && (
             <button onClick={loadMore} style={loadMoreBtnStyle}>Load More</button>
           )}
         </div>
@@ -232,3 +253,8 @@ const contentAreaStyle = { width: "100%", paddingBottom: "100px" };
 const gridStyle = { display: "grid" };
 const loadMoreBtnStyle = { display: "block", width: "100%", padding: "20px", background: "none", border: "none", color: "#8e8e8e", fontSize: "13px", fontWeight: "600", cursor: "pointer" };
 const loaderStyle = { padding: "40px", textAlign: "center", color: "#666", fontSize: "14px" };
+
+// 🟢 NEW STYLES FOR GROUPS
+const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px", background: "var(--bg-color)", borderBottom: "1px solid rgba(255,255,255,0.05)" };
+const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
+const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
