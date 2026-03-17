@@ -260,6 +260,7 @@ app.post("/webhook", async (req, res) => {
     else if (rawCaption.toLowerCase().includes("#baddies")) category = "baddies";
     else if (rawCaption.toLowerCase().includes("#trends")) category = "trends";
     else if (rawCaption.toLowerCase().includes("#shots")) category = "shots";
+    else if (rawCaption.toLowerCase().includes("#premium")) category = "premium"; // 🟢 ADDED THIS
     else if (rawCaption.toLowerCase().includes("#hotties")) category = "hotties";
 
     let cleanCaption = rawCaption.replace(/#\w+/g, "").trim();
@@ -317,7 +318,8 @@ const upload = multer({ dest: "uploads/" });
 
 app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) => {
   try {
-    const { caption, category, uploader_id } = req.body;
+    // 🟢 THE FIX: Extract media_group_id from the frontend request
+    const { caption, category, uploader_id, media_group_id } = req.body; 
     const videoFile = req.file;
 
     if (!ALLOWED_USERS.includes(Number(uploader_id))) {
@@ -333,9 +335,10 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     const internalId = `premium_${Date.now()}`;
     
+    // 🟢 THE FIX: Add media_group_id ($8) to the database insert
     await pool.query(
-      `INSERT INTO videos (chat_id, message_id, file_id, uploader_id, category, caption, cloudflare_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready')`,
+      `INSERT INTO videos (chat_id, message_id, file_id, uploader_id, category, caption, cloudflare_id, status, media_group_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', $8)`,
       [
         "internal", 
         internalId, 
@@ -343,7 +346,8 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
         uploader_id, 
         category || "premium", 
         caption, 
-        cfResult.uid 
+        cfResult.uid,
+        media_group_id || null // Save the group ID if it exists, otherwise leave null
       ]
     );
 

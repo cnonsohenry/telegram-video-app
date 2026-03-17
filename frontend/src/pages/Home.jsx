@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp } from "lucide-react";
+import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp, ArrowLeft } from "lucide-react"; // 🟢 Added ArrowLeft
 import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
@@ -25,6 +25,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [isChangingTab, setIsChangingTab] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
 
+  // 🟢 NEW: State to track if we are viewing a specific group/album of videos
+  const [activeGroup, setActiveGroup] = useState(null);
+
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
   
@@ -49,7 +52,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     });
   }, []);
 
-  const videosToDisplay = useMemo(() => {
+  // 🟢 Renamed to rawVideosToDisplay to distinguish between the feed and a folder
+  const rawVideosToDisplay = useMemo(() => {
     if (isChangingTab) return []; 
     if (videoCache[currentCategory]) return videoCache[currentCategory];
     if (loading) return [];
@@ -61,6 +65,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   }, [loading]);
 
   const handleTabClick = (index) => {
+    setActiveGroup(null); // 🟢 FIX: Always close any open folder when changing tabs
     if (activeTab === index) {
       scrollToTop();
     } else {
@@ -92,6 +97,17 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
     if (!video) return;
 
+    // 🟢 IF IT'S A GROUP: Open the folder view instead of playing!
+    if (video.is_group && !activeGroup) {
+      setActiveGroup({
+        title: video.caption || "Collection",
+        videos: video.sub_videos || [video]
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // 🟢 PREMIUM PAYWALL CHECK
     if (video.category === "premium") {
       if (!user || !user.is_premium) {
         setShowPaywall(true);
@@ -101,6 +117,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       return;
     }
 
+    // 🟢 FREE CONTENT AD CHECK
     const videoKey = `${video.chat_id}:${video.message_id}`;
     
     if (unlockedVideos.has(videoKey)) { 
@@ -129,7 +146,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     } else {
       playVideo(video);
     }
-  }, [user, unlockedVideos]);
+  }, [user, unlockedVideos, activeGroup]); // 🟢 Added activeGroup to dependencies
 
 
   useEffect(() => {
@@ -173,7 +190,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   }, []);
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
-  const handleRefresh = async () => window.location.reload();
+  const handleRefresh = async () => {
+    setActiveGroup(null); // Reset group on refresh
+    window.location.reload();
+  };
 
   const TABS = [
     { icon: <Play size={22} />, label: "KNACKS"},
@@ -181,6 +201,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     { icon: <UserIcon size={22} />, label: "BADDIES"},
     { icon: <Flame size={22} />, label: "TRENDS"}
   ];
+
+  // 🟢 Determine what array to actually render (The full feed OR the selected group folder)
+  const actualVideosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
 
   return (
     <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -190,11 +213,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         setSearchTerm={setSearchTerm} 
         user={user} 
         onProfileClick={onProfileClick} 
-        suggestions={sidebarSuggestions} // 🟢 Passes the same suggestions as the sidebar
-        onVideoClick={(v, e) => handleOpenVideo(v, e)} // 🟢 Re-uses your ad/paywall logic
+        suggestions={sidebarSuggestions} 
+        onVideoClick={(v, e) => handleOpenVideo(v, e)} 
       />
       
-      {/* 🟢 Removed paddingRight hack. Let flexbox handle the natural layout width */}
       <div style={{ display: "flex", flex: 1, position: "relative" }}>
         
         {isDesktop && (
@@ -261,34 +283,49 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           
           <PullToRefresh onRefresh={handleRefresh}>
             <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
+               
+               {/* 🟢 NEW: Group Header & Back Button (Only visible when viewing an album) */}
+               {activeGroup && (
+                 <div style={groupHeaderStyle}>
+                   <button onClick={() => setActiveGroup(null)} style={backButtonStyle}>
+                     <ArrowLeft size={20} />
+                     <span>Back to {currentCategory.toUpperCase()}</span>
+                   </button>
+                   <span style={groupTitleStyle}>{activeGroup.videos.length} clips in collection</span>
+                 </div>
+               )}
+
                <div style={{ 
                  display: "grid", 
                  gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(2, 1fr)", 
                  gap: isDesktop ? "20px" : "10px", 
                  animation: "fadeIn 0.3s ease-out" 
                }}>
-                  {videosToDisplay.map(v => (
+                  {actualVideosToDisplay.map(v => (
                     <VideoCard 
                       key={`${v.chat_id}:${v.message_id}`} 
                       video={v} 
                       onOpen={(vData, e) => handleOpenVideo(vData, e)} 
                     />
                   ))}
-                  {(loading || isChangingTab) && videosToDisplay.length === 0 && (
+                  
+                  {/* Hide skeletons if we are inside an active group */}
+                  {(loading || isChangingTab) && !activeGroup && actualVideosToDisplay.length === 0 && (
                     [...Array(fetchLimit)].map((_, i) => <div key={i} style={skeletonSocket} />)
                   )}
                </div>
-               {(!loading && !isChangingTab) && videosToDisplay.length > 0 && (
+               
+               {/* Hide Load More button if we are inside a group */}
+               {(!loading && !isChangingTab && !activeGroup) && actualVideosToDisplay.length > 0 && (
                  <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
                )}
             </div>
             
-            {videosToDisplay.length > 0 && <LegalFooter />}
+            {actualVideosToDisplay.length > 0 && <LegalFooter />}
             
           </PullToRefresh>
         </div>
 
-        {/* 🟢 Removed the repetitive header entirely */}
         {isDesktop && (
           <aside style={suggestedSidebarRail} className="custom-scrollbar">
             <SuggestedSidebar 
@@ -328,8 +365,6 @@ const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, di
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
 
-// 🟢 FIX: Returned padding to 30px so it perfectly matches the grid's top padding.
-// Adjusted top to 70px and height to calc(100vh - 70px) so it sticks cleanly right under the header.
 const suggestedSidebarRail = { 
   width: "320px", 
   height: "calc(100vh - 70px)", 
@@ -344,3 +379,8 @@ const suggestedSidebarRail = {
 
 const showMoreButtonStyle = { display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "14px 40px", borderRadius: "35px", border: "1px solid #333", fontWeight: "900", cursor: "pointer" };
 const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "pointer" };
+
+// 🟢 NEW STYLES FOR GROUPS
+const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 15px 0", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)" };
+const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
+const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
