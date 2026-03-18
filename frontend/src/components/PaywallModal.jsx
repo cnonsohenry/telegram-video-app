@@ -9,9 +9,9 @@ const PACKAGES = [
 ];
 
 const BANK_DETAILS = {
-  bankName: "Moniepoint",
-  accountNumber: "8138617303",
-  accountName: "Okonkwo Chukwunonso"
+  bankName: "Not available, use crypto option",
+  accountNumber: "Not available, use crypto option",
+  accountName: "Not available, use crypto option"
 };
 
 export default function PaywallModal({ onClose, user }) {

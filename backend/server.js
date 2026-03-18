@@ -428,7 +428,37 @@ function signThumbnail(chatId, messageId) {
 }
 
 /* =====================
-   List videos (With Signed Thumbnails, Cloudflare & Grouping)
+   HELPER: Base Mapper (Used by Videos, Suggestions & Groups)
+===================== */
+const mapVideoToResponse = (v, apiBaseUrl) => {
+  let thumbnailUrl = "";
+  if (v.cloudflare_id && v.cloudflare_id !== "none") {
+     const cleanId = v.cloudflare_id.split('?')[0];
+     thumbnailUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
+  } else {
+     const sig = signThumbnail(v.chat_id, v.message_id);
+     thumbnailUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
+  }
+
+  return {
+    chat_id: v.chat_id,
+    message_id: v.message_id,
+    views: v.views,
+    caption: v.caption,
+    category: v.category,
+    uploader_id: v.uploader_id,
+    uploader_name: v.uploader_name || "Member",
+    created_at: v.created_at,
+    thumbnail_url: thumbnailUrl,
+    media_group_id: v.media_group_id || null,
+    is_group: Number(v.group_count || 1) > 1, // 🟢 Triggers the folder icon on frontend
+    group_count: Number(v.group_count || 1)
+  };
+};
+
+
+/* =====================
+   List videos (Lazy Loading Albums & Pagination Fix)
 ===================== */
 app.get("/api/videos", async (req, res) => {
   try {
@@ -439,102 +469,107 @@ app.get("/api/videos", async (req, res) => {
     
     const apiBaseUrl = "https://videos.naijahomemade.com";
 
+    // 🟢 1. MAIN QUERY: Uses SQL Window Functions to pick exactly 1 "Cover" per album
     let query;
     let queryValues;
 
     if (category === "trends") {
-      query = `SELECT v.*, u.username as uploader_name FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id ORDER BY v.views DESC LIMIT $1 OFFSET $2`;
+      query = `
+        WITH GroupedVideos AS (
+          SELECT v.*, u.username as uploader_name,
+            ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.views DESC) as rn,
+            COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
+          FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id
+        )
+        SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY views DESC LIMIT $1 OFFSET $2
+      `;
       queryValues = [limit, offset];
     } else {
-      query = `SELECT v.*, u.username as uploader_name FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id WHERE v.category = $1 ORDER BY v.created_at DESC LIMIT $2 OFFSET $3`;
+      query = `
+        WITH GroupedVideos AS (
+          SELECT v.*, u.username as uploader_name,
+            ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
+            COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
+          FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id
+          WHERE category = $1
+        )
+        SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+      `;
       queryValues = [category, limit, offset];
     }
 
     const videosRes = await pool.query(query, queryValues);
 
+    // 🟢 2. SUGGESTIONS: Upgraded to also pick unique covers so the sidebar doesn't spam albums
     let suggestions = [];
     if (page === 1) {
       const suggestQuery = `
-        SELECT v.*, u.username as uploader_name 
-        FROM videos v 
-        LEFT JOIN users u ON v.uploader_id = u.user_id 
-        ORDER BY RANDOM() LIMIT 10`;
+        WITH GroupedSuggestions AS (
+          SELECT v.*, u.username as uploader_name,
+            ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
+            COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
+          FROM videos v 
+          LEFT JOIN users u ON v.uploader_id = u.user_id 
+        )
+        SELECT * FROM GroupedSuggestions WHERE rn = 1 ORDER BY RANDOM() LIMIT 10
+      `;
       const suggestRes = await pool.query(suggestQuery);
       suggestions = suggestRes.rows;
     }
 
-    const countQuery = category === "trends" ? `SELECT COUNT(*) FROM videos` : `SELECT COUNT(*) FROM videos WHERE category = $1`;
+    // 🟢 3. TOTAL COUNT: Upgraded to count distinct groups so the frontend math is perfect!
+    let countQuery;
+    if (category === "trends") {
+      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos`;
+    } else {
+      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos WHERE category = $1`;
+    }
+    
     const countValues = category === "trends" ? [] : [category];
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
 
-    // 🟢 BASE MAPPER
-    const mapVideo = (v) => {
-      let thumbnailUrl = "";
-      if (v.cloudflare_id) {
-         const cleanId = v.cloudflare_id.split('?')[0];
-         thumbnailUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
-      } else {
-         const sig = signThumbnail(v.chat_id, v.message_id);
-         thumbnailUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
-      }
-
-      return {
-        chat_id: v.chat_id,
-        message_id: v.message_id,
-        views: v.views,
-        caption: v.caption,
-        category: v.category,
-        uploader_id: v.uploader_id,
-        uploader_name: v.uploader_name || "Member",
-        created_at: v.created_at,
-        thumbnail_url: thumbnailUrl,
-        media_group_id: v.media_group_id || null
-      };
-    };
-
-    // 🟢 FIXED BUNDLING ENGINE: Breaks the circular loop
-    const bundleVideos = (rows) => {
-      const bundled = [];
-      const groupMap = new Map();
-
-      for (const row of rows) {
-        const video = mapVideo(row);
-
-        if (video.media_group_id && video.media_group_id !== 'none') {
-          if (groupMap.has(video.media_group_id)) {
-            // Add to existing group
-            groupMap.get(video.media_group_id).sub_videos.push(video);
-          } else {
-            // 🟢 THE FIX: Create a clean "Cover" object that wraps the video, 
-            // preventing the original video from referencing itself.
-            const coverVideo = {
-              ...video,
-              is_group: true,
-              sub_videos: [video] 
-            };
-            groupMap.set(video.media_group_id, coverVideo);
-            bundled.push(coverVideo);
-          }
-        } else {
-          // Normal, standalone video
-          video.is_group = false;
-          bundled.push(video);
-        }
-      }
-      return bundled;
-    };
-
+    // No more manual JS bundling! Just map the raw SQL outputs cleanly.
     res.json({
       page,
       limit,
       total,
-      videos: bundleVideos(videosRes.rows),
-      suggestions: bundleVideos(suggestions)
+      videos: videosRes.rows.map(v => mapVideoToResponse(v, apiBaseUrl)),
+      suggestions: suggestions.map(v => mapVideoToResponse(v, apiBaseUrl))
     });
   } catch (err) {
     console.error("DB Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+/* =====================
+   NEW: Fetch Album Contents via Lazy Load
+===================== */
+app.get("/api/group", async (req, res) => {
+  try {
+    const { media_group_id } = req.query;
+    if (!media_group_id || media_group_id === 'none') return res.status(400).json({error: "Invalid group"});
+    
+    const query = `
+      SELECT v.*, u.username as uploader_name 
+      FROM videos v 
+      LEFT JOIN users u ON v.uploader_id = u.user_id 
+      WHERE v.media_group_id = $1 
+      ORDER BY v.created_at ASC
+    `;
+    const { rows } = await pool.query(query, [media_group_id]);
+    
+    const apiBaseUrl = "https://videos.naijahomemade.com";
+    
+    // Map them as normal, standalone videos so they play immediately inside the group view
+    res.json(rows.map(v => ({ 
+      ...mapVideoToResponse(v, apiBaseUrl), 
+      is_group: false 
+    })));
+  } catch (err) {
+    console.error("Group fetch error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 

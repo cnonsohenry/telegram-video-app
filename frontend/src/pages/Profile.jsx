@@ -44,14 +44,20 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     }
     if (!video) return;
 
-    // 🟢 IF IT'S A GROUP: Open the folder view instead of playing!
+    // 🟢 IF IT'S A GROUP: Fetch the full album from the server!
     if (video.is_group && !activeGroup) {
-      setActiveGroup({
-        title: video.caption || "Collection",
-        videos: video.sub_videos || [video]
-      });
-      // Scroll slightly down to focus on the new grid
-      window.scrollTo({ top: isDesktop ? 300 : 200, behavior: "smooth" });
+      try {
+        const res = await fetch(`https://videos.naijahomemade.com/api/group?media_group_id=${video.media_group_id}`);
+        const groupVideos = await res.json();
+        
+        setActiveGroup({
+          title: video.caption || "Collection",
+          videos: groupVideos
+        });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (err) {
+        alert("🚨 Failed to load album contents.");
+      }
       return;
     }
 
