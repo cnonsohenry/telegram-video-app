@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
-import AdminDashboard from "./components/AdminDashboard"; // 🟢 IMPORT DASHBOARD
+import AdminDashboard from "./components/AdminDashboard"; 
 import AuthForm from "./components/AuthForm";
 import PitchView from "./components/PitchView";
 import FullscreenPlayer from "./components/FullscreenPlayer"; 
@@ -175,12 +175,20 @@ export default function App() {
       });
     }
     
+    // 🟢 ROUTING LOGIC
     const params = new URLSearchParams(window.location.search);
     if (params.get("admin") === "true") setActiveTab("admin");
     
     const legalParam = params.get("legal");
     if (legalParam) {
       setActiveLegalPage(legalParam);
+    }
+
+    // 🟢 NEW: Route /login directly to AuthForm
+    if (window.location.pathname === "/login") {
+      setActiveTab("profile"); // AuthForm lives in the profile slide
+      setHasSeenPitch(true);   // Skip the pitch overlay
+      window.history.replaceState({}, document.title, "/"); // Clean the URL
     }
   }, [token, user, applyTheme]);
 
