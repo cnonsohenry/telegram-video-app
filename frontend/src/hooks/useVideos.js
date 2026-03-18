@@ -45,12 +45,18 @@ export function useVideos(currentCategory, limit = 12) {
     }
   }, [currentCategory, limit]);
 
+  // Initial Load Effect (LOOP PROOF)
   useEffect(() => {
+    // Reset state specifically for the new category
     isFetching.current = false; 
     setHasMore(true);
     setVideos([]); 
+    setSidebarSuggestions([]); // 🟢 THE FIX: Clear the sidebar so the skeleton animation plays!
     setPage(1);
+    
+    // Trigger the first fetch
     fetchData(1, true);
+    
   }, [currentCategory, fetchData]);
 
   return { 
