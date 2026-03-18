@@ -27,13 +27,23 @@ export default function PaywallModal({ onClose, user }) {
   const [cryptoPaymentDetails, setCryptoPaymentDetails] = useState(null);
   const [copiedField, setCopiedField] = useState(null); 
   
-  // 🟢 NEW: Track if the user has clicked "I Have Paid" on the crypto screen
   const [cryptoPaidClicked, setCryptoPaidClicked] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
+
+  // 🟢 NEW: Authentication Gatekeeper
+  const handleMethodSelect = (method) => {
+    if (!user || !user.id) {
+      alert("You need to be logged in to subscribe to Premium.");
+      onClose(); // Close the modal
+      window.location.href = "/login"; // Redirect to login page
+      return;
+    }
+    setSelectedMethod(method);
+  };
 
   // FIAT POLLING COUNTDOWN
   useEffect(() => {
@@ -47,7 +57,7 @@ export default function PaywallModal({ onClose, user }) {
     return () => clearInterval(interval);
   }, [verifying, timer]);
 
-  // 🟢 UPDATED: CRYPTO POLLING ENGINE (Only starts AFTER they click the button)
+  // CRYPTO POLLING ENGINE
   useEffect(() => {
     let cryptoInterval;
     
@@ -60,7 +70,6 @@ export default function PaywallModal({ onClose, user }) {
           if (data.success && data.status === 'APPROVED') {
             setVerifyStatus("success");
             clearInterval(cryptoInterval);
-            // Auto-refresh the page to unlock content after 3 seconds
             setTimeout(() => window.location.reload(), 3000);
           }
         } catch (err) {
@@ -68,16 +77,13 @@ export default function PaywallModal({ onClose, user }) {
         }
       };
 
-      // Check immediately on click, then every 10 seconds
       checkStatus();
       cryptoInterval = setInterval(checkStatus, 10000); 
     }
     return () => clearInterval(cryptoInterval);
   }, [cryptoPaymentDetails, cryptoPaidClicked, verifyStatus]);
 
-  // ==========================================
   // BANK TRANSFER POLLING ENGINE
-  // ==========================================
   const startVerification = async () => {
     if (!senderName.trim()) {
       alert("Please enter the exact name you are sending from.");
@@ -131,9 +137,7 @@ export default function PaywallModal({ onClose, user }) {
     poll(); 
   };
 
-  // ==========================================
   // CRYPTO GENERATION ENGINE
-  // ==========================================
   const generateCryptoAddress = async (coin) => {
     setGeneratingCrypto(true);
     try {
@@ -180,7 +184,7 @@ export default function PaywallModal({ onClose, user }) {
     setSelectedMethod(null); 
     setSelectedPackage(null);
     setCryptoPaymentDetails(null);
-    setCryptoPaidClicked(false); // Reset the button state
+    setCryptoPaidClicked(false);
   };
 
   return (
@@ -221,14 +225,16 @@ export default function PaywallModal({ onClose, user }) {
               </div>
 
               <div style={actionColumnStyle}>
-                <button onClick={() => setSelectedMethod('transfer')} style={{...payButtonStyle, background: "var(--primary-color)"}}>
-                  <CreditCard size={20} />
-                  Pay with Bank Transfer
+                {/* 🟢 SWAPPED & STYLED: Crypto Button is now on top with a vibrant orange pop */}
+                <button onClick={() => handleMethodSelect('crypto')} style={{...payButtonStyle, background: "#F7931A", color: "#000", boxShadow: "0 4px 15px rgba(247, 147, 26, 0.3)"}}>
+                  <Bitcoin size={20} color="#000" />
+                  Pay with Crypto
                 </button>
 
-                <button onClick={() => setSelectedMethod('crypto')} style={{...payButtonStyle, background: "#1a1a1a", border: "1px solid #333"}}>
-                  <Bitcoin size={20} color="#f7931a" />
-                  Pay with Crypto
+                {/* 🟢 SWAPPED & STYLED: Bank Transfer is now underneath in a subtle dark theme */}
+                <button onClick={() => handleMethodSelect('transfer')} style={{...payButtonStyle, background: "#1a1a1a", border: "1px solid #333", color: "#fff"}}>
+                  <CreditCard size={20} color="#fff" />
+                  Pay with Bank Transfer
                 </button>
               </div>
             </div>
@@ -291,12 +297,9 @@ export default function PaywallModal({ onClose, user }) {
                  <button onClick={() => generateCryptoAddress('usdttrc20')} style={{...cryptoGridButtonStyle, background: "#26A17B"}}>
                     USDT (TRC-20)
                  </button>
-                 
-                 {/* 🟢 NEW: USDT on Binance Smart Chain */}
                  <button onClick={() => generateCryptoAddress('usdtbsc')} style={{...cryptoGridButtonStyle, background: "#26A17B"}}>
                     USDT (BSC)
                  </button>
-                 
                  <button onClick={() => generateCryptoAddress('btc')} style={{...cryptoGridButtonStyle, background: "#F7931A"}}>
                     Bitcoin (BTC)
                  </button>
@@ -309,7 +312,6 @@ export default function PaywallModal({ onClose, user }) {
                  <button onClick={() => generateCryptoAddress('bnbbsc')} style={{...cryptoGridButtonStyle, background: "#F3BA2F", color: "#000"}}>
                     BNB (BSC)
                  </button>
-                 {/* 🟢 I made Toncoin span both columns at the bottom so it looks perfectly symmetrical! */}
                  <button onClick={() => generateCryptoAddress('ton')} style={{...cryptoGridButtonStyle, background: "#0098EA", gridColumn: "span 2"}}>
                     Toncoin (TON)
                  </button>
@@ -366,7 +368,6 @@ export default function PaywallModal({ onClose, user }) {
                  />
               </div>
 
-              {/* 🟢 NEW: Toggle between "I Have Paid" button and the Polling Spinner */}
               {!cryptoPaidClicked ? (
                 <button onClick={() => setCryptoPaidClicked(true)} style={{...payButtonStyle, background: "var(--primary-color)", marginTop: "15px"}}>
                   Tap here after payment
