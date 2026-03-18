@@ -1,10 +1,33 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Play, Lock } from "lucide-react";
 
-// 🟢 THE FIX: Added 'loading' as a prop
-export default function SuggestedSidebar({ suggestions = [], loading, onVideoClick }) {
-  
-  // 🟢 THE FIX: Only show skeleton if we are ACTIVELY loading and have no data
+// 🟢 THE FIX: Removed 'suggestions' and 'loading' from props. The sidebar now manages itself!
+export default function SuggestedSidebar({ onVideoClick }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+
+    // 🟢 AUTONOMOUS FETCH: The sidebar hits the API directly, completely bypassing the Home cache
+    fetch("https://videos.naijahomemade.com/api/videos?page=1&limit=1")
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data.suggestions) {
+          // Extra safety: Randomize them here just in case the backend didn't
+          const shuffled = data.suggestions.sort(() => 0.5 - Math.random());
+          setSuggestions(shuffled.slice(0, 10));
+        }
+      })
+      .catch((err) => console.error("Sidebar fetch error:", err))
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => { isMounted = false; };
+  }, []); // Runs once perfectly on mount
+
   const showSkeleton = loading && suggestions.length === 0;
 
   return (
