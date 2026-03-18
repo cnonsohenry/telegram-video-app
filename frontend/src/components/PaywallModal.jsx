@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, ArrowLeft, Copy, QrCode, ShieldCheck, Wallet } from "lucide-react";
+import { X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, ArrowLeft, Copy, QrCode, ShieldCheck, Wallet, UserX } from "lucide-react";
 
 // 🟢 Dual-Pricing Packages
 const PACKAGES = [
@@ -10,8 +10,8 @@ const PACKAGES = [
 
 const BANK_DETAILS = {
   bankName: "Not available, use crypto option",
-  accountNumber: "Not available, use crypto option",
-  accountName: "Not available, use crypto option"
+  accountNumber: "",
+  accountName: ""
 };
 
 export default function PaywallModal({ onClose, user }) {
@@ -28,18 +28,19 @@ export default function PaywallModal({ onClose, user }) {
   const [copiedField, setCopiedField] = useState(null); 
   
   const [cryptoPaidClicked, setCryptoPaidClicked] = useState(false);
+  
+  // 🟢 NEW: State for the native login alert
+  const [showAuthAlert, setShowAuthAlert] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  // 🟢 NEW: Authentication Gatekeeper
+  // 🟢 UPDATED: Native Authentication Gatekeeper
   const handleMethodSelect = (method) => {
     if (!user || !user.id) {
-      alert("You need to be logged in to subscribe to Premium.");
-      onClose(); // Close the modal
-      window.location.href = "/login"; // Redirect to login page
+      setShowAuthAlert(true); // Trigger the beautifully styled UI instead of an alert()
       return;
     }
     setSelectedMethod(method);
@@ -181,6 +182,10 @@ export default function PaywallModal({ onClose, user }) {
   };
 
   const resetState = () => {
+    if (showAuthAlert) {
+      setShowAuthAlert(false);
+      return;
+    }
     setSelectedMethod(null); 
     setSelectedPackage(null);
     setCryptoPaymentDetails(null);
@@ -192,7 +197,7 @@ export default function PaywallModal({ onClose, user }) {
       <div style={modalStyle}>
         
         <div style={topBarStyle}>
-          {!verifying && verifyStatus !== "success" && selectedMethod && (
+          {!verifying && verifyStatus !== "success" && (selectedMethod || showAuthAlert) && (
             <button onClick={resetState} style={iconButtonStyle}>
               <ArrowLeft size={20} color="#fff" />
             </button>
@@ -206,9 +211,43 @@ export default function PaywallModal({ onClose, user }) {
         </div>
 
         <div style={contentContainerStyle}>
+
+          {/* 🟢 NEW NATIVE VIEW: LOGIN ALERT */}
+          {showAuthAlert && (
+            <div style={{ ...centerFlexStyle, textAlign: "center", animation: "fadeInUp 0.3s ease-out" }}>
+              <div style={headerStyle}>
+                <div style={{...iconWrapperStyle, background: "rgba(255, 59, 48, 0.1)"}}>
+                  <UserX size={32} color="#ff3b30" />
+                </div>
+                <h2 style={titleStyle}>Login Required</h2>
+                <p style={{...subStyle, fontSize: "15px", marginTop: "10px", color: "#ddd"}}>
+                  You need to be logged in to subscribe to Premium.
+                </p>
+              </div>
+
+              <div style={{...actionColumnStyle, marginTop: "20px"}}>
+                <button 
+                  onClick={() => {
+                    onClose();
+                    window.location.href = "/login";
+                  }} 
+                  style={{...payButtonStyle, background: "var(--primary-color)"}}
+                >
+                  Continue to Login
+                </button>
+
+                <button 
+                  onClick={() => setShowAuthAlert(false)} 
+                  style={{...payButtonStyle, background: "transparent", border: "1px solid #333"}}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           
           {/* STATE 1: INITIAL SELECTION */}
-          {!selectedMethod && (
+          {!showAuthAlert && !selectedMethod && (
             <div style={centerFlexStyle}>
               <div style={headerStyle}>
                 <div style={iconWrapperStyle}>
@@ -225,13 +264,11 @@ export default function PaywallModal({ onClose, user }) {
               </div>
 
               <div style={actionColumnStyle}>
-                {/* 🟢 SWAPPED & STYLED: Crypto Button is now on top with a vibrant orange pop */}
                 <button onClick={() => handleMethodSelect('crypto')} style={{...payButtonStyle, background: "#F7931A", color: "#000", boxShadow: "0 4px 15px rgba(247, 147, 26, 0.3)"}}>
                   <Bitcoin size={20} color="#000" />
                   Pay with Crypto
                 </button>
 
-                {/* 🟢 SWAPPED & STYLED: Bank Transfer is now underneath in a subtle dark theme */}
                 <button onClick={() => handleMethodSelect('transfer')} style={{...payButtonStyle, background: "#1a1a1a", border: "1px solid #333", color: "#fff"}}>
                   <CreditCard size={20} color="#fff" />
                   Pay with Bank Transfer
@@ -241,7 +278,7 @@ export default function PaywallModal({ onClose, user }) {
           )}
 
           {/* STATE 2: PACKAGE SELECTION */}
-          {selectedMethod && !selectedPackage && !verifying && !verifyStatus && (
+          {!showAuthAlert && selectedMethod && !selectedPackage && !verifying && !verifyStatus && (
             <div style={{ paddingTop: "20px" }}>
               <h2 style={{...titleStyle, fontSize: "20px", textAlign: "center", marginBottom: "20px"}}>Select a Package</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
@@ -262,7 +299,7 @@ export default function PaywallModal({ onClose, user }) {
           )}
 
           {/* STATE 3A: BANK TRANSFER FLOW */}
-          {selectedMethod === 'transfer' && selectedPackage && !verifying && !verifyStatus && (
+          {!showAuthAlert && selectedMethod === 'transfer' && selectedPackage && !verifying && !verifyStatus && (
             <div style={transferDetailsBox}>
               <p style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#8e8e93" }}>Please transfer exactly <strong style={{color:"#fff"}}>{selectedPackage.priceText}</strong> to:</p>
               <div style={infoBoxStyle}>
@@ -289,7 +326,7 @@ export default function PaywallModal({ onClose, user }) {
           )}
 
           {/* STATE 3B: CRYPTO FLOW WITH GRID */}
-          {selectedMethod === 'crypto' && selectedPackage && !cryptoPaymentDetails && !generatingCrypto && (
+          {!showAuthAlert && selectedMethod === 'crypto' && selectedPackage && !cryptoPaymentDetails && !generatingCrypto && (
             <div style={transferDetailsBox}>
                <h3 style={{color: "#fff", textAlign: "center", marginBottom: "15px", marginTop: "0", fontSize: "18px"}}>Select Cryptocurrency</h3>
                
