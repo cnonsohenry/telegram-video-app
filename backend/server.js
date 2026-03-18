@@ -500,18 +500,20 @@ app.get("/api/videos", async (req, res) => {
 
     const videosRes = await pool.query(query, queryValues);
 
-    // 🟢 2. SUGGESTIONS: Upgraded to also pick unique covers so the sidebar doesn't spam albums
+    // 🟢 2. SUGGESTIONS: Upgraded to a Subquery so PostgreSQL never drops the random results
     let suggestions = [];
     if (page === 1) {
       const suggestQuery = `
-        WITH GroupedSuggestions AS (
+        SELECT * FROM (
           SELECT v.*, u.username as uploader_name,
-            ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
-            COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
+            ROW_NUMBER() OVER(PARTITION BY COALESCE(NULLIF(v.media_group_id, 'none'), v.message_id) ORDER BY v.created_at ASC) as rn,
+            COUNT(*) OVER(PARTITION BY COALESCE(NULLIF(v.media_group_id, 'none'), v.message_id)) as group_count
           FROM videos v 
           LEFT JOIN users u ON v.uploader_id = u.user_id 
-        )
-        SELECT * FROM GroupedSuggestions WHERE rn = 1 ORDER BY RANDOM() LIMIT 10
+        ) sub
+        WHERE rn = 1
+        ORDER BY RANDOM() 
+        LIMIT 10
       `;
       const suggestRes = await pool.query(suggestQuery);
       suggestions = suggestRes.rows;

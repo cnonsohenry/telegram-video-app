@@ -336,7 +336,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         {isDesktop && (
           <aside style={suggestedSidebarRail} className="custom-scrollbar">
             <SuggestedSidebar 
-              suggestions={sidebarSuggestions} 
+              suggestions={sidebarSuggestions}
+              loading={loading} 
               onVideoClick={(v, e) => handleOpenVideo(v, e)} 
             />
           </aside>
