@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp, ArrowLeft } from "lucide-react"; 
 import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
@@ -27,6 +27,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [activeGroup, setActiveGroup] = useState(null);
 
   const [premiumPool, setPremiumPool] = useState([]);
+  
+  // 🟢 THE FIX: A memory bank to store the random slots so they don't jump around on re-renders
+  const premiumInjectionMap = useRef(new Map());
 
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
@@ -61,7 +64,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     });
   }, []);
 
-  // 🟢 THE UPDATED RANDOM INJECTION ENGINE
+  // 🟢 UPGRADED RANDOM INJECTION ENGINE: Handles Refreshing & Pagination!
   const rawVideosToDisplay = useMemo(() => {
     if (isChangingTab) return []; 
     const baseList = videoCache[currentCategory] || (loading ? [] : videos);
@@ -69,27 +72,37 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     if (baseList.length > 0 && premiumPool.length > 0) {
       const newList = [...baseList];
       
-      // 1. Grab a stable seed number from the first loaded video
-      const seed = baseList[0]?.message_id || 1;
-      const premiumVideo = premiumPool[seed % premiumPool.length];
-      
-      // 2. Confine the random placement to the *first page* of videos 
-      // (so they don't miss it, and it doesn't jump when they click 'Show More')
-      const maxPlacementBoundary = Math.min(newList.length, fetchLimit);
-      
-      // 3. Stable Pseudo-Random Math: 
-      // It scrambles the seed to pick a random-feeling index, but because the seed 
-      // is tied to the category data, the video won't magically jump around on re-renders!
-      const injectIndex = (seed * 27 + currentCategory.length * 13) % maxPlacementBoundary;
-      
-      // 4. Inject it into the random slot!
-      newList[injectIndex] = premiumVideo;
+      // Calculate how many pages/chunks of videos we currently have loaded
+      const totalChunks = Math.ceil(newList.length / fetchLimit);
+
+      // Loop through every page and inject exactly one premium video per page
+      for (let i = 0; i < totalChunks; i++) {
+        // Create a unique key for this specific category and page number
+        const chunkKey = `${currentCategory}-page-${i}`;
+
+        // If we haven't picked a random spot for this page yet, pick one now!
+        if (!premiumInjectionMap.current.has(chunkKey)) {
+           // Ensure it doesn't replace the very first video on the page
+           const minOffset = isDesktop ? 2 : 1; 
+           const randomOffset = Math.floor(Math.random() * (fetchLimit - minOffset)) + minOffset;
+           premiumInjectionMap.current.set(chunkKey, randomOffset);
+        }
+
+        const offset = premiumInjectionMap.current.get(chunkKey);
+        const absoluteIndex = (i * fetchLimit) + offset;
+
+        if (absoluteIndex < newList.length) {
+           // Rotate through the premium pool so they see different premium videos as they scroll
+           const premiumVideo = premiumPool[i % premiumPool.length];
+           newList[absoluteIndex] = premiumVideo;
+        }
+      }
       
       return newList;
     }
     
     return baseList;
-  }, [videoCache, currentCategory, loading, videos, isChangingTab, premiumPool, fetchLimit]);
+  }, [videoCache, currentCategory, loading, videos, isChangingTab, premiumPool, fetchLimit, isDesktop]);
 
   useEffect(() => {
     if (!loading) setIsChangingTab(false);
@@ -225,6 +238,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   const handleRefresh = async () => {
+    premiumInjectionMap.current.clear(); // Clear memory on refresh to get new spots!
     setActiveGroup(null); 
     window.location.reload();
   };
