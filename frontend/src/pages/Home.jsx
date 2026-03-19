@@ -28,8 +28,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   const [premiumPool, setPremiumPool] = useState([]);
   
-  // 🟢 THE FIX: A memory bank to store the random slots so they don't jump around on re-renders
   const premiumInjectionMap = useRef(new Map());
+  // 🟢 THE FIX: A global tracker that ensures we never show the same premium video twice across tabs!
+  const premiumTracker = useRef(0); 
 
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
@@ -42,7 +43,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     fetch(`${import.meta.env.VITE_API_URL}/api/videos?category=premium&limit=20`)
       .then(res => res.json())
       .then(data => {
-        if (data.videos) setPremiumPool(data.videos);
+        if (data.videos) {
+          const shuffled = data.videos.sort(() => 0.5 - Math.random());
+          setPremiumPool(shuffled);
+        }
       })
       .catch(err => console.error("Failed to load premium pool", err));
   }, []);
@@ -64,40 +68,50 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     });
   }, []);
 
-  // 🟢 UPGRADED RANDOM INJECTION ENGINE: Handles Refreshing & Pagination!
   const rawVideosToDisplay = useMemo(() => {
     if (isChangingTab) return []; 
-    const baseList = videoCache[currentCategory] || (loading ? [] : videos);
     
+    let baseList = [];
+    
+    if (videoCache[currentCategory] && videoCache[currentCategory].length > 0) {
+      baseList = videoCache[currentCategory];
+    } 
+    else if (!loading && videos.length > 0) {
+       const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
+       if (isCorrectCategory) {
+          baseList = videos;
+       }
+    }
+
     if (baseList.length > 0 && premiumPool.length > 0) {
       const newList = [...baseList];
-      
-      // Calculate how many pages/chunks of videos we currently have loaded
       const totalChunks = Math.ceil(newList.length / fetchLimit);
 
-      // Loop through every page and inject exactly one premium video per page
       for (let i = 0; i < totalChunks; i++) {
-        // Create a unique key for this specific category and page number
         const chunkKey = `${currentCategory}-page-${i}`;
-
-        // If we haven't picked a random spot for this page yet, pick one now!
+        
+        // If this specific tab & page hasn't been assigned a premium video yet...
         if (!premiumInjectionMap.current.has(chunkKey)) {
-           // Ensure it doesn't replace the very first video on the page
            const minOffset = isDesktop ? 2 : 1; 
            const randomOffset = Math.floor(Math.random() * (fetchLimit - minOffset)) + minOffset;
-           premiumInjectionMap.current.set(chunkKey, randomOffset);
-        }
+           
+           // 🟢 Grab the NEXT unique premium video from our global tracker, then increment the tracker!
+           const assignedPremiumIndex = premiumTracker.current % premiumPool.length;
+           premiumTracker.current += 1;
 
-        const offset = premiumInjectionMap.current.get(chunkKey);
-        const absoluteIndex = (i * fetchLimit) + offset;
+           // Save BOTH the random slot position AND the unique premium video index
+           premiumInjectionMap.current.set(chunkKey, { offset: randomOffset, videoIndex: assignedPremiumIndex });
+        }
+        
+        const injectionData = premiumInjectionMap.current.get(chunkKey);
+        const absoluteIndex = (i * fetchLimit) + injectionData.offset;
 
         if (absoluteIndex < newList.length) {
-           // Rotate through the premium pool so they see different premium videos as they scroll
-           const premiumVideo = premiumPool[i % premiumPool.length];
+           // Pull the exact premium video we assigned to this slot
+           const premiumVideo = premiumPool[injectionData.videoIndex];
            newList[absoluteIndex] = premiumVideo;
         }
       }
-      
       return newList;
     }
     
@@ -107,6 +121,15 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   useEffect(() => {
     if (!loading) setIsChangingTab(false);
   }, [loading]);
+
+  useEffect(() => {
+    if (!loading && videos?.length > 0) {
+      const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
+      if (isCorrectCategory) {
+        updateCache(currentCategory, videos);
+      }
+    }
+  }, [videos, currentCategory, loading, updateCache]);
 
   const handleTabClick = (index) => {
     setActiveGroup(null); 
@@ -197,12 +220,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   }, [user, unlockedVideos, activeGroup]); 
 
   useEffect(() => {
-    if (!loading && videos?.length > 0) {
-      updateCache(currentCategory, videos);
-    }
-  }, [videos, currentCategory, loading, updateCache]);
-
-  useEffect(() => {
     if (loading || videos.length === 0) return;
     const prefetch = async () => {
       const neighbors = [(activeTab + 1) % CATEGORIES.length, (activeTab - 1 + CATEGORIES.length) % CATEGORIES.length];
@@ -237,8 +254,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   }, []);
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  
   const handleRefresh = async () => {
-    premiumInjectionMap.current.clear(); // Clear memory on refresh to get new spots!
+    premiumInjectionMap.current.clear(); 
+    premiumTracker.current = 0; // Reset tracker on refresh
     setActiveGroup(null); 
     window.location.reload();
   };
