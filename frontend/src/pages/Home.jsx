@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp, ArrowLeft } from "lucide-react"; // 🟢 Added ArrowLeft
+import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp, ArrowLeft } from "lucide-react"; 
 import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
@@ -24,9 +24,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isChangingTab, setIsChangingTab] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-
-  // 🟢 NEW: State to track if we are viewing a specific group/album of videos
   const [activeGroup, setActiveGroup] = useState(null);
+
+  const [premiumPool, setPremiumPool] = useState([]);
 
   const currentCategory = CATEGORIES[activeTab];
   const isDesktop = windowWidth > 1024;
@@ -34,6 +34,15 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const fetchLimit = isDesktop ? 15 : 12;
   
   const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory, fetchLimit);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL}/api/videos?category=premium&limit=20`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.videos) setPremiumPool(data.videos);
+      })
+      .catch(err => console.error("Failed to load premium pool", err));
+  }, []);
 
   const updateCache = useCallback((category, data) => {
     setCacheOrder(prevOrder => {
@@ -52,20 +61,42 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     });
   }, []);
 
-  // 🟢 Renamed to rawVideosToDisplay to distinguish between the feed and a folder
+  // 🟢 THE UPDATED RANDOM INJECTION ENGINE
   const rawVideosToDisplay = useMemo(() => {
     if (isChangingTab) return []; 
-    if (videoCache[currentCategory]) return videoCache[currentCategory];
-    if (loading) return [];
-    return videos;
-  }, [videoCache, currentCategory, loading, videos, isChangingTab]);
+    const baseList = videoCache[currentCategory] || (loading ? [] : videos);
+    
+    if (baseList.length > 0 && premiumPool.length > 0) {
+      const newList = [...baseList];
+      
+      // 1. Grab a stable seed number from the first loaded video
+      const seed = baseList[0]?.message_id || 1;
+      const premiumVideo = premiumPool[seed % premiumPool.length];
+      
+      // 2. Confine the random placement to the *first page* of videos 
+      // (so they don't miss it, and it doesn't jump when they click 'Show More')
+      const maxPlacementBoundary = Math.min(newList.length, fetchLimit);
+      
+      // 3. Stable Pseudo-Random Math: 
+      // It scrambles the seed to pick a random-feeling index, but because the seed 
+      // is tied to the category data, the video won't magically jump around on re-renders!
+      const injectIndex = (seed * 27 + currentCategory.length * 13) % maxPlacementBoundary;
+      
+      // 4. Inject it into the random slot!
+      newList[injectIndex] = premiumVideo;
+      
+      return newList;
+    }
+    
+    return baseList;
+  }, [videoCache, currentCategory, loading, videos, isChangingTab, premiumPool, fetchLimit]);
 
   useEffect(() => {
     if (!loading) setIsChangingTab(false);
   }, [loading]);
 
   const handleTabClick = (index) => {
-    setActiveGroup(null); // 🟢 FIX: Always close any open folder when changing tabs
+    setActiveGroup(null); 
     if (activeTab === index) {
       scrollToTop();
     } else {
@@ -97,7 +128,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
     if (!video) return;
 
-    // 🟢 IF IT'S A GROUP: Fetch the full album from the server!
     if (video.is_group && !activeGroup) {
       try {
         const res = await fetch(`https://videos.naijahomemade.com/api/group?media_group_id=${video.media_group_id}`);
@@ -114,7 +144,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       return;
     }
 
-    // 🟢 PREMIUM PAYWALL CHECK
     if (video.category === "premium") {
       if (!user || !user.is_premium) {
         setShowPaywall(true);
@@ -124,7 +153,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       return;
     }
 
-    // 🟢 FREE CONTENT AD CHECK
     const videoKey = `${video.chat_id}:${video.message_id}`;
     
     if (unlockedVideos.has(videoKey)) { 
@@ -153,8 +181,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     } else {
       playVideo(video);
     }
-  }, [user, unlockedVideos, activeGroup]); // 🟢 Added activeGroup to dependencies
-
+  }, [user, unlockedVideos, activeGroup]); 
 
   useEffect(() => {
     if (!loading && videos?.length > 0) {
@@ -198,7 +225,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   const handleRefresh = async () => {
-    setActiveGroup(null); // Reset group on refresh
+    setActiveGroup(null); 
     window.location.reload();
   };
 
@@ -209,7 +236,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     { icon: <Flame size={22} />, label: "TRENDS"}
   ];
 
-  // 🟢 Determine what array to actually render (The full feed OR the selected group folder)
   const actualVideosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
 
   return (
@@ -291,7 +317,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           <PullToRefresh onRefresh={handleRefresh}>
             <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
                
-               {/* 🟢 NEW: Group Header & Back Button (Only visible when viewing an album) */}
                {activeGroup && (
                  <div style={groupHeaderStyle}>
                    <button onClick={() => setActiveGroup(null)} style={backButtonStyle}>
@@ -316,13 +341,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                     />
                   ))}
                   
-                  {/* Hide skeletons if we are inside an active group */}
                   {(loading || isChangingTab) && !activeGroup && actualVideosToDisplay.length === 0 && (
                     [...Array(fetchLimit)].map((_, i) => <div key={i} style={skeletonSocket} />)
                   )}
                </div>
                
-               {/* Hide Load More button if we are inside a group */}
                {(!loading && !isChangingTab && !activeGroup) && actualVideosToDisplay.length > 0 && (
                  <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
                )}
@@ -367,35 +390,17 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
 // 🖌 STYLES
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "12px", animation: "pulse 1.5s infinite" };
-const mobileNavStyle = { 
-  display: "flex", 
-  position: "sticky", // 🟢 THE FIX: Keeps the nav pinned and traps the absolute indicator inside it
-  top: 0, 
-  zIndex: 1000, 
-  background: "var(--bg-color)", 
-  borderBottom: "1px solid var(--border-color)" 
-};
+const mobileNavStyle = { display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "var(--bg-color)", borderBottom: "1px solid var(--border-color)" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
 const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", padding: "20px 0" };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
 
-const suggestedSidebarRail = { 
-  width: "320px", 
-  height: "calc(100vh - 70px)", 
-  position: "sticky", 
-  top: "70px", 
-  borderLeft: "1px solid var(--border-color)", 
-  padding: "30px 15px", 
-  background: "transparent", 
-  overflowY: "auto", 
-  flexShrink: 0 
-};
+const suggestedSidebarRail = { width: "320px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", borderLeft: "1px solid var(--border-color)", padding: "30px 15px", background: "transparent", overflowY: "auto", flexShrink: 0 };
 
 const showMoreButtonStyle = { display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "14px 40px", borderRadius: "35px", border: "1px solid #333", fontWeight: "900", cursor: "pointer" };
 const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "pointer" };
 
-// 🟢 NEW STYLES FOR GROUPS
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 15px 0", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)" };
 const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
 const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
