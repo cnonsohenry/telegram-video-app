@@ -818,8 +818,13 @@ app.get("/api/avatar", async (req, res) => {
 app.get("/sitemap.xml", async (req, res) => {
   try {
     // 1. Fetch message_id, created_at, AND caption for SEO
+    // 🔴 THE FIX: Exclude premium category right at the database level
     const { rows } = await pool.query(
-      `SELECT message_id, created_at, caption, cloudflare_id FROM videos ORDER BY created_at DESC LIMIT 10000`
+      `SELECT message_id, created_at, caption, cloudflare_id 
+       FROM videos 
+       WHERE category != 'premium' 
+       ORDER BY created_at DESC 
+       LIMIT 10000`
     );
 
     // 2. Helper to prevent special characters from breaking the XML format
@@ -883,7 +888,3 @@ app.get("/sitemap.xml", async (req, res) => {
     res.status(500).end();
   }
 });
-
-const PORT = process.env.PORT || 3000;
-await initDatabase();
-app.listen(PORT, () => console.log(`🚀 Server running on PORT ${PORT}`));
