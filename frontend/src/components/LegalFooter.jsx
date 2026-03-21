@@ -10,7 +10,7 @@ export default function LegalFooter() {
         <a href="/?legal=cookies" style={linkStyle}>Cookie Notice</a>
         <a href="/?legal=dmca" style={linkStyle}>DMCA</a>
         <a href="/?legal=2257" style={linkStyle}>18 U.S.C. 2257</a>
-        <a href="/?legal=sitemap" style={linkStyle}>Site Map</a>
+        
       </div>
       <p style={copyrightStyle}>&copy; {new Date().getFullYear()} Naija Homemade. All rights reserved.</p>
     </footer>

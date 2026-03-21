@@ -8,7 +8,6 @@ import AboutUs from "./legal/AboutUs";
 import DMCA from "./legal/DMCA";
 import Privacy from "./legal/Privacy";
 import Cookies from "./legal/Cookies";
-import HTMLSitemap from "./legal/HTMLSitemap";
 
 const LEGAL_TABS = [
   { id: "about", label: "About Us", icon: <Globe size={16} /> },
@@ -16,8 +15,8 @@ const LEGAL_TABS = [
   { id: "privacy", label: "Privacy Notice", icon: <Lock size={16} /> },
   { id: "cookies", label: "Cookie Notice", icon: <Eye size={16} /> },
   { id: "dmca", label: "DMCA", icon: <Shield size={16} /> },
-  { id: "2257", label: "18 U.S.C. 2257", icon: <UserCheck size={16} /> },
-  { id: "sitemap", label: "Sitemap", icon: <Globe size={16} /> }
+  { id: "2257", label: "18 U.S.C. 2257", icon: <UserCheck size={16} /> }
+  
 ];
 
 export default function LegalPages({ onBack, initialPage = "terms" }) {
@@ -39,7 +38,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
       case "dmca": return <DMCA />;
       case "privacy": return <Privacy />;
       case "cookies": return <Cookies />;
-      case "sitemap": return <HTMLSitemap />;
+      
       default: 
         return <div style={{ color: "#888", textAlign: "center", padding: "40px 0" }}>Content being updated. Please check back later.</div>;
     }
