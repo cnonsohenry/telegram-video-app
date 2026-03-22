@@ -8,6 +8,12 @@ import fs from "fs";
 import pkg from "pg";
 import https from "https";
 import crypto from "crypto";
+// Native imports needed for ES Modules to serve frontend files
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Import Prerender
+import prerender from "prerender-node";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import adminRoutes from "./admin.js";
 import authRoutes from "./auth.js";
@@ -19,6 +25,10 @@ import { z } from "zod";
 
 
 const { Pool } = pkg;
+
+// 🟢 NEW: ES Module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const ALLOWED_USERS = [1881815190, 993163169, 5806906139, 5441995861];
 const agent = new https.Agent({ family: 4 });
@@ -33,6 +43,22 @@ app.use(cors({
     "http://localhost:5173" 
   ]
 }));
+
+/* =====================
+   🤖 PRERENDER MIDDLEWARE (SEO & EXOCLICK FIX)
+===================== */
+// 1. Set the token from your .env file
+prerender.set('prerenderToken', process.env.PRERENDER_TOKEN);
+
+// 2. Add custom bots (ExoClick, Telegram, Twitter)
+prerender.crawlerUserAgents.push('ExoBot');
+prerender.crawlerUserAgents.push('exobot');
+prerender.crawlerUserAgents.push('TelegramBot');
+prerender.crawlerUserAgents.push('Twitterbot');
+
+// 3. Mount the middleware globally. 
+// It will intercept requests from bots, render the SPA, and return full HTML.
+app.use(prerender);
 
 /* =====================
    SERVER MONITORING (SECURED)
@@ -810,6 +836,17 @@ app.get("/api/avatar", async (req, res) => {
   } catch (err) {
     res.status(500).end();
   }
+});
+
+/* =======================================================
+   🟢 NEW: SERVE THE COMPILED FRONTEND (React/Vue/Vite)
+======================================================= */
+// 1. Serve all static files (JS, CSS, Images) from your external frontend folder
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+// 2. The SPA Catch-All Route: Any non-API request gets sent your index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
