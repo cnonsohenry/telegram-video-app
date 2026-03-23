@@ -184,10 +184,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         playerInstance.current.on('play', () => setIsPlaying(true));
         playerInstance.current.on('pause', () => setIsPlaying(false));
         
-        // Ensure the loading spinner vanishes when the ad (if any) is done
-        if (!isPremiumStream) {
-            playerInstance.current.on('adFinished', () => setIsLoading(false));
-        }
+        // ✅ REPLACE WITH THIS
+        playerInstance.current.on('playing', () => setIsLoading(false));
     }
 
     return () => {
