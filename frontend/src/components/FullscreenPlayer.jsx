@@ -1,22 +1,26 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, Share2, Download, Check } from "lucide-react";
+import fluidPlayer from 'fluid-player';
+import 'fluid-player/src/css/fluidplayer.css'; 
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null); 
+  const playerInstance = useRef(null); 
   const lastTap = useRef(0);
   const hideTimeout = useRef(null); 
   
-  // 🟢 1. Initialize to false. We let the video 'onPlay' event switch this to true.
-  // This ensures if a mobile browser blocks autoplay, the Play button will be visible!
   const [isPlaying, setIsPlaying] = useState(false); 
-  
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showControls, setShowControls] = useState(true); 
   const [copied, setCopied] = useState(false); 
   const [isDownloading, setIsDownloading] = useState(false); 
+
+  // 🟢 1. DETECT PREMIUM STREAM vs FREE R2 VIDEO
+  // Cloudflare Stream URLs always contain .m3u8, your free R2 videos do not.
+  const isPremiumStream = video?.video_url?.includes('.m3u8');
 
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
@@ -63,10 +67,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             });
           } else {
             resetHideTimer();
-            if (videoRef.current.paused) {
-              videoRef.current.play().catch(() => {});
-            } else {
-              videoRef.current.pause();
+            if (playerInstance.current) {
+              if (isPlaying) playerInstance.current.pause();
+              else playerInstance.current.play();
             }
           }
         }
@@ -77,12 +80,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const handleTogglePlay = (e) => {
     e.stopPropagation();
     resetHideTimer();
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play().catch(() => {});
-      }
+    if (playerInstance.current) {
+      if (isPlaying) playerInstance.current.pause();
+      else playerInstance.current.play();
     }
   };
 
@@ -92,15 +92,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     const shareUrl = `https://naijahomemade.com/v/${video.message_id}`;
 
     if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Naija Homemade',
-          text: video.caption || 'Watch this video on Naija Homemade',
-          url: shareUrl,
-        });
-      } catch (err) {
-        console.log("Native share cancelled", err);
-      }
+      try { await navigator.share({ title: 'Naija Homemade', text: video.caption || 'Watch this video', url: shareUrl }); } 
+      catch (err) { console.log("Native share cancelled", err); }
     } else {
       navigator.clipboard.writeText(shareUrl);
       setCopied(true);
@@ -112,13 +105,11 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     e.stopPropagation();
     resetHideTimer();
     if (isDownloading) return;
-    
     setIsDownloading(true);
     try {
       const response = await fetch(video.video_url);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
-      
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = `naijahomemade-${video.message_id}.mp4`;
@@ -127,7 +118,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      console.error("Download failed:", err);
       alert("Download failed. Please try again.");
     } finally {
       setIsDownloading(false);
@@ -159,16 +149,45 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     enterFullscreen();
     resetHideTimer();
 
-    // 🟢 2. Explicitly handle strict mobile browser Autoplay Blocks
-    if (videoRef.current) {
-      const playPromise = videoRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((error) => {
-          console.warn("Autoplay blocked by mobile browser. Waiting for user interaction.");
-          setIsPlaying(false); 
-          setShowControls(true);
-        });
-      }
+    // 🟢 2. DYNAMIC FLUID PLAYER CONFIGURATION
+    if (videoRef.current && !playerInstance.current) {
+        
+        // Base settings for BOTH free and premium videos
+        const playerOptions = {
+            layoutControls: {
+                fillToContainer: true,
+                playButtonShowing: false, 
+                autoPlay: true, 
+                keyboardControl: false,
+                controlBar: { autoHide: true, autoHideTimeout: 3, animated: true }
+            }
+        };
+
+        // 🟢 ONLY INJECT ADS IF IT IS A FREE R2 VIDEO
+        if (!isPremiumStream) {
+            playerOptions.vastOptions = {
+                allowVPAID: true,
+                adList: [
+                    {
+                        roll: 'preRoll',
+                        vastTag: 'https://s.magsrv.com/v1/vast.php?idzone=5880122',
+                        adText: 'Ad closes in [unplayedSeconds]s',
+                        adTextPosition: 'top right'
+                    }
+                ]
+            };
+        }
+
+        // Initialize the player with our dynamic options
+        playerInstance.current = fluidPlayer(videoRef.current, playerOptions);
+
+        playerInstance.current.on('play', () => setIsPlaying(true));
+        playerInstance.current.on('pause', () => setIsPlaying(false));
+        
+        // Ensure the loading spinner vanishes when the ad (if any) is done
+        if (!isPremiumStream) {
+            playerInstance.current.on('adFinished', () => setIsLoading(false));
+        }
     }
 
     return () => {
@@ -179,8 +198,13 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
       document.body.style.width = originalStyle.width;
       window.scrollTo(0, scrollY);
       if (hideTimeout.current) clearTimeout(hideTimeout.current);
+      
+      if (playerInstance.current) {
+          playerInstance.current.destroy();
+          playerInstance.current = null;
+      }
     };
-  }, [resetHideTimer]);
+  }, [resetHideTimer, video.video_url, isPremiumStream]);
 
   if (!video) return null;
 
@@ -200,6 +224,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
       <div style={stageStyle} onClick={(e) => e.stopPropagation()}>
         <div onClick={handleInteraction} style={videoWrapperStyle}>
+          
           {isLoading && (
             <div style={loaderContainerStyle}>
               <Loader2 size={48} color="var(--primary-color)" className="spin-animation" />
@@ -208,19 +233,23 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
           <video
             ref={videoRef}
-            src={video.video_url}
-            autoPlay playsInline loop
+            playsInline 
+            loop
             onTimeUpdate={handleTimeUpdate}
             onWaiting={() => setIsLoading(true)}
             onCanPlay={() => setIsLoading(false)}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
             style={{ 
                 width: "100%", height: "100%", 
                 objectFit: isZoomed ? "cover" : "contain",
                 transition: "object-fit 0.3s ease" 
             }}
-          />
+          >
+              {/* 🟢 3. DYNAMIC VIDEO TYPE: .m3u8 for Premium, .mp4 for Free R2 */}
+              <source 
+                  src={video.video_url} 
+                  type={isPremiumStream ? "application/x-mpegURL" : "video/mp4"} 
+              />
+          </video>
 
           {(!isLoading && (showControls || !isPlaying)) && (
             <button
@@ -293,6 +322,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         .range-mini { height: 2px !important; pointer-events: none; opacity: 0.5; }
         .range-active::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
         .range-active { height: 6px !important; pointer-events: auto; }
+        
+        .fluid_controls_container { display: none !important; }
       `}</style>
     </div>
   );
@@ -309,11 +340,8 @@ const progressWrapperStyle = { position: "absolute", left: 0, right: 0, zIndex: 
 const rangeInputBaseStyle = { width: "100%", cursor: "pointer", accentColor: "var(--primary-color)", background: "rgba(255,255,255,0.2)", appearance: "none", outline: "none" };
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
-
-// 🟢 CENTER CONTROL STYLES
 const centerControlStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "transparent", border: "none", cursor: "pointer", zIndex: 10005, transition: "opacity 0.3s ease", display: "flex", alignItems: "center", justifyContent: "center" };
 const centerIconCircleStyle = { background: "rgba(0,0,0,0.4)", borderRadius: "50%", padding: "20px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" };
-
 const actionButtonsContainerStyle = { position: "absolute", right: "15px", bottom: "80px", display: "flex", flexDirection: "column", gap: "20px", zIndex: 10005, transition: "opacity 0.4s ease", alignItems: "center" };
 const actionButtonStyle = { background: "transparent", border: "none", color: "#fff", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: 0 };
 const sideIconCircleStyle = { background: "rgba(0,0,0,0.5)", width: "45px", height: "45px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
