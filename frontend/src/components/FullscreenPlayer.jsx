@@ -18,8 +18,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const [copied, setCopied] = useState(false); 
   const [isDownloading, setIsDownloading] = useState(false); 
 
-  // 🟢 1. DETECT PREMIUM STREAM vs FREE R2 VIDEO
-  // Cloudflare Stream URLs always contain .m3u8, your free R2 videos do not.
+  // 🟢 NEW: Track if the VAST Ad is currently active on screen
+  const [isAdActive, setIsAdActive] = useState(false);
+
   const isPremiumStream = video?.video_url?.includes('.m3u8');
 
   const resetHideTimer = useCallback(() => {
@@ -35,7 +36,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   }, []);
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
+    // Only update progress bar if the main video is playing (not the ad)
+    if (videoRef.current && !isAdActive) {
       const current = videoRef.current.currentTime;
       const duration = videoRef.current.duration;
       if (duration > 0) setProgress((current / duration) * 100);
@@ -44,6 +46,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   const handleInteraction = (e) => {
     if (e) e.stopPropagation();
+    if (isAdActive) return; // 🟢 Disable custom double-taps while ad is playing so they can click the ad safely
 
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
@@ -149,21 +152,18 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     enterFullscreen();
     resetHideTimer();
 
-    // 🟢 2. DYNAMIC FLUID PLAYER CONFIGURATION
     if (videoRef.current && !playerInstance.current) {
         
-        // Base settings for BOTH free and premium videos
         const playerOptions = {
             layoutControls: {
                 fillToContainer: true,
-                playButtonShowing: false, 
+                playButtonShowing: false, // We use your custom button for main videos
                 autoPlay: true, 
                 keyboardControl: false,
-                controlBar: { autoHide: true, autoHideTimeout: 3, animated: true }
+                // We let fluid player manage its own UI, but hide its progress bar via CSS below
             }
         };
 
-        // 🟢 ONLY INJECT ADS IF IT IS A FREE R2 VIDEO
         if (!isPremiumStream) {
             playerOptions.vastOptions = {
                 allowVPAID: true,
@@ -178,14 +178,26 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             };
         }
 
-        // Initialize the player with our dynamic options
         playerInstance.current = fluidPlayer(videoRef.current, playerOptions);
 
-        playerInstance.current.on('play', () => setIsPlaying(true));
+        // 🟢 SYNC STATE WITH FLUID PLAYER
+        playerInstance.current.on('playing', () => {
+            setIsPlaying(true);
+            setIsLoading(false); // Guarantee spinner turns off!
+        });
         playerInstance.current.on('pause', () => setIsPlaying(false));
+        playerInstance.current.on('ended', () => setIsPlaying(false));
         
-        // ✅ REPLACE WITH THIS
-        playerInstance.current.on('playing', () => setIsLoading(false));
+        // 🟢 AD-AWARE LISTENER: Hides custom UI while ad plays
+        if (!isPremiumStream) {
+            playerInstance.current.on('adStart', () => {
+                setIsAdActive(true);
+                setIsLoading(false); // Ad is running, stop the spinner!
+            });
+            playerInstance.current.on('adFinished', () => {
+                setIsAdActive(false);
+            });
+        }
     }
 
     return () => {
@@ -206,10 +218,13 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   if (!video) return null;
 
+  // 🟢 ONLY RENDER YOUR CUSTOM UI IF NO AD IS PLAYING
+  const renderCustomUI = !isAdActive;
+
   return (
     <div ref={containerRef} style={overlayStyle} onClick={onClose}>
-      <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />
-
+      
+      {/* 🟢 Keep Close Button ALWAYS visible so users aren't trapped */}
       {!isDesktop ? (
         <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ ...mobileBackButtonStyle, zIndex: 10006 }}>
           <ArrowLeft size={28} />
@@ -219,6 +234,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
           <X size={24} />
         </button>
       )}
+
+      {renderCustomUI && <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />}
 
       <div style={stageStyle} onClick={(e) => e.stopPropagation()}>
         <div onClick={handleInteraction} style={videoWrapperStyle}>
@@ -232,7 +249,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
           <video
             ref={videoRef}
             playsInline 
-            loop
             onTimeUpdate={handleTimeUpdate}
             onWaiting={() => setIsLoading(true)}
             onCanPlay={() => setIsLoading(false)}
@@ -242,14 +258,13 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
                 transition: "object-fit 0.3s ease" 
             }}
           >
-              {/* 🟢 3. DYNAMIC VIDEO TYPE: .m3u8 for Premium, .mp4 for Free R2 */}
               <source 
                   src={video.video_url} 
                   type={isPremiumStream ? "application/x-mpegURL" : "video/mp4"} 
               />
           </video>
 
-          {(!isLoading && (showControls || !isPlaying)) && (
+          {renderCustomUI && (!isLoading && (showControls || !isPlaying)) && (
             <button
               onClick={handleTogglePlay}
               style={{
@@ -264,52 +279,56 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             </button>
           )}
 
-          <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
+          {renderCustomUI && <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />}
 
-          <div style={{ ...actionButtonsContainerStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
-            <button onClick={handleShare} style={actionButtonStyle}>
-              <div style={sideIconCircleStyle}>
-                {copied ? <Check size={20} color="#4ade80" /> : <Share2 size={20} />}
-              </div>
-              <span style={actionLabelStyle}>{copied ? "Copied!" : "Share"}</span>
-            </button>
+          {renderCustomUI && (
+            <div style={{ ...actionButtonsContainerStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
+              <button onClick={handleShare} style={actionButtonStyle}>
+                <div style={sideIconCircleStyle}>
+                  {copied ? <Check size={20} color="#4ade80" /> : <Share2 size={20} />}
+                </div>
+                <span style={actionLabelStyle}>{copied ? "Copied!" : "Share"}</span>
+              </button>
 
-            <button onClick={handleDownload} style={actionButtonStyle}>
-              <div style={sideIconCircleStyle}>
-                {isDownloading ? <Loader2 size={20} className="spin-animation" /> : <Download size={20} />}
-              </div>
-              <span style={actionLabelStyle}>Save</span>
-            </button>
+              <button onClick={handleDownload} style={actionButtonStyle}>
+                <div style={sideIconCircleStyle}>
+                  {isDownloading ? <Loader2 size={20} className="spin-animation" /> : <Download size={20} />}
+                </div>
+                <span style={actionLabelStyle}>Save</span>
+              </button>
 
-            <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); resetHideTimer(); }} style={actionButtonStyle}>
-               <div style={sideIconCircleStyle}>
-                 {isZoomed ? <Minimize size={20} /> : <Maximize size={20} />}
-               </div>
-               <span style={actionLabelStyle}>{isZoomed ? "Fit" : "Fill"}</span>
-            </button>
-          </div>
+              <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); resetHideTimer(); }} style={actionButtonStyle}>
+                 <div style={sideIconCircleStyle}>
+                   {isZoomed ? <Minimize size={20} /> : <Maximize size={20} />}
+                 </div>
+                 <span style={actionLabelStyle}>{isZoomed ? "Fit" : "Fill"}</span>
+              </button>
+            </div>
+          )}
 
-          <div style={{ 
-              ...progressWrapperStyle, 
-              bottom: showControls ? "max(30px, env(safe-area-inset-bottom))" : "10px",
-              padding: showControls ? "0 20px" : "0",
-              opacity: 1 
-          }}>
-             <input 
-               type="range" min="0" max="100" step="0.1"
-               value={progress || 0} 
-               onChange={(e) => {
-                 e.stopPropagation();
-                 if (videoRef.current) {
-                   videoRef.current.currentTime = (e.target.value / 100) * videoRef.current.duration;
-                   setProgress(e.target.value);
-                   resetHideTimer();
-                 }
-               }}
-               className={showControls ? "range-active" : "range-mini"}
-               style={rangeInputBaseStyle}
-             />
-          </div>
+          {renderCustomUI && (
+            <div style={{ 
+                ...progressWrapperStyle, 
+                bottom: showControls ? "max(30px, env(safe-area-inset-bottom))" : "10px",
+                padding: showControls ? "0 20px" : "0",
+                opacity: 1 
+            }}>
+               <input 
+                 type="range" min="0" max="100" step="0.1"
+                 value={progress || 0} 
+                 onChange={(e) => {
+                   e.stopPropagation();
+                   if (videoRef.current) {
+                     videoRef.current.currentTime = (e.target.value / 100) * videoRef.current.duration;
+                     setProgress(e.target.value);
+                     resetHideTimer();
+                   }
+                 }}
+                 className={showControls ? "range-active" : "range-mini"}
+                 style={rangeInputBaseStyle}
+               />
+            </div>
+          )}
         </div>
       </div>
 
@@ -321,13 +340,14 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         .range-active::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
         .range-active { height: 6px !important; pointer-events: auto; }
         
-        .fluid_controls_container { display: none !important; }
+        /* 🟢 THE MAGIC FIX: We only hide Fluid's bottom timeline bar, leaving the Ad Skip buttons visible! */
+        .fluid_controls_bottom { display: none !important; }
       `}</style>
     </div>
   );
 }
 
-// 🖌 STYLES
+// 🖌 STYLES (Unchanged)
 const overlayStyle = { position: "fixed", inset: 0, height: "100dvh", backgroundColor: "#000", zIndex: 999999, display: "flex", flexDirection: "column", overflow: "hidden", touchAction: "none" };
 const stageStyle = { display: "flex", width: "100%", height: "100%", background: "#000", position: "relative" };
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
