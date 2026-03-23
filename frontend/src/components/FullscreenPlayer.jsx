@@ -17,8 +17,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const [showControls, setShowControls] = useState(true); 
   const [copied, setCopied] = useState(false); 
   const [isDownloading, setIsDownloading] = useState(false); 
-
-  // 🟢 NEW: Track if the VAST Ad is currently active on screen
   const [isAdActive, setIsAdActive] = useState(false);
 
   const isPremiumStream = video?.video_url?.includes('.m3u8');
@@ -36,7 +34,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   }, []);
 
   const handleTimeUpdate = () => {
-    // Only update progress bar if the main video is playing (not the ad)
     if (videoRef.current && !isAdActive) {
       const current = videoRef.current.currentTime;
       const duration = videoRef.current.duration;
@@ -46,7 +43,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   const handleInteraction = (e) => {
     if (e) e.stopPropagation();
-    if (isAdActive) return; // 🟢 Disable custom double-taps while ad is playing so they can click the ad safely
+    if (isAdActive) return; // Prevent double taps during an ad
 
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
@@ -93,7 +90,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     e.stopPropagation();
     resetHideTimer();
     const shareUrl = `https://naijahomemade.com/v/${video.message_id}`;
-
     if (navigator.share) {
       try { await navigator.share({ title: 'Naija Homemade', text: video.caption || 'Watch this video', url: shareUrl }); } 
       catch (err) { console.log("Native share cancelled", err); }
@@ -128,28 +124,13 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   };
 
   useEffect(() => {
-    const originalStyle = {
-      overflow: document.body.style.overflow,
-      position: document.body.style.position,
-      top: document.body.style.top,
-      width: document.body.style.width,
-    };
+    // Lock background scrolling
     const scrollY = window.scrollY;
-
     document.body.style.overflow = "hidden";
     document.body.style.position = "fixed";
     document.body.style.top = `-${scrollY}px`;
     document.body.style.width = "100%";
 
-    const enterFullscreen = async () => {
-      try {
-        const elem = containerRef.current;
-        if (elem?.requestFullscreen) await elem.requestFullscreen();
-        else if (videoRef.current?.webkitEnterFullscreen) videoRef.current.webkitEnterFullscreen();
-      } catch (err) { console.warn("FS blocked"); }
-    };
-
-    enterFullscreen();
     resetHideTimer();
 
     if (videoRef.current && !playerInstance.current) {
@@ -157,10 +138,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         const playerOptions = {
             layoutControls: {
                 fillToContainer: true,
-                playButtonShowing: false, // We use your custom button for main videos
+                playButtonShowing: false, 
                 autoPlay: true, 
                 keyboardControl: false,
-                // We let fluid player manage its own UI, but hide its progress bar via CSS below
             }
         };
 
@@ -174,38 +154,39 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
                         adText: 'Ad closes in [unplayedSeconds]s',
                         adTextPosition: 'top right'
                     }
-                ]
+                ],
+                // 🟢 THE MAGIC FIX: Official VAST Callbacks
+                vastAdvanced: {
+                    vastVideoPlayingCallback: () => {
+                        setIsAdActive(true);
+                        setIsLoading(false); // Ad is playing, stop loader
+                    },
+                    vastVideoEndedCallback: () => setIsAdActive(false),
+                    vastVideoSkippedCallback: () => setIsAdActive(false),
+                    noVastVideoCallback: () => {
+                        // VAST was blocked or failed! Resume normal playback instantly.
+                        setIsAdActive(false);
+                        setIsLoading(false); 
+                    }
+                }
             };
         }
 
         playerInstance.current = fluidPlayer(videoRef.current, playerOptions);
 
-        // 🟢 SYNC STATE WITH FLUID PLAYER
         playerInstance.current.on('playing', () => {
             setIsPlaying(true);
-            setIsLoading(false); // Guarantee spinner turns off!
+            setIsLoading(false); // Ensure loader stops when main video plays
         });
         playerInstance.current.on('pause', () => setIsPlaying(false));
         playerInstance.current.on('ended', () => setIsPlaying(false));
-        
-        // 🟢 AD-AWARE LISTENER: Hides custom UI while ad plays
-        if (!isPremiumStream) {
-            playerInstance.current.on('adStart', () => {
-                setIsAdActive(true);
-                setIsLoading(false); // Ad is running, stop the spinner!
-            });
-            playerInstance.current.on('adFinished', () => {
-                setIsAdActive(false);
-            });
-        }
     }
 
     return () => {
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-      document.body.style.overflow = originalStyle.overflow;
-      document.body.style.position = originalStyle.position;
-      document.body.style.top = originalStyle.top;
-      document.body.style.width = originalStyle.width;
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
       window.scrollTo(0, scrollY);
       if (hideTimeout.current) clearTimeout(hideTimeout.current);
       
@@ -218,13 +199,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
 
   if (!video) return null;
 
-  // 🟢 ONLY RENDER YOUR CUSTOM UI IF NO AD IS PLAYING
-  const renderCustomUI = !isAdActive;
-
   return (
     <div ref={containerRef} style={overlayStyle} onClick={onClose}>
       
-      {/* 🟢 Keep Close Button ALWAYS visible so users aren't trapped */}
       {!isDesktop ? (
         <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ ...mobileBackButtonStyle, zIndex: 10006 }}>
           <ArrowLeft size={28} />
@@ -235,7 +212,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         </button>
       )}
 
-      {renderCustomUI && <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />}
+      {/* 🟢 Hide custom UI elements entirely while ad is active so user can click the ad safely */}
+      {!isAdActive && <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />}
 
       <div style={stageStyle} onClick={(e) => e.stopPropagation()}>
         <div onClick={handleInteraction} style={videoWrapperStyle}>
@@ -250,12 +228,17 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             ref={videoRef}
             playsInline 
             onTimeUpdate={handleTimeUpdate}
+            onPlaying={() => {
+              setIsLoading(false);
+              setIsPlaying(true);
+            }}
             onWaiting={() => setIsLoading(true)}
-            onCanPlay={() => setIsLoading(false)}
             style={{ 
                 width: "100%", height: "100%", 
                 objectFit: isZoomed ? "cover" : "contain",
-                transition: "object-fit 0.3s ease" 
+                transition: "object-fit 0.3s ease",
+                // Ensure the video sits behind the ad container when active
+                zIndex: 1 
             }}
           >
               <source 
@@ -264,7 +247,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
               />
           </video>
 
-          {renderCustomUI && (!isLoading && (showControls || !isPlaying)) && (
+          {!isAdActive && (!isLoading && (showControls || !isPlaying)) && (
             <button
               onClick={handleTogglePlay}
               style={{
@@ -279,9 +262,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             </button>
           )}
 
-          {renderCustomUI && <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />}
+          {!isAdActive && <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />}
 
-          {renderCustomUI && (
+          {!isAdActive && (
             <div style={{ ...actionButtonsContainerStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
               <button onClick={handleShare} style={actionButtonStyle}>
                 <div style={sideIconCircleStyle}>
@@ -306,7 +289,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             </div>
           )}
 
-          {renderCustomUI && (
+          {!isAdActive && (
             <div style={{ 
                 ...progressWrapperStyle, 
                 bottom: showControls ? "max(30px, env(safe-area-inset-bottom))" : "10px",
@@ -340,14 +323,17 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         .range-active::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
         .range-active { height: 6px !important; pointer-events: auto; }
         
-        /* 🟢 THE MAGIC FIX: We only hide Fluid's bottom timeline bar, leaving the Ad Skip buttons visible! */
+        /* 🟢 Cleanly hides Fluid Player's default bottom UI while keeping Ad UI visible */
         .fluid_controls_bottom { display: none !important; }
+        
+        /* Ensures the ad container sits properly above the main video but below the close button */
+        .fluid_video_wrapper.fluid_ad_playing { z-index: 5 !important; }
       `}</style>
     </div>
   );
 }
 
-// 🖌 STYLES (Unchanged)
+// 🖌 STYLES (Keep your existing constants below)
 const overlayStyle = { position: "fixed", inset: 0, height: "100dvh", backgroundColor: "#000", zIndex: 999999, display: "flex", flexDirection: "column", overflow: "hidden", touchAction: "none" };
 const stageStyle = { display: "flex", width: "100%", height: "100%", background: "#000", position: "relative" };
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
