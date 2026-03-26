@@ -378,6 +378,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                     [...Array(fetchLimit)].map((_, i) => <div key={i} style={skeletonSocket} />)
                   )}
                </div>
+
+               {/* 🟢 THE AD GRID: Now sits outside the main grid, spanning full width! */}
+               {actualVideosToDisplay.length > 0 && !activeGroup && (
+                 <ExoClickWidget />
+               )}
                
                {(!loading && !isChangingTab && !activeGroup) && actualVideosToDisplay.length > 0 && (
                  <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
@@ -437,3 +442,29 @@ const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px",
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 15px 0", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)" };
 const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
 const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
+
+// 🟢 THE FULL-WIDTH EXOCLICK GRID
+const ExoClickWidget = () => {
+  useEffect(() => {
+    if (!document.querySelector('script[src="https://a.magsrv.com/ad-provider.js"]')) {
+      const script = document.createElement('script');
+      script.src = "https://a.magsrv.com/ad-provider.js";
+      script.async = true;
+      script.type = "application/javascript";
+      document.body.appendChild(script);
+    }
+    window.AdProvider = window.AdProvider || [];
+    window.AdProvider.push({"serve": {}});
+  }, []);
+
+  return (
+    // We give it 100% width so ExoClick's 5-col/2-col settings can expand properly!
+    <div style={{ width: "100%", marginTop: "20px", marginBottom: "20px" }}>
+      <ins 
+        className="eas6a97888e20" 
+        data-zoneid="5882826"
+        style={{ display: "block", width: "100%" }}
+      ></ins>
+    </div>
+  );
+};
