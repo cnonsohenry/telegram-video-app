@@ -26,16 +26,188 @@
         overscroll-behavior-y: none; /* 🟢 Stops Telegram from trying to pull-to-refresh */
       }
 
-  
+      /* Prevent background scroll when age gate is active */
+      body.no-scroll { overflow: hidden; height: 100dvh; }
+
+      /* 🟢 18+ Age Gate Styles */
+      #age-gate {
+        position: fixed; inset: 0;
+        display: none; 
+        flex-direction: column; align-items: center; justify-content: center;
+        background-color: #000;
+        z-index: 2147483647; 
+        transition: opacity 0.3s ease;
+        padding: 20px;
+        text-align: center;
+      }
+
+      .age-gate-content {
+        max-width: 600px;
+        background: #111;
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 40px 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      }
+
+      .logo-text { color: #ffffff; font-size: 20px; font-weight: 900; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+      .highlight { color: #ff3b30; }
+
+      .age-gate-title {
+        font-size: 22px;
+        font-weight: 700;
+        margin: 0 0 10px 0;
+      }
+
+      .age-gate-subtitle {
+        font-size: 18px;
+        font-weight: 600;
+        color: #ff3b30;
+        margin: 0 0 15px 0;
+      }
+
+      .age-gate-text {
+        font-size: 14px;
+        line-height: 1.6;
+        color: #bbb;
+        margin: 0 0 30px 0;
+      }
+
+      .age-gate-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-bottom: 30px;
+      }
+
+      .btn-enter {
+        background-color: #ff3b30;
+        color: #fff;
+        border: none;
+        padding: 16px;
+        font-size: 16px;
+        font-weight: 800;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .btn-enter:hover { background-color: #d63328; }
+
+      .btn-exit {
+        background-color: transparent;
+        color: #888;
+        border: 1px solid #444;
+        padding: 16px;
+        font-size: 16px;
+        font-weight: 700;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .btn-exit:hover { background-color: #222; color: #fff; border-color: #666; }
+
+      .age-gate-footer {
+        font-size: 12px;
+        color: #666;
+        line-height: 1.5;
+      }
+
+      .age-gate-footer a { color: #888; text-decoration: underline; }
+      .age-gate-footer a:hover { color: #fff; }
+
+      @media (min-width: 600px) {
+        .age-gate-buttons { flex-direction: row; }
+        .btn-enter, .btn-exit { flex: 1; }
+      }
+
+      /* Targets the Adsterra Social Bar iframe */
+      iframe[id^="container-"][style*="z-index: 2147483647"] {
+        bottom: auto !important;
+        top: 110px !important;             
+        inset: 110px 0px auto 0px !important;  
+        position: fixed !important;       
+        margin-top: 0px !important;
+        left: 0 !important;
+        right: 0 !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
     </style>
   </head>
   
   <body class="no-scroll">
+    <div id="age-gate">
+      <div class="age-gate-content">
+        <div class="logo-text">NAIJA<span class="highlight">HOMEMADE</span></div>
+        <h1 class="age-gate-title">This is an adult website</h1>
+        <h2 class="age-gate-subtitle">Notice to Users</h2>
+        <p class="age-gate-text">
+          This website contains age-restricted materials including nudity and explicit depictions of sexual activity. By entering, you affirm that you are at least 18 years of age or the age of majority in the jurisdiction you are accessing the website from and you consent to viewing sexually explicit content.
+        </p>
+        
+        <div class="age-gate-buttons">
+          <button id="btn-enter" class="btn-enter">I am 18 or older - Enter</button>
+          <button id="btn-exit" class="btn-exit">I am under 18 - Exit</button>
+        </div>
+
+        <div class="age-gate-footer">
+          Naija Homemade <a href="#">parental controls page</a> explains how you can easily block access to this site.<br>
+          <a href="#">Terms of Service</a> &bull; Notice to Law Enforcement<br><br>
+          &copy; NaijaHomemade.com, 2026
+        </div>
+      </div>
+    </div>
 
     <div id="root"></div>
 
     <script type="module" src="/src/main.jsx"></script>
 
-    
+    <script>
+      // 🟢 1. Helper function to inject the ad script safely
+      function loadAdNetwork() {
+        const script = document.createElement('script');
+        script.src = "https://pl28640933.effectivegatecpm.com/ef/8f/7e/ef8f7ec30c881245423ab301030a35ab.js";
+        script.async = true;
+        document.body.appendChild(script);
+      }
+
+      // 🟢 2. Check Verification Status on Load
+      (function() {
+        const ageGate = document.getElementById('age-gate');
+        const isVerified = localStorage.getItem('ageVerified');
+        
+        if (isVerified === 'true') {
+          // Hide gate, allow scroll, AND load ads
+          ageGate.style.display = 'none';
+          document.body.classList.remove('no-scroll');
+          loadAdNetwork(); 
+        } else {
+          // Show gate, DO NOT load ads yet
+          ageGate.style.display = 'flex';
+        }
+      })();
+
+      // 🟢 3. Handle User Clicking "Enter"
+      document.getElementById('btn-enter').addEventListener('click', () => {
+        const ageGate = document.getElementById('age-gate');
+        localStorage.setItem('ageVerified', 'true');
+        
+        // Load the ad network the moment they verify
+        loadAdNetwork();
+        
+        ageGate.style.opacity = '0';
+        setTimeout(() => {
+          ageGate.style.display = 'none';
+          document.body.classList.remove('no-scroll');
+        }, 300);
+      });
+
+      // Handle User Clicking "Exit"
+      document.getElementById('btn-exit').addEventListener('click', () => {
+        window.location.href = 'https://www.google.com';
+      });
+    </script>
   </body>
 </html>
