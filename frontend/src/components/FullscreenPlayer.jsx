@@ -4,16 +4,12 @@ import fluidPlayer from 'fluid-player';
 import 'fluid-player/src/css/fluidplayer.css'; 
 
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
-  // 🟢 NEW: The "Safe Room" wrapper for our raw video element
   const playerWrapperRef = useRef(null);
   const videoRef = useRef(null);
-  
   const containerRef = useRef(null); 
   const playerInstance = useRef(null); 
   const lastTap = useRef(0);
   const hideTimeout = useRef(null); 
-  
-  // 🟢 NEW: Use a Ref to track ad state inside raw JS events without causing stale closures
   const isAdActiveRef = useRef(false);
   
   const [isPlaying, setIsPlaying] = useState(false); 
@@ -30,7 +26,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
     if (hideTimeout.current) clearTimeout(hideTimeout.current);
-    
     hideTimeout.current = setTimeout(() => {
       setIsPlaying(playing => {
         if (playing) setShowControls(false); 
@@ -39,11 +34,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     }, 3000);
   }, []);
 
-  // 🟢 Safely update zooming without triggering a full React re-render of the video
   useEffect(() => {
-    if (videoRef.current) {
-        videoRef.current.style.objectFit = isZoomed ? "cover" : "contain";
-    }
+    if (videoRef.current) videoRef.current.style.objectFit = isZoomed ? "cover" : "contain";
   }, [isZoomed]);
 
   const handleInteraction = (e) => {
@@ -63,10 +55,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         if (lastTap.current === now && videoRef.current) {
           if (!isDesktop) {
             setShowControls(prev => {
-              if (!prev) {
-                resetHideTimer();
-                return true;
-              }
+              if (!prev) { resetHideTimer(); return true; }
               if (hideTimeout.current) clearTimeout(hideTimeout.current);
               return false;
             });
@@ -136,16 +125,25 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     document.body.style.width = "100%";
 
     resetHideTimer();
+    
+    let isMounted = true;
+    let initTimeout;
 
-    // 🟢 RAW JAVASCRIPT ENGINE: Completely hidden from React's DOM rendering!
-    if (playerWrapperRef.current && !playerInstance.current) {
+    initTimeout = setTimeout(() => {
+        if (!isMounted || !playerWrapperRef.current || playerInstance.current) return;
         
-        playerWrapperRef.current.innerHTML = ''; // Clear strict-mode duplicates
+        playerWrapperRef.current.innerHTML = ''; 
         
-        // 1. Build the video element natively
+        const uniqueId = `fp-video-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        
         const videoEl = document.createElement('video');
-        videoEl.id = `fp-video-${video.message_id}`;
+        videoEl.id = uniqueId;
         videoEl.playsInline = true;
+        
+        // 🟢 THE JS NUKE: Aggressively strip native browser controls
+        videoEl.controls = false; 
+        videoEl.removeAttribute('controls');
+        
         videoEl.style.width = "100%";
         videoEl.style.height = "100%";
         videoEl.style.objectFit = "contain";
@@ -160,7 +158,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         playerWrapperRef.current.appendChild(videoEl);
         videoRef.current = videoEl;
 
-        // 2. Attach native event listeners
         videoEl.ontimeupdate = () => {
             if (!isAdActiveRef.current) {
                 const current = videoEl.currentTime;
@@ -171,13 +168,13 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         videoEl.onplaying = () => { setIsLoading(false); setIsPlaying(true); };
         videoEl.onwaiting = () => setIsLoading(true);
 
-        // 3. Initialize Fluid Player
         const playerOptions = {
             layoutControls: {
                 fillToContainer: true,
                 playButtonShowing: false, 
                 autoPlay: true, 
                 keyboardControl: false,
+                allowDownload: false, // Double check Fluid doesn't add its own download button
             }
         };
 
@@ -210,13 +207,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
                         setIsAdActive(false);
                         isAdActiveRef.current = false;
                         setIsLoading(false); 
-                        
-                        // 🟢 FAILSAFE: If ad gets blocked, force the main video to play!
-                        setTimeout(() => {
-                            if (videoRef.current && videoRef.current.paused) {
-                                videoRef.current.play().catch(() => console.log("Autoplay strictly blocked by browser"));
-                            }
-                        }, 100);
                     }
                 }
             };
@@ -230,9 +220,12 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         });
         playerInstance.current.on('pause', () => setIsPlaying(false));
         playerInstance.current.on('ended', () => setIsPlaying(false));
-    }
+        
+    }, 50);
 
     return () => {
+      isMounted = false;
+      clearTimeout(initTimeout);
       document.body.style.overflow = "";
       document.body.style.position = "";
       document.body.style.top = "";
@@ -244,8 +237,11 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
           playerInstance.current.destroy();
           playerInstance.current = null;
       }
+      if (playerWrapperRef.current) {
+          playerWrapperRef.current.innerHTML = '';
+      }
     };
-  }, [resetHideTimer, video.video_url, isPremiumStream, video.message_id]);
+  }, [resetHideTimer, video.video_url, isPremiumStream]);
 
   if (!video) return null;
 
@@ -273,7 +269,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             </div>
           )}
 
-          {/* 🟢 THE SAFE ROOM: React leaves this alone entirely so Fluid Player can do its job */}
           <div ref={playerWrapperRef} style={{ width: "100%", height: "100%", zIndex: 1 }} />
 
           {!isAdActive && (!isLoading && (showControls || !isPlaying)) && (
@@ -352,15 +347,23 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         .range-active::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
         .range-active { height: 6px !important; pointer-events: auto; }
         
+        /* 🟢 THE CSS NUKE: Permanently blindfold all native and fluid player controls */
+        .fluid_controls_container { display: none !important; } /* Destroys Fluid Player's progress bar */
         .fluid_controls_bottom { display: none !important; }
-        .fluid_state_button { display: none !important; } /* 🟢 Hides native big play button so yours is the only one */
+        .fluid_state_button { display: none !important; } 
+        
+        /* Safari & Chrome native control shadow-DOM destruction */
+        video::-webkit-media-controls { display: none !important; }
+        video::-webkit-media-controls-enclosure { display: none !important; }
+        video::-webkit-media-controls-panel { display: none !important; }
+        
         .fluid_video_wrapper.fluid_ad_playing { z-index: 5 !important; }
       `}</style>
     </div>
   );
 }
 
-// 🖌 STYLES (Keep your existing constants exactly as they were)
+// 🖌 STYLES
 const overlayStyle = { position: "fixed", inset: 0, height: "100dvh", backgroundColor: "#000", zIndex: 999999, display: "flex", flexDirection: "column", overflow: "hidden", touchAction: "none" };
 const stageStyle = { display: "flex", width: "100%", height: "100%", background: "#000", position: "relative" };
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
