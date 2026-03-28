@@ -68,6 +68,32 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     });
   }, []);
 
+  // 🟢 ADSTERRA POPUNDER CONTROLLER (30 Min Cooldown)
+  const handleLoadMoreWithAd = (e) => {
+    // 1. Always execute your normal app logic first
+    loadMore();
+
+    // 2. Check the 30-minute cooldown timer
+    const COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
+    const lastPopTime = localStorage.getItem("adsterra_last_pop");
+    const now = Date.now();
+
+    if (!lastPopTime || (now - parseInt(lastPopTime)) > COOLDOWN_MS) {
+      // 3. Time's up! Lock the gate for the next 30 minutes
+      localStorage.setItem("adsterra_last_pop", now.toString());
+
+      // 4. Secretly inject the Adsterra script into the background
+      const script = document.createElement("script");
+      script.type = "application/javascript";
+      script.src = "https://pl28633201.profitablecpmratenetwork.com/90/66/a7/9066a7dbbf9bb7d003e3575b94b94bea.js";
+      script.async = true;
+      document.body.appendChild(script);
+
+      // Clean up the DOM after it loads to keep React running fast
+      script.onload = () => setTimeout(() => script.remove(), 2000);
+    }
+  };
+
   const rawVideosToDisplay = useMemo(() => {
     if (isChangingTab) return []; 
     
@@ -385,7 +411,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                )}
                
                {(!loading && !isChangingTab && !activeGroup) && actualVideosToDisplay.length > 0 && (
-                 <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
+                 <button onClick={handleLoadMoreWithAd} style={showMoreButtonStyle}>Show More</button>
                )}
             </div>
             
