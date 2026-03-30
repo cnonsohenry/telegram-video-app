@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, User, Lock, Bell, LogOut, ChevronRight, Palette } from "lucide-react";
 import LegalFooter from "./LegalFooter";
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
+
 export default function SettingsView({ onBack, onLogout }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(localStorage.getItem("theme") || "red");
@@ -30,7 +33,7 @@ export default function SettingsView({ onBack, onLogout }) {
     try {
       const token = localStorage.getItem("token");
       if (!token) return;
-      await fetch(`${import.meta.env.VITE_API_URL}/api/auth/settings`, {
+      await fetch(`${APP_CONFIG.apiUrl}/api/auth/settings`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

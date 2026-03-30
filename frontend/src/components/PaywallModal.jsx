@@ -1,18 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, ArrowLeft, Copy, QrCode, ShieldCheck, Wallet, UserX } from "lucide-react";
 
-// 🟢 Dual-Pricing Packages
-const PACKAGES = [
-  { id: '1_month', label: '1 Month', price: 15000, priceText: '₦15,000', priceUsd: 19, textUsd: '$19' },
-  { id: '2_months', label: '2 Months', price: 25000, priceText: '₦25,000', priceUsd: 25, textUsd: '$25' },
-  { id: '1_year', label: '1 Year', price: 125000, priceText: '₦125,000', priceUsd: 95, textUsd: '$95' }
-];
-
-const BANK_DETAILS = {
-  bankName: "Not available, use crypto option",
-  accountNumber: "",
-  accountName: ""
-};
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
 
 export default function PaywallModal({ onClose, user }) {
   const [selectedMethod, setSelectedMethod] = useState(null); 
@@ -28,8 +18,6 @@ export default function PaywallModal({ onClose, user }) {
   const [copiedField, setCopiedField] = useState(null); 
   
   const [cryptoPaidClicked, setCryptoPaidClicked] = useState(false);
-  
-  // 🟢 NEW: State for the native login alert
   const [showAuthAlert, setShowAuthAlert] = useState(false);
 
   useEffect(() => {
@@ -37,16 +25,14 @@ export default function PaywallModal({ onClose, user }) {
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  // 🟢 UPDATED: Native Authentication Gatekeeper
   const handleMethodSelect = (method) => {
     if (!user || !user.id) {
-      setShowAuthAlert(true); // Trigger the beautifully styled UI instead of an alert()
+      setShowAuthAlert(true); 
       return;
     }
     setSelectedMethod(method);
   };
 
-  // FIAT POLLING COUNTDOWN
   useEffect(() => {
     let interval;
     if (verifying && timer > 0) {
@@ -58,14 +44,14 @@ export default function PaywallModal({ onClose, user }) {
     return () => clearInterval(interval);
   }, [verifying, timer]);
 
-  // CRYPTO POLLING ENGINE
   useEffect(() => {
     let cryptoInterval;
     
     if (cryptoPaymentDetails && cryptoPaidClicked && verifyStatus !== "success") {
       const checkStatus = async () => {
         try {
-          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/crypto/status/${cryptoPaymentDetails.order_id}`);
+          // 🟢 THE FIX: Dynamic API URL
+          const res = await fetch(`${APP_CONFIG.apiUrl}/api/crypto/status/${cryptoPaymentDetails.order_id}`);
           const data = await res.json();
           
           if (data.success && data.status === 'APPROVED') {
@@ -84,7 +70,6 @@ export default function PaywallModal({ onClose, user }) {
     return () => clearInterval(cryptoInterval);
   }, [cryptoPaymentDetails, cryptoPaidClicked, verifyStatus]);
 
-  // BANK TRANSFER POLLING ENGINE
   const startVerification = async () => {
     if (!senderName.trim()) {
       alert("Please enter the exact name you are sending from.");
@@ -100,7 +85,8 @@ export default function PaywallModal({ onClose, user }) {
       if (attempts >= maxAttempts) return; 
       
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/verify-payment`, {
+        // 🟢 THE FIX: Dynamic API URL
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/verify-payment`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -138,11 +124,11 @@ export default function PaywallModal({ onClose, user }) {
     poll(); 
   };
 
-  // CRYPTO GENERATION ENGINE
   const generateCryptoAddress = async (coin) => {
     setGeneratingCrypto(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/crypto/create`, {
+      // 🟢 THE FIX: Dynamic API URL
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/crypto/create`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -212,7 +198,6 @@ export default function PaywallModal({ onClose, user }) {
 
         <div style={contentContainerStyle}>
 
-          {/* 🟢 NEW NATIVE VIEW: LOGIN ALERT */}
           {showAuthAlert && (
             <div style={{ ...centerFlexStyle, textAlign: "center", animation: "fadeInUp 0.3s ease-out" }}>
               <div style={headerStyle}>
@@ -246,7 +231,6 @@ export default function PaywallModal({ onClose, user }) {
             </div>
           )}
           
-          {/* STATE 1: INITIAL SELECTION */}
           {!showAuthAlert && !selectedMethod && (
             <div style={centerFlexStyle}>
               <div style={headerStyle}>
@@ -277,12 +261,12 @@ export default function PaywallModal({ onClose, user }) {
             </div>
           )}
 
-          {/* STATE 2: PACKAGE SELECTION */}
           {!showAuthAlert && selectedMethod && !selectedPackage && !verifying && !verifyStatus && (
             <div style={{ paddingTop: "20px" }}>
               <h2 style={{...titleStyle, fontSize: "20px", textAlign: "center", marginBottom: "20px"}}>Select a Package</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
-                {PACKAGES.map((pkg) => (
+                {/* 🟢 THE FIX: Dynamic Packages from Config */}
+                {APP_CONFIG.subscriptionPackages.map((pkg) => (
                   <button 
                     key={pkg.id} 
                     onClick={() => setSelectedPackage(pkg)}
@@ -298,14 +282,14 @@ export default function PaywallModal({ onClose, user }) {
             </div>
           )}
 
-          {/* STATE 3A: BANK TRANSFER FLOW */}
           {!showAuthAlert && selectedMethod === 'transfer' && selectedPackage && !verifying && !verifyStatus && (
             <div style={transferDetailsBox}>
               <p style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#8e8e93" }}>Please transfer exactly <strong style={{color:"#fff"}}>{selectedPackage.priceText}</strong> to:</p>
               <div style={infoBoxStyle}>
-                <div><strong>Bank:</strong> {BANK_DETAILS.bankName}</div>
-                <div><strong>Account:</strong> <span style={{color: "var(--primary-color)", fontSize: "18px", letterSpacing: "1px"}}>{BANK_DETAILS.accountNumber}</span></div>
-                <div><strong>Name:</strong> {BANK_DETAILS.accountName}</div>
+                {/* 🟢 THE FIX: Dynamic Bank Details from Config */}
+                <div><strong>Bank:</strong> {APP_CONFIG.bankDetails.bankName}</div>
+                <div><strong>Account:</strong> <span style={{color: "var(--primary-color)", fontSize: "18px", letterSpacing: "1px"}}>{APP_CONFIG.bankDetails.accountNumber}</span></div>
+                <div><strong>Name:</strong> {APP_CONFIG.bankDetails.accountName}</div>
               </div>
 
               <div style={{ marginTop: "20px" }}>
@@ -331,27 +315,21 @@ export default function PaywallModal({ onClose, user }) {
                <h3 style={{color: "#fff", textAlign: "center", marginBottom: "15px", marginTop: "0", fontSize: "18px"}}>Select Cryptocurrency</h3>
                
                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                 <button onClick={() => generateCryptoAddress('usdttrc20')} style={{...cryptoGridButtonStyle, background: "#26A17B"}}>
-                    USDT (TRC-20)
-                 </button>
-                 <button onClick={() => generateCryptoAddress('usdtbsc')} style={{...cryptoGridButtonStyle, background: "#26A17B"}}>
-                    USDT (BSC)
-                 </button>
-                 <button onClick={() => generateCryptoAddress('btc')} style={{...cryptoGridButtonStyle, background: "#F7931A"}}>
-                    Bitcoin (BTC)
-                 </button>
-                 <button onClick={() => generateCryptoAddress('eth')} style={{...cryptoGridButtonStyle, background: "#627EEA"}}>
-                    Ethereum (ETH)
-                 </button>
-                 <button onClick={() => generateCryptoAddress('ltc')} style={{...cryptoGridButtonStyle, background: "#345D9D"}}>
-                    Litecoin (LTC)
-                 </button>
-                 <button onClick={() => generateCryptoAddress('bnbbsc')} style={{...cryptoGridButtonStyle, background: "#F3BA2F", color: "#000"}}>
-                    BNB (BSC)
-                 </button>
-                 <button onClick={() => generateCryptoAddress('ton')} style={{...cryptoGridButtonStyle, background: "#0098EA", gridColumn: "span 2"}}>
-                    Toncoin (TON)
-                 </button>
+                 {/* 🟢 THE FIX: Dynamic Crypto Buttons from Config */}
+                 {APP_CONFIG.cryptoOptions.map((coin) => (
+                   <button 
+                     key={coin.id}
+                     onClick={() => generateCryptoAddress(coin.id)} 
+                     style={{
+                       ...cryptoGridButtonStyle, 
+                       background: coin.bg, 
+                       color: coin.text,
+                       gridColumn: coin.span === 2 ? "span 2" : "auto"
+                     }}
+                   >
+                      {coin.label}
+                   </button>
+                 ))}
                </div>
             </div>
           )}
@@ -418,7 +396,6 @@ export default function PaywallModal({ onClose, user }) {
             </div>
           )}
 
-          {/* STATE 4: POLLING / SUCCESS / TIMEOUT */}
           {verifying && (
             <div style={{ textAlign: "center", padding: "40px 10px", margin: "auto" }}>
               <Loader2 size={48} color="var(--primary-color)" style={{ animation: "spin 1s linear infinite", margin: "0 auto 20px auto" }} />
@@ -446,7 +423,8 @@ export default function PaywallModal({ onClose, user }) {
               <p style={{ fontSize: "13px", color: "#fff", marginTop: "15px", marginBottom: "20px", background: "rgba(255,255,255,0.05)", padding: "10px", borderRadius: "8px" }}>
                 Send your receipt to our Admin on Telegram to instantly unlock your account.
               </p>
-              <button onClick={() => window.open("https://t.me/NaijaHomemade", "_blank")} style={{...payButtonStyle, background: "#0088cc"}}>
+              {/* 🟢 THE FIX: Dynamic Support Link */}
+              <button onClick={() => window.open(APP_CONFIG.supportTelegramLink, "_blank")} style={{...payButtonStyle, background: "#0088cc"}}>
                 Contact Admin
               </button>
               <button onClick={onClose} style={{...payButtonStyle, background: "transparent", border: "1px solid #333", marginTop: "10px"}}>
@@ -487,7 +465,7 @@ const Benefit = ({ text }) => (
   </div>
 );
 
-// 🖌 UI STYLES
+// 🖌 UI STYLES (Unchanged)
 const overlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999, padding: "20px" };
 const modalStyle = { background: "#0B0F1A", border: "1px solid var(--border-color)", borderRadius: "24px", width: "100%", maxWidth: "400px", height: "90vh", maxHeight: "650px", display: "flex", flexDirection: "column", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", animation: "fadeInUp 0.3s ease-out", padding: "20px" };
 

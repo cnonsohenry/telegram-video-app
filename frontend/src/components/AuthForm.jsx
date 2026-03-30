@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Eye, EyeOff, Loader2, Check, X, AlertCircle } from "lucide-react";
 
-// 🟢 UPDATED: Floating Label Input Component with Neutral Gray Focus States
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
+
 const FloatingInput = ({ label, type = "text", value, onChange, rightIcon, statusColor, ...props }) => {
   const [isFocused, setIsFocused] = useState(false);
   
   const active = isFocused || value.length > 0;
 
-  // 🟢 THE FIX: Resting state is dark gray (#333), focused state is light gray (#777)
   let borderColor = "#333";
   if (statusColor) borderColor = statusColor;
   else if (isFocused) borderColor = "#777"; 
@@ -20,7 +21,6 @@ const FloatingInput = ({ label, type = "text", value, onChange, rightIcon, statu
         top: active ? "10px" : "50%",
         transform: active ? "none" : "translateY(-50%)",
         fontSize: active ? "11px" : "15px",
-        // 🟢 Label turns silver instead of red when focused
         color: active ? (isFocused ? "#ccc" : "#8e8e93") : "#8e8e93",
         fontWeight: active ? "700" : "400",
         pointerEvents: "none", 
@@ -45,7 +45,6 @@ const FloatingInput = ({ label, type = "text", value, onChange, rightIcon, statu
           outline: "none",
           boxSizing: "border-box",
           transition: "border-color 0.2s, box-shadow 0.2s",
-          // 🟢 Changed the red glow to a sleek, subtle white glow
           boxShadow: isFocused && !statusColor ? `0 0 0 3px rgba(255, 255, 255, 0.08)` : "none"
         }}
         {...props}
@@ -103,7 +102,8 @@ export default function AuthForm({ onLoginSuccess }) {
     setError("");
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google`, {
+      // 🟢 THE FIX: Dynamic API URL
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: response.credential }),
@@ -136,7 +136,8 @@ export default function AuthForm({ onLoginSuccess }) {
     const endpoint = isRegistering ? "/api/auth/register" : "/api/auth/login";
     
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
+      // 🟢 THE FIX: Dynamic API URL
+      const res = await fetch(`${APP_CONFIG.apiUrl}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -172,7 +173,8 @@ export default function AuthForm({ onLoginSuccess }) {
 
     debounceTimerRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/check-username?username=${sanitizedValue}`);
+        // 🟢 THE FIX: Dynamic API URL
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/auth/check-username?username=${sanitizedValue}`);
         const data = await res.json();
         
         if (data.available) {
@@ -194,7 +196,11 @@ export default function AuthForm({ onLoginSuccess }) {
     <div style={loginContainerStyle}>
       <div style={contentWrapper}>
         <div style={innerContainer}>
-          <h1 style={logoStyle}>NAIJA<span style={{ color: "var(--primary-color)" }}>HOMEMADE</span></h1>
+          {/* 🟢 THE FIX: Dynamic App Logo */}
+          <h1 style={logoStyle}>
+            {APP_CONFIG.appNamePrefix}
+            <span style={{ color: "var(--primary-color)" }}>{APP_CONFIG.appNameSuffix}</span>
+          </h1>
           
           <div style={errorContainerStyle}>
             {error && (

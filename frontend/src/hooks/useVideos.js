@@ -25,9 +25,6 @@ export function useVideos(currentCategory, limit = 12) {
       if (currentCategory === APP_CONFIG.categories[3] || currentCategory === "trends") {
         url += `&sort=trending`;
       }
-
-      // 🟢 Add this console.log right above the fetch
-      console.log("🔍 FETCHING URL:", url);
       
       const res = await fetch(url);
       const data = await res.json();

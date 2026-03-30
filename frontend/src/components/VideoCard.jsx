@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Play, Copy } from 'lucide-react'; // 🟢 Added 'Copy' icon
+import { Play, Copy } from 'lucide-react'; 
+
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
 
 export default function VideoCard({ video, onOpen, showDetails = true }) {
   const videoRef = useRef(null);
@@ -104,7 +107,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           }}
         />
         
-        {/* 🟢 THE GROUP ICON: Shows up top-right if video.is_group is true */}
         {video.is_group && (
           <div style={{
             position: "absolute",
@@ -117,7 +119,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 11 // Stays above the video layer
+            zIndex: 11 
           }}>
             <Copy size={16} color="#fff" />
           </div>
@@ -142,20 +144,22 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
       {showDetails && (
         <div style={{ padding: "12px 4px", display: "flex", flexDirection: "column", flexShrink: 0 }}>
           <p style={captionTextStyle}>
-            {video.caption || "No caption provided"}
+            {/* 🟢 THE FIX: Dynamic fallback caption */}
+            {video.caption || APP_CONFIG.defaultCaption}
           </p>
           
           <div style={userInfoRowStyle}>
             <div style={avatarWrapperStyle}>
                <img 
-                 src={`https://videos.naijahomemade.com/api/avatar?user_id=${video.uploader_id}`}
+                 src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
                  alt=""
                  onError={(e) => { e.target.style.display = 'none'; }}
                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
                />
             </div>
             <span style={uploaderNameStyle}>
-              @{video.uploader_name || "Member"}
+              {/* 🟢 THE FIX: Dynamic fallback username */}
+              @{video.uploader_name || APP_CONFIG.defaultUploader}
             </span>
           </div>
         </div>
@@ -172,7 +176,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
 }
 
 // 🖌 Styles
-const captionTextStyle = { margin: "0 0 6px 0", fontSize: "14px", color: "#fff", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "600" };
+const captionTextStyle = { margin: "0 0 6px 0", fontSize: "12px", color: "#fff", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "600" };
 const userInfoRowStyle = { display: "flex", alignItems: "center", gap: "8px" };
-const avatarWrapperStyle = { width: "24px", height: "24px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid #333" };
-const uploaderNameStyle = { fontSize: "12px", color: "#8e8e8e", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const avatarWrapperStyle = { width: "16px", height: "16px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid #333" };
+const uploaderNameStyle = { fontSize: "10px", color: "#8e8e8e", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Play, Lock } from "lucide-react";
 
-// 🟢 THE FIX: Removed 'suggestions' and 'loading' from props. The sidebar now manages itself!
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
+
 export default function SuggestedSidebar({ onVideoClick }) {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,7 +13,7 @@ export default function SuggestedSidebar({ onVideoClick }) {
     setLoading(true);
 
     // 🟢 AUTONOMOUS FETCH: The sidebar hits the API directly, completely bypassing the Home cache
-    fetch("https://videos.naijahomemade.com/api/videos?page=1&limit=1")
+    fetch(`${APP_CONFIG.apiUrl}/api/videos?page=1&limit=1`)
       .then((res) => res.json())
       .then((data) => {
         if (isMounted && data.suggestions) {
@@ -78,14 +80,16 @@ export default function SuggestedSidebar({ onVideoClick }) {
                   lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", 
                   WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" 
                 }}>
-                  {v.caption || "View trending video..."}
+                  {/* 🟢 THE FIX: Dynamic Default Caption */}
+                  {v.caption || APP_CONFIG.defaultCaption}
                 </p>
                 <div style={{ color: "#8e8e8e", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
                   <Play size={10} fill="#8e8e8e" strokeWidth={0} />
                   <span>{Number(v.views || 0).toLocaleString()} views</span>
                 </div>
                 <div style={{ color: "#555", fontSize: "11px", fontWeight: "700", marginTop: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  @{v.uploader_name || "Member"}
+                  {/* 🟢 THE FIX: Dynamic Default Uploader */}
+                  @{v.uploader_name || APP_CONFIG.defaultUploader}
                 </div>
               </div>
             </div>

@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Settings, Grid3X3, Heart, Lock, CheckCircle, Share2, ArrowLeft } from "lucide-react"; // 🟢 Added ArrowLeft
+import { Settings, Grid3X3, Heart, Lock, CheckCircle, Share2, ArrowLeft } from "lucide-react"; 
 import VideoCard from "../components/VideoCard"; 
 import SettingsView from "../components/SettingsView"; 
 import { useVideos } from "../hooks/useVideos";
+
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
 
 export default function Profile({ user, onLogout, setHideFooter, setActiveVideo, setShowPaywall }) {
   const [activeTab, setActiveTab] = useState("videos");
   const [currentView, setCurrentView] = useState("profile");
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
   
-  // 🟢 NEW: State to track if we are viewing a specific group of videos
   const [activeGroup, setActiveGroup] = useState(null);
 
-  // Handle Resize for layout switching
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth > 1024);
     window.addEventListener("resize", handleResize);
@@ -28,7 +29,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     return () => setHideFooter(false);
   }, [currentView, setHideFooter]);
 
-  // 🟢 NEW: Reset the active group if the user changes tabs
   useEffect(() => {
     setActiveGroup(null);
   }, [activeTab]);
@@ -36,7 +36,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
   const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots");
   const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium");
 
-  // 🟢 Updated open logic to handle Groups
   const handleOpenVideo = useCallback(async (video, e) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
@@ -44,10 +43,10 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     }
     if (!video) return;
 
-    // 🟢 IF IT'S A GROUP: Fetch the full album from the server!
     if (video.is_group && !activeGroup) {
       try {
-        const res = await fetch(`https://videos.naijahomemade.com/api/group?media_group_id=${video.media_group_id}`);
+        // 🟢 THE FIX: Dynamic API URL
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
         
         setActiveGroup({
@@ -61,7 +60,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
       return;
     }
 
-    // 🟢 PREMIUM GATE
     if (video.category === "premium" || activeTab === "premium") {
       if (!user || !user.is_premium) {
         setShowPaywall(true);
@@ -69,10 +67,10 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
       }
     }
 
-    // Free Content / Unlocked Premium Content
     try {
       setActiveVideo({ ...video, video_url: null }); 
-      const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+      // 🟢 THE FIX: Dynamic API URL
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       if (!res.ok) throw new Error("Fetch failed");
       const data = await res.json();
       if (data.video_url) setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
@@ -80,13 +78,12 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
       console.error("Profile Video Load Error:", err);
       setActiveVideo(null);
     }
-  }, [user, activeTab, setActiveVideo, activeGroup, isDesktop]); // 🟢 Added dependencies
+  }, [user, activeTab, setActiveVideo, activeGroup, isDesktop]); 
 
   const { data: rawVideosToDisplay, loading, loadMore } = activeTab === "premium" 
     ? { data: premium || [], loading: premiumLoading, loadMore: loadMorePremium }
     : { data: shots || [], loading: shotsLoading, loadMore: loadMoreShots };
 
-  // 🟢 Determine what array to actually render (The full feed OR the selected group)
   const videosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
 
   if (currentView === "settings") {
@@ -102,7 +99,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           <div style={navGridStyle}>
             <div style={{ width: "40px" }}></div>
             <div style={centerTitleContainer}>
-              <h2 style={usernameStyle}>{user?.username || "Member"}</h2>
+              <h2 style={usernameStyle}>{user?.username || APP_CONFIG.defaultUploader}</h2>
               <CheckCircle size={14} color="#20D5EC" fill="black" style={{ marginLeft: "4px" }} />
             </div>
             <div style={{ display: "flex", gap: "16px", justifyContent: "flex-end", flex: 1 }}>
@@ -138,8 +135,9 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
               </div>
 
               <p style={{ ...bioStyle, fontSize: isDesktop ? "16px" : "12px", color: "#ccc", lineHeight: "1.4" }}>
-                <b style={{ color: "#fff" }}>Official Preview Channel</b><br/>
-                Catch my latest shots here before they hit Premium 💎
+                {/* 🟢 THE FIX: Dynamic Profile Bio */}
+                <b style={{ color: "#fff" }}>{APP_CONFIG.profileBioTitle}</b><br/>
+                {APP_CONFIG.profileBioSubtitle}
               </p>
 
               {isDesktop && (
@@ -148,7 +146,8 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
                     style={premiumButtonStyle}
                     onClick={() => (!user || !user.is_premium) ? setShowPaywall(true) : alert("You are already Premium!")}
                   >
-                    {user?.is_premium ? "VIP MEMBER" : "SUBSCRIBE PREMIUM"}
+                    {/* 🟢 THE FIX: Dynamic Subscribe Text */}
+                    {user?.is_premium ? APP_CONFIG.profileVipText : APP_CONFIG.profileSubscribeText}
                   </button>
                   <button style={secondaryButtonStyle} onClick={() => alert("Link Copied")}><Share2 size={18} /></button>
                 </div>
@@ -162,7 +161,8 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
                 style={{ ...premiumButtonStyle, flex: 1, padding: "8px 16px", fontSize: "13px" }}
                 onClick={() => (!user || !user.is_premium) ? setShowPaywall(true) : alert("You are already Premium!")}
               >
-                {user?.is_premium ? "VIP MEMBER" : "SUBSCRIBE PREMIUM"}
+                {/* 🟢 THE FIX: Dynamic Subscribe Text */}
+                {user?.is_premium ? APP_CONFIG.profileVipText : APP_CONFIG.profileSubscribeText}
               </button>
               <button style={{ ...secondaryButtonStyle, padding: "0 15px" }} onClick={() => alert("Link Copied")}><Share2 size={18} /></button>
             </div>
@@ -177,15 +177,33 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           borderTop: isDesktop ? "1px solid var(--border-color)" : "none",
           top: isDesktop ? "0" : "48px"
         }}>
-          <TabButton isDesktop={isDesktop} active={activeTab === "videos"} onClick={() => setActiveTab("videos")} icon={<Grid3X3 size={isDesktop ? 18 : 24} />} label="POSTS" />
-          <TabButton isDesktop={isDesktop} active={activeTab === "premium"} onClick={() => setActiveTab("premium")} icon={<Lock size={isDesktop ? 18 : 24} />} label="PREMIUM" />
-          <TabButton isDesktop={isDesktop} active={activeTab === "likes"} onClick={() => setActiveTab("likes")} icon={<Heart size={isDesktop ? 18 : 24} />} label="LIKED" />
+          {/* 🟢 THE FIX: Dynamic Tab Labels */}
+          <TabButton 
+            isDesktop={isDesktop} 
+            active={activeTab === "videos"} 
+            onClick={() => setActiveTab("videos")} 
+            icon={<Grid3X3 size={isDesktop ? 18 : 24} />} 
+            label={APP_CONFIG.profileTabs.posts} 
+          />
+          <TabButton 
+            isDesktop={isDesktop} 
+            active={activeTab === "premium"} 
+            onClick={() => setActiveTab("premium")} 
+            icon={<Lock size={isDesktop ? 18 : 24} />} 
+            label={APP_CONFIG.profileTabs.premium} 
+          />
+          <TabButton 
+            isDesktop={isDesktop} 
+            active={activeTab === "likes"} 
+            onClick={() => setActiveTab("likes")} 
+            icon={<Heart size={isDesktop ? 18 : 24} />} 
+            label={APP_CONFIG.profileTabs.liked} 
+          />
         </div>
 
         {/* VIDEO GRID */}
         <div style={contentAreaStyle}>
           
-          {/* 🟢 NEW: Group Header & Back Button (Only visible when viewing a group) */}
           {activeGroup && (
             <div style={groupHeaderStyle}>
               <button onClick={() => setActiveGroup(null)} style={backButtonStyle}>
@@ -240,7 +258,7 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
   </button>
 );
 
-// 🖌 STYLES
+// 🖌 STYLES (Unchanged)
 const containerStyle = { minHeight: "100%", background: "var(--bg-color)", color: "#fff", position: "relative", overflowX: "hidden" };
 const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%" };
 const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid var(--border-color)", position: "sticky", top: 0, background: "var(--bg-color)", zIndex: 100, backdropFilter: "blur(15px)" };
@@ -260,7 +278,6 @@ const gridStyle = { display: "grid" };
 const loadMoreBtnStyle = { display: "block", width: "100%", padding: "20px", background: "none", border: "none", color: "#8e8e8e", fontSize: "13px", fontWeight: "600", cursor: "pointer" };
 const loaderStyle = { padding: "40px", textAlign: "center", color: "#666", fontSize: "14px" };
 
-// 🟢 NEW STYLES FOR GROUPS
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px", background: "var(--bg-color)", borderBottom: "1px solid rgba(255,255,255,0.05)" };
 const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
 const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link, X, Send } from "lucide-react";
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
+
 export default function AdminUpload({ onClose }) {
   const [uploadMode, setUploadMode] = useState("local"); 
 
-  const [adminId, setAdminId] = useState("1881815190"); 
+  // 🟢 THE FIX: Set default values dynamically from config
+  const [adminId, setAdminId] = useState(APP_CONFIG.adminUsers[0]?.id || ""); 
   const [category, setCategory] = useState("premium");
 
   // Local State
@@ -21,8 +25,8 @@ export default function AdminUpload({ onClose }) {
   const [telegramUrl, setTelegramUrl] = useState("");
   const [telegramStatus, setTelegramStatus] = useState("idle"); 
 
-  // Shared Dest State
-  const [telegramDest, setTelegramDest] = useState("@mini_video_app_bot"); 
+  // 🟢 THE FIX: Set default Telegram destination from config
+  const [telegramDest, setTelegramDest] = useState(APP_CONFIG.telegramDestinations[0]?.id || ""); 
 
   useEffect(() => {
     const scrollY = window.scrollY;
@@ -63,7 +67,8 @@ export default function AdminUpload({ onClose }) {
     formData.append("category", category);
 
     try {
-      const res = await fetch("https://videos.naijahomemade.com/api/admin/upload-premium", {
+      // 🟢 THE FIX: Dynamic API URL
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/upload-premium`, {
         method: "POST",
         body: formData,
       });
@@ -94,9 +99,10 @@ export default function AdminUpload({ onClose }) {
 
     setTwitterStatus("processing");
 
+    // 🟢 THE FIX: Dynamic API URLs
     const endpoint = pipelineRoute === "direct" 
-        ? "https://videos.naijahomemade.com/twitter-api/import-twitter-direct"
-        : "https://videos.naijahomemade.com/twitter-api/import-twitter-telethon";
+        ? `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-direct`
+        : `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-telethon`;
 
     try {
       const res = await fetch(endpoint, {
@@ -136,7 +142,8 @@ export default function AdminUpload({ onClose }) {
     setTelegramStatus("processing");
 
     try {
-      const res = await fetch("https://videos.naijahomemade.com/twitter-api/import-telegram-link", {
+      // 🟢 THE FIX: Dynamic API URL
+      const res = await fetch(`${APP_CONFIG.apiUrl}/twitter-api/import-telegram-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -203,34 +210,36 @@ export default function AdminUpload({ onClose }) {
           </button>
         </div>
 
-        {/* 🟢 SHARED INPUTS (Visible across all modes) */}
+        {/* 🟢 SHARED INPUTS */}
         <div style={formStyle}>
           
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Your Admin ID</label>
             <select value={adminId} onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required>
               <option value="" disabled>Select your Admin ID</option>
-              <option value="1881815190">Main Admin (1881815190)</option>
-              <option value="5441995861">Mamsuazulu (5441995861)</option>
+              {/* 🟢 THE FIX: Dynamic Admin Users from Config */}
+              {APP_CONFIG.adminUsers.map(admin => (
+                <option key={admin.id} value={admin.id}>{admin.label} ({admin.id})</option>
+              ))}
             </select>
           </div>
 
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Category</label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
+              {/* 🟢 THE FIX: Dynamic Categories from Config (Including premium and shots) */}
               <option value="premium">Premium</option>
-              <option value="hotties">Hotties</option>
-              <option value="knacks">Knacks</option>
-              <option value="trends">Trends</option>
               <option value="shots">Shots</option>
-              <option value="baddies">Baddies</option>
+              {APP_CONFIG.categories.map(cat => (
+                <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+              ))}
             </select>
           </div>
         </div>
 
         <hr style={{ border: "none", borderTop: "1px solid #333", margin: "20px 0" }} />
 
-        {/* 🟢 LOCAL UPLOAD SPECIFIC FIELDS */}
+        {/* 🟢 LOCAL UPLOAD */}
         {uploadMode === "local" && (
           <form onSubmit={handleUpload} style={formStyle}>
             <div style={inputGroupStyle}>
@@ -244,7 +253,7 @@ export default function AdminUpload({ onClose }) {
             <div style={fileDropStyle}>
               <input type="file" accept="video/*" onChange={handleFileChange} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
               {file ? (
-                <div style={{ textAlign: "center", color: "#20D5EC" }}>
+                <div style={{ textAlign: "center", color: "var(--primary-color)" }}>
                   <FileVideo size={32} style={{ marginBottom: "8px" }} />
                   <div style={{ fontSize: "14px", fontWeight: "600" }}>{file.name}</div>
                 </div>
@@ -258,14 +267,14 @@ export default function AdminUpload({ onClose }) {
 
             <button 
               type="submit" disabled={status === "uploading"}
-              style={{ ...buttonStyle, background: status === "uploading" ? "#333" : status === "success" ? "#4cd964" : status === "error" ? "#ff3b30" : "#ff3b30" }}
+              style={{ ...buttonStyle, background: status === "uploading" ? "#333" : status === "success" ? "#4cd964" : status === "error" ? "#ff3b30" : "var(--primary-color)" }}
             >
               {status === "uploading" ? <><Loader2 className="spin" size={18} /> Uploading...</> : status === "success" ? <><CheckCircle size={18} /> Complete!</> : status === "error" ? <><AlertCircle size={18} /> Failed.</> : "Upload Video"}
             </button>
           </form>
         )}
 
-        {/* 🟢 TWITTER IMPORT SPECIFIC FIELDS */}
+        {/* 🟢 TWITTER IMPORT */}
         {uploadMode === "twitter" && (
           <form onSubmit={handleTwitterImport} style={formStyle}>
             <div style={inputGroupStyle}>
@@ -276,15 +285,14 @@ export default function AdminUpload({ onClose }) {
               </select>
             </div>
 
-            {/* DYNAMIC DESTINATION DROPDOWN */}
             {pipelineRoute === "telethon" && (
               <div style={inputGroupStyle}>
                 <label style={labelStyle}>Telegram Destination</label>
                 <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
-                  <option value="@mini_video_app_bot">🤖 Main Bot (@mini_video_app_bot)</option>
-                  <option value="-1001547669083">NaijaHomemade Backup</option>
-                  <option value="-1001539197699">NaijaHomemade Channel</option>
-                  <option value="-1003814827178">VIP Premiun Mar 06</option>
+                  {/* 🟢 THE FIX: Dynamic Telegram Destinations from Config */}
+                  {APP_CONFIG.telegramDestinations.map(dest => (
+                    <option key={dest.id} value={dest.id}>{dest.label}</option>
+                  ))}
                 </select>
               </div>
             )}
@@ -313,16 +321,16 @@ export default function AdminUpload({ onClose }) {
           </form>
         )}
 
-        {/* 🟢 TELEGRAM IMPORT SPECIFIC FIELDS */}
+        {/* 🟢 TELEGRAM IMPORT */}
         {uploadMode === "telegram" && (
           <form onSubmit={handleTelegramImport} style={formStyle}>
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Telegram Destination</label>
               <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
-                <option value="@mini_video_app_bot">🤖 Main Bot (@mini_video_app_bot)</option>
-                <option value="-1001547669083">NaijaHomemade Backup</option>
-                <option value="-1001539197699">NaijaHomemade Channel</option>
-                <option value="-1003814827178">VIP Premiun Mar 06</option>
+                {/* 🟢 THE FIX: Dynamic Telegram Destinations from Config */}
+                {APP_CONFIG.telegramDestinations.map(dest => (
+                  <option key={dest.id} value={dest.id}>{dest.label}</option>
+                ))}
               </select>
             </div>
 

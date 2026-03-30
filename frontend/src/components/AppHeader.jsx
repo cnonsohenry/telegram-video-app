@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock } from "lucide-react";
 
-const SUGGESTED_KEYWORDS = ["Knacks", "Trending", "Lagos Baddies", "Exclusive"];
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
 
 export default function AppHeader({ 
   isDesktop, searchTerm, setSearchTerm, 
@@ -15,8 +16,6 @@ export default function AppHeader({
 
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
-  
-  // 🟢 NEW: State to track if the user has explicitly hit "Search"
   const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
   
   const [searchPage, setSearchPage] = useState(1);
@@ -41,7 +40,7 @@ export default function AppHeader({
       setSearchResults([]);
       setIsSearching(false);
       setHasMoreResults(false);
-      setHasSubmittedSearch(false); // Reset submitted state when empty
+      setHasSubmittedSearch(false); 
       return;
     }
 
@@ -50,7 +49,8 @@ export default function AppHeader({
 
     const delayDebounceFn = setTimeout(async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/search?q=${encodeURIComponent(searchTerm)}&page=1&limit=15`);
+        // 🟢 THE FIX: Use dynamic API URL
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchTerm)}&page=1&limit=15`);
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data.videos || []);
@@ -73,7 +73,8 @@ export default function AppHeader({
     const nextPage = searchPage + 1;
     
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/search?q=${encodeURIComponent(searchTerm)}&page=${nextPage}&limit=15`);
+      // 🟢 THE FIX: Use dynamic API URL
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchTerm)}&page=${nextPage}&limit=15`);
       if (res.ok) {
         const data = await res.json();
         setSearchResults(prev => {
@@ -94,11 +95,10 @@ export default function AppHeader({
 
   const handleKeywordClick = (keyword) => {
     setSearchTerm(keyword);
-    setHasSubmittedSearch(true); // Treat clicking a keyword pill as a submitted search
+    setHasSubmittedSearch(true); 
     saveSearchHistory(keyword);
   };
 
-  // 🟢 Helper to save search history
   const saveSearchHistory = (term) => {
     if (!term.trim()) return;
     const currentTerm = term.trim();
@@ -107,7 +107,6 @@ export default function AppHeader({
     localStorage.setItem("recent_searches", JSON.stringify(updatedSearches));
   };
 
-  // 🟢 Handle explicit search submission (Enter key or Search button)
   const handleSearchSubmit = () => {
     if (searchTerm.trim()) {
       setHasSubmittedSearch(true);
@@ -143,20 +142,20 @@ export default function AppHeader({
               <input 
                 autoFocus 
                 type="text" 
-                placeholder="Search shots..." 
+                // 🟢 THE FIX: Dynamic placeholder
+                placeholder={APP_CONFIG.searchPlaceholder} 
                 value={searchTerm} 
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  setHasSubmittedSearch(false); // 🟢 Revert to suggestions when user resumes typing
+                  setHasSubmittedSearch(false); 
                 }} 
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSearchSubmit(); // 🟢 Trigger submit on Enter
+                  if (e.key === 'Enter') handleSearchSubmit(); 
                 }}
                 style={inputStyle} 
               />
               {searchTerm && <X size={16} color="#8e8e8e" style={{ cursor: "pointer" }} onClick={() => setSearchTerm("")} />}
             </div>
-            {/* 🟢 Trigger submit on button click */}
             <button onClick={handleSearchSubmit} style={searchActionBtnStyle}>Search</button>
           </div>
 
@@ -185,7 +184,8 @@ export default function AppHeader({
 
                 <div style={sectionStyle}>
                   <div style={keywordGridStyle}>
-                    {SUGGESTED_KEYWORDS.map(kw => (
+                    {/* 🟢 THE FIX: Dynamic search keywords */}
+                    {APP_CONFIG.searchKeywords.map(kw => (
                       <button key={kw} onClick={() => handleKeywordClick(kw)} style={keywordPillStyle}>
                         <TrendingUp size={14} color="#8e8e8e" />
                         {kw}
@@ -213,7 +213,8 @@ export default function AppHeader({
                             )}
                           </div>
                           <div style={suggestedVideoInfo(isDesktop)}>
-                            <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
+                            {/* 🟢 THE FIX: Dynamic default caption */}
+                            <p style={suggestedCaption}>{v.caption || APP_CONFIG.defaultCaption}</p>
                             <span style={suggestedUploader}>
                               @{v.uploader_name} 
                               {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
@@ -239,7 +240,6 @@ export default function AppHeader({
                   </div>
                 ) : (
                   <>
-                    {/* 🟢 DYNAMIC RENDER: List if typing, Grid if submitted */}
                     {!hasSubmittedSearch ? (
                       <div style={suggestedContentGrid(isDesktop)}>
                         {searchResults.slice(0, 8).map(v => (
@@ -254,7 +254,8 @@ export default function AppHeader({
                               )}
                             </div>
                             <div style={suggestedVideoInfo(isDesktop)}>
-                              <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
+                              {/* 🟢 THE FIX: Dynamic default caption */}
+                              <p style={suggestedCaption}>{v.caption || APP_CONFIG.defaultCaption}</p>
                               <span style={suggestedUploader}>
                                 @{v.uploader_name} 
                                 {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
@@ -264,7 +265,6 @@ export default function AppHeader({
                         ))}
                       </div>
                     ) : (
-                      // 🟢 SUBMITTED GRID VIEW (2 on mobile, 5 on desktop)
                       <div style={submittedContentGrid(isDesktop)}>
                         {searchResults.map(v => (
                           <div key={`grid-${v.message_id}`} onClick={(e) => handleExecuteSearch(v, e)} style={submittedVideoItem}>
@@ -276,7 +276,8 @@ export default function AppHeader({
                               </div>
                             </div>
                             <div style={submittedVideoInfo}>
-                              <p style={suggestedCaption}>{v.caption || "View trending shot..."}</p>
+                              {/* 🟢 THE FIX: Dynamic default caption */}
+                              <p style={suggestedCaption}>{v.caption || APP_CONFIG.defaultCaption}</p>
                               <span style={suggestedUploader}>@{v.uploader_name}</span>
                             </div>
                           </div>
@@ -306,14 +307,18 @@ export default function AppHeader({
       {isDesktop && (
         <header style={desktopHeaderStyle}>
           <div style={{ userSelect: "none" }}>
-            <h1 style={logoStyle}>NAIJA<span style={{ color: "var(--primary-color)" }}>HOMEMADE</span></h1>
+            {/* 🟢 THE FIX: Dynamic App Logo */}
+            <h1 style={logoStyle}>
+              {APP_CONFIG.appNamePrefix}
+              <span style={{ color: "var(--primary-color)" }}>{APP_CONFIG.appNameSuffix}</span>
+            </h1>
           </div>
           
           <div style={{ display: "flex", alignItems: "center", gap: "25px" }}>
             <div style={searchBarStyle} onClick={() => setIsSearchOpen(true)}>
               <Search size={18} color="#8e8e8e" />
               <div style={{ ...inputStyle, color: searchTerm ? "#fff" : "#8e8e8e", cursor: "text" }}>
-                {searchTerm || "Search shots..."}
+                {searchTerm || APP_CONFIG.searchPlaceholder}
               </div>
             </div>
             
@@ -331,8 +336,10 @@ export default function AppHeader({
       {/* 🟢 DEFAULT MOBILE HEADER */}
       {!isDesktop && (
         <div style={mobileHeaderStyle}>
+          {/* 🟢 THE FIX: Dynamic App Logo */}
           <h1 style={{ color: "#fff", fontSize: "18px", fontWeight: "900", margin: 0 }}>
-            NAIJA<span style={{ color: "var(--primary-color)" }}>HOMEMADE</span>
+            {APP_CONFIG.appNamePrefix}
+            <span style={{ color: "var(--primary-color)" }}>{APP_CONFIG.appNameSuffix}</span>
           </h1>
           <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
             <Search size={22} color="#fff" onClick={() => setIsSearchOpen(true)} />
@@ -350,7 +357,7 @@ export default function AppHeader({
   );
 }
 
-// 🎨 Styles
+// 🎨 Styles (Remain exactly the same!)
 const desktopHeaderStyle = { position: "sticky", top: 0, zIndex: 100, height: "70px", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", borderBottom: "1px solid #262626", padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between" };
 const logoStyle = { color: "#fff", fontSize: "24px", fontWeight: "900", letterSpacing: "-1px", margin: 0 };
 const searchBarStyle = { display: "flex", alignItems: "center", background: "#1c1c1e", borderRadius: "20px", padding: "0 15px", width: "400px", border: "1px solid #333", cursor: "text" };
@@ -383,7 +390,7 @@ const viewsOverlay = { position: "absolute", bottom: "6px", left: "6px", backgro
 const suggestedCaption = { color: "#fff", fontSize: "14px", fontWeight: "600", margin: "0 0 6px 0", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.4" };
 const suggestedUploader = { color: "#8e8e8e", fontSize: "12px", fontWeight: "500" };
 
-// 🟢 NEW: Submitted Grid Styles (Like Home.jsx)
+// Submitted Grid Styles
 const submittedContentGrid = (isDesktop) => ({ display: "grid", gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(2, 1fr)", gap: isDesktop ? "20px" : "10px", animation: "fadeIn 0.3s ease-out" });
 const submittedVideoItem = { display: "flex", flexDirection: "column", gap: "8px", cursor: "pointer", width: "100%" };
 const submittedThumbWrapper = { width: "100%", aspectRatio: "9/16", background: "#111", borderRadius: "12px", position: "relative", overflow: "hidden" };

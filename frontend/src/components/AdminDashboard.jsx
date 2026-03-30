@@ -5,6 +5,9 @@ import {
 } from "lucide-react";
 import AdminUpload from "./AdminUpload"; 
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
+
 export default function AdminDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
@@ -12,27 +15,24 @@ export default function AdminDashboard({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   
-  // Mobile Navigation State
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Modals
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null); 
   const [deleteWarning, setDeleteWarning] = useState(null); 
 
-  // Data States
   const [stats, setStats] = useState({ total_users: 0, premium_users: 0, total_revenue_usd: 0, pending_crypto_orders: 0 });
   const [usersList, setUsersList] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [videosList, setVideosList] = useState([]);
 
-  // 🟢 FETCH DATA
   const fetchData = async () => {
     setLoading(true);
     setError("");
     try {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem("token")}` };
-      const baseUrl = import.meta.env.VITE_API_URL;
+      // 🟢 THE FIX: Use dynamic API URL from config
+      const baseUrl = APP_CONFIG.apiUrl;
 
       if (activeTab === "overview") {
         const res = await fetch(`${baseUrl}/api/admin/stats`, { headers });
@@ -60,7 +60,6 @@ export default function AdminDashboard({ user, onLogout }) {
     fetchData(); 
   }, [activeTab]);
 
-  // 🟢 SORTING LOGIC
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
@@ -83,7 +82,6 @@ export default function AdminDashboard({ user, onLogout }) {
       : <ChevronDown size={14} color="var(--primary-color)" style={{marginLeft: "5px"}} />;
   };
 
-  // 🟢 FILTERING & PREPPING DATA
   const processedUsers = useMemo(() => sortData(usersList.filter(u => 
     u.username?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   )), [usersList, searchQuery, sortConfig]);
@@ -96,7 +94,6 @@ export default function AdminDashboard({ user, onLogout }) {
     t.username?.toLowerCase().includes(searchQuery.toLowerCase()) || t.payment_method?.toLowerCase().includes(searchQuery.toLowerCase())
   )), [transactions, searchQuery, sortConfig]);
 
-  // 🟢 ACTION HANDLERS (API Calls)
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     try {
@@ -105,7 +102,8 @@ export default function AdminDashboard({ user, onLogout }) {
         ? { caption: editingItem.data.caption, category: editingItem.data.category }
         : { role: editingItem.data.role, is_premium: editingItem.data.is_premium };
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
+      // 🟢 THE FIX: Use dynamic API URL from config
+      const res = await fetch(`${APP_CONFIG.apiUrl}${endpoint}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem("token")}` },
         body: JSON.stringify(payload)
@@ -122,7 +120,8 @@ export default function AdminDashboard({ user, onLogout }) {
   const handleDelete = async () => {
     try {
       const endpoint = deleteWarning.type === 'video' ? `/api/admin/video/${deleteWarning.id}` : `/api/admin/user/${deleteWarning.id}`;
-      const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
+      // 🟢 THE FIX: Use dynamic API URL from config
+      const res = await fetch(`${APP_CONFIG.apiUrl}${endpoint}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem("token")}` }
       });
@@ -137,7 +136,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
   const handleTabSwitch = (tab) => {
     setActiveTab(tab);
-    setSidebarOpen(false); // Auto-close sidebar on mobile
+    setSidebarOpen(false); 
   };
 
   if (!user || user.role !== 'admin') {
@@ -156,7 +155,6 @@ export default function AdminDashboard({ user, onLogout }) {
   return (
     <div style={dashboardContainerStyle}>
       
-      {/* 🟢 MOBILE RESPONSIVE CSS INJECTION */}
       <style>{`
         .hamburger-btn, .mobile-close-btn { display: none; background: transparent; border: none; color: white; cursor: pointer; padding: 0; }
         .mobile-overlay { display: none; }
@@ -174,7 +172,6 @@ export default function AdminDashboard({ user, onLogout }) {
           .hamburger-btn { display: block; }
           .mobile-close-btn { display: block; }
           
-          /* Show overlay when sidebar is open */
           .mobile-overlay.open {
             display: block;
             position: fixed;
@@ -201,14 +198,16 @@ export default function AdminDashboard({ user, onLogout }) {
         }
       `}</style>
 
-      {/* 🔴 MOBILE OVERLAY */}
       <div className={`mobile-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
-      {/* 🟢 SIDEBAR */}
       <div className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`} style={sidebarStyle}>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <h2 style={logoStyle}>NAIJA<span style={{ color: "var(--primary-color)" }}>ADMIN</span></h2>
+            {/* 🟢 THE FIX: Dynamic App Logo */}
+            <h2 style={logoStyle}>
+              {APP_CONFIG.appNamePrefix}
+              <span style={{ color: "var(--primary-color)" }}>ADMIN</span>
+            </h2>
             <button className="mobile-close-btn" onClick={() => setSidebarOpen(false)}><X size={24} /></button>
           </div>
           
@@ -222,7 +221,6 @@ export default function AdminDashboard({ user, onLogout }) {
         <button onClick={onLogout} style={logoutBtnStyle}><LogOut size={20} /> Exit Admin</button>
       </div>
 
-      {/* 🟢 MAIN CONTENT */}
       <div style={mainContentStyle}>
         <div className="top-bar-container" style={topBarStyle}>
           
@@ -256,7 +254,6 @@ export default function AdminDashboard({ user, onLogout }) {
             <div style={centerFlex}><RefreshCw size={40} color="var(--primary-color)" style={{ animation: "spin 1s linear infinite" }} /></div>
           ) : (
             <>
-              {/* TAB 1: OVERVIEW */}
               {activeTab === "overview" && (
                 <div style={gridStatsStyle}>
                   <StatCard title="Total Revenue" value={`$${stats.total_revenue_usd}`} icon={<TrendingUp size={24} color="#34C759" />} bg="rgba(52, 199, 89, 0.1)" />
@@ -266,7 +263,6 @@ export default function AdminDashboard({ user, onLogout }) {
                 </div>
               )}
 
-              {/* TAB 2: VIDEOS TABLE */}
               {activeTab === "videos" && (
                 <div style={tableContainerStyle}>
                   <table style={tableStyle}>
@@ -301,7 +297,6 @@ export default function AdminDashboard({ user, onLogout }) {
                 </div>
               )}
 
-              {/* TAB 3: USERS TABLE */}
               {activeTab === "users" && (
                 <div style={tableContainerStyle}>
                   <table style={tableStyle}>
@@ -336,7 +331,6 @@ export default function AdminDashboard({ user, onLogout }) {
                 </div>
               )}
 
-              {/* TAB 4: TRANSACTIONS TABLE */}
               {activeTab === "transactions" && (
                 <div style={tableContainerStyle}>
                   <table style={tableStyle}>
@@ -372,7 +366,6 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       </div>
 
-      {/* 🔴 EDIT MODAL */}
       {editingItem && (
         <div style={modalOverlayStyle}>
           <form onSubmit={handleSaveEdit} style={modalBoxStyle}>
@@ -389,11 +382,11 @@ export default function AdminDashboard({ user, onLogout }) {
                 </div>
                 <div style={inputGroupStyle}>
                   <label>Category</label>
+                  {/* 🟢 THE FIX: Dynamic Dropdown Categories from Config */}
                   <select value={editingItem.data.category} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, category: e.target.value}})} style={formInputStyle}>
-                    <option value="hotties">Hotties</option>
-                    <option value="baddies">Baddies</option>
-                    <option value="knacks">Knacks</option>
-                    <option value="shots">Shots</option>
+                    {APP_CONFIG.categories.map((cat) => (
+                      <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                    ))}
                     <option value="premium">Premium</option>
                   </select>
                 </div>
@@ -421,7 +414,6 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       )}
 
-      {/* 🔴 DELETE MODAL */}
       {deleteWarning && (
         <div style={modalOverlayStyle}>
           <div style={{...modalBoxStyle, textAlign: "center", maxWidth: "350px", margin: "0 20px"}}>
@@ -439,7 +431,6 @@ export default function AdminDashboard({ user, onLogout }) {
   );
 }
 
-// 🎨 SUB-COMPONENTS
 const SidebarBtn = ({ active, onClick, icon, label }) => (
   <button onClick={onClick} style={{
     display: "flex", alignItems: "center", gap: "12px", width: "100%", padding: "12px 16px", borderRadius: "10px", border: "none", cursor: "pointer", fontSize: "15px", fontWeight: "600", transition: "all 0.2s",
@@ -459,7 +450,7 @@ const StatCard = ({ title, value, icon, bg }) => (
   </div>
 );
 
-// 🖌 UI STYLES
+// 🖌 UI STYLES (Unchanged)
 const dashboardContainerStyle = { display: "flex", height: "100dvh", width: "100vw", background: "#050505", color: "#fff", position: "absolute", zIndex: 999999, top: 0, left: 0 };
 const sidebarStyle = { width: "260px", background: "#0a0a0a", borderRight: "1px solid rgba(255,255,255,0.05)", padding: "30px 20px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
 const logoStyle = { margin: 0, fontSize: "20px", fontWeight: "900", letterSpacing: "-1px", color: "#fff" };
@@ -468,7 +459,6 @@ const topBarStyle = { display: "flex", justifyContent: "space-between", alignIte
 const contentAreaStyle = { flex: 1, overflowY: "auto", padding: "40px" };
 const gridStatsStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px" };
 
-// Table Styles
 const tableContainerStyle = { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", overflow: "hidden", overflowX: "auto" };
 const tableStyle = { width: "100%", borderCollapse: "collapse" };
 const thStyle = { textAlign: "left", padding: "18px 20px", color: "#8e8e93", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", borderBottom: "1px solid rgba(255,255,255,0.1)", userSelect: "none", whiteSpace: "nowrap" };
@@ -479,7 +469,6 @@ const premiumBadge = { ...badgeStyle, background: "rgba(52, 199, 89, 0.1)", colo
 const freeBadge = { ...badgeStyle, background: "rgba(255,255,255,0.05)", color: "#8e8e93" };
 const iconBtnStyle = { background: "rgba(255,255,255,0.05)", border: "none", color: "#fff", padding: "8px", borderRadius: "8px", cursor: "pointer", marginLeft: "5px" };
 
-// Header Actions
 const searchBarStyle = { display: "flex", alignItems: "center", gap: "10px", background: "rgba(255,255,255,0.05)", padding: "10px 16px", borderRadius: "8px", width: "250px" };
 const searchInputStyle = { background: "transparent", border: "none", color: "#fff", outline: "none", width: "100%", fontSize: "14px" };
 const logoutBtnStyle = { display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", background: "rgba(255,255,255,0.05)", color: "#fff", border: "none", padding: "14px", borderRadius: "10px", fontWeight: "600", cursor: "pointer" };
@@ -487,11 +476,9 @@ const refreshBtnStyle = { display: "flex", alignItems: "center", gap: "8px", bac
 const uploadBtnStyle = { display: "flex", alignItems: "center", gap: "8px", background: "var(--primary-color)", color: "#fff", border: "none", padding: "10px 16px", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "700" };
 const centerFlex = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%" };
 
-// Error Screen Styles
 const errorScreenStyle = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100dvh", width: "100vw", background: "#050505", color: "#ff3b30", position: "absolute", zIndex: 999999, top: 0, left: 0 };
 const goBackBtnStyle = { background: "#fff", color: "#000", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "700", cursor: "pointer", fontSize: "15px", transition: "transform 0.2s" };
 
-// Modal Styles
 const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999999 };
 const modalBoxStyle = { background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "16px", padding: "25px", width: "100%", maxWidth: "400px", margin: "0 15px" };
 const modalHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" };

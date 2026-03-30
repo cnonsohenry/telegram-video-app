@@ -10,6 +10,9 @@ import LegalPages from "./pages/LegalPages";
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "./config";
+
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [user, setUser] = useState(null);
@@ -24,6 +27,11 @@ export default function App() {
 
   const isLoggedIn = !!token;
   const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
+
+  // 🟢 DYNAMIC BROWSER TAB TITLE
+  useEffect(() => {
+    document.title = `${APP_CONFIG.appNamePrefix} ${APP_CONFIG.appNameSuffix}`;
+  }, []);
 
   // 🟢 AdFreeZone logic
   const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView);
@@ -121,12 +129,14 @@ export default function App() {
       setIsSharedVideoView(true);
       const fetchSharedVideo = async () => {
         try {
-          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/video/details?message_id=${sharedVideoId}`);
+          // 🟢 THE FIX: Use dynamic APP_CONFIG API URL
+          const res = await fetch(`${APP_CONFIG.apiUrl}/api/video/details?message_id=${sharedVideoId}`);
           if (res.ok) {
             const videoData = await res.json();
             setActiveVideo({ ...videoData, video_url: null });
             
-            const playRes = await fetch(`${import.meta.env.VITE_API_URL}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`);
+            // 🟢 THE FIX: Use dynamic APP_CONFIG API URL
+            const playRes = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`);
             if (playRes.ok) {
               const playData = await playRes.json();
               setActiveVideo(prev => ({ ...prev, video_url: playData.video_url }));
@@ -161,7 +171,8 @@ export default function App() {
 
   useEffect(() => {
     if (token && !user) {
-      fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+      // 🟢 THE FIX: Use dynamic APP_CONFIG API URL
+      fetch(`${APP_CONFIG.apiUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       .then(res => res.ok ? res.json() : Promise.reject())
