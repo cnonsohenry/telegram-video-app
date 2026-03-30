@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config"; 
+
 export function useVideos(currentCategory, limit = 12) {
   const [videos, setVideos] = useState([]);
   const [sidebarSuggestions, setSidebarSuggestions] = useState([]);
@@ -15,8 +18,16 @@ export function useVideos(currentCategory, limit = 12) {
     setLoading(true);
 
     try {
-      let url = `https://videos.naijahomemade.com/api/videos?page=${targetPage}&limit=${limit}&category=${currentCategory}`;
-      if (currentCategory === "trends") url += `&sort=trending`;
+      // 🟢 THE FIX: Swap the hardcoded domain for your dynamic config URL
+      let url = `${APP_CONFIG.apiUrl}/api/videos?page=${targetPage}&limit=${limit}&category=${currentCategory}`;
+      
+      // 🟢 THE FIX: Dynamically check if this is your "Trending" category (usually the 4th tab)
+      if (currentCategory === APP_CONFIG.categories[3] || currentCategory === "trends") {
+        url += `&sort=trending`;
+      }
+
+      // 🟢 Add this console.log right above the fetch
+      console.log("🔍 FETCHING URL:", url);
       
       const res = await fetch(url);
       const data = await res.json();
@@ -29,7 +40,7 @@ export function useVideos(currentCategory, limit = 12) {
           return Array.from(uniqueMap.values());
         });
         
-        // 🟢 THE FIX: The math is simple again. If the server couldn't fill the limit, we hit the end!
+        // If the server couldn't fill the limit, we hit the end!
         if (data.videos.length < limit) {
             setHasMore(false);
         } else {
@@ -51,7 +62,7 @@ export function useVideos(currentCategory, limit = 12) {
     isFetching.current = false; 
     setHasMore(true);
     setVideos([]); 
-    setSidebarSuggestions([]); // 🟢 THE FIX: Clear the sidebar so the skeleton animation plays!
+    setSidebarSuggestions([]); // Clear the sidebar so the skeleton animation plays!
     setPage(1);
     
     // Trigger the first fetch

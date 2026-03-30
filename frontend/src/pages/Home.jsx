@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { Play, Flame, Grid3X3, User as UserIcon, ArrowUp, ArrowLeft } from "lucide-react"; 
+import { ArrowUp, ArrowLeft } from "lucide-react"; 
 import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
@@ -10,12 +10,15 @@ import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 import LegalFooter from "../components/LegalFooter";
 
-const CATEGORIES = ["knacks", "hotties", "baddies", "trends"];
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config"; 
+
 const MAX_CACHE_SIZE = 4;
 const AD_FREQUENCY = 3;
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
-  const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * CATEGORIES.length)); 
+  // 🟢 Use dynamic categories from config
+  const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * APP_CONFIG.categories.length)); 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState("");
@@ -29,10 +32,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [premiumPool, setPremiumPool] = useState([]);
   
   const premiumInjectionMap = useRef(new Map());
-  // 🟢 THE FIX: A global tracker that ensures we never show the same premium video twice across tabs!
   const premiumTracker = useRef(0); 
 
-  const currentCategory = CATEGORIES[activeTab];
+  // 🟢 Use dynamic current category
+  const currentCategory = APP_CONFIG.categories[activeTab];
   const isDesktop = windowWidth > 1024;
   
   const fetchLimit = isDesktop ? 15 : 12;
@@ -40,7 +43,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory, fetchLimit);
 
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/videos?category=premium&limit=20`)
+    // 🟢 Use dynamic API URL
+    fetch(`${APP_CONFIG.apiUrl}/api/videos?category=premium&limit=20`)
       .then(res => res.json())
       .then(data => {
         if (data.videos) {
@@ -68,32 +72,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     });
   }, []);
 
-  // 🟢 ADSTERRA POPUNDER CONTROLLER (30 Min Cooldown)
-  const handleLoadMoreWithAd = (e) => {
-    // 1. Always execute your normal app logic first
-    loadMore();
-
-    // 2. Check the 30-minute cooldown timer
-    const COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
-    const lastPopTime = localStorage.getItem("adsterra_last_pop");
-    const now = Date.now();
-
-    if (!lastPopTime || (now - parseInt(lastPopTime)) > COOLDOWN_MS) {
-      // 3. Time's up! Lock the gate for the next 30 minutes
-      localStorage.setItem("adsterra_last_pop", now.toString());
-
-      // 4. Secretly inject the Adsterra script into the background
-      const script = document.createElement("script");
-      script.type = "application/javascript";
-      script.src = "https://pl28633201.profitablecpmratenetwork.com/90/66/a7/9066a7dbbf9bb7d003e3575b94b94bea.js";
-      script.async = true;
-      document.body.appendChild(script);
-
-      // Clean up the DOM after it loads to keep React running fast
-      script.onload = () => setTimeout(() => script.remove(), 2000);
-    }
-  };
-
   const rawVideosToDisplay = useMemo(() => {
     if (isChangingTab) return []; 
     
@@ -103,7 +81,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       baseList = videoCache[currentCategory];
     } 
     else if (!loading && videos.length > 0) {
-       const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
+       // 🟢 Assuming "trends" is still a universal category, otherwise make this dynamic too
+       const isCorrectCategory = currentCategory === APP_CONFIG.categories[3] || videos[0].category === currentCategory;
        if (isCorrectCategory) {
           baseList = videos;
        }
@@ -116,16 +95,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       for (let i = 0; i < totalChunks; i++) {
         const chunkKey = `${currentCategory}-page-${i}`;
         
-        // If this specific tab & page hasn't been assigned a premium video yet...
         if (!premiumInjectionMap.current.has(chunkKey)) {
            const minOffset = isDesktop ? 2 : 1; 
            const randomOffset = Math.floor(Math.random() * (fetchLimit - minOffset)) + minOffset;
            
-           // 🟢 Grab the NEXT unique premium video from our global tracker, then increment the tracker!
            const assignedPremiumIndex = premiumTracker.current % premiumPool.length;
            premiumTracker.current += 1;
 
-           // Save BOTH the random slot position AND the unique premium video index
            premiumInjectionMap.current.set(chunkKey, { offset: randomOffset, videoIndex: assignedPremiumIndex });
         }
         
@@ -133,7 +109,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         const absoluteIndex = (i * fetchLimit) + injectionData.offset;
 
         if (absoluteIndex < newList.length) {
-           // Pull the exact premium video we assigned to this slot
            const premiumVideo = premiumPool[injectionData.videoIndex];
            newList[absoluteIndex] = premiumVideo;
         }
@@ -150,7 +125,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   useEffect(() => {
     if (!loading && videos?.length > 0) {
-      const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
+      // 🟢 Dynamic check
+      const isCorrectCategory = currentCategory === APP_CONFIG.categories[3] || videos[0].category === currentCategory;
       if (isCorrectCategory) {
         updateCache(currentCategory, videos);
       }
@@ -171,7 +147,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const playVideo = async (video) => {
     try {
       setActiveVideo({ ...video, video_url: null }); 
-      const res = await fetch(`https://videos.naijahomemade.com/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+      // 🟢 Use dynamic API URL
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       if (!res.ok) throw new Error("Server error");
       const data = await res.json();
       if (data.video_url) {
@@ -192,7 +169,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
     if (video.is_group && !activeGroup) {
       try {
-        const res = await fetch(`https://videos.naijahomemade.com/api/group?media_group_id=${video.media_group_id}`);
+        // 🟢 Use dynamic API URL
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
         
         setActiveGroup({
@@ -248,12 +226,14 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   useEffect(() => {
     if (loading || videos.length === 0) return;
     const prefetch = async () => {
-      const neighbors = [(activeTab + 1) % CATEGORIES.length, (activeTab - 1 + CATEGORIES.length) % CATEGORIES.length];
+      // 🟢 Dynamic length check
+      const neighbors = [(activeTab + 1) % APP_CONFIG.categories.length, (activeTab - 1 + APP_CONFIG.categories.length) % APP_CONFIG.categories.length];
       for (const idx of neighbors) {
-        const cat = CATEGORIES[idx];
+        const cat = APP_CONFIG.categories[idx];
         if (!videoCache[cat]) {
           try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/videos?category=${cat}&limit=${fetchLimit}`);
+            // 🟢 Dynamic API URL
+            const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${cat}&limit=${fetchLimit}`);
             if (res.ok) {
               const data = await res.json();
               updateCache(cat, data.videos);
@@ -283,17 +263,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   
   const handleRefresh = async () => {
     premiumInjectionMap.current.clear(); 
-    premiumTracker.current = 0; // Reset tracker on refresh
+    premiumTracker.current = 0;
     setActiveGroup(null); 
     window.location.reload();
   };
-
-  const TABS = [
-    { icon: <Play size={22} />, label: "KNACKS"},
-    { icon: <Grid3X3 size={22} />, label: "HOTTIES"},
-    { icon: <UserIcon size={22} />, label: "BADDIES"},
-    { icon: <Flame size={22} />, label: "TRENDS"}
-  ];
 
   const actualVideosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
 
@@ -330,7 +303,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                 borderRight: isSidebarHovered ? "1px solid #333" : "1px solid var(--border-color)"
               }}
             >
-              {TABS.map((tab, index) => (
+              {/* 🟢 Render tabs dynamically from config */}
+              {APP_CONFIG.tabs.map((tab, index) => (
                 <button 
                   key={index} 
                   onClick={() => handleTabClick(index)} 
@@ -359,7 +333,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         <div style={{ flex: 1, minWidth: 0 }}>
           {!isDesktop && (
             <nav style={mobileNavStyle}>
-              {TABS.map((tab, index) => (
+              {/* 🟢 Render tabs dynamically from config */}
+              {APP_CONFIG.tabs.map((tab, index) => (
                 <button 
                   key={index} 
                   onClick={() => handleTabClick(index)} 
@@ -369,7 +344,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                   <span style={{ fontSize: "10px", fontWeight: "700" }}>{tab.label}</span>
                 </button>
               ))}
-              <div style={{ ...indicatorStyle, transform: `translateX(${activeTab * 100}%)` }} />
+              <div style={{ ...indicatorStyle, transform: `translateX(${activeTab * 100}%)`, width: `${100 / APP_CONFIG.tabs.length}%` }} />
             </nav>
           )}
           
@@ -405,13 +380,12 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                   )}
                </div>
 
-               {/* 🟢 THE AD GRID: Now sits outside the main grid, spanning full width! */}
                {actualVideosToDisplay.length > 0 && !activeGroup && (
                  <ExoClickWidget />
                )}
                
                {(!loading && !isChangingTab && !activeGroup) && actualVideosToDisplay.length > 0 && (
-                 <button onClick={handleLoadMoreWithAd} style={showMoreButtonStyle}>Show More</button>
+                 <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
                )}
             </div>
             
@@ -455,7 +429,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 // 🖌 STYLES
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "12px", animation: "pulse 1.5s infinite" };
 const mobileNavStyle = { display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "var(--bg-color)", borderBottom: "1px solid var(--border-color)" };
-const indicatorStyle = { position: "absolute", bottom: 0, left: 0, width: "25%", height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
+const indicatorStyle = { position: "absolute", bottom: 0, left: 0, height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
 const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", padding: "20px 0" };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
@@ -464,10 +438,6 @@ const suggestedSidebarRail = { width: "320px", height: "calc(100vh - 70px)", pos
 
 const showMoreButtonStyle = { display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "14px 40px", borderRadius: "35px", border: "1px solid #333", fontWeight: "900", cursor: "pointer" };
 const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "pointer" };
-
-const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 15px 0", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)" };
-const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
-const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
 
 // 🟢 THE FULL-WIDTH EXOCLICK GRID
 const ExoClickWidget = () => {
@@ -484,11 +454,11 @@ const ExoClickWidget = () => {
   }, []);
 
   return (
-    // We give it 100% width so ExoClick's 5-col/2-col settings can expand properly!
     <div style={{ width: "100%", marginTop: "20px", marginBottom: "20px" }}>
       <ins 
         className="eas6a97888e20" 
-        data-zoneid="5882826"
+        // 🟢 Inject Ad ID dynamically!
+        data-zoneid={APP_CONFIG.exoClickZoneId}
         style={{ display: "block", width: "100%" }}
       ></ins>
     </div>
