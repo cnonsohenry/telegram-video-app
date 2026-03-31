@@ -1,8 +1,16 @@
 import React from "react";
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../../config";
+
 export default function Compliance2257() {
   const sectionHeaderStyle = { color: "#fff", marginTop: "25px", marginBottom: "10px", fontSize: "18px" };
   const textBlockStyle = { marginBottom: "15px" };
+
+  // 🟢 Auto-format the brand name for prose
+  const brandName = APP_CONFIG.appNamePrefix.charAt(0).toUpperCase() + 
+                    APP_CONFIG.appNamePrefix.slice(1).toLowerCase() + 
+                    APP_CONFIG.appNameSuffix.toLowerCase();
 
   return (
     <div style={{ 
@@ -25,22 +33,23 @@ export default function Compliance2257() {
 
       <div style={textBlockStyle}>
         <p>
-          The operator of <strong>Naijahomemade</strong> is not the producer (whether primary or secondary as defined in 18 U.S.C. § 2257) of any of the content found on Naijahomemade. The operator’s activities are limited to the transmission, storage, retrieval, hosting and/or formatting of depictions posted by third-party users.
+          The operator of <strong>{brandName}</strong> is not the producer (whether primary or secondary as defined in 18 U.S.C. § 2257) of any of the content found on {brandName}. The operator’s activities are limited to the transmission, storage, retrieval, hosting and/or formatting of depictions posted by third-party users.
         </p>
       </div>
 
       <h3 style={sectionHeaderStyle}>Requests for Records</h3>
       <p style={textBlockStyle}>
-        Please direct any request regarding §2257 records in relation to any content found on Naijahomemade directly to the respective uploader, amateur, producer, studio, or account holder of the content (<strong>"Verified Uploaders"</strong>).
+        Please direct any request regarding §2257 records in relation to any content found on {brandName} directly to the respective uploader, amateur, producer, studio, or account holder of the content (<strong>"Verified Uploaders"</strong>).
       </p>
       
       <p style={textBlockStyle}>
         For further assistance in communicating with Verified Uploaders or questions regarding this notice, please contact our compliance department at: 
-        <a href="mailto:support@Naijahomemade.com" style={{ color: "#fff", marginLeft: "5px" }}>support@Naijahomemade.com</a>.
+        {/* 🟢 THE FIX: Dynamic Support Email */}
+        <a href={`mailto:${APP_CONFIG.supportEmail}`} style={{ color: "#fff", marginLeft: "5px" }}>{APP_CONFIG.supportEmail}</a>.
       </p>
 
       <h3 style={sectionHeaderStyle}>Strict Compliance Procedures</h3>
-      <p style={textBlockStyle}>Naijahomemade abides by the following mandatory procedures for all uploaded content:</p>
+      <p style={textBlockStyle}>{brandName} abides by the following mandatory procedures for all uploaded content:</p>
       
       <ul style={{ paddingLeft: "20px", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "12px" }}>
         <li>
@@ -69,9 +78,13 @@ export default function Compliance2257() {
         </h3>
         <p style={{ margin: 0, fontStyle: "normal", color: "#fff" }}>
           Compliance Department<br/>
-          Naija Homemade LLC<br/>
-          123 Legal Avenue<br/>
-          Port Harcourt, Rivers State, Nigeria
+          {/* 🟢 THE FIX: Dynamic Company Name and Address */}
+          {APP_CONFIG.companyName}<br/>
+          {APP_CONFIG.legalAddress.map((line, index) => (
+            <React.Fragment key={index}>
+              {line}<br/>
+            </React.Fragment>
+          ))}
         </p>
       </div>
 

@@ -178,5 +178,5 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
 // 🖌 Styles
 const captionTextStyle = { margin: "0 0 6px 0", fontSize: "12px", color: "#fff", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "600" };
 const userInfoRowStyle = { display: "flex", alignItems: "center", gap: "8px" };
-const avatarWrapperStyle = { width: "16px", height: "16px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid #333" };
-const uploaderNameStyle = { fontSize: "10px", color: "#8e8e8e", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const avatarWrapperStyle = { width: "14px", height: "14px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid #333" };
+const uploaderNameStyle = { fontSize: "8px", color: "#8e8e8e", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };

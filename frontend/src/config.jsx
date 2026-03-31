@@ -6,8 +6,8 @@ export const APP_CONFIG = {
   exoClickZoneId: import.meta.env.VITE_EXOCLICK_ZONE_ID || "5882826", // <-- This missing comma caused the crash!
 
   // 🟢 2. App Branding
-  appNamePrefix: "NAIJA",
-  appNameSuffix: "HOMEMADE", 
+  appNamePrefix: "Naija",
+  appNameSuffix: "homemade", 
   
   // 🟢 3. Search & UI Text
   searchPlaceholder: "Search shots...",
@@ -72,5 +72,20 @@ export const APP_CONFIG = {
     { id: "-1001547669083", label: "Backup Channel" },
     { id: "-1001539197699", label: "Main Channel" },
     { id: "-1003814827178", label: "VIP Premium" }
+  ],
+
+  // 🟢 NEW: Marketing Pitch Slides
+  pitchSlides: [
+    { title: "CATCH THE SHOTS", description: "Sneak peeks of your favorite creators before the main drop.", image: "/assets/slide4.jpg" },
+    { title: "PREMIUM ACCESS", description: "Unlock exclusive full-length videos and 4K content.", image: "/assets/slide2.jpg" },
+    { title: "JOIN THE HUB", description: "Connect with the biggest hub for homegrown talent.", image: "/assets/slide3.jpg" }
+  ],
+
+  // 🟢 NEW: Legal & Corporate Details
+  companyName: "Naija Homemade LLC",
+  supportEmail: "support@naijahomemade.com",
+  legalAddress: [
+    "123 Legal Avenue",
+    "Port Harcourt, Rivers State, Nigeria"
   ]
 };

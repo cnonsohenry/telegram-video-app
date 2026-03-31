@@ -1,10 +1,20 @@
 import React from "react";
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../../config";
+
 export default function DMCA() {
   const headerStyle = { color: "#fff", marginTop: "30px", marginBottom: "15px", fontSize: "22px", borderBottom: "1px solid #333", paddingBottom: "10px" };
   const subHeaderStyle = { color: "#fff", marginTop: "20px", marginBottom: "10px", fontSize: "17px", fontWeight: "600" };
   const textBlockStyle = { marginBottom: "15px" };
   const highlightBox = { background: "#1a1a1a", padding: "20px", borderRadius: "8px", border: "1px solid #333", margin: "20px 0" };
+
+  // 🟢 THE FIX: Auto-format the brand name and domain
+  const brandName = APP_CONFIG.appNamePrefix.charAt(0).toUpperCase() + 
+                    APP_CONFIG.appNamePrefix.slice(1).toLowerCase() + 
+                    APP_CONFIG.appNameSuffix.toLowerCase();
+                    
+  const domainName = `www.${APP_CONFIG.appNamePrefix.toLowerCase()}${APP_CONFIG.appNameSuffix.toLowerCase()}.com`;
 
   return (
     <div style={{ 
@@ -20,11 +30,11 @@ export default function DMCA() {
       <h1 style={headerStyle}>Reporting Claims of Copyright Infringement</h1>
       
       <p style={textBlockStyle}>
-        We take claims of copyright infringement seriously. We will respond to notices of alleged copyright infringement that comply with the Digital Millennium Copyright Act (the “DMCA”) or any other applicable intellectual property legislation or laws. Responses may include removing, blocking, or disabling access to material claimed to be the subject of infringing activity, terminating the user’s access to <strong>https://www.Naijahomemade.com</strong>, or all of the foregoing.
+        We take claims of copyright infringement seriously. We will respond to notices of alleged copyright infringement that comply with the Digital Millennium Copyright Act (the “DMCA”) or any other applicable intellectual property legislation or laws. Responses may include removing, blocking, or disabling access to material claimed to be the subject of infringing activity, terminating the user’s access to <strong>https://{domainName}</strong>, or all of the foregoing.
       </p>
 
       <p style={textBlockStyle}>
-        If you believe any material accessible on <strong>Naijahomemade</strong> infringes your copyright, you may submit a notification. These requests should only be submitted by the copyright owner, or an agent authorized to act on the owner’s behalf.
+        If you believe any material accessible on <strong>{brandName}</strong> infringes your copyright, you may submit a notification. These requests should only be submitted by the copyright owner, or an agent authorized to act on the owner’s behalf.
       </p>
 
       <h2 style={headerStyle}>Filing a DMCA Notice</h2>
@@ -48,16 +58,20 @@ export default function DMCA() {
       <div style={{ ...highlightBox, borderColor: "#444" }}>
         <p style={{ margin: 0, color: "#fff" }}>
           <strong>Compliance Officer</strong><br/>
-          Naija Homemade LLC<br/>
-          123 Legal Avenue<br/>
-          Port Harcourt, Rivers State, Nigeria<br/>
-          <strong>Email:</strong> <a href="mailto:support@Naijahomemade.com" style={{ color: "#fff" }}>support@Naijahomemade.com</a>
+          {/* 🟢 THE FIX: Dynamic Company Name and Address */}
+          {APP_CONFIG.companyName}<br/>
+          {APP_CONFIG.legalAddress.map((line, index) => (
+            <React.Fragment key={index}>
+              {line}<br/>
+            </React.Fragment>
+          ))}
+          <strong>Email:</strong> <a href={`mailto:${APP_CONFIG.supportEmail}`} style={{ color: "#fff" }}>{APP_CONFIG.supportEmail}</a>
         </p>
       </div>
 
       <h2 style={headerStyle}>Counter-Notification Procedures</h2>
       <p style={textBlockStyle}>
-        If you believe that material you posted on <strong>Naijahomemade</strong> was removed by mistake or misidentification, you may file a counter-notification with our designated agent listed above.
+        If you believe that material you posted on <strong>{brandName}</strong> was removed by mistake or misidentification, you may file a counter-notification with our designated agent listed above.
       </p>
 
       <div style={highlightBox}>
@@ -77,11 +91,12 @@ export default function DMCA() {
 
       <h2 style={headerStyle}>Content Fingerprinting</h2>
       <p style={textBlockStyle}>
-        <strong>Naijahomemade</strong> uses automated audiovisual identification systems to assist us in identifying and blocking potentially infringing content from being uploaded. Videos uploaded to our platform are compared against a database of digital fingerprints. When a video is matched to a digital fingerprint, access to it is disabled.
+        <strong>{brandName}</strong> uses automated audiovisual identification systems to assist us in identifying and blocking potentially infringing content from being uploaded. Videos uploaded to our platform are compared against a database of digital fingerprints. When a video is matched to a digital fingerprint, access to it is disabled.
       </p>
 
       <footer style={{ marginTop: "50px", padding: "20px 0", borderTop: "1px solid #333", textAlign: "center", fontSize: "13px" }}>
-        <p>© 2026 Naijahomemade. All rights reserved.</p>
+        {/* 🟢 THE FIX: Dynamic Copyright Year and Brand Name */}
+        <p>© {new Date().getFullYear()} {brandName}. All rights reserved.</p>
       </footer>
     </div>
   );

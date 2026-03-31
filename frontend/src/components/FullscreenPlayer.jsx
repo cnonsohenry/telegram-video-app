@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, Share2, Download, Check } from "lucide-react";
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
+
 export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null); 
   const lastTap = useRef(0);
   const hideTimeout = useRef(null); 
   
-  // 🟢 1. Initialize to false. We let the video 'onPlay' event switch this to true.
-  // This ensures if a mobile browser blocks autoplay, the Play button will be visible!
   const [isPlaying, setIsPlaying] = useState(false); 
   
   const [isLoading, setIsLoading] = useState(true);
@@ -89,13 +90,17 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   const handleShare = async (e) => {
     e.stopPropagation();
     resetHideTimer();
-    const shareUrl = `https://naijahomemade.com/v/${video.message_id}`;
+    
+    // 🟢 THE FIX: Dynamically construct the share URL based on the current domain
+    const shareUrl = `${window.location.origin}/v/${video.message_id}`;
+    // 🟢 THE FIX: Dynamic App Name
+    const brandName = `${APP_CONFIG.appNamePrefix} ${APP_CONFIG.appNameSuffix}`;
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Naija Homemade',
-          text: video.caption || 'Watch this video on Naija Homemade',
+          title: brandName,
+          text: video.caption || `Watch this video on ${brandName}`,
           url: shareUrl,
         });
       } catch (err) {
@@ -121,7 +126,10 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
       
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `naijahomemade-${video.message_id}.mp4`;
+      
+      // 🟢 THE FIX: Dynamic App Prefix for the downloaded file name
+      link.download = `${APP_CONFIG.appNamePrefix.toLowerCase()}-${video.message_id}.mp4`;
+      
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -159,7 +167,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     enterFullscreen();
     resetHideTimer();
 
-    // 🟢 2. Explicitly handle strict mobile browser Autoplay Blocks
     if (videoRef.current) {
       const playPromise = videoRef.current.play();
       if (playPromise !== undefined) {
@@ -298,7 +305,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   );
 }
 
-// 🖌 STYLES
+// 🖌 STYLES (Unchanged)
 const overlayStyle = { position: "fixed", inset: 0, height: "100dvh", backgroundColor: "#000", zIndex: 999999, display: "flex", flexDirection: "column", overflow: "hidden", touchAction: "none" };
 const stageStyle = { display: "flex", width: "100%", height: "100%", background: "#000", position: "relative" };
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
@@ -310,7 +317,6 @@ const rangeInputBaseStyle = { width: "100%", cursor: "pointer", accentColor: "va
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
 
-// 🟢 CENTER CONTROL STYLES
 const centerControlStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "transparent", border: "none", cursor: "pointer", zIndex: 10005, transition: "opacity 0.3s ease", display: "flex", alignItems: "center", justifyContent: "center" };
 const centerIconCircleStyle = { background: "rgba(0,0,0,0.4)", borderRadius: "50%", padding: "20px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" };
 

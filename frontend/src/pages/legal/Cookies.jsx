@@ -1,4 +1,6 @@
 import React from "react";
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../../config";
 
 export default function Cookies() {
   const headerStyle = { color: "#fff", marginTop: "40px", marginBottom: "15px", fontSize: "24px", borderBottom: "1px solid #333", paddingBottom: "10px" };
@@ -8,6 +10,13 @@ export default function Cookies() {
   const tableStyle = { width: "100%", borderCollapse: "collapse", fontSize: "13px", textAlign: "left" };
   const thStyle = { background: "#1a1a1a", color: "#fff", padding: "12px", borderBottom: "1px solid #333" };
   const tdStyle = { padding: "12px", borderBottom: "1px solid #222" };
+
+  // 🟢 THE FIX: Auto-format the brand name and domain
+  const brandName = APP_CONFIG.appNamePrefix.charAt(0).toUpperCase() + 
+                    APP_CONFIG.appNamePrefix.slice(1).toLowerCase() + 
+                    APP_CONFIG.appNameSuffix.toLowerCase();
+                    
+  const domainName = `www.${APP_CONFIG.appNamePrefix.toLowerCase()}${APP_CONFIG.appNameSuffix.toLowerCase()}.com`;
 
   return (
     <div style={{ 
@@ -24,7 +33,7 @@ export default function Cookies() {
 
       <section>
         <p style={textBlockStyle}>
-          This Cookie Notice applies to cookies and other similar technologies which may be placed when you visit different pages on <strong>www.naijahomemade.com</strong> (the “Website”), which is operated by <strong>Naijahomemade</strong> (hereinafter “we” or “us”).
+          This Cookie Notice applies to cookies and other similar technologies which may be placed when you visit different pages on <strong>{domainName}</strong> (the “Website”), which is operated by <strong>{brandName}</strong> (hereinafter “we” or “us”).
         </p>
 
         <h2 style={headerStyle}>What are cookies?</h2>
@@ -211,7 +220,8 @@ export default function Cookies() {
       </section>
 
       <footer style={{ marginTop: "50px", padding: "20px 0", borderTop: "1px solid #333", textAlign: "center", fontSize: "13px" }}>
-        <p>© 2026 Naijahomemade. All rights reserved.</p>
+        {/* 🟢 THE FIX: Dynamic Copyright Year and Brand Name */}
+        <p>© {new Date().getFullYear()} {brandName}. All rights reserved.</p>
       </footer>
     </div>
   );

@@ -1,9 +1,20 @@
 import React from "react";
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../../config";
+
 export default function Terms() {
   const headerStyle = { color: "#fff", marginTop: "30px", marginBottom: "10px", fontSize: "20px" };
   const subHeaderStyle = { color: "#fff", marginTop: "20px", marginBottom: "8px", fontSize: "17px" };
   const textBlockStyle = { marginBottom: "15px" };
+
+  // 🟢 THE FIX: Auto-format the brand name, domain, and DSA email
+  const brandName = APP_CONFIG.appNamePrefix.charAt(0).toUpperCase() + 
+                    APP_CONFIG.appNamePrefix.slice(1).toLowerCase() + 
+                    APP_CONFIG.appNameSuffix.toLowerCase();
+                    
+  const cleanDomain = `${APP_CONFIG.appNamePrefix.toLowerCase()}${APP_CONFIG.appNameSuffix.toLowerCase()}.com`;
+  const dsaEmail = `dsa@${cleanDomain}`;
 
   return (
     <div style={{ 
@@ -66,7 +77,7 @@ export default function Terms() {
       <section>
         <h2 style={headerStyle}>4. Account Security & Verification</h2>
         <p style={textBlockStyle}>
-          You are responsible for maintaining the confidentiality of your login credentials. You agree to notify us immediately of any unauthorized access at <strong>support@yourdomain.com</strong>. Verification may require high-resolution scans of government ID and biometric processing through third-party providers.
+          You are responsible for maintaining the confidentiality of your login credentials. You agree to notify us immediately of any unauthorized access at <strong>{APP_CONFIG.supportEmail}</strong>. Verification may require high-resolution scans of government ID and biometric processing through third-party providers.
         </p>
       </section>
 
@@ -99,12 +110,13 @@ export default function Terms() {
       <section>
         <h2 style={headerStyle}>8. Contact & Communication</h2>
         <p style={textBlockStyle}>
-          By registering, you consent to receive electronic communications relating to your account. For Digital Services Act (DSA) inquiries, you may contact <strong>dsa@yourdomain.com</strong>.
+          By registering, you consent to receive electronic communications relating to your account. For Digital Services Act (DSA) inquiries, you may contact <strong>{dsaEmail}</strong>.
         </p>
       </section>
 
       <footer style={{ marginTop: "40px", padding: "20px 0", borderTop: "1px solid #333", textAlign: "center", fontSize: "13px" }}>
-        <p>© 2026 Your Website Name. All rights reserved.</p>
+        {/* 🟢 THE FIX: Dynamic Copyright Year and Brand Name */}
+        <p>© {new Date().getFullYear()} {brandName}. All rights reserved.</p>
       </footer>
     </div>
   );

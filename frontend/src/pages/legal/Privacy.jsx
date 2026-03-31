@@ -1,10 +1,22 @@
 import React from "react";
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../../config";
+
 export default function Privacy() {
   const headerStyle = { color: "#fff", marginTop: "40px", marginBottom: "15px", fontSize: "24px", borderBottom: "1px solid #333", paddingBottom: "10px" };
   const subHeaderStyle = { color: "#fff", marginTop: "25px", marginBottom: "10px", fontSize: "19px", fontWeight: "600" };
   const textBlockStyle = { marginBottom: "15px" };
   const highlightBox = { background: "#1a1a1a", padding: "20px", borderRadius: "8px", border: "1px solid #333", margin: "20px 0" };
+
+  // 🟢 THE FIX: Auto-format the brand name, domain, and DPO email
+  const brandName = APP_CONFIG.appNamePrefix.charAt(0).toUpperCase() + 
+                    APP_CONFIG.appNamePrefix.slice(1).toLowerCase() + 
+                    APP_CONFIG.appNameSuffix.toLowerCase();
+                    
+  const cleanDomain = `${APP_CONFIG.appNamePrefix.toLowerCase()}${APP_CONFIG.appNameSuffix.toLowerCase()}.com`;
+  const domainName = `www.${cleanDomain}`;
+  const dpoEmail = `dpo@${cleanDomain}`;
 
   return (
     <div style={{ 
@@ -28,12 +40,13 @@ export default function Privacy() {
       <section>
         <h1 style={headerStyle}>Introduction</h1>
         <p style={textBlockStyle}>
-          <strong>Naija Homemade LLC</strong> (hereinafter “we”, “us” or “our”) operates the website 
-          <strong> www.naijahomemade.com</strong> (hereinafter “Naijahomemade”) and is the controller of the information 
+          {/* 🟢 THE FIX: Dynamic Company Name and Domain */}
+          <strong>{APP_CONFIG.companyName}</strong> (hereinafter “we”, “us” or “our”) operates the website 
+          <strong> {domainName}</strong> (hereinafter “{brandName}”) and is the controller of the information 
           collected or provided via the platform.
         </p>
         <p style={textBlockStyle}>
-          Please read this Privacy Notice carefully. Your access to and use of Naijahomemade signifies that you have 
+          Please read this Privacy Notice carefully. Your access to and use of {brandName} signifies that you have 
           read and understand all terms within this Privacy Notice. We respect your privacy and are committed to 
           protecting your personal data.
         </p>
@@ -42,7 +55,7 @@ export default function Privacy() {
       <section>
         <h2 style={headerStyle}>1. Scope</h2>
         <p style={textBlockStyle}>
-          This Privacy Notice applies to information we process on Naijahomemade and through your communications 
+          This Privacy Notice applies to information we process on {brandName} and through your communications 
           with us via email, online support chats, or phone support. “Processing” refers to any operation performed 
           on personal data, including collection, storage, use, and erasure.
         </p>
@@ -52,9 +65,9 @@ export default function Privacy() {
         <h2 style={headerStyle}>2. Our Policy Towards Minors</h2>
         <div style={{ ...highlightBox, borderColor: "#ff4d4d" }}>
           <p style={{ margin: 0, color: "#fff" }}>
-            <strong>STRICT PROHIBITION:</strong> Naijahomemade prohibits minors from using the platform. Access is 
+            <strong>STRICT PROHIBITION:</strong> {brandName} prohibits minors from using the platform. Access is 
             forbidden for persons under the age of 18. If you believe a minor has provided us with personal 
-            information, contact <strong>support@naijahomemade.com</strong> immediately for deletion.
+            information, contact <strong>{APP_CONFIG.supportEmail}</strong> immediately for deletion.
           </p>
         </div>
       </section>
@@ -75,7 +88,7 @@ export default function Privacy() {
           <li><strong>Biometric Information:</strong> Facial recognition data used solely for identity and age verification.</li>
         </ul>
 
-        <h3 style={subHeaderStyle}>Naijahomemade Models</h3>
+        <h3 style={subHeaderStyle}>{brandName} Models</h3>
         <ul style={{ paddingLeft: "20px" }}>
           <li><strong>Application Data:</strong> Legal name, address, and phone number.</li>
           <li><strong>Transaction Data:</strong> Tax Identification Numbers and payment details for revenue processing.</li>
@@ -130,19 +143,24 @@ export default function Privacy() {
       <section>
         <h2 style={headerStyle}>8. Contact Information</h2>
         <div style={highlightBox}>
-          <p style={{ margin: "0 0 10px 0", color: "#fff" }}><strong>General Support:</strong> support@naijahomemade.com</p>
-          <p style={{ margin: "0 0 10px 0", color: "#fff" }}><strong>Data Protection Officer:</strong> dpo@naijahomemade.com</p>
+          {/* 🟢 THE FIX: Dynamic Emails and Legal Address */}
+          <p style={{ margin: "0 0 10px 0", color: "#fff" }}><strong>General Support:</strong> {APP_CONFIG.supportEmail}</p>
+          <p style={{ margin: "0 0 10px 0", color: "#fff" }}><strong>Data Protection Officer:</strong> {dpoEmail}</p>
           <p style={{ margin: 0 }}>
             <strong>Address:</strong><br/>
-            Naija Homemade LLC<br/>
-            123 Legal Avenue<br/>
-            Port Harcourt, Rivers State, Nigeria
+            {APP_CONFIG.companyName}<br/>
+            {APP_CONFIG.legalAddress.map((line, index) => (
+              <React.Fragment key={index}>
+                {line}<br/>
+              </React.Fragment>
+            ))}
           </p>
         </div>
       </section>
 
       <footer style={{ marginTop: "50px", padding: "20px 0", borderTop: "1px solid #333", textAlign: "center", fontSize: "13px" }}>
-        <p>© 2026 Naijahomemade. All rights reserved.</p>
+        {/* 🟢 THE FIX: Dynamic Copyright */}
+        <p>© {new Date().getFullYear()} {brandName}. All rights reserved.</p>
       </footer>
     </div>
   );

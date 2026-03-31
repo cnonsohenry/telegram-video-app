@@ -1,17 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
+
 // 🟢 THE MAGIC FIX: Preload images immediately when the file is parsed by the browser.
 // This guarantees zero lag or blank screens when the user swipes!
-const slides = [
-  { title: "CATCH THE SHOTS", description: "Sneak peeks of your favorite creators before the main drop.", image: "/assets/slide4.jpg" },
-  { title: "PREMIUM ACCESS", description: "Unlock exclusive full-length videos and 4K content.", image: "/assets/slide2.jpg" },
-  { title: "JOIN THE HUB", description: "Connect with the biggest hub for homegrown talent.", image: "/assets/slide3.jpg" }
-];
-
-// Execute preloading instantly
 if (typeof window !== "undefined") {
-  slides.forEach(slide => {
+  // 🟢 THE FIX: Use dynamic slides from config
+  APP_CONFIG.pitchSlides.forEach(slide => {
     const img = new Image();
     img.src = slide.image;
   });
@@ -21,6 +18,9 @@ export default function PitchView({ onComplete }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
   
+  // 🟢 Create a local reference to the slides for cleaner code
+  const slides = APP_CONFIG.pitchSlides;
+
   const touchStartX = useRef(null);
   const touchEndX = useRef(null);
   const minSwipeDistance = 50;
@@ -28,7 +28,7 @@ export default function PitchView({ onComplete }) {
   const nextSlide = useCallback(() => {
     if (currentSlide < slides.length - 1) setCurrentSlide(currentSlide + 1);
     else onComplete();
-  }, [currentSlide, onComplete]);
+  }, [currentSlide, slides.length, onComplete]);
 
   const prevSlide = useCallback(() => {
     if (currentSlide > 0) setCurrentSlide(currentSlide - 1);
@@ -77,7 +77,6 @@ export default function PitchView({ onComplete }) {
         onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
       >
         {slides.map((s, i) => (
-          // 🟢 CSS UPDATE: Added willChange to force the GPU to handle the sliding animations
           <div key={i} style={{...slideUnit, backgroundImage: `url(${s.image})`, willChange: "transform" }}>
             <div style={{
               ...slideOverlay,
@@ -105,7 +104,7 @@ export default function PitchView({ onComplete }) {
       <div style={{...pitchFooter, paddingBottom: isDesktop ? "60px" : "calc(60px + env(safe-area-inset-bottom))"}}>
         <div style={dotsContainer}>
           {slides.map((_, i) => (
-            <div key={i} style={{...dot, background: currentSlide === i ? "#ff3b30" : "rgba(255,255,255,0.3)"}} />
+            <div key={i} style={{...dot, background: currentSlide === i ? "var(--primary-color)" : "rgba(255,255,255,0.3)"}} />
           ))}
         </div>
         <button onClick={nextSlide} style={nextButtonStyle} className="pulse-animation">
@@ -113,7 +112,6 @@ export default function PitchView({ onComplete }) {
         </button>
       </div>
       
-      {/* Ensure the pulse animation is defined */}
       <style>{`
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulseBtn { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
@@ -123,9 +121,9 @@ export default function PitchView({ onComplete }) {
   );
 }
 
-// 🖌 STYLES
+// 🖌 STYLES (Unchanged)
 const pitchContainerStyle = { height: "100dvh", background: "#000", position: "fixed", inset: 0, zIndex: 20000, overflow: "hidden" };
-const sliderWrapper = { display: "flex", width: "100%", height: "100%", transition: "transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)", willChange: "transform" }; // Sped up the transition slightly for a snappier feel
+const sliderWrapper = { display: "flex", width: "100%", height: "100%", transition: "transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)", willChange: "transform" }; 
 const slideUnit = { minWidth: "100%", height: "100%", backgroundSize: "cover", backgroundPosition: "center", position: "relative" };
 const slideOverlay = { position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 100%)", display: "flex", flexDirection: "column" };
 const skipButton = { position: "absolute", top: "max(30px, env(safe-area-inset-top))", right: "20px", background: "rgba(0,0,0,0.5)", border: "none", color: "#fff", padding: "10px 20px", borderRadius: "20px", fontSize: "14px", fontWeight: "700", zIndex: 20005, backdropFilter: "blur(10px)", cursor: "pointer" };

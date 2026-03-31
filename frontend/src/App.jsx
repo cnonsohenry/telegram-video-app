@@ -30,7 +30,7 @@ export default function App() {
 
   // 🟢 DYNAMIC BROWSER TAB TITLE
   useEffect(() => {
-    document.title = `${APP_CONFIG.appNamePrefix} ${APP_CONFIG.appNameSuffix}`;
+    document.title = `${APP_CONFIG.appNamePrefix}${APP_CONFIG.appNameSuffix}`;
   }, []);
 
   // 🟢 AdFreeZone logic

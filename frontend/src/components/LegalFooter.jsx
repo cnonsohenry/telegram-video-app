@@ -1,4 +1,6 @@
 import React from "react";
+// 🟢 IMPORT YOUR CENTRAL CONFIG
+import { APP_CONFIG } from "../config";
 
 export default function LegalFooter() {
   return (
@@ -10,9 +12,12 @@ export default function LegalFooter() {
         <a href="/?legal=cookies" style={linkStyle}>Cookie Notice</a>
         <a href="/?legal=dmca" style={linkStyle}>DMCA</a>
         <a href="/?legal=2257" style={linkStyle}>18 U.S.C. 2257</a>
-        
       </div>
-      <p style={copyrightStyle}>&copy; {new Date().getFullYear()} Naija Homemade. All rights reserved.</p>
+      
+      {/* 🟢 THE FIX: Dynamic Brand Name for the copyright */}
+      <p style={copyrightStyle}>
+        &copy; {new Date().getFullYear()} {APP_CONFIG.appNamePrefix} {APP_CONFIG.appNameSuffix}. All rights reserved.
+      </p>
     </footer>
   );
 }
@@ -21,4 +26,4 @@ export default function LegalFooter() {
 const footerStyle = { padding: "40px 20px", textAlign: "center", borderTop: "1px solid #1a1a1a", marginTop: "40px" };
 const linkRowStyle = { display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "15px", marginBottom: "20px" };
 const linkStyle = { color: "#8e8e8e", fontSize: "12px", textDecoration: "none", fontWeight: "600", transition: "color 0.2s" };
-const copyrightStyle = { color: "#555", fontSize: "11px" };
+const copyrightStyle = { color: "#555", fontSize: "11px", textTransform: "capitalize" };
