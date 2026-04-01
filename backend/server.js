@@ -43,22 +43,6 @@ app.use(cors({
 }));
 
 /* =====================
-   🤖 PRERENDER MIDDLEWARE (SEO & EXOCLICK FIX)
-===================== */
-// 1. Set the token from your .env file
-prerender.set('prerenderToken', process.env.PRERENDER_TOKEN);
-
-// 2. Add custom bots (ExoClick, Telegram, Twitter)
-prerender.crawlerUserAgents.push('ExoBot');
-prerender.crawlerUserAgents.push('exobot');
-prerender.crawlerUserAgents.push('TelegramBot');
-prerender.crawlerUserAgents.push('Twitterbot');
-
-// 3. Mount the middleware globally. 
-// It will intercept requests from bots, render the SPA, and return full HTML.
-app.use(prerender);
-
-/* =====================
    SERVER MONITORING (SECURED)
 ===================== */
 // 1. Lock down the /status route with a username and password
@@ -843,6 +827,18 @@ app.get("/api/avatar", async (req, res) => {
     res.status(500).end();
   }
 });
+
+/* =======================================================
+   🤖 PRERENDER MIDDLEWARE (SEO & EXOCLICK FIX)
+======================================================= */
+prerender.set('prerenderToken', process.env.PRERENDER_TOKEN);
+prerender.crawlerUserAgents.push('ExoBot');
+prerender.crawlerUserAgents.push('exobot');
+prerender.crawlerUserAgents.push('TelegramBot');
+prerender.crawlerUserAgents.push('Twitterbot');
+
+// Mount Prerender ONLY after all API and /v/ routes have been checked
+app.use(prerender);
 
 /* =======================================================
    🟢 NEW: SERVE THE COMPILED FRONTEND (React/Vue/Vite)
