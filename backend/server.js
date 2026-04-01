@@ -23,7 +23,6 @@ import { verifyPayment } from "./controllers/payment.js";
 import { createCryptoPayment, cryptoWebhook, checkCryptoTransaction } from "./controllers/crypto.js";
 import { z } from "zod"; 
 
-
 const { Pool } = pkg;
 
 // 🟢 NEW: ES Module equivalent of __dirname
@@ -36,12 +35,11 @@ const agent = new https.Agent({ family: 4 });
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// 🟢 THE FIX: Dynamic CORS derived from the .env file
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : ["http://localhost:5173"];
 app.use(cors({
-  origin: [
-    "https://naijahomemade.com",
-    "https://www.naijahomemade.com",
-    "http://localhost:5173" 
-  ]
+  origin: allowedOrigins
 }));
 
 /* =====================
@@ -72,7 +70,8 @@ app.use("/status", basicAuth({
 
 // 2. Initialize the status monitor
 app.use(statusMonitor({
-  title: 'Naija Homemade Server Status',
+  // 🟢 THE FIX: Dynamic App Name for Status Monitor
+  title: `${process.env.APP_NAME || 'Platform'} Server Status`,
   path: '/status',
   spans: [{
     interval: 1,            // Every second
@@ -431,8 +430,8 @@ app.get("/api/video", async (req, res) => {
     const filePath = tgRes.data.result.file_path;
     const { exp, sig } = signWorkerUrl(filePath);
 
-    // 🟢 This correctly stays on media.naijahomemade.com for the Worker
-    const workerUrl = `https://media.naijahomemade.com/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}`;
+    // 🟢 THE FIX: Dynamic Worker Base URL
+    const workerUrl = `${process.env.WORKER_BASE_URL}/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}`;
     
     return res.json({ video_url: workerUrl });
 
@@ -493,7 +492,8 @@ app.get("/api/videos", async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category || "hotties";
     
-    const apiBaseUrl = "https://videos.naijahomemade.com";
+    // 🟢 THE FIX: Dynamic API Base URL
+    const apiBaseUrl = process.env.API_BASE_URL;
 
     // 🟢 1. MAIN QUERY: Uses SQL Window Functions to pick exactly 1 "Cover" per album
     let query;
@@ -582,7 +582,8 @@ app.get("/api/group", async (req, res) => {
     `;
     const { rows } = await pool.query(query, [media_group_id]);
     
-    const apiBaseUrl = "https://videos.naijahomemade.com";
+    // 🟢 THE FIX: Dynamic API Base URL
+    const apiBaseUrl = process.env.API_BASE_URL;
     
     // Map them as normal, standalone videos so they play immediately inside the group view
     res.json(rows.map(v => ({ 
@@ -621,7 +622,8 @@ app.get("/api/search", async (req, res) => {
 
 
   try {
-    const apiBaseUrl = "https://videos.naijahomemade.com"; 
+    // 🟢 THE FIX: Dynamic API Base URL
+    const apiBaseUrl = process.env.API_BASE_URL; 
     
     // 🟢 4. Safely calculate offset without needing Number() casting
     const offset = (page - 1) * limit;
@@ -754,6 +756,10 @@ app.get('/v/:message_id', async (req, res) => {
   try {
     const { message_id } = req.params;
     
+    // 🟢 THE FIX: Fetch Frontend and App Name strings from config
+    const frontendUrl = process.env.FRONTEND_URL;
+    const appName = process.env.APP_NAME || "App";
+    
     const result = await pool.query(`
       SELECT v.*, u.username as uploader_name 
       FROM videos v 
@@ -761,7 +767,7 @@ app.get('/v/:message_id', async (req, res) => {
       WHERE v.message_id = $1 LIMIT 1
     `, [message_id]);
 
-    if (!result.rows.length) return res.redirect('https://naijahomemade.com');
+    if (!result.rows.length) return res.redirect(frontendUrl);
 
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
@@ -769,7 +775,7 @@ app.get('/v/:message_id', async (req, res) => {
     // 🟢 FIX: We increase the height request to 1280 to ensure crisp portrait quality
     const thumbUrl = video.cloudflare_id 
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
-      : `https://videos.naijahomemade.com/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
 
     res.send(`
       <!DOCTYPE html>
@@ -779,7 +785,7 @@ app.get('/v/:message_id', async (req, res) => {
           <meta charset="utf-8">
           
           <meta property="og:type" content="video.other">
-          <meta property="og:site_name" content="Naija Homemade">
+          <meta property="og:site_name" content="${appName}">
           <meta property="og:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
           <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
           <meta property="og:image" content="${thumbUrl}">
@@ -787,24 +793,24 @@ app.get('/v/:message_id', async (req, res) => {
           <meta property="og:image:width" content="720">
           <meta property="og:image:height" content="1280">
           
-          <meta property="og:url" content="https://videos.naijahomemade.com/v/${message_id}">
+          <meta property="og:url" content="${process.env.API_BASE_URL}/v/${message_id}">
           
           <meta name="twitter:card" content="summary_large_image">
           <meta name="twitter:title" content="${video.caption || "Watch Shot"}">
           <meta name="twitter:image" content="${thumbUrl}">
 
           <script>
-            window.location.href = "https://naijahomemade.com/?v=${message_id}";
+            window.location.href = "${frontendUrl}/?v=${message_id}";
           </script>
         </head>
         <body style="background:#000; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
-          <p>Redirecting to Naija Homemade...</p>
+          <p>Redirecting to ${appName}...</p>
         </body>
       </html>
     `);
   } catch (err) {
     console.error("Share Link Error:", err.message);
-    res.redirect('https://naijahomemade.com');
+    res.redirect(process.env.FRONTEND_URL);
   }
 });
 

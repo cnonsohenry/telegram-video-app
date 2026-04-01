@@ -69,9 +69,9 @@ export const APP_CONFIG = {
   ],
   telegramDestinations: [
     { id: "@mini_video_app_bot", label: "🤖 Main Bot" },
-    { id: "-1001547669083", label: "Backup Channel" },
+    { id: "-1001844042622", label: "NaijaBaddies TV" },
     { id: "-1001539197699", label: "Main Channel" },
-    { id: "-1003814827178", label: "VIP Premium" }
+    { id: "-1003768125972", label: "VIP April 06" }
   ],
 
   // 🟢 NEW: Marketing Pitch Slides
