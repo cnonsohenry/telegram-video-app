@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   LayoutDashboard, Users, CreditCard, LogOut, TrendingUp, ShieldCheck, 
-  Clock, RefreshCw, UploadCloud, Video, Search, Edit3, Trash2, ChevronUp, ChevronDown, X, AlertTriangle, Menu 
+  Clock, RefreshCw, UploadCloud, Video, Search, Edit3, Trash2, ChevronUp, ChevronDown, X, AlertTriangle, Menu,
+  PlayCircle, Eye, PieChart, Activity, Star, Percent 
 } from "lucide-react";
 import AdminUpload from "./AdminUpload"; 
 
@@ -15,7 +16,6 @@ export default function AdminDashboard({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   
-  // 🟢 PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
   
@@ -63,7 +63,6 @@ export default function AdminDashboard({ user, onLogout }) {
     fetchData(); 
   }, [activeTab]);
 
-  // Reset pagination when searching, sorting, or switching tabs
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, searchQuery, sortConfig]);
@@ -90,6 +89,7 @@ export default function AdminDashboard({ user, onLogout }) {
       : <ChevronDown size={14} color="var(--primary-color)" style={{marginLeft: "5px"}} />;
   };
 
+  // 🟢 SEARCH & SORT PROCESSING
   const processedUsers = useMemo(() => sortData(usersList.filter(u => 
     u.username?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   )), [usersList, searchQuery, sortConfig]);
@@ -102,7 +102,36 @@ export default function AdminDashboard({ user, onLogout }) {
     t.username?.toLowerCase().includes(searchQuery.toLowerCase()) || t.payment_method?.toLowerCase().includes(searchQuery.toLowerCase())
   )), [transactions, searchQuery, sortConfig]);
 
-  // 🟢 CALCULATE PAGINATION
+  // 🟢 DYNAMIC SECTION ANALYTICS
+  const videoAnalytics = useMemo(() => {
+    const total = videosList.length;
+    const views = videosList.reduce((sum, v) => sum + (Number(v.views) || 0), 0);
+    const avgViews = total > 0 ? Math.round(views / total) : 0;
+    const catCounts = {};
+    videosList.forEach(v => { catCounts[v.category] = (catCounts[v.category] || 0) + 1; });
+    const topCat = Object.keys(catCounts).sort((a,b) => catCounts[b] - catCounts[a])[0] || 'N/A';
+    return { total, views, avgViews, topCat };
+  }, [videosList]);
+
+  const userAnalytics = useMemo(() => {
+    const total = usersList.length;
+    const premium = usersList.filter(u => u.is_premium).length;
+    const admins = usersList.filter(u => u.role === 'admin').length;
+    const ratio = total > 0 ? Math.round((premium / total) * 100) : 0;
+    return { total, premium, admins, ratio };
+  }, [usersList]);
+
+  const txAnalytics = useMemo(() => {
+    const total = transactions.length;
+    const approved = transactions.filter(t => t.status === 'APPROVED');
+    const revenue = approved.reduce((sum, t) => sum + Number(t.amount || 0), 0).toFixed(2);
+    const pending = transactions.filter(t => t.status === 'PENDING' || t.status === 'WAITING');
+    const pendingRev = pending.reduce((sum, t) => sum + Number(t.amount || 0), 0).toFixed(2);
+    const approvalRate = total > 0 ? Math.round((approved.length / total) * 100) : 0;
+    return { total, revenue, pendingRev, approvalRate };
+  }, [transactions]);
+
+  // 🟢 PAGINATION CALCS
   const paginatedVideos = processedVideos.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   const totalVideoPages = Math.ceil(processedVideos.length / ITEMS_PER_PAGE);
 
@@ -269,6 +298,7 @@ export default function AdminDashboard({ user, onLogout }) {
             <div style={centerFlex}><RefreshCw size={40} color="var(--primary-color)" style={{ animation: "spin 1s linear infinite" }} /></div>
           ) : (
             <>
+              {/* 🟢 OVERVIEW TAB */}
               {activeTab === "overview" && (
                 <div style={gridStatsStyle}>
                   <StatCard title="Total Revenue" value={`$${stats.total_revenue_usd}`} icon={<TrendingUp size={24} color="#34C759" />} bg="rgba(52, 199, 89, 0.1)" />
@@ -278,130 +308,160 @@ export default function AdminDashboard({ user, onLogout }) {
                 </div>
               )}
 
+              {/* 🟢 VIDEOS TAB */}
               {activeTab === "videos" && (
-                <div style={tableContainerStyle}>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={tableStyle}>
-                      <thead>
-                        <tr>
-                          <th style={thStyle}>Thumb</th>
-                          <th onClick={() => handleSort('caption')} style={{...thStyle, cursor:"pointer"}}>Caption <SortIcon columnKey="caption" /></th>
-                          <th onClick={() => handleSort('category')} style={{...thStyle, cursor:"pointer"}}>Category <SortIcon columnKey="category" /></th>
-                          <th onClick={() => handleSort('views')} style={{...thStyle, cursor:"pointer"}}>Views <SortIcon columnKey="views" /></th>
-                          <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Uploaded <SortIcon columnKey="created_at" /></th>
-                          <th style={thStyle}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedVideos.map(v => (
-                          <tr key={v.id} style={trStyle}>
-                            <td style={tdStyle}><img src={v.thumbnail_url || '/assets/default-avatar.png'} alt="" style={{width:"50px", height:"50px", objectFit:"cover", borderRadius:"6px"}}/></td>
-                            <td style={{...tdStyle, fontWeight:"600", minWidth: "200px"}}>{v.caption || "Untitled"}</td>
-                            <td style={{...tdStyle, textTransform:"capitalize"}}>{v.category}</td>
-                            <td style={tdStyle}>{v.views}</td>
-                            <td style={{...tdStyle, color:"#8e8e93", minWidth: "120px"}}>{new Date(v.created_at).toLocaleDateString()}</td>
-                            <td style={tdStyle}>
-                              <div style={{ display: "flex" }}>
-                                <button onClick={() => setEditingItem({type: 'video', data: v})} style={iconBtnStyle}><Edit3 size={16} /></button>
-                                <button onClick={() => setDeleteWarning({type: 'video', id: v.id, name: v.caption})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <>
+                  <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
+                    <StatCard title="Total Videos" value={videoAnalytics.total} icon={<PlayCircle size={24} color="#ff3b30" />} bg="rgba(255, 59, 48, 0.1)" />
+                    <StatCard title="Total Views" value={videoAnalytics.views.toLocaleString()} icon={<Eye size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
+                    <StatCard title="Avg Views/Video" value={videoAnalytics.avgViews.toLocaleString()} icon={<Activity size={24} color="#34C759" />} bg="rgba(52, 199, 89, 0.1)" />
+                    <StatCard title="Top Category" value={<span style={{textTransform:'capitalize'}}>{videoAnalytics.topCat}</span>} icon={<PieChart size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
                   </div>
-                  {totalVideoPages > 1 && (
-                    <div style={paginationStyle}>
-                      <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                      <span style={pageTextStyle}>Page {currentPage} of {totalVideoPages}</span>
-                      <button disabled={currentPage === totalVideoPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalVideoPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+
+                  <div style={tableContainerStyle}>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={tableStyle}>
+                        <thead>
+                          <tr>
+                            <th style={thStyle}>Thumb</th>
+                            <th onClick={() => handleSort('caption')} style={{...thStyle, cursor:"pointer"}}>Caption <SortIcon columnKey="caption" /></th>
+                            <th onClick={() => handleSort('category')} style={{...thStyle, cursor:"pointer"}}>Category <SortIcon columnKey="category" /></th>
+                            <th onClick={() => handleSort('views')} style={{...thStyle, cursor:"pointer"}}>Views <SortIcon columnKey="views" /></th>
+                            <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Uploaded <SortIcon columnKey="created_at" /></th>
+                            <th style={thStyle}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedVideos.map(v => (
+                            <tr key={v.id} style={trStyle}>
+                              <td style={tdStyle}><img src={v.thumbnail_url || '/assets/default-avatar.png'} alt="" style={{width:"50px", height:"50px", objectFit:"cover", borderRadius:"6px"}}/></td>
+                              <td style={{...tdStyle, fontWeight:"600", minWidth: "200px"}}>{v.caption || "Untitled"}</td>
+                              <td style={{...tdStyle, textTransform:"capitalize"}}>{v.category}</td>
+                              <td style={tdStyle}>{v.views}</td>
+                              <td style={{...tdStyle, color:"#8e8e93", minWidth: "120px"}}>{new Date(v.created_at).toLocaleDateString()}</td>
+                              <td style={tdStyle}>
+                                <div style={{ display: "flex" }}>
+                                  <button onClick={() => setEditingItem({type: 'video', data: v})} style={iconBtnStyle}><Edit3 size={16} /></button>
+                                  <button onClick={() => setDeleteWarning({type: 'video', id: v.id, name: v.caption})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </div>
+                    {totalVideoPages > 1 && (
+                      <div style={paginationStyle}>
+                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
+                        <span style={pageTextStyle}>Page {currentPage} of {totalVideoPages}</span>
+                        <button disabled={currentPage === totalVideoPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalVideoPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
+              {/* 🟢 USERS TAB */}
               {activeTab === "users" && (
-                <div style={tableContainerStyle}>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={tableStyle}>
-                      <thead>
-                        <tr>
-                          <th onClick={() => handleSort('username')} style={{...thStyle, cursor:"pointer"}}>Username <SortIcon columnKey="username" /></th>
-                          <th onClick={() => handleSort('email')} style={{...thStyle, cursor:"pointer"}}>Email <SortIcon columnKey="email" /></th>
-                          <th onClick={() => handleSort('is_premium')} style={{...thStyle, cursor:"pointer"}}>Tier <SortIcon columnKey="is_premium" /></th>
-                          <th onClick={() => handleSort('role')} style={{...thStyle, cursor:"pointer"}}>Role <SortIcon columnKey="role" /></th>
-                          <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Joined <SortIcon columnKey="created_at" /></th>
-                          <th style={thStyle}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedUsers.map(u => (
-                          <tr key={u.id} style={trStyle}>
-                            <td style={{...tdStyle, fontWeight: "600"}}>{u.username}</td>
-                            <td style={{...tdStyle, color: "#8e8e93"}}>{u.email}</td>
-                            <td style={tdStyle}>{u.is_premium ? <span style={premiumBadge}>Premium</span> : <span style={freeBadge}>Free</span>}</td>
-                            <td style={{...tdStyle, textTransform: "capitalize", color: u.role==='admin' ? '#ff3b30' : '#8e8e93'}}>{u.role}</td>
-                            <td style={{...tdStyle, color: "#8e8e93", minWidth: "120px"}}>{new Date(u.created_at).toLocaleDateString()}</td>
-                            <td style={tdStyle}>
-                              <div style={{ display: "flex" }}>
-                                <button onClick={() => setEditingItem({type: 'user', data: u})} style={iconBtnStyle}><Edit3 size={16} /></button>
-                                <button onClick={() => setDeleteWarning({type: 'user', id: u.id, name: u.username})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <>
+                  <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
+                    <StatCard title="Total Registered" value={userAnalytics.total} icon={<Users size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
+                    <StatCard title="Premium Users" value={userAnalytics.premium} icon={<Star size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
+                    <StatCard title="Premium Ratio" value={`${userAnalytics.ratio}%`} icon={<Percent size={24} color="#34C759" />} bg="rgba(52, 199, 89, 0.1)" />
+                    <StatCard title="Admin Staff" value={userAnalytics.admins} icon={<ShieldCheck size={24} color="#ff3b30" />} bg="rgba(255, 59, 48, 0.1)" />
                   </div>
-                  {totalUserPages > 1 && (
-                    <div style={paginationStyle}>
-                      <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                      <span style={pageTextStyle}>Page {currentPage} of {totalUserPages}</span>
-                      <button disabled={currentPage === totalUserPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalUserPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+
+                  <div style={tableContainerStyle}>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={tableStyle}>
+                        <thead>
+                          <tr>
+                            <th onClick={() => handleSort('username')} style={{...thStyle, cursor:"pointer"}}>Username <SortIcon columnKey="username" /></th>
+                            <th onClick={() => handleSort('email')} style={{...thStyle, cursor:"pointer"}}>Email <SortIcon columnKey="email" /></th>
+                            <th onClick={() => handleSort('is_premium')} style={{...thStyle, cursor:"pointer"}}>Tier <SortIcon columnKey="is_premium" /></th>
+                            <th onClick={() => handleSort('role')} style={{...thStyle, cursor:"pointer"}}>Role <SortIcon columnKey="role" /></th>
+                            <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Joined <SortIcon columnKey="created_at" /></th>
+                            <th style={thStyle}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedUsers.map(u => (
+                            <tr key={u.id} style={trStyle}>
+                              <td style={{...tdStyle, fontWeight: "600"}}>{u.username}</td>
+                              <td style={{...tdStyle, color: "#8e8e93"}}>{u.email}</td>
+                              <td style={tdStyle}>{u.is_premium ? <span style={premiumBadge}>Premium</span> : <span style={freeBadge}>Free</span>}</td>
+                              <td style={{...tdStyle, textTransform: "capitalize", color: u.role==='admin' ? '#ff3b30' : '#8e8e93'}}>{u.role}</td>
+                              <td style={{...tdStyle, color: "#8e8e93", minWidth: "120px"}}>{new Date(u.created_at).toLocaleDateString()}</td>
+                              <td style={tdStyle}>
+                                <div style={{ display: "flex" }}>
+                                  <button onClick={() => setEditingItem({type: 'user', data: u})} style={iconBtnStyle}><Edit3 size={16} /></button>
+                                  <button onClick={() => setDeleteWarning({type: 'user', id: u.id, name: u.username})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </div>
+                    {totalUserPages > 1 && (
+                      <div style={paginationStyle}>
+                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
+                        <span style={pageTextStyle}>Page {currentPage} of {totalUserPages}</span>
+                        <button disabled={currentPage === totalUserPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalUserPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
+              {/* 🟢 TRANSACTIONS TAB */}
               {activeTab === "transactions" && (
-                <div style={tableContainerStyle}>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={tableStyle}>
-                      <thead>
-                        <tr>
-                          <th onClick={() => handleSort('username')} style={{...thStyle, cursor:"pointer"}}>User <SortIcon columnKey="username" /></th>
-                          <th onClick={() => handleSort('amount')} style={{...thStyle, cursor:"pointer"}}>Amount <SortIcon columnKey="amount" /></th>
-                          <th onClick={() => handleSort('payment_method')} style={{...thStyle, cursor:"pointer"}}>Method <SortIcon columnKey="payment_method" /></th>
-                          <th onClick={() => handleSort('status')} style={{...thStyle, cursor:"pointer"}}>Status <SortIcon columnKey="status" /></th>
-                          <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Date <SortIcon columnKey="created_at" /></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedTx.map(tx => (
-                          <tr key={tx.id} style={trStyle}>
-                            <td style={{...tdStyle, fontWeight: "600"}}>{tx.username || tx.email || "Unknown"}</td>
-                            <td style={{...tdStyle, fontWeight: "700", minWidth: "140px"}}>${tx.amount} <br/><span style={{fontSize:"12px", color:"#8e8e93"}}>({tx.crypto_amount || 0} {tx.crypto_currency?.toUpperCase()})</span></td>
-                            <td style={tdStyle}>{tx.payment_method?.toUpperCase() || 'TRANSFER'}</td>
-                            <td style={tdStyle}>
-                              {tx.status === 'APPROVED' && <span style={premiumBadge}>Approved</span>}
-                              {tx.status === 'WAITING' && <span style={{...premiumBadge, color:"#F3BA2F", background:"rgba(243,186,47,0.1)"}}>Waiting</span>}
-                              {(tx.status === 'FAILED' || tx.status === 'PENDING') && <span style={{...freeBadge}}>Pending</span>}
-                            </td>
-                            <td style={{...tdStyle, color: "#8e8e93", minWidth: "180px"}}>{new Date(tx.created_at).toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <>
+                  <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
+                    <StatCard title="Gross Revenue" value={`$${txAnalytics.revenue}`} icon={<TrendingUp size={24} color="#34C759" />} bg="rgba(52, 199, 89, 0.1)" />
+                    <StatCard title="Pending Review" value={`$${txAnalytics.pendingRev}`} icon={<Clock size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
+                    <StatCard title="Total Volume" value={txAnalytics.total} icon={<CreditCard size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
+                    <StatCard title="Approval Rate" value={`${txAnalytics.approvalRate}%`} icon={<ShieldCheck size={24} color="#ff3b30" />} bg="rgba(255, 59, 48, 0.1)" />
                   </div>
-                  {totalTxPages > 1 && (
-                    <div style={paginationStyle}>
-                      <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                      <span style={pageTextStyle}>Page {currentPage} of {totalTxPages}</span>
-                      <button disabled={currentPage === totalTxPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalTxPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+
+                  <div style={tableContainerStyle}>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={tableStyle}>
+                        <thead>
+                          <tr>
+                            <th onClick={() => handleSort('username')} style={{...thStyle, cursor:"pointer"}}>User <SortIcon columnKey="username" /></th>
+                            <th onClick={() => handleSort('amount')} style={{...thStyle, cursor:"pointer"}}>Amount <SortIcon columnKey="amount" /></th>
+                            <th onClick={() => handleSort('payment_method')} style={{...thStyle, cursor:"pointer"}}>Method <SortIcon columnKey="payment_method" /></th>
+                            <th onClick={() => handleSort('status')} style={{...thStyle, cursor:"pointer"}}>Status <SortIcon columnKey="status" /></th>
+                            <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Date <SortIcon columnKey="created_at" /></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedTx.map(tx => (
+                            <tr key={tx.id} style={trStyle}>
+                              <td style={{...tdStyle, fontWeight: "600"}}>{tx.username || tx.email || "Unknown"}</td>
+                              <td style={{...tdStyle, fontWeight: "700", minWidth: "140px"}}>${tx.amount} <br/><span style={{fontSize:"12px", color:"#8e8e93"}}>({tx.crypto_amount || 0} {tx.crypto_currency?.toUpperCase()})</span></td>
+                              <td style={tdStyle}>{tx.payment_method?.toUpperCase() || 'TRANSFER'}</td>
+                              <td style={tdStyle}>
+                                {tx.status === 'APPROVED' && <span style={premiumBadge}>Approved</span>}
+                                {tx.status === 'WAITING' && <span style={{...premiumBadge, color:"#F3BA2F", background:"rgba(243,186,47,0.1)"}}>Waiting</span>}
+                                {(tx.status === 'FAILED' || tx.status === 'PENDING') && <span style={{...freeBadge}}>Pending</span>}
+                              </td>
+                              <td style={{...tdStyle, color: "#8e8e93", minWidth: "180px"}}>{new Date(tx.created_at).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </div>
+                    {totalTxPages > 1 && (
+                      <div style={paginationStyle}>
+                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
+                        <span style={pageTextStyle}>Page {currentPage} of {totalTxPages}</span>
+                        <button disabled={currentPage === totalTxPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalTxPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </>
           )}
@@ -527,7 +587,6 @@ const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "6px", 
 const formInputStyle = { background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", padding: "12px", borderRadius: "8px", color: "#fff", fontSize: "14px", outline: "none" };
 const saveBtnStyle = { width: "100%", background: "var(--primary-color)", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "700", fontSize: "15px", cursor: "pointer", marginTop: "10px" };
 
-// 🟢 NEW: PAGINATION STYLES
 const paginationStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 20px", background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.05)" };
 const pageBtnStyle = { background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 16px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600", transition: "0.2s" };
 const pageBtnDisabledStyle = { ...pageBtnStyle, opacity: 0.3, cursor: "not-allowed" };
