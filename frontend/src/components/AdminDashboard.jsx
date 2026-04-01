@@ -15,6 +15,10 @@ export default function AdminDashboard({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   
+  // 🟢 PAGINATION STATE
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
+  
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -31,7 +35,6 @@ export default function AdminDashboard({ user, onLogout }) {
     setError("");
     try {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem("token")}` };
-      // 🟢 THE FIX: Use dynamic API URL from config
       const baseUrl = APP_CONFIG.apiUrl;
 
       if (activeTab === "overview") {
@@ -59,6 +62,11 @@ export default function AdminDashboard({ user, onLogout }) {
     setSearchQuery(""); 
     fetchData(); 
   }, [activeTab]);
+
+  // Reset pagination when searching, sorting, or switching tabs
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery, sortConfig]);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -94,6 +102,16 @@ export default function AdminDashboard({ user, onLogout }) {
     t.username?.toLowerCase().includes(searchQuery.toLowerCase()) || t.payment_method?.toLowerCase().includes(searchQuery.toLowerCase())
   )), [transactions, searchQuery, sortConfig]);
 
+  // 🟢 CALCULATE PAGINATION
+  const paginatedVideos = processedVideos.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalVideoPages = Math.ceil(processedVideos.length / ITEMS_PER_PAGE);
+
+  const paginatedUsers = processedUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalUserPages = Math.ceil(processedUsers.length / ITEMS_PER_PAGE);
+
+  const paginatedTx = processedTx.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalTxPages = Math.ceil(processedTx.length / ITEMS_PER_PAGE);
+
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     try {
@@ -102,7 +120,6 @@ export default function AdminDashboard({ user, onLogout }) {
         ? { caption: editingItem.data.caption, category: editingItem.data.category }
         : { role: editingItem.data.role, is_premium: editingItem.data.is_premium };
 
-      // 🟢 THE FIX: Use dynamic API URL from config
       const res = await fetch(`${APP_CONFIG.apiUrl}${endpoint}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem("token")}` },
@@ -120,7 +137,6 @@ export default function AdminDashboard({ user, onLogout }) {
   const handleDelete = async () => {
     try {
       const endpoint = deleteWarning.type === 'video' ? `/api/admin/video/${deleteWarning.id}` : `/api/admin/user/${deleteWarning.id}`;
-      // 🟢 THE FIX: Use dynamic API URL from config
       const res = await fetch(`${APP_CONFIG.apiUrl}${endpoint}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem("token")}` }
@@ -203,7 +219,6 @@ export default function AdminDashboard({ user, onLogout }) {
       <div className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`} style={sidebarStyle}>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            {/* 🟢 THE FIX: Dynamic App Logo */}
             <h2 style={logoStyle}>
               {APP_CONFIG.appNamePrefix}
               <span style={{ color: "var(--primary-color)" }}>ADMIN</span>
@@ -265,100 +280,127 @@ export default function AdminDashboard({ user, onLogout }) {
 
               {activeTab === "videos" && (
                 <div style={tableContainerStyle}>
-                  <table style={tableStyle}>
-                    <thead>
-                      <tr>
-                        <th style={thStyle}>Thumb</th>
-                        <th onClick={() => handleSort('caption')} style={{...thStyle, cursor:"pointer"}}>Caption <SortIcon columnKey="caption" /></th>
-                        <th onClick={() => handleSort('category')} style={{...thStyle, cursor:"pointer"}}>Category <SortIcon columnKey="category" /></th>
-                        <th onClick={() => handleSort('views')} style={{...thStyle, cursor:"pointer"}}>Views <SortIcon columnKey="views" /></th>
-                        <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Uploaded <SortIcon columnKey="created_at" /></th>
-                        <th style={thStyle}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {processedVideos.map(v => (
-                        <tr key={v.id} style={trStyle}>
-                          <td style={tdStyle}><img src={v.thumbnail_url || '/assets/default-avatar.png'} alt="" style={{width:"50px", height:"50px", objectFit:"cover", borderRadius:"6px"}}/></td>
-                          <td style={{...tdStyle, fontWeight:"600", minWidth: "200px"}}>{v.caption || "Untitled"}</td>
-                          <td style={{...tdStyle, textTransform:"capitalize"}}>{v.category}</td>
-                          <td style={tdStyle}>{v.views}</td>
-                          <td style={{...tdStyle, color:"#8e8e93", minWidth: "120px"}}>{new Date(v.created_at).toLocaleDateString()}</td>
-                          <td style={tdStyle}>
-                            <div style={{ display: "flex" }}>
-                              <button onClick={() => setEditingItem({type: 'video', data: v})} style={iconBtnStyle}><Edit3 size={16} /></button>
-                              <button onClick={() => setDeleteWarning({type: 'video', id: v.id, name: v.caption})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
-                            </div>
-                          </td>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={tableStyle}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>Thumb</th>
+                          <th onClick={() => handleSort('caption')} style={{...thStyle, cursor:"pointer"}}>Caption <SortIcon columnKey="caption" /></th>
+                          <th onClick={() => handleSort('category')} style={{...thStyle, cursor:"pointer"}}>Category <SortIcon columnKey="category" /></th>
+                          <th onClick={() => handleSort('views')} style={{...thStyle, cursor:"pointer"}}>Views <SortIcon columnKey="views" /></th>
+                          <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Uploaded <SortIcon columnKey="created_at" /></th>
+                          <th style={thStyle}>Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {paginatedVideos.map(v => (
+                          <tr key={v.id} style={trStyle}>
+                            <td style={tdStyle}><img src={v.thumbnail_url || '/assets/default-avatar.png'} alt="" style={{width:"50px", height:"50px", objectFit:"cover", borderRadius:"6px"}}/></td>
+                            <td style={{...tdStyle, fontWeight:"600", minWidth: "200px"}}>{v.caption || "Untitled"}</td>
+                            <td style={{...tdStyle, textTransform:"capitalize"}}>{v.category}</td>
+                            <td style={tdStyle}>{v.views}</td>
+                            <td style={{...tdStyle, color:"#8e8e93", minWidth: "120px"}}>{new Date(v.created_at).toLocaleDateString()}</td>
+                            <td style={tdStyle}>
+                              <div style={{ display: "flex" }}>
+                                <button onClick={() => setEditingItem({type: 'video', data: v})} style={iconBtnStyle}><Edit3 size={16} /></button>
+                                <button onClick={() => setDeleteWarning({type: 'video', id: v.id, name: v.caption})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {totalVideoPages > 1 && (
+                    <div style={paginationStyle}>
+                      <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
+                      <span style={pageTextStyle}>Page {currentPage} of {totalVideoPages}</span>
+                      <button disabled={currentPage === totalVideoPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalVideoPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                    </div>
+                  )}
                 </div>
               )}
 
               {activeTab === "users" && (
                 <div style={tableContainerStyle}>
-                  <table style={tableStyle}>
-                    <thead>
-                      <tr>
-                        <th onClick={() => handleSort('username')} style={{...thStyle, cursor:"pointer"}}>Username <SortIcon columnKey="username" /></th>
-                        <th onClick={() => handleSort('email')} style={{...thStyle, cursor:"pointer"}}>Email <SortIcon columnKey="email" /></th>
-                        <th onClick={() => handleSort('is_premium')} style={{...thStyle, cursor:"pointer"}}>Tier <SortIcon columnKey="is_premium" /></th>
-                        <th onClick={() => handleSort('role')} style={{...thStyle, cursor:"pointer"}}>Role <SortIcon columnKey="role" /></th>
-                        <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Joined <SortIcon columnKey="created_at" /></th>
-                        <th style={thStyle}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {processedUsers.map(u => (
-                        <tr key={u.id} style={trStyle}>
-                          <td style={{...tdStyle, fontWeight: "600"}}>{u.username}</td>
-                          <td style={{...tdStyle, color: "#8e8e93"}}>{u.email}</td>
-                          <td style={tdStyle}>{u.is_premium ? <span style={premiumBadge}>Premium</span> : <span style={freeBadge}>Free</span>}</td>
-                          <td style={{...tdStyle, textTransform: "capitalize", color: u.role==='admin' ? '#ff3b30' : '#8e8e93'}}>{u.role}</td>
-                          <td style={{...tdStyle, color: "#8e8e93", minWidth: "120px"}}>{new Date(u.created_at).toLocaleDateString()}</td>
-                          <td style={tdStyle}>
-                            <div style={{ display: "flex" }}>
-                              <button onClick={() => setEditingItem({type: 'user', data: u})} style={iconBtnStyle}><Edit3 size={16} /></button>
-                              <button onClick={() => setDeleteWarning({type: 'user', id: u.id, name: u.username})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
-                            </div>
-                          </td>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={tableStyle}>
+                      <thead>
+                        <tr>
+                          <th onClick={() => handleSort('username')} style={{...thStyle, cursor:"pointer"}}>Username <SortIcon columnKey="username" /></th>
+                          <th onClick={() => handleSort('email')} style={{...thStyle, cursor:"pointer"}}>Email <SortIcon columnKey="email" /></th>
+                          <th onClick={() => handleSort('is_premium')} style={{...thStyle, cursor:"pointer"}}>Tier <SortIcon columnKey="is_premium" /></th>
+                          <th onClick={() => handleSort('role')} style={{...thStyle, cursor:"pointer"}}>Role <SortIcon columnKey="role" /></th>
+                          <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Joined <SortIcon columnKey="created_at" /></th>
+                          <th style={thStyle}>Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {paginatedUsers.map(u => (
+                          <tr key={u.id} style={trStyle}>
+                            <td style={{...tdStyle, fontWeight: "600"}}>{u.username}</td>
+                            <td style={{...tdStyle, color: "#8e8e93"}}>{u.email}</td>
+                            <td style={tdStyle}>{u.is_premium ? <span style={premiumBadge}>Premium</span> : <span style={freeBadge}>Free</span>}</td>
+                            <td style={{...tdStyle, textTransform: "capitalize", color: u.role==='admin' ? '#ff3b30' : '#8e8e93'}}>{u.role}</td>
+                            <td style={{...tdStyle, color: "#8e8e93", minWidth: "120px"}}>{new Date(u.created_at).toLocaleDateString()}</td>
+                            <td style={tdStyle}>
+                              <div style={{ display: "flex" }}>
+                                <button onClick={() => setEditingItem({type: 'user', data: u})} style={iconBtnStyle}><Edit3 size={16} /></button>
+                                <button onClick={() => setDeleteWarning({type: 'user', id: u.id, name: u.username})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {totalUserPages > 1 && (
+                    <div style={paginationStyle}>
+                      <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
+                      <span style={pageTextStyle}>Page {currentPage} of {totalUserPages}</span>
+                      <button disabled={currentPage === totalUserPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalUserPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                    </div>
+                  )}
                 </div>
               )}
 
               {activeTab === "transactions" && (
                 <div style={tableContainerStyle}>
-                  <table style={tableStyle}>
-                    <thead>
-                      <tr>
-                        <th onClick={() => handleSort('username')} style={{...thStyle, cursor:"pointer"}}>User <SortIcon columnKey="username" /></th>
-                        <th onClick={() => handleSort('amount')} style={{...thStyle, cursor:"pointer"}}>Amount <SortIcon columnKey="amount" /></th>
-                        <th onClick={() => handleSort('payment_method')} style={{...thStyle, cursor:"pointer"}}>Method <SortIcon columnKey="payment_method" /></th>
-                        <th onClick={() => handleSort('status')} style={{...thStyle, cursor:"pointer"}}>Status <SortIcon columnKey="status" /></th>
-                        <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Date <SortIcon columnKey="created_at" /></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {processedTx.map(tx => (
-                        <tr key={tx.id} style={trStyle}>
-                          <td style={{...tdStyle, fontWeight: "600"}}>{tx.username || tx.email || "Unknown"}</td>
-                          <td style={{...tdStyle, fontWeight: "700", minWidth: "140px"}}>${tx.amount} <br/><span style={{fontSize:"12px", color:"#8e8e93"}}>({tx.crypto_amount || 0} {tx.crypto_currency?.toUpperCase()})</span></td>
-                          <td style={tdStyle}>{tx.payment_method?.toUpperCase() || 'TRANSFER'}</td>
-                          <td style={tdStyle}>
-                            {tx.status === 'APPROVED' && <span style={premiumBadge}>Approved</span>}
-                            {tx.status === 'WAITING' && <span style={{...premiumBadge, color:"#F3BA2F", background:"rgba(243,186,47,0.1)"}}>Waiting</span>}
-                            {(tx.status === 'FAILED' || tx.status === 'PENDING') && <span style={{...freeBadge}}>Pending</span>}
-                          </td>
-                          <td style={{...tdStyle, color: "#8e8e93", minWidth: "180px"}}>{new Date(tx.created_at).toLocaleString()}</td>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={tableStyle}>
+                      <thead>
+                        <tr>
+                          <th onClick={() => handleSort('username')} style={{...thStyle, cursor:"pointer"}}>User <SortIcon columnKey="username" /></th>
+                          <th onClick={() => handleSort('amount')} style={{...thStyle, cursor:"pointer"}}>Amount <SortIcon columnKey="amount" /></th>
+                          <th onClick={() => handleSort('payment_method')} style={{...thStyle, cursor:"pointer"}}>Method <SortIcon columnKey="payment_method" /></th>
+                          <th onClick={() => handleSort('status')} style={{...thStyle, cursor:"pointer"}}>Status <SortIcon columnKey="status" /></th>
+                          <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Date <SortIcon columnKey="created_at" /></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {paginatedTx.map(tx => (
+                          <tr key={tx.id} style={trStyle}>
+                            <td style={{...tdStyle, fontWeight: "600"}}>{tx.username || tx.email || "Unknown"}</td>
+                            <td style={{...tdStyle, fontWeight: "700", minWidth: "140px"}}>${tx.amount} <br/><span style={{fontSize:"12px", color:"#8e8e93"}}>({tx.crypto_amount || 0} {tx.crypto_currency?.toUpperCase()})</span></td>
+                            <td style={tdStyle}>{tx.payment_method?.toUpperCase() || 'TRANSFER'}</td>
+                            <td style={tdStyle}>
+                              {tx.status === 'APPROVED' && <span style={premiumBadge}>Approved</span>}
+                              {tx.status === 'WAITING' && <span style={{...premiumBadge, color:"#F3BA2F", background:"rgba(243,186,47,0.1)"}}>Waiting</span>}
+                              {(tx.status === 'FAILED' || tx.status === 'PENDING') && <span style={{...freeBadge}}>Pending</span>}
+                            </td>
+                            <td style={{...tdStyle, color: "#8e8e93", minWidth: "180px"}}>{new Date(tx.created_at).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {totalTxPages > 1 && (
+                    <div style={paginationStyle}>
+                      <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
+                      <span style={pageTextStyle}>Page {currentPage} of {totalTxPages}</span>
+                      <button disabled={currentPage === totalTxPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalTxPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -382,7 +424,6 @@ export default function AdminDashboard({ user, onLogout }) {
                 </div>
                 <div style={inputGroupStyle}>
                   <label>Category</label>
-                  {/* 🟢 THE FIX: Dynamic Dropdown Categories from Config */}
                   <select value={editingItem.data.category} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, category: e.target.value}})} style={formInputStyle}>
                     {APP_CONFIG.categories.map((cat) => (
                       <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
@@ -450,7 +491,7 @@ const StatCard = ({ title, value, icon, bg }) => (
   </div>
 );
 
-// 🖌 UI STYLES (Unchanged)
+// 🖌 UI STYLES
 const dashboardContainerStyle = { display: "flex", height: "100dvh", width: "100vw", background: "#050505", color: "#fff", position: "absolute", zIndex: 999999, top: 0, left: 0 };
 const sidebarStyle = { width: "260px", background: "#0a0a0a", borderRight: "1px solid rgba(255,255,255,0.05)", padding: "30px 20px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
 const logoStyle = { margin: 0, fontSize: "20px", fontWeight: "900", letterSpacing: "-1px", color: "#fff" };
@@ -459,7 +500,7 @@ const topBarStyle = { display: "flex", justifyContent: "space-between", alignIte
 const contentAreaStyle = { flex: 1, overflowY: "auto", padding: "40px" };
 const gridStatsStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px" };
 
-const tableContainerStyle = { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", overflow: "hidden", overflowX: "auto" };
+const tableContainerStyle = { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", overflow: "hidden" };
 const tableStyle = { width: "100%", borderCollapse: "collapse" };
 const thStyle = { textAlign: "left", padding: "18px 20px", color: "#8e8e93", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", borderBottom: "1px solid rgba(255,255,255,0.1)", userSelect: "none", whiteSpace: "nowrap" };
 const trStyle = { borderBottom: "1px solid rgba(255,255,255,0.05)" };
@@ -485,3 +526,9 @@ const modalHeaderStyle = { display: "flex", justifyContent: "space-between", ali
 const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "6px", marginBottom: "15px" };
 const formInputStyle = { background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", padding: "12px", borderRadius: "8px", color: "#fff", fontSize: "14px", outline: "none" };
 const saveBtnStyle = { width: "100%", background: "var(--primary-color)", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "700", fontSize: "15px", cursor: "pointer", marginTop: "10px" };
+
+// 🟢 NEW: PAGINATION STYLES
+const paginationStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 20px", background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.05)" };
+const pageBtnStyle = { background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 16px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600", transition: "0.2s" };
+const pageBtnDisabledStyle = { ...pageBtnStyle, opacity: 0.3, cursor: "not-allowed" };
+const pageTextStyle = { fontSize: "13px", color: "#8e8e93", fontWeight: "600" };
