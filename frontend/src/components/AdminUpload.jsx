@@ -68,12 +68,9 @@ export default function AdminUpload({ onClose }) {
     formData.append("caption", caption);
     formData.append("uploader_id", adminId); 
     formData.append("category", category);
-    
-    // 🟢 NEW: Append the selected upload target to the form data
-    formData.append("upload_target", uploadTarget);
+    formData.append("upload_target", uploadTarget); // 🟢 R2/Stream toggle
 
     try {
-      // 🟢 THE FIX: Dynamic API URL
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/upload-premium`, {
         method: "POST",
         body: formData,
@@ -105,7 +102,6 @@ export default function AdminUpload({ onClose }) {
 
     setTwitterStatus("processing");
 
-    // 🟢 THE FIX: Dynamic API URLs
     const endpoint = pipelineRoute === "direct" 
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-telethon`;
@@ -118,7 +114,8 @@ export default function AdminUpload({ onClose }) {
           url: twitterUrl,
           admin_id: adminId, 
           category: category,
-          telegram_dest: telegramDest 
+          telegram_dest: telegramDest,
+          upload_target: uploadTarget // 🟢 THE FIX: Pass target to Python Server
         }),
       });
 
@@ -148,14 +145,14 @@ export default function AdminUpload({ onClose }) {
     setTelegramStatus("processing");
 
     try {
-      // 🟢 THE FIX: Dynamic API URL
       const res = await fetch(`${APP_CONFIG.apiUrl}/twitter-api/import-telegram-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           url: telegramUrl,
           category: category,
-          telegram_dest: telegramDest 
+          telegram_dest: telegramDest,
+          upload_target: uploadTarget // 🟢 THE FIX: Pass target to Python Server
         }),
       });
 
@@ -216,14 +213,12 @@ export default function AdminUpload({ onClose }) {
           </button>
         </div>
 
-        {/* 🟢 SHARED INPUTS */}
+        {/* 🟢 SHARED INPUTS (Moved Storage Target Here) */}
         <div style={formStyle}>
-          
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Your Admin ID</label>
             <select value={adminId} onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required>
               <option value="" disabled>Select your Admin ID</option>
-              {/* 🟢 THE FIX: Dynamic Admin Users from Config */}
               {APP_CONFIG.adminUsers.map(admin => (
                 <option key={admin.id} value={admin.id}>{admin.label} ({admin.id})</option>
               ))}
@@ -233,12 +228,20 @@ export default function AdminUpload({ onClose }) {
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Category</label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
-              {/* 🟢 THE FIX: Dynamic Categories from Config (Including premium and shots) */}
               <option value="premium">Premium</option>
               <option value="shots">Shots</option>
               {APP_CONFIG.categories.map(cat => (
                 <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
               ))}
+            </select>
+          </div>
+
+          {/* 🟢 THE FIX: Storage Destination is now globally available for all upload modes */}
+          <div style={inputGroupStyle}>
+            <label style={labelStyle}>Storage Destination</label>
+            <select value={uploadTarget} onChange={(e) => setUploadTarget(e.target.value)} style={inputStyle}>
+              <option value="r2">Cloudflare R2 (Budget-Friendly Storage)</option>
+              <option value="stream">Cloudflare Stream (Fast Encoding)</option>
             </select>
           </div>
         </div>
@@ -254,15 +257,6 @@ export default function AdminUpload({ onClose }) {
                 type="text" placeholder="Video description..." value={caption}
                 onChange={(e) => setCaption(e.target.value)} style={inputStyle}
               />
-            </div>
-            
-            {/* 🟢 NEW: Storage Target Selection */}
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>Storage Destination</label>
-              <select value={uploadTarget} onChange={(e) => setUploadTarget(e.target.value)} style={inputStyle}>
-                <option value="r2">Cloudflare R2 (Budget-Friendly Storage)</option>
-                <option value="stream">Cloudflare Stream (Fast Encoding)</option>
-              </select>
             </div>
 
             <div style={fileDropStyle}>
@@ -304,7 +298,6 @@ export default function AdminUpload({ onClose }) {
               <div style={inputGroupStyle}>
                 <label style={labelStyle}>Telegram Destination</label>
                 <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
-                  {/* 🟢 THE FIX: Dynamic Telegram Destinations from Config */}
                   {APP_CONFIG.telegramDestinations.map(dest => (
                     <option key={dest.id} value={dest.id}>{dest.label}</option>
                   ))}
@@ -342,7 +335,6 @@ export default function AdminUpload({ onClose }) {
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Telegram Destination</label>
               <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
-                {/* 🟢 THE FIX: Dynamic Telegram Destinations from Config */}
                 {APP_CONFIG.telegramDestinations.map(dest => (
                   <option key={dest.id} value={dest.id}>{dest.label}</option>
                 ))}
