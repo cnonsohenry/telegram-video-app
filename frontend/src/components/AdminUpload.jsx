@@ -7,7 +7,6 @@ import { APP_CONFIG } from "../config";
 export default function AdminUpload({ onClose }) {
   const [uploadMode, setUploadMode] = useState("local"); 
 
-  // 🟢 THE FIX: Set default values dynamically from config
   const [adminId, setAdminId] = useState(APP_CONFIG.adminUsers[0]?.id || ""); 
   const [category, setCategory] = useState("premium");
 
@@ -16,8 +15,8 @@ export default function AdminUpload({ onClose }) {
   const [caption, setCaption] = useState("");
   const [status, setStatus] = useState("idle"); 
   
-  // 🟢 NEW: State for deciding where the file goes (R2 or Stream)
-  const [uploadTarget, setUploadTarget] = useState("r2"); // Defaulting to R2 to save you money!
+  // Storage Target State
+  const [uploadTarget, setUploadTarget] = useState("r2"); 
 
   // Twitter State
   const [twitterUrl, setTwitterUrl] = useState("");
@@ -27,8 +26,6 @@ export default function AdminUpload({ onClose }) {
   // Telegram Import State
   const [telegramUrl, setTelegramUrl] = useState("");
   const [telegramStatus, setTelegramStatus] = useState("idle"); 
-
-  // 🟢 THE FIX: Set default Telegram destination from config
   const [telegramDest, setTelegramDest] = useState(APP_CONFIG.telegramDestinations[0]?.id || ""); 
 
   useEffect(() => {
@@ -68,7 +65,7 @@ export default function AdminUpload({ onClose }) {
     formData.append("caption", caption);
     formData.append("uploader_id", adminId); 
     formData.append("category", category);
-    formData.append("upload_target", uploadTarget); // 🟢 R2/Stream toggle
+    formData.append("upload_target", uploadTarget); 
 
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/upload-premium`, {
@@ -115,7 +112,7 @@ export default function AdminUpload({ onClose }) {
           admin_id: adminId, 
           category: category,
           telegram_dest: telegramDest,
-          upload_target: uploadTarget // 🟢 THE FIX: Pass target to Python Server
+          upload_target: uploadTarget 
         }),
       });
 
@@ -144,15 +141,21 @@ export default function AdminUpload({ onClose }) {
 
     setTelegramStatus("processing");
 
+    // 🟢 THE FIX: Dynamic endpoint based on routing pipeline
+    const endpoint = pipelineRoute === "direct" 
+        ? `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-direct`
+        : `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-link`;
+
     try {
-      const res = await fetch(`${APP_CONFIG.apiUrl}/twitter-api/import-telegram-link`, {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           url: telegramUrl,
+          admin_id: adminId, // 🟢 THE FIX: Included missing admin_id
           category: category,
           telegram_dest: telegramDest,
-          upload_target: uploadTarget // 🟢 THE FIX: Pass target to Python Server
+          upload_target: uploadTarget 
         }),
       });
 
@@ -213,7 +216,7 @@ export default function AdminUpload({ onClose }) {
           </button>
         </div>
 
-        {/* 🟢 SHARED INPUTS (Moved Storage Target Here) */}
+        {/* 🟢 SHARED INPUTS */}
         <div style={formStyle}>
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Your Admin ID</label>
@@ -236,7 +239,6 @@ export default function AdminUpload({ onClose }) {
             </select>
           </div>
 
-          {/* 🟢 THE FIX: Storage Destination is now globally available for all upload modes */}
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Storage Destination</label>
             <select value={uploadTarget} onChange={(e) => setUploadTarget(e.target.value)} style={inputStyle}>
@@ -332,14 +334,26 @@ export default function AdminUpload({ onClose }) {
         {/* 🟢 TELEGRAM IMPORT */}
         {uploadMode === "telegram" && (
           <form onSubmit={handleTelegramImport} style={formStyle}>
+            
+            {/* 🟢 THE FIX: Added Routing Pipeline to Telegram */}
             <div style={inputGroupStyle}>
-              <label style={labelStyle}>Telegram Destination</label>
-              <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
-                {APP_CONFIG.telegramDestinations.map(dest => (
-                  <option key={dest.id} value={dest.id}>{dest.label}</option>
-                ))}
+              <label style={labelStyle}>Routing Pipeline</label>
+              <select value={pipelineRoute} onChange={(e) => setPipelineRoute(e.target.value)} style={inputStyle}>
+                <option value="direct">⚡ Direct to Cloudflare</option>
+                <option value="telethon">🤖 Send to Telegram Bot</option>
               </select>
             </div>
+
+            {pipelineRoute === "telethon" && (
+              <div style={inputGroupStyle}>
+                <label style={labelStyle}>Telegram Destination</label>
+                <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
+                  {APP_CONFIG.telegramDestinations.map(dest => (
+                    <option key={dest.id} value={dest.id}>{dest.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Telegram Post Link</label>
