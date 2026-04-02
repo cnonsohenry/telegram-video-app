@@ -15,6 +15,9 @@ export default function AdminUpload({ onClose }) {
   const [file, setFile] = useState(null);
   const [caption, setCaption] = useState("");
   const [status, setStatus] = useState("idle"); 
+  
+  // 🟢 NEW: State for deciding where the file goes (R2 or Stream)
+  const [uploadTarget, setUploadTarget] = useState("r2"); // Defaulting to R2 to save you money!
 
   // Twitter State
   const [twitterUrl, setTwitterUrl] = useState("");
@@ -65,6 +68,9 @@ export default function AdminUpload({ onClose }) {
     formData.append("caption", caption);
     formData.append("uploader_id", adminId); 
     formData.append("category", category);
+    
+    // 🟢 NEW: Append the selected upload target to the form data
+    formData.append("upload_target", uploadTarget);
 
     try {
       // 🟢 THE FIX: Dynamic API URL
@@ -248,6 +254,15 @@ export default function AdminUpload({ onClose }) {
                 type="text" placeholder="Video description..." value={caption}
                 onChange={(e) => setCaption(e.target.value)} style={inputStyle}
               />
+            </div>
+            
+            {/* 🟢 NEW: Storage Target Selection */}
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Storage Destination</label>
+              <select value={uploadTarget} onChange={(e) => setUploadTarget(e.target.value)} style={inputStyle}>
+                <option value="r2">Cloudflare R2 (Budget-Friendly Storage)</option>
+                <option value="stream">Cloudflare Stream (Fast Encoding)</option>
+              </select>
             </div>
 
             <div style={fileDropStyle}>

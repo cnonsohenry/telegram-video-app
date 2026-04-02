@@ -321,14 +321,14 @@ app.post("/webhook", async (req, res) => {
 
 
 /* =====================
-   PREMIUM UPLOAD
+   PREMIUM UPLOAD (STREAM & R2 SUPPORT)
 ===================== */
 const upload = multer({ dest: "uploads/" }); 
 
 app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) => {
   try {
-    // 🟢 THE FIX: Extract media_group_id from the frontend request
-    const { caption, category, uploader_id, media_group_id } = req.body; 
+    // 🟢 Extract the new 'upload_target' flag (defaults to 'stream' if not provided)
+    const { caption, category, uploader_id, media_group_id, upload_target } = req.body; 
     const videoFile = req.file;
 
     if (!ALLOWED_USERS.includes(Number(uploader_id))) {
@@ -337,14 +337,34 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     if (!videoFile) return res.status(400).json({ error: "No video file provided" });
 
-    const cfResult = await uploadDirectToStream(videoFile.path, {
-      caption: caption || "Premium Content",
-      category: category || "premium"
-    });
-
+    let savedCloudflareId = "none";
     const internalId = `premium_${Date.now()}`;
-    
-    // 🟢 THE FIX: Add media_group_id ($8) to the database insert
+
+    if (upload_target === "r2") {
+      // 🟢 ROUTE 1: Upload directly to Cloudflare R2 Bucket
+      const fileStream = fs.createReadStream(videoFile.path);
+      const extension = videoFile.originalname.split('.').pop() || "mp4";
+      const r2Key = `premium/${internalId}.${extension}`; // e.g., premium/premium_1612345.mp4
+      
+      await r2.send(new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: r2Key,
+        Body: fileStream,
+        ContentType: videoFile.mimetype || "video/mp4",
+      }));
+      
+      // We prefix with 'r2:' so the playback API knows it is not a Cloudflare Stream ID
+      savedCloudflareId = `r2:${r2Key}`;
+      
+    } else {
+      // 🔵 ROUTE 2: Upload to Cloudflare Stream (Default/Legacy behavior)
+      const cfResult = await uploadDirectToStream(videoFile.path, {
+        caption: caption || "Premium Content",
+        category: category || "premium"
+      });
+      savedCloudflareId = cfResult.uid;
+    }
+
     await pool.query(
       `INSERT INTO videos (chat_id, message_id, file_id, uploader_id, category, caption, cloudflare_id, status, media_group_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', $8)`,
@@ -355,16 +375,21 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
         uploader_id, 
         category || "premium", 
         caption, 
-        cfResult.uid,
-        media_group_id || null // Save the group ID if it exists, otherwise leave null
+        savedCloudflareId,
+        media_group_id || null 
       ]
     );
 
+    // Delete the temporary file from the server
     fs.unlinkSync(videoFile.path);
 
-    res.json({ success: true, videoId: cfResult.uid });
+    res.json({ success: true, videoId: savedCloudflareId });
   } catch (err) {
     console.error("Admin Upload Error:", err.message);
+    // 🟢 Failsafe: Clean up the file if the upload crashes so you don't run out of disk space
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     res.status(500).json({ error: "Upload failed" });
   }
 });
@@ -390,11 +415,25 @@ app.get("/api/video", async (req, res) => {
 
     const video = dbRes.rows[0];
 
+    // 🟢 THE FIX: Handle both R2 Buckets and Cloudflare Stream formats
     if (video.cloudflare_id && video.cloudflare_id !== "none") {
-      const cleanId = video.cloudflare_id.split('?')[0];
-      const video_url = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
-      console.log(`[PLAYBACK] Serving Cloudflare: ${cleanId}`);
-      return res.json({ video_url });
+      
+      // 1. If it's an R2 file (prefixed with 'r2:')
+      if (video.cloudflare_id.startsWith("r2:")) {
+        const r2Key = video.cloudflare_id.replace("r2:", "");
+        // Serve using your dynamic worker domain
+        const video_url = `${process.env.WORKER_BASE_URL}/${r2Key}`; 
+        console.log(`[PLAYBACK] Serving R2 Bucket: ${r2Key}`);
+        return res.json({ video_url });
+      } 
+      
+      // 2. If it's a standard Cloudflare Stream file
+      else {
+        const cleanId = video.cloudflare_id.split('?')[0];
+        const video_url = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
+        console.log(`[PLAYBACK] Serving Cloudflare Stream: ${cleanId}`);
+        return res.json({ video_url });
+      }
     }
 
     if (!video.file_id || video.file_id === "none") {
@@ -414,7 +453,7 @@ app.get("/api/video", async (req, res) => {
     const filePath = tgRes.data.result.file_path;
     const { exp, sig } = signWorkerUrl(filePath);
 
-    // 🟢 THE FIX: Dynamic Worker Base URL
+    // 🟢 THE FIX: Dynamic Worker Base URL for Telegram files
     const workerUrl = `${process.env.WORKER_BASE_URL}/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}`;
     
     return res.json({ video_url: workerUrl });
