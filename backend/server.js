@@ -15,6 +15,7 @@ import { fileURLToPath } from "url";
 // Import Prerender
 import prerender from "prerender-node";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import adminRoutes from "./admin.js";
 import authRoutes from "./auth.js";
 import multer from "multer";
@@ -415,16 +416,22 @@ app.get("/api/video", async (req, res) => {
 
     const video = dbRes.rows[0];
 
-    // 🟢 THE FIX: Handle both R2 Buckets and Cloudflare Stream formats
+    // 🟢 THE FIX: Handle both R2 Buckets and Cloudflare Stream formats properly
     if (video.cloudflare_id && video.cloudflare_id !== "none") {
       
       // 1. If it's an R2 file (prefixed with 'r2:')
       if (video.cloudflare_id.startsWith("r2:")) {
         const r2Key = video.cloudflare_id.replace("r2:", "");
-        // Serve using your dynamic worker domain
-        const video_url = `${process.env.WORKER_BASE_URL}/${r2Key}`; 
-        console.log(`[PLAYBACK] Serving R2 Bucket: ${r2Key}`);
-        return res.json({ video_url });
+        
+        // 🟢 Generate a secure, 6-hour temporary streaming URL directly from the R2 bucket
+        const command = new GetObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: r2Key
+        });
+        const signedUrl = await getSignedUrl(r2, command, { expiresIn: 21600 }); 
+        
+        console.log(`[PLAYBACK] Serving Secure R2 Link: ${r2Key}`);
+        return res.json({ video_url: signedUrl });
       } 
       
       // 2. If it's a standard Cloudflare Stream file
@@ -453,7 +460,7 @@ app.get("/api/video", async (req, res) => {
     const filePath = tgRes.data.result.file_path;
     const { exp, sig } = signWorkerUrl(filePath);
 
-    // 🟢 THE FIX: Dynamic Worker Base URL for Telegram files
+    // 🟢 Dynamic Worker Base URL for Telegram files
     const workerUrl = `${process.env.WORKER_BASE_URL}/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}`;
     
     return res.json({ video_url: workerUrl });
@@ -480,9 +487,15 @@ function signThumbnail(chatId, messageId) {
 ===================== */
 const mapVideoToResponse = (v, apiBaseUrl) => {
   let thumbnailUrl = "";
+  
   if (v.cloudflare_id && v.cloudflare_id !== "none") {
-     const cleanId = v.cloudflare_id.split('?')[0];
-     thumbnailUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
+     if (v.cloudflare_id.startsWith("r2:")) {
+         // 🟢 THE FIX: R2 files don't have auto-generated thumbnails. Use a safe fallback.
+         thumbnailUrl = '/assets/default-avatar.png'; 
+     } else {
+         const cleanId = v.cloudflare_id.split('?')[0];
+         thumbnailUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
+     }
   } else {
      const sig = signThumbnail(v.chat_id, v.message_id);
      thumbnailUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
