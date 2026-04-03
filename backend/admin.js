@@ -99,12 +99,23 @@ router.get("/all-videos", authenticateToken, isAdmin, async (req, res) => {
     `);
     
     // Auto-generate thumbnails for the grid
-    const formatted = videos.rows.map(v => ({
-      ...v,
-      thumbnail_url: v.cloudflare_id && v.cloudflare_id !== "none" 
-        ? `https://videodelivery.net/${v.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=600`
-        : `https://videos.naijahomemade.com/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`
-    }));
+    const formatted = videos.rows.map(v => {
+      let thumbUrl = "";
+      
+      // 🟢 THE FIX: Only route Cloudflare Stream files to videodelivery.net
+      if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
+        thumbUrl = `https://videodelivery.net/${v.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=600`;
+      } else {
+        // R2 files and Telegram files will use your upgraded local Thumbnail API!
+        const baseUrl = process.env.API_BASE_URL || 'https://videos.naijahomemade.com';
+        thumbUrl = `${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`;
+      }
+
+      return {
+        ...v,
+        thumbnail_url: thumbUrl
+      };
+    });
     
     res.json(formatted);
   } catch (err) {
