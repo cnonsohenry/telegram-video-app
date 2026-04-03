@@ -8,6 +8,12 @@ import fs from "fs";
 import pkg from "pg";
 import https from "https";
 import crypto from "crypto";
+
+// 🟢 NEW: Imports for FFmpeg thumbnail extraction
+import { exec } from "child_process";
+import util from "util";
+const execPromise = util.promisify(exec);
+
 // Native imports needed for ES Modules to serve frontend files
 import path from "path";
 import { fileURLToPath } from "url";
@@ -26,7 +32,6 @@ import { z } from "zod";
 
 const { Pool } = pkg;
 
-// 🟢 NEW: ES Module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -37,7 +42,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🟢 THE FIX: Dynamic CORS derived from the .env file
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : ["http://localhost:5173"];
 app.use(cors({
   origin: allowedOrigins
@@ -46,27 +50,21 @@ app.use(cors({
 /* =====================
    SERVER MONITORING (SECURED)
 ===================== */
-// 1. Lock down the /status route with a username and password
 app.use("/status", basicAuth({
-  users: { 'admin': process.env.ADMIN_PASSWORD }, // Change this password!
+  users: { 'admin': process.env.ADMIN_PASSWORD },
   challenge: true,
   unauthorizedResponse: 'Access Denied: Admins Only'
 }));
 
-// 2. Initialize the status monitor
 app.use(statusMonitor({
-  // 🟢 THE FIX: Dynamic App Name for Status Monitor
   title: `${process.env.APP_NAME || 'Platform'} Server Status`,
   path: '/status',
   spans: [{
-    interval: 1,            // Every second
-    retention: 60           // Keep 60 data points in memory
+    interval: 1, retention: 60
   }, {
-    interval: 5,            // Every 5 seconds
-    retention: 60
+    interval: 5, retention: 60
   }, {
-    interval: 15,           // Every 15 seconds
-    retention: 60
+    interval: 15, retention: 60
   }]
 }));
 
@@ -81,7 +79,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Configure R2 Client
 const r2 = new S3Client({
   region: "auto",
   endpoint: process.env.R2_ENDPOINT, 
@@ -98,7 +95,6 @@ async function initDatabase() {
   let retries = 5;
   while (retries) {
     try {
-      // 1. Telegram Uploaders/Admins
       await pool.query(`
         CREATE TABLE IF NOT EXISTS users (
           user_id BIGINT PRIMARY KEY,
@@ -108,7 +104,6 @@ async function initDatabase() {
         )
       `);
 
-      // 2. The Website Consumers (Matching your exact schema)
       await pool.query(`
         CREATE TABLE IF NOT EXISTS app_users (
           id SERIAL PRIMARY KEY,
@@ -123,12 +118,10 @@ async function initDatabase() {
         )
       `);
 
-      // 🟢 Safely inject the premium flag into your existing app_users table
       await pool.query(`
         ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
       `);
 
-      // 3. The Video Content
       await pool.query(`
         CREATE TABLE IF NOT EXISTS videos (
           id SERIAL PRIMARY KEY,
@@ -147,7 +140,6 @@ async function initDatabase() {
         )
       `);
 
-      // 4. The Payment Ledger
       await pool.query(`
         CREATE TABLE IF NOT EXISTS transactions (
           id SERIAL PRIMARY KEY,
@@ -177,28 +169,15 @@ function signWorkerUrl(filePath) {
   return { exp, sig };
 }
 
-
 /* =====================
-   AUTH
+   AUTH & ROUTES
 ===================== */
 app.use("/api/auth", authRoutes);
-
-/* =====================
-   ADMIN CONTROL
-===================== */
 app.use("/api/admin", adminRoutes);
 
-/* =====================
-   PAYMENT & CRYPTO BRIDGES
-===================== */
-// 1. Bank Transfer AI Engine
 app.post("/api/verify-payment", (req, res) => verifyPayment(req, res, pool));
-
-// 2. NOWPayments Crypto Engine
 app.post("/api/crypto/create", (req, res) => createCryptoPayment(req, res, pool));
 app.post("/api/crypto/webhook", (req, res) => cryptoWebhook(req, res, pool));
-
-// 3. Crypto Payment status check
 app.get("/api/crypto/status/:order_id", (req, res) => checkCryptoTransaction(req, res, pool));
 
 /* =====================
@@ -208,15 +187,11 @@ async function uploadThumbnailToR2(thumbFileId, chatId, messageId) {
   if (!thumbFileId) return null;
   
   try {
-    // 1. Get file path from Telegram
     const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: thumbFileId } });
     const filePath = fileRes.data.result.file_path;
-
-    // 2. Download the image buffer
     const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${filePath}`, { responseType: "arraybuffer" });
     const buffer = Buffer.from(imageRes.data);
 
-    // 3. Upload to Cloudflare R2
     const key = `thumbs/${chatId}_${messageId}.jpg`;
     await r2.send(new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
@@ -234,7 +209,7 @@ async function uploadThumbnailToR2(thumbFileId, chatId, messageId) {
 }
 
 /* =====================
-   Webhook (Updated with Album Inheritance & R2 Sync)
+   Webhook
 ===================== */
 app.post("/webhook", async (req, res) => {
   try {
@@ -270,7 +245,7 @@ app.post("/webhook", async (req, res) => {
     else if (rawCaption.toLowerCase().includes("#baddies")) category = "baddies";
     else if (rawCaption.toLowerCase().includes("#trends")) category = "trends";
     else if (rawCaption.toLowerCase().includes("#shots")) category = "shots";
-    else if (rawCaption.toLowerCase().includes("#premium")) category = "premium"; // 🟢 ADDED THIS
+    else if (rawCaption.toLowerCase().includes("#premium")) category = "premium"; 
     else if (rawCaption.toLowerCase().includes("#hotties")) category = "hotties";
 
     let cleanCaption = rawCaption.replace(/#\w+/g, "").trim();
@@ -279,8 +254,6 @@ app.post("/webhook", async (req, res) => {
     const messageId = (message.forward_from_message_id ?? message.message_id).toString();
     const mediaGroupId = message.media_group_id || null;
 
-    // 🟢 THE FIX: Album Sibling Inheritance
-    // If this video has no caption but belongs to a group, copy the caption/category from the first video in the DB!
     if (mediaGroupId && !rawCaption) {
       const siblingRes = await pool.query(
         `SELECT category, caption FROM videos WHERE media_group_id = $1 LIMIT 1`,
@@ -289,7 +262,6 @@ app.post("/webhook", async (req, res) => {
       if (siblingRes.rows.length > 0) {
         category = siblingRes.rows[0].category;
         cleanCaption = siblingRes.rows[0].caption;
-        console.log(`🔗 Inherited category '${category}' for grouped video ${messageId}`);
       }
     }
     
@@ -320,15 +292,13 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-
 /* =====================
-   PREMIUM UPLOAD (STREAM & R2 SUPPORT)
+   PREMIUM UPLOAD (STREAM & R2 THUMBNAIL SUPPORT)
 ===================== */
 const upload = multer({ dest: "uploads/" }); 
 
 app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) => {
   try {
-    // 🟢 Extract the new 'upload_target' flag (defaults to 'stream' if not provided)
     const { caption, category, uploader_id, media_group_id, upload_target } = req.body; 
     const videoFile = req.file;
 
@@ -341,11 +311,30 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     let savedCloudflareId = "none";
     const internalId = `premium_${Date.now()}`;
 
+    // 🟢 FFmpeg: Generate a Thumbnail locally before uploading
+    try {
+      const thumbPath = `${videoFile.path}.jpg`;
+      // Extract the frame at the 1-second mark, scale width to 400px (auto-height)
+      await execPromise(`ffmpeg -i ${videoFile.path} -ss 00:00:01.000 -vframes 1 -vf scale=400:-1 -q:v 5 ${thumbPath} -y`);
+
+      const thumbBuffer = fs.readFileSync(thumbPath);
+      await r2.send(new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: `thumbs/internal_${internalId}.jpg`, // Matched to chat_id = "internal", message_id = internalId
+        Body: thumbBuffer,
+        ContentType: "image/jpeg",
+      }));
+      fs.unlinkSync(thumbPath); 
+      console.log(`🖼️ R2 Thumbnail successfully generated: thumbs/internal_${internalId}.jpg`);
+    } catch (ffmpegErr) {
+      console.error("⚠️ FFmpeg thumbnail extraction failed:", ffmpegErr.message);
+      // Fails gracefully - upload will still proceed even if thumbnail fails
+    }
+
     if (upload_target === "r2") {
-      // 🟢 ROUTE 1: Upload directly to Cloudflare R2 Bucket
       const fileStream = fs.createReadStream(videoFile.path);
       const extension = videoFile.originalname.split('.').pop() || "mp4";
-      const r2Key = `premium/${internalId}.${extension}`; // e.g., premium/premium_1612345.mp4
+      const r2Key = `premium/${internalId}.${extension}`; 
       
       await r2.send(new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -354,11 +343,8 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
         ContentType: videoFile.mimetype || "video/mp4",
       }));
       
-      // We prefix with 'r2:' so the playback API knows it is not a Cloudflare Stream ID
       savedCloudflareId = `r2:${r2Key}`;
-      
     } else {
-      // 🔵 ROUTE 2: Upload to Cloudflare Stream (Default/Legacy behavior)
       const cfResult = await uploadDirectToStream(videoFile.path, {
         caption: caption || "Premium Content",
         category: category || "premium"
@@ -381,13 +367,11 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       ]
     );
 
-    // Delete the temporary file from the server
     fs.unlinkSync(videoFile.path);
 
     res.json({ success: true, videoId: savedCloudflareId });
   } catch (err) {
     console.error("Admin Upload Error:", err.message);
-    // 🟢 Failsafe: Clean up the file if the upload crashes so you don't run out of disk space
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
@@ -416,14 +400,10 @@ app.get("/api/video", async (req, res) => {
 
     const video = dbRes.rows[0];
 
-    // 🟢 THE FIX: Handle both R2 Buckets and Cloudflare Stream formats properly
     if (video.cloudflare_id && video.cloudflare_id !== "none") {
-      
-      // 1. If it's an R2 file (prefixed with 'r2:')
       if (video.cloudflare_id.startsWith("r2:")) {
         const r2Key = video.cloudflare_id.replace("r2:", "");
         
-        // 🟢 Generate a secure, 6-hour temporary streaming URL directly from the R2 bucket
         const command = new GetObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
           Key: r2Key
@@ -432,10 +412,7 @@ app.get("/api/video", async (req, res) => {
         
         console.log(`[PLAYBACK] Serving Secure R2 Link: ${r2Key}`);
         return res.json({ video_url: signedUrl });
-      } 
-      
-      // 2. If it's a standard Cloudflare Stream file
-      else {
+      } else {
         const cleanId = video.cloudflare_id.split('?')[0];
         const video_url = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
         console.log(`[PLAYBACK] Serving Cloudflare Stream: ${cleanId}`);
@@ -460,7 +437,6 @@ app.get("/api/video", async (req, res) => {
     const filePath = tgRes.data.result.file_path;
     const { exp, sig } = signWorkerUrl(filePath);
 
-    // 🟢 Dynamic Worker Base URL for Telegram files
     const workerUrl = `${process.env.WORKER_BASE_URL}/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}`;
     
     return res.json({ video_url: workerUrl });
@@ -488,17 +464,14 @@ function signThumbnail(chatId, messageId) {
 const mapVideoToResponse = (v, apiBaseUrl) => {
   let thumbnailUrl = "";
   
-  if (v.cloudflare_id && v.cloudflare_id !== "none") {
-     if (v.cloudflare_id.startsWith("r2:")) {
-         // 🟢 THE FIX: R2 files don't have auto-generated thumbnails. Use a safe fallback.
-         thumbnailUrl = '/assets/default-avatar.png'; 
-     } else {
-         const cleanId = v.cloudflare_id.split('?')[0];
-         thumbnailUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
-     }
+  // 🟢 THE FIX: Only route Standard Stream videos to videodelivery.net. 
+  // R2 and Telegram videos will BOTH use your local /api/thumbnail endpoint!
+  if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
+      const cleanId = v.cloudflare_id.split('?')[0];
+      thumbnailUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
   } else {
-     const sig = signThumbnail(v.chat_id, v.message_id);
-     thumbnailUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
+      const sig = signThumbnail(v.chat_id, v.message_id);
+      thumbnailUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
   }
 
   return {
@@ -512,14 +485,13 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     created_at: v.created_at,
     thumbnail_url: thumbnailUrl,
     media_group_id: v.media_group_id || null,
-    is_group: Number(v.group_count || 1) > 1, // 🟢 Triggers the folder icon on frontend
+    is_group: Number(v.group_count || 1) > 1, 
     group_count: Number(v.group_count || 1)
   };
 };
 
-
 /* =====================
-   List videos (Lazy Loading Albums & Pagination Fix)
+   List videos
 ===================== */
 app.get("/api/videos", async (req, res) => {
   try {
@@ -528,10 +500,8 @@ app.get("/api/videos", async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category || "hotties";
     
-    // 🟢 THE FIX: Dynamic API Base URL
     const apiBaseUrl = process.env.API_BASE_URL;
 
-    // 🟢 1. MAIN QUERY: Uses SQL Window Functions to pick exactly 1 "Cover" per album
     let query;
     let queryValues;
 
@@ -562,7 +532,6 @@ app.get("/api/videos", async (req, res) => {
 
     const videosRes = await pool.query(query, queryValues);
 
-    // 🟢 2. SUGGESTIONS: Reverted to your original, blazing-fast simple query!
     let suggestions = [];
     if (page === 1) {
       const suggestQuery = `
@@ -575,7 +544,6 @@ app.get("/api/videos", async (req, res) => {
       suggestions = suggestRes.rows;
     }
 
-    // 🟢 3. TOTAL COUNT: Upgraded to count distinct groups so the frontend math is perfect!
     let countQuery;
     if (category === "trends") {
       countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos`;
@@ -587,7 +555,6 @@ app.get("/api/videos", async (req, res) => {
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
 
-    // No more manual JS bundling! Just map the raw SQL outputs cleanly.
     res.json({
       page,
       limit,
@@ -602,7 +569,7 @@ app.get("/api/videos", async (req, res) => {
 });
 
 /* =====================
-   NEW: Fetch Album Contents via Lazy Load
+   Fetch Album Contents via Lazy Load
 ===================== */
 app.get("/api/group", async (req, res) => {
   try {
@@ -617,11 +584,8 @@ app.get("/api/group", async (req, res) => {
       ORDER BY v.created_at ASC
     `;
     const { rows } = await pool.query(query, [media_group_id]);
-    
-    // 🟢 THE FIX: Dynamic API Base URL
     const apiBaseUrl = process.env.API_BASE_URL;
     
-    // Map them as normal, standalone videos so they play immediately inside the group view
     res.json(rows.map(v => ({ 
       ...mapVideoToResponse(v, apiBaseUrl), 
       is_group: false 
@@ -635,33 +599,24 @@ app.get("/api/group", async (req, res) => {
 /* =====================
    SEARCH ENDPOINT (PAGINATED & VALIDATED)
 ===================== */
-
-// 🟢 1. Define strict validation rules for the query parameters
 const searchSchema = z.object({
-  q: z.string().trim().max(100, "Search query is too long").optional().default(""), // Caps at 100 chars
-  page: z.coerce.number().int().positive().default(1), // Forces into a positive whole number
-  limit: z.coerce.number().int().positive().max(50).default(12), // Caps limit at 50 to prevent DB DoS attacks
+  q: z.string().trim().max(100, "Search query is too long").optional().default(""), 
+  page: z.coerce.number().int().positive().default(1), 
+  limit: z.coerce.number().int().positive().max(50).default(12), 
 });
 
 app.get("/api/search", async (req, res) => {
-  // 🟢 2. Pass incoming query through Zod
   const parsed = searchSchema.safeParse(req.query);
   
   if (!parsed.success) {
-    // 🟢 FIX: Safely extract the error message using optional chaining to prevent undefined crashes
     const errorMessage = parsed.error?.issues?.[0]?.message || "Invalid search parameters";
     return res.status(400).json({ error: errorMessage });
   }
 
-  // 🟢 3. Extract the safely parsed and coerced variables
   const { q, page, limit } = parsed.data;
 
-
   try {
-    // 🟢 THE FIX: Dynamic API Base URL
     const apiBaseUrl = process.env.API_BASE_URL; 
-    
-    // 🟢 4. Safely calculate offset without needing Number() casting
     const offset = (page - 1) * limit;
 
     const searchQuery = `
@@ -677,7 +632,9 @@ app.get("/api/search", async (req, res) => {
 
     const formattedVideos = rows.map(v => {
       let thumbUrl = "";
-      if (v.cloudflare_id && v.cloudflare_id !== "none") {
+      
+      // 🟢 THE FIX applied to the search endpoint as well
+      if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
          const cleanId = v.cloudflare_id.split('?')[0];
          thumbUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
       } else {
@@ -698,7 +655,6 @@ app.get("/api/search", async (req, res) => {
       };
     });
 
-    // 🟢 5. Return hasMore safely using the validated limit number
     res.json({ 
       videos: formattedVideos,
       hasMore: formattedVideos.length === limit 
@@ -710,7 +666,7 @@ app.get("/api/search", async (req, res) => {
 });
 
 /* =====================
-   Video Details Helper (For Shared Links)
+   Video Details Helper
 ===================== */
 app.get("/api/video/details", async (req, res) => {
   try {
@@ -733,7 +689,7 @@ app.get("/api/video/details", async (req, res) => {
 });
 
 /* =====================
-   UPDATED: Thumbnail (R2 Caching Logic)
+   UPDATED: Thumbnail API (Bulletproof Fallback)
 ===================== */
 app.get("/api/thumbnail", async (req, res) => {
   const { chat_id, message_id } = req.query;
@@ -750,16 +706,21 @@ app.get("/api/thumbnail", async (req, res) => {
       
       res.set({
         "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=31536000, immutable", // 1 year
+        "Cache-Control": "public, max-age=31536000, immutable", 
         "Access-Control-Allow-Origin": "*"
       });
       return r2Object.Body.pipe(res);
     } catch (r2Err) {
-      console.log(`Thumbnail ${fileName} not in R2, fetching from Telegram...`);
+      console.log(`Thumbnail ${fileName} not in R2, checking Database...`);
     }
 
     const dbRes = await pool.query("SELECT thumb_file_id FROM videos WHERE chat_id=$1 AND message_id=$2", [chat_id, message_id]);
-    if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) return res.status(204).end();
+    
+    // 🟢 THE FIX: If there is no thumbnail file ID (e.g. older R2 videos or extraction failed), 
+    // we safely redirect to the generic avatar instead of rendering a broken blank image.
+    if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) {
+        return res.redirect('/assets/default-avatar.png');
+    }
 
     const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: dbRes.rows[0].thumb_file_id } });
     const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
@@ -781,18 +742,18 @@ app.get("/api/thumbnail", async (req, res) => {
 
   } catch (err) {
     console.error("Thumbnail Route Error:", err.message);
-    res.status(500).end();
+    // Ultimate Failsafe
+    res.redirect('/assets/default-avatar.png');
   }
 });
 
 /* =====================
-   Share Link (UPDATED FOR OPEN GRAPH PORTRAIT FIX)
+   Share Link
 ===================== */
 app.get('/v/:message_id', async (req, res) => {
   try {
     const { message_id } = req.params;
     
-    // 🟢 THE FIX: Fetch Frontend and App Name strings from config
     const frontendUrl = process.env.FRONTEND_URL;
     const appName = process.env.APP_NAME || "App";
     
@@ -808,8 +769,8 @@ app.get('/v/:message_id', async (req, res) => {
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
     
-    // 🟢 FIX: We increase the height request to 1280 to ensure crisp portrait quality
-    const thumbUrl = video.cloudflare_id 
+    // 🟢 THE FIX: Applied Stream vs R2 mapping rule to Open Graph tags
+    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:"))
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
       : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
 
@@ -889,16 +850,13 @@ prerender.crawlerUserAgents.push('exobot');
 prerender.crawlerUserAgents.push('TelegramBot');
 prerender.crawlerUserAgents.push('Twitterbot');
 
-// Mount Prerender ONLY after all API and /v/ routes have been checked
 app.use(prerender);
 
 /* =======================================================
-   🟢 NEW: SERVE THE COMPILED FRONTEND (React/Vue/Vite)
+   SERVE THE COMPILED FRONTEND
 ======================================================= */
-// 1. Serve all static files (JS, CSS, Images) from your external frontend folder
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
-// 2. The SPA Catch-All Route: Any non-API request gets sent your index.html
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
 });
