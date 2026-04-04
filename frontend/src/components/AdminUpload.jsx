@@ -99,9 +99,10 @@ export default function AdminUpload({ onClose }) {
 
     setTwitterStatus("processing");
 
+    // 🟢 THE FIX: Route to central Python Engine instead of local Node server
     const endpoint = pipelineRoute === "direct" 
-        ? `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-direct`
-        : `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-telethon`;
+        ? `${APP_CONFIG.pythonEngineUrl}/api/import-twitter-direct`
+        : `${APP_CONFIG.pythonEngineUrl}/api/import-twitter-telethon`;
 
     try {
       const res = await fetch(endpoint, {
@@ -112,7 +113,9 @@ export default function AdminUpload({ onClose }) {
           admin_id: adminId, 
           category: category,
           telegram_dest: telegramDest,
-          upload_target: uploadTarget 
+          upload_target: uploadTarget,
+          // 🟢 THE FIX: Pass the specific website's callback URL to Python
+          callback_url: `${APP_CONFIG.apiUrl}/api/admin/upload-premium`
         }),
       });
 
@@ -141,10 +144,10 @@ export default function AdminUpload({ onClose }) {
 
     setTelegramStatus("processing");
 
-    // 🟢 THE FIX: Dynamic endpoint based on routing pipeline
+    // 🟢 THE FIX: Route to central Python Engine instead of local Node server
     const endpoint = pipelineRoute === "direct" 
-        ? `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-direct`
-        : `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-link`;
+        ? `${APP_CONFIG.pythonEngineUrl}/api/import-telegram-direct`
+        : `${APP_CONFIG.pythonEngineUrl}/api/import-telegram-link`;
 
     try {
       const res = await fetch(endpoint, {
@@ -152,10 +155,12 @@ export default function AdminUpload({ onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           url: telegramUrl,
-          admin_id: adminId, // 🟢 THE FIX: Included missing admin_id
+          admin_id: adminId, 
           category: category,
           telegram_dest: telegramDest,
-          upload_target: uploadTarget 
+          upload_target: uploadTarget,
+          // 🟢 THE FIX: Pass the specific website's callback URL to Python
+          callback_url: `${APP_CONFIG.apiUrl}/api/admin/upload-premium`
         }),
       });
 
@@ -335,7 +340,6 @@ export default function AdminUpload({ onClose }) {
         {uploadMode === "telegram" && (
           <form onSubmit={handleTelegramImport} style={formStyle}>
             
-            {/* 🟢 THE FIX: Added Routing Pipeline to Telegram */}
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Routing Pipeline</label>
               <select value={pipelineRoute} onChange={(e) => setPipelineRoute(e.target.value)} style={inputStyle}>
