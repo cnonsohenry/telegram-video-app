@@ -15,8 +15,9 @@ export default function AdminUpload({ onClose }) {
   const [caption, setCaption] = useState("");
   const [status, setStatus] = useState("idle"); 
   
-  // Storage Target State
+  // Storage Target & Watermark State
   const [uploadTarget, setUploadTarget] = useState("r2"); 
+  const [applyWatermark, setApplyWatermark] = useState(true); // 🟢 NEW: Watermark State
 
   // Twitter State
   const [twitterUrl, setTwitterUrl] = useState("");
@@ -66,6 +67,7 @@ export default function AdminUpload({ onClose }) {
     formData.append("uploader_id", adminId); 
     formData.append("category", category);
     formData.append("upload_target", uploadTarget); 
+    formData.append("apply_watermark", applyWatermark); // 🟢 NEW: Passed to Node.js (if applicable)
 
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/upload-premium`, {
@@ -99,10 +101,9 @@ export default function AdminUpload({ onClose }) {
 
     setTwitterStatus("processing");
 
-    // 🟢 THE FIX: Route to central Python Engine instead of local Node server
     const endpoint = pipelineRoute === "direct" 
-        ? `${APP_CONFIG.pythonEngineUrl}/api/import-twitter-direct`
-        : `${APP_CONFIG.pythonEngineUrl}/api/import-twitter-telethon`;
+        ? `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-direct`
+        : `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-telethon`;
 
     try {
       const res = await fetch(endpoint, {
@@ -114,8 +115,8 @@ export default function AdminUpload({ onClose }) {
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
-          // 🟢 THE FIX: Pass the specific website's callback URL to Python
-          callback_url: `${APP_CONFIG.apiUrl}/api/admin/upload-premium`
+          callback_url: `${APP_CONFIG.apiUrl}/api/admin/upload-premium`,
+          apply_watermark: applyWatermark // 🟢 NEW: Tell Python engine to watermark or skip
         }),
       });
 
@@ -144,10 +145,9 @@ export default function AdminUpload({ onClose }) {
 
     setTelegramStatus("processing");
 
-    // 🟢 THE FIX: Route to central Python Engine instead of local Node server
     const endpoint = pipelineRoute === "direct" 
-        ? `${APP_CONFIG.pythonEngineUrl}/api/import-telegram-direct`
-        : `${APP_CONFIG.pythonEngineUrl}/api/import-telegram-link`;
+        ? `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-direct`
+        : `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-link`;
 
     try {
       const res = await fetch(endpoint, {
@@ -159,8 +159,8 @@ export default function AdminUpload({ onClose }) {
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
-          // 🟢 THE FIX: Pass the specific website's callback URL to Python
-          callback_url: `${APP_CONFIG.apiUrl}/api/admin/upload-premium`
+          callback_url: `${APP_CONFIG.apiUrl}/api/admin/upload-premium`,
+          apply_watermark: applyWatermark // 🟢 NEW: Tell Python engine to watermark or skip
         }),
       });
 
@@ -250,6 +250,33 @@ export default function AdminUpload({ onClose }) {
               <option value="r2">Cloudflare R2 (Budget-Friendly Storage)</option>
               <option value="stream">Cloudflare Stream (Fast Encoding)</option>
             </select>
+          </div>
+
+          {/* 🟢 NEW: Radio Buttons for Watermark */}
+          <div style={inputGroupStyle}>
+            <label style={labelStyle}>Apply Brand Watermark?</label>
+            <div style={{ display: "flex", gap: "16px", marginTop: "4px" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", color: "#fff", cursor: "pointer" }}>
+                <input 
+                  type="radio" 
+                  name="watermark" 
+                  checked={applyWatermark === true} 
+                  onChange={() => setApplyWatermark(true)} 
+                  style={{ accentColor: "var(--primary-color)", width: "16px", height: "16px" }}
+                />
+                Yes (Stamp it)
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", color: "#fff", cursor: "pointer" }}>
+                <input 
+                  type="radio" 
+                  name="watermark" 
+                  checked={applyWatermark === false} 
+                  onChange={() => setApplyWatermark(false)} 
+                  style={{ accentColor: "var(--primary-color)", width: "16px", height: "16px" }}
+                />
+                No (Keep it raw)
+              </label>
+            </div>
           </div>
         </div>
 
@@ -394,7 +421,7 @@ export default function AdminUpload({ onClose }) {
   );
 }
 
-// 🎨 DARK THEME STYLES
+// 🎨 DARK THEME STYLES (Kept exactly the same)
 const containerStyle = { position: "fixed", inset: 0, zIndex: 99999, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", color: "#fff", fontFamily: "sans-serif", touchAction: "none" };
 const closeButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", right: "20px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "8px", borderRadius: "50%", cursor: "pointer", zIndex: 100000, display: "flex", alignItems: "center", justifyContent: "center" };
 const cardStyle = { width: "100%", maxWidth: "400px", maxHeight: "90dvh", overflowY: "auto", margin: "0 auto", background: "#1c1c1e", borderRadius: "16px", padding: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.5)", border: "1px solid #333", position: "relative" };
