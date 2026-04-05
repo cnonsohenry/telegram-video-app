@@ -29,8 +29,6 @@ export default function AdminUpload({ onClose }) {
   const [telegramStatus, setTelegramStatus] = useState("idle"); 
   const [telegramDest, setTelegramDest] = useState(APP_CONFIG.telegramDestinations[0]?.id || ""); 
 
-  // 🟢 THE FIX: The Synchronous Hard Lock
-  // This instantly freezes the form the millisecond it is clicked, bypassing React's state delay.
   const processingLock = useRef(false);
 
   useEffect(() => {
@@ -58,13 +56,44 @@ export default function AdminUpload({ onClose }) {
     }
   };
 
+  // 🟢 NEW: Automated Background Share Function
+  const autoShareToTelegram = async (responseData, customCaption) => {
+    // 🟢 THE FIX: Gatekeeper to protect Premium content
+    if (category === "premium") {
+      console.log("🔒 Premium content detected. Skipping Telegram auto-share to keep it exclusive.");
+      return; 
+    }
+
+    // Gracefully extract the Video ID if your backend returned it
+    const videoId = responseData?.video?.message_id || responseData?.message_id || responseData?.id;
+    const publicUrl = videoId ? `${APP_CONFIG.apiUrl}/v/${videoId}` : APP_CONFIG.apiUrl;
+
+    // Grab the ID of your Main Channel from the config (Fallback provided if not found)
+    const mainChannelId = APP_CONFIG.telegramDestinations.find(d => d.label.includes("Main"))?.id || "-1001539197699";
+
+    try {
+      await fetch(`${APP_CONFIG.pythonEngineUrl}/api/share-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_url: publicUrl,
+          caption: customCaption || "🔥 New drop! Catch it now.",
+          telegram_dest: mainChannelId
+        }),
+      });
+      console.log("✅ Auto-share to Telegram triggered successfully.");
+    } catch (err) {
+      console.error("⚠️ Auto-share silent failure:", err);
+    }
+  };
+
   const handleUpload = async (e) => {
     e.preventDefault();
-    if (processingLock.current) return; // 🔒 INSTANT LOCK CHECK
+    if (processingLock.current) return;
     if (!file) return alert("Please select a video file");
     if (!adminId) return alert("Please select your Admin Telegram ID");
 
-    processingLock.current = true; // 🔒 LOCK ENGAGED
+    processingLock.current = true;
     setStatus("uploading");
 
     const formData = new FormData();
@@ -85,6 +114,9 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok && data.success) {
         setStatus("success");
+        
+        autoShareToTelegram(data, caption);
+
         setTimeout(() => {
           setStatus("idle");
           setCaption("");
@@ -99,16 +131,16 @@ export default function AdminUpload({ onClose }) {
       console.error("Upload error:", err);
       alert("Network Error: Could not connect to server.");
     } finally {
-      processingLock.current = false; // 🔓 LOCK RELEASED
+      processingLock.current = false;
     }
   };
 
   const handleTwitterImport = async (e) => {
     e.preventDefault();
-    if (processingLock.current) return; // 🔒 INSTANT LOCK CHECK
+    if (processingLock.current) return;
     if (!twitterUrl) return alert("Please enter a Twitter URL");
 
-    processingLock.current = true; // 🔒 LOCK ENGAGED
+    processingLock.current = true;
     setTwitterStatus("processing");
 
     const endpoint = pipelineRoute === "direct" 
@@ -134,6 +166,9 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok) {
         setTwitterStatus("success");
+
+        autoShareToTelegram(data, "🔥 Hot new trend imported!");
+
         setTimeout(() => {
           setTwitterStatus("idle");
           setTwitterUrl("");
@@ -147,16 +182,16 @@ export default function AdminUpload({ onClose }) {
       console.error("Twitter Import error:", err);
       alert("Network Error: Is the FastAPI server running?");
     } finally {
-      processingLock.current = false; // 🔓 LOCK RELEASED
+      processingLock.current = false; 
     }
   };
 
   const handleTelegramImport = async (e) => {
     e.preventDefault();
-    if (processingLock.current) return; // 🔒 INSTANT LOCK CHECK
+    if (processingLock.current) return;
     if (!telegramUrl) return alert("Please enter a Telegram Link");
 
-    processingLock.current = true; // 🔒 LOCK ENGAGED
+    processingLock.current = true;
     setTelegramStatus("processing");
 
     const endpoint = pipelineRoute === "direct" 
@@ -182,6 +217,9 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok) {
         setTelegramStatus("success");
+
+        autoShareToTelegram(data, "🔥 Fresh exclusive content just dropped!");
+
         setTimeout(() => {
           setTelegramStatus("idle");
           setTelegramUrl("");
@@ -195,7 +233,7 @@ export default function AdminUpload({ onClose }) {
       console.error("Telegram Import error:", err);
       alert("Network Error: Is the FastAPI server running?");
     } finally {
-      processingLock.current = false; // 🔓 LOCK RELEASED
+      processingLock.current = false;
     }
   };
 
