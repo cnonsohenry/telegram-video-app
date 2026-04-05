@@ -5,7 +5,7 @@ export const APP_CONFIG = {
   apiUrl: import.meta.env.VITE_API_URL || "https://videos.naijahomemade.com",
   exoClickZoneId: import.meta.env.VITE_EXOCLICK_ZONE_ID || "5882826", // <-- This missing comma caused the crash!
 
-  pythonEngineUrl: import.meta.env.VITE_PYTHON_ENGINE_URL || "http://94.72.109.109:8000",
+  pythonEngineUrl: import.meta.env.VITE_PYTHON_ENGINE_URL || "https://engine.naijahomemade.com",
 
   // 🟢 2. App Branding
   appNamePrefix: "Naija",
