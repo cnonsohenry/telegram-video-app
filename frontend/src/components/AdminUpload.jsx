@@ -175,7 +175,7 @@ export default function AdminUpload({ onClose }) {
       if (res.ok) {
         setTwitterStatus("success");
 
-        autoShareToTelegram(data, "🔥 Hot new trend imported!");
+        autoShareToTelegram(data);
 
         setTimeout(() => {
           setTwitterStatus("idle");
