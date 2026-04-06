@@ -56,20 +56,28 @@ export default function AdminUpload({ onClose }) {
     }
   };
 
-  // 🟢 NEW: Automated Background Share Function
+// 🟢 NEW: Automated Background Share Function
   const autoShareToTelegram = async (responseData, customCaption) => {
-    // 🟢 THE FIX: Gatekeeper to protect Premium content
+    // Gatekeeper to protect Premium content
     if (category === "premium") {
       console.log("🔒 Premium content detected. Skipping Telegram auto-share to keep it exclusive.");
       return; 
     }
 
-    // Gracefully extract the Video ID if your backend returned it
-    const videoId = responseData?.video?.message_id || responseData?.message_id || responseData?.id;
-    const publicUrl = videoId ? `${APP_CONFIG.apiUrl}/v/${videoId}` : APP_CONFIG.apiUrl;
+    // 🟢 THE FIX: Check if data came through Python (backend_response) or directly from Local Upload
+    const dataSource = responseData?.backend_response || responseData;
+    
+    // Extract the exact ID
+    const videoId = dataSource?.video?.message_id || dataSource?.message_id || dataSource?.id;
 
-    // Grab the ID of your Main Channel from the config (Fallback provided if not found)
-    const mainChannelId = APP_CONFIG.telegramDestinations.find(d => d.label.includes("Main"))?.id || "-1001539197699";
+    // 🟢 THE FIX: Abort entirely if no ID is found (prevents sharing just the homepage)
+    if (!videoId) {
+      console.warn("⚠️ Cannot auto-share: No video ID was returned from the backend.");
+      return;
+    }
+
+    const publicUrl = `${APP_CONFIG.apiUrl}/v/${videoId}`;
+    const mainChannelId = APP_CONFIG.telegramDestinations.find(d => d.label === "Main Channel")?.id || "-1001539197699";
 
     try {
       await fetch(`${APP_CONFIG.pythonEngineUrl}/api/share-link`, {
@@ -81,7 +89,7 @@ export default function AdminUpload({ onClose }) {
           telegram_dest: mainChannelId
         }),
       });
-      console.log("✅ Auto-share to Telegram triggered successfully.");
+      console.log(`✅ Auto-share triggered successfully: ${publicUrl}`);
     } catch (err) {
       console.error("⚠️ Auto-share silent failure:", err);
     }
