@@ -309,7 +309,10 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     if (!videoFile) return res.status(400).json({ error: "No video file provided" });
 
     let savedCloudflareId = "none";
-    const internalId = `premium_${Date.now()}`;
+    
+    // 🟢 THE FIX: Dynamically generate the ID based on the category
+    const safeCategory = category ? category.toLowerCase().trim() : "premium";
+    const internalId = `${safeCategory}_${Date.now()}`;
 
     // 🟢 FFmpeg: Generate a Thumbnail locally before uploading
     try {
@@ -334,7 +337,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     if (upload_target === "r2") {
       const fileStream = fs.createReadStream(videoFile.path);
       const extension = videoFile.originalname.split('.').pop() || "mp4";
-      const r2Key = `premium/${internalId}.${extension}`; 
+      const r2Key = `${safeCategory}/${internalId}.${extension}`; // Also organizing R2 storage cleanly!
       
       await r2.send(new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -347,7 +350,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     } else {
       const cfResult = await uploadDirectToStream(videoFile.path, {
         caption: caption || "Premium Content",
-        category: category || "premium"
+        category: safeCategory
       });
       savedCloudflareId = cfResult.uid;
     }
@@ -360,7 +363,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
         internalId, 
         "none", 
         uploader_id, 
-        category || "premium", 
+        safeCategory, 
         caption, 
         savedCloudflareId,
         media_group_id || null 
@@ -369,11 +372,11 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     fs.unlinkSync(videoFile.path);
 
-    // 🟢 THE FIX: Pass back the internalId as 'message_id' so React can build the share link!
+    // 🟢 Ensuring the internalId (message_id) is passed back to React for the auto-share link
     res.json({ 
       success: true, 
       videoId: savedCloudflareId,
-      message_id: internalId // <-- React is waiting for this!
+      message_id: internalId 
     });
   } catch (err) {
     console.error("Admin Upload Error:", err.message);
