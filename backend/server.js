@@ -369,7 +369,12 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     fs.unlinkSync(videoFile.path);
 
-    res.json({ success: true, videoId: savedCloudflareId });
+    // 🟢 THE FIX: Pass back the internalId as 'message_id' so React can build the share link!
+    res.json({ 
+      success: true, 
+      videoId: savedCloudflareId,
+      message_id: internalId // <-- React is waiting for this!
+    });
   } catch (err) {
     console.error("Admin Upload Error:", err.message);
     if (req.file && fs.existsSync(req.file.path)) {
