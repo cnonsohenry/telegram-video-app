@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link, X, Send } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link, X, Send, Instagram } from "lucide-react"; // 🟢 ADDED INSTAGRAM ICON
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -29,6 +29,10 @@ export default function AdminUpload({ onClose }) {
   const [telegramStatus, setTelegramStatus] = useState("idle"); 
   const [telegramDest, setTelegramDest] = useState(APP_CONFIG.telegramDestinations[0]?.id || ""); 
 
+  // 🟢 NEW: Instagram Import State
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [instagramStatus, setInstagramStatus] = useState("idle"); 
+
   const processingLock = useRef(false);
 
   useEffect(() => {
@@ -56,7 +60,6 @@ export default function AdminUpload({ onClose }) {
     }
   };
 
-// 🟢 NEW: Automated Background Share Function
   const autoShareToTelegram = async (responseData, customCaption) => {
     // Gatekeeper to protect Premium content
     if (category === "premium") {
@@ -64,13 +67,9 @@ export default function AdminUpload({ onClose }) {
       return; 
     }
 
-    // 🟢 THE FIX: Check if data came through Python (backend_response) or directly from Local Upload
     const dataSource = responseData?.backend_response || responseData;
-    
-    // Extract the exact ID
     const videoId = dataSource?.video?.message_id || dataSource?.message_id || dataSource?.id;
 
-    // 🟢 THE FIX: Abort entirely if no ID is found (prevents sharing just the homepage)
     if (!videoId) {
       console.warn("⚠️ Cannot auto-share: No video ID was returned from the backend.");
       return;
@@ -122,9 +121,7 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok && data.success) {
         setStatus("success");
-        
         autoShareToTelegram(data, caption);
-
         setTimeout(() => {
           setStatus("idle");
           setCaption("");
@@ -174,9 +171,7 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok) {
         setTwitterStatus("success");
-
         autoShareToTelegram(data);
-
         setTimeout(() => {
           setTwitterStatus("idle");
           setTwitterUrl("");
@@ -225,9 +220,7 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok) {
         setTelegramStatus("success");
-
         autoShareToTelegram(data, "🔥 Fresh exclusive content just dropped!");
-
         setTimeout(() => {
           setTelegramStatus("idle");
           setTelegramUrl("");
@@ -245,6 +238,57 @@ export default function AdminUpload({ onClose }) {
     }
   };
 
+  // 🟢 NEW: Instagram Import Handler
+  const handleInstagramImport = async (e) => {
+    e.preventDefault();
+    if (processingLock.current) return;
+    if (!instagramUrl) return alert("Please enter an Instagram URL");
+
+    processingLock.current = true;
+    setInstagramStatus("processing");
+
+    // Make sure your backend proxy points `/twitter-api` to the fastAPI server correctly!
+    const endpoint = pipelineRoute === "direct" 
+        ? `${APP_CONFIG.apiUrl}/twitter-api/import-instagram-direct`
+        : `${APP_CONFIG.apiUrl}/twitter-api/import-instagram-telethon`;
+
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          url: instagramUrl,
+          admin_id: adminId, 
+          category: category,
+          telegram_dest: telegramDest,
+          upload_target: uploadTarget,
+          callback_url: `${APP_CONFIG.apiUrl}/api/admin/upload-premium`,
+          apply_watermark: applyWatermark 
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setInstagramStatus("success");
+        autoShareToTelegram(data, "📸 Fresh IG exclusive dropped!");
+        setTimeout(() => {
+          setInstagramStatus("idle");
+          setInstagramUrl("");
+        }, 3000);
+      } else {
+        setInstagramStatus("error");
+        alert(data.detail || "Import failed. Check the URL or IG might be blocking.");
+      }
+    } catch (err) {
+      setInstagramStatus("error");
+      console.error("Instagram Import error:", err);
+      alert("Network Error: Is the FastAPI server running?");
+    } finally {
+      processingLock.current = false; 
+    }
+  };
+
   return (
     <div style={containerStyle}>
       <button onClick={onClose} style={closeButtonStyle}>
@@ -254,7 +298,10 @@ export default function AdminUpload({ onClose }) {
       <div style={cardStyle} className="admin-card">
         <div style={headerStyle}>
           <h2 style={{ margin: 0, fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-            {uploadMode === "local" ? <Video color="#ff3b30" /> : uploadMode === "twitter" ? <Twitter color="#1DA1F2" /> : <Send color="#0088cc" />} 
+            {uploadMode === "local" ? <Video color="#ff3b30" /> : 
+             uploadMode === "twitter" ? <Twitter color="#1DA1F2" /> : 
+             uploadMode === "instagram" ? <Instagram color="#E1306C" /> : 
+             <Send color="#0088cc" />} 
             Admin Upload
           </h2>
           <p style={{ margin: "5px 0 0", fontSize: "12px", color: "#888" }}>
@@ -262,22 +309,29 @@ export default function AdminUpload({ onClose }) {
           </p>
         </div>
 
+        {/* 🟢 NEW: 4-Way Tabs Container */}
         <div style={tabsContainerStyle}>
           <button 
             onClick={() => setUploadMode("local")} 
-            style={{ ...tabStyle, padding: "8px", background: uploadMode === "local" ? "#333" : "transparent", color: uploadMode === "local" ? "#fff" : "#666" }}
+            style={{ ...tabStyle, padding: "8px 4px", background: uploadMode === "local" ? "#333" : "transparent", color: uploadMode === "local" ? "#fff" : "#666" }}
           >
             Local
           </button>
           <button 
             onClick={() => setUploadMode("twitter")} 
-            style={{ ...tabStyle, padding: "8px", background: uploadMode === "twitter" ? "#1DA1F220" : "transparent", color: uploadMode === "twitter" ? "#1DA1F2" : "#666" }}
+            style={{ ...tabStyle, padding: "8px 4px", background: uploadMode === "twitter" ? "#1DA1F220" : "transparent", color: uploadMode === "twitter" ? "#1DA1F2" : "#666" }}
           >
             Twitter
           </button>
           <button 
+            onClick={() => setUploadMode("instagram")} 
+            style={{ ...tabStyle, padding: "8px 4px", background: uploadMode === "instagram" ? "#E1306C20" : "transparent", color: uploadMode === "instagram" ? "#E1306C" : "#666" }}
+          >
+            Instagram
+          </button>
+          <button 
             onClick={() => setUploadMode("telegram")} 
-            style={{ ...tabStyle, padding: "8px", background: uploadMode === "telegram" ? "#0088cc20" : "transparent", color: uploadMode === "telegram" ? "#0088cc" : "#666" }}
+            style={{ ...tabStyle, padding: "8px 4px", background: uploadMode === "telegram" ? "#0088cc20" : "transparent", color: uploadMode === "telegram" ? "#0088cc" : "#666" }}
           >
             Telegram
           </button>
@@ -424,6 +478,52 @@ export default function AdminUpload({ onClose }) {
           </form>
         )}
 
+        {/* 🟢 INSTAGRAM IMPORT */}
+        {uploadMode === "instagram" && (
+          <form onSubmit={handleInstagramImport} style={formStyle}>
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Routing Pipeline</label>
+              <select value={pipelineRoute} onChange={(e) => setPipelineRoute(e.target.value)} style={inputStyle}>
+                <option value="direct">⚡ Direct to Cloudflare</option>
+                <option value="telethon">🤖 Send to Telegram Bot</option>
+              </select>
+            </div>
+
+            {pipelineRoute === "telethon" && (
+              <div style={inputGroupStyle}>
+                <label style={labelStyle}>Telegram Destination</label>
+                <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
+                  {APP_CONFIG.telegramDestinations.map(dest => (
+                    <option key={dest.id} value={dest.id}>{dest.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Instagram Link</label>
+              <div style={{ position: "relative" }}>
+                <Link size={18} color="#888" style={{ position: "absolute", left: "12px", top: "12px" }} />
+                <input 
+                  type="url" 
+                  placeholder="https://instagram.com/p/..." 
+                  value={instagramUrl}
+                  onChange={(e) => setInstagramUrl(e.target.value)}
+                  style={{ ...inputStyle, paddingLeft: "40px" }}
+                  required
+                />
+              </div>
+            </div>
+
+            <button 
+              type="submit" disabled={instagramStatus === "processing"}
+              style={{ ...buttonStyle, background: instagramStatus === "processing" ? "#333" : instagramStatus === "success" ? "#4cd964" : instagramStatus === "error" ? "#ff3b30" : "#E1306C" }}
+            >
+              {instagramStatus === "processing" ? <><Loader2 className="spin" size={18} /> Extracting & Uploading...</> : instagramStatus === "success" ? <><CheckCircle size={18} /> Successfully Imported!</> : instagramStatus === "error" ? <><AlertCircle size={18} /> Import Failed.</> : "Import Reel / Post"}
+            </button>
+          </form>
+        )}
+
         {/* 🟢 TELEGRAM IMPORT */}
         {uploadMode === "telegram" && (
           <form onSubmit={handleTelegramImport} style={formStyle}>
@@ -487,8 +587,8 @@ const containerStyle = { position: "fixed", inset: 0, zIndex: 99999, background:
 const closeButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", right: "20px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "8px", borderRadius: "50%", cursor: "pointer", zIndex: 100000, display: "flex", alignItems: "center", justifyContent: "center" };
 const cardStyle = { width: "100%", maxWidth: "400px", maxHeight: "90dvh", overflowY: "auto", margin: "0 auto", background: "#1c1c1e", borderRadius: "16px", padding: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.5)", border: "1px solid #333", position: "relative" };
 const headerStyle = { marginBottom: "20px", textAlign: "center" };
-const tabsContainerStyle = { display: "flex", gap: "10px", marginBottom: "24px", background: "#121212", padding: "4px", borderRadius: "10px" };
-const tabStyle = { flex: 1, padding: "8px", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
+const tabsContainerStyle = { display: "flex", gap: "6px", marginBottom: "24px", background: "#121212", padding: "4px", borderRadius: "10px" };
+const tabStyle = { flex: 1, padding: "8px 4px", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
 const formStyle = { display: "flex", flexDirection: "column", gap: "20px" };
 const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "8px" };
 const labelStyle = { fontSize: "12px", fontWeight: "700", color: "#888", textTransform: "uppercase" };

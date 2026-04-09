@@ -42,9 +42,9 @@ export const APP_CONFIG = {
   // 🟢 NEW: Paywall & Monetization Config
   supportTelegramLink: "https://t.me/NaijaHomemade",
   bankDetails: {
-    bankName: "MoniePoint",
-    accountNumber: "8138617303",
-    accountName: "Okonkwo"
+    bankName: ".",
+    accountNumber: ".",
+    accountName: "."
   },
 
   subscriptionPackages: [
