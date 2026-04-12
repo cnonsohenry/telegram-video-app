@@ -76,7 +76,7 @@ export default function AdminUpload({ onClose }) {
     }
 
     const publicUrl = `${APP_CONFIG.apiUrl}/v/${videoId}`;
-    const mainChannelId = APP_CONFIG.telegramDestinations.find(d => d.label === "Main Channel")?.id || "-1001539197699";
+    const linkChannelId = APP_CONFIG.telegramDestinations.find(d => d.label === "Link Channel")?.id || "-1003952752560";
 
     try {
       await fetch(`${APP_CONFIG.pythonEngineUrl}/api/share-link`, {
@@ -84,8 +84,8 @@ export default function AdminUpload({ onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           video_url: publicUrl,
-          caption: customCaption || "🔥 New drop! Catch it now.",
-          telegram_dest: mainChannelId
+          caption: customCaption,
+          telegram_dest: linkChannelId
         }),
       });
       console.log(`✅ Auto-share triggered successfully: ${publicUrl}`);
