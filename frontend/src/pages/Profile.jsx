@@ -216,7 +216,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
 
           <div style={{ 
             ...gridStyle, 
-            gridTemplateColumns: isDesktop ? "repeat(3, 1fr)" : "repeat(3, 1fr)",
+            gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(3, 1fr)",
             gap: isDesktop ? "28px" : "1px"
           }}>
             {videosToDisplay.map(v => (
@@ -224,7 +224,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
                 key={`${v.chat_id}:${v.message_id}`} 
                 video={v} 
                 onOpen={(vData, e) => handleOpenVideo(vData, e)} 
-                showDetails={false} 
+                showDetails={true} 
               />
             ))}
           </div>
