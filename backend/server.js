@@ -874,6 +874,52 @@ app.get("/api/avatar", async (req, res) => {
   }
 });
 
+/* =====================
+   DYNAMIC SITEMAP.XML
+===================== */
+app.get('/sitemap.xml', async (req, res) => {
+  try {
+    // Fetch the latest 5,000 videos (Google's limit per sitemap is 50k)
+    const result = await pool.query(`
+      SELECT message_id, created_at 
+      FROM videos 
+      ORDER BY created_at DESC 
+      LIMIT 5000
+    `);
+
+    const baseUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+
+    // Add the homepage
+    xml += `  <url>\n`;
+    xml += `    <loc>${baseUrl}/</loc>\n`;
+    xml += `    <changefreq>hourly</changefreq>\n`;
+    xml += `    <priority>1.0</priority>\n`;
+    xml += `  </url>\n`;
+
+    // Add every single video page
+    result.rows.forEach(video => {
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}/v/${video.message_id}</loc>\n`;
+      // Use the video creation date as the lastmod
+      xml += `    <lastmod>${new Date(video.created_at).toISOString()}</lastmod>\n`;
+      xml += `    <changefreq>never</changefreq>\n`;
+      xml += `    <priority>0.8</priority>\n`;
+      xml += `  </url>\n`;
+    });
+
+    xml += `</urlset>`;
+
+    res.header('Content-Type', 'application/xml');
+    res.send(xml);
+  } catch (err) {
+    console.error('Sitemap error:', err);
+    res.status(500).end();
+  }
+});
+
 /* =======================================================
    🤖 PRERENDER MIDDLEWARE (SEO & EXOCLICK FIX)
 ======================================================= */
