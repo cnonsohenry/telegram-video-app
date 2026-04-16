@@ -757,12 +757,11 @@ app.get("/api/thumbnail", async (req, res) => {
 });
 
 /* =====================
-   Share Link
+   Share Link (Updated with JSON-LD SEO)
 ===================== */
 app.get('/v/:message_id', async (req, res) => {
   try {
     const { message_id } = req.params;
-    
     const frontendUrl = process.env.FRONTEND_URL;
     const appName = process.env.APP_NAME || "App";
     
@@ -778,10 +777,40 @@ app.get('/v/:message_id', async (req, res) => {
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
     
-    // 🟢 THE FIX: Applied Stream vs R2 mapping rule to Open Graph tags
     const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:"))
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
       : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+
+    // 🟢 1. Define your hidden SEO Keywords here
+    const hiddenKeywords = [
+      "naijahomemade",
+      "naijahomemade channel telegram",
+      "nigerian trending videos",
+      "exclusive telegram shots",
+      "homemade naija sex",
+      "nigerian homemade sex",
+      "nigeria home made sex videos",
+      "naija homemade porn",
+      "naija homemade xxx",
+      "naija homemade fuck",
+      "naija homemade sex videos",
+      video.category // Dynamically drops in "hotties", "premium", etc.
+    ];
+
+    // 🟢 2. Build the JSON-LD Schema
+    const schemaJSON = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "VideoObject",
+      "name": video.caption || `Shot from @${video.uploader_name}`,
+      "description": `Watch this high-quality ${video.category} video on ${appName}.`,
+      "thumbnailUrl": [thumbUrl],
+      "uploadDate": video.created_at || new Date().toISOString(),
+      "keywords": hiddenKeywords, // Crawlers read this, users don't!
+      "author": {
+        "@type": "Person",
+        "name": video.uploader_name || "Member"
+      }
+    });
 
     res.send(`
       <!DOCTYPE html>
@@ -796,14 +825,9 @@ app.get('/v/:message_id', async (req, res) => {
           <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
           <meta property="og:image" content="${thumbUrl}">
           
-          <meta property="og:image:width" content="720">
-          <meta property="og:image:height" content="1280">
-          
-          <meta property="og:url" content="${process.env.API_BASE_URL}/v/${message_id}">
-          
-          <meta name="twitter:card" content="summary_large_image">
-          <meta name="twitter:title" content="${video.caption || "Watch Shot"}">
-          <meta name="twitter:image" content="${thumbUrl}">
+          <script type="application/ld+json">
+            ${schemaJSON}
+          </script>
 
           <script>
             window.location.href = "${frontendUrl}/?v=${message_id}";
