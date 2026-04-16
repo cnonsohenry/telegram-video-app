@@ -33,8 +33,10 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     setActiveGroup(null);
   }, [activeTab]);
 
-  const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots");
-  const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium");
+  const fetchLimit = isDesktop ? 15 : 12;
+
+  const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots", fetchLimit);
+  const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium", fetchLimit);
 
   const handleOpenVideo = useCallback(async (video, e) => {
     if (e && typeof e.preventDefault === 'function') {
