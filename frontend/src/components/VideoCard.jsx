@@ -38,8 +38,12 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
   }, [isVisible, isHovered]);
 
   return (
-    <div
-      onClick={(e) => onOpen(video, e)}
+    <a
+      href={`/v/${video.message_id}`}
+      onClick={(e) => {
+        e.preventDefault(); // 🟢 THE FIX: Stops browser from leaving the page
+        onOpen(video, e);   // 🟢 THE FIX: Triggers your modal instead
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
@@ -52,7 +56,9 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         position: "relative",
         transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
         transform: (isHovered && showDetails) ? "translateY(-4px)" : "translateY(0)",
-        zIndex: isHovered ? 10 : 1, 
+        zIndex: isHovered ? 10 : 1,
+        textDecoration: "none", // 🟢 Prevents the ugly blue link underline
+        color: "inherit"        // 🟢 Inherits text color properly
       }}
     >
       <div style={{ 
@@ -171,7 +177,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           100% { background-position: -200% 0; }
         }
       `}</style>
-    </div>
+    </a>
   );
 }
 

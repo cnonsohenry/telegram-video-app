@@ -392,6 +392,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 ===================== */
 app.get("/api/video", async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     const { chat_id, message_id } = req.query;
     if (!chat_id || !message_id) return res.status(400).json({ error: "Missing parameters" });
 
