@@ -21,7 +21,7 @@ import { fileURLToPath } from "url";
 // Import Prerender
 import prerender from "prerender-node";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; // Left here in case needed elsewhere, but no longer blocking video caching!
 import adminRoutes from "./admin.js";
 import authRoutes from "./auth.js";
 import multer from "multer";
@@ -310,20 +310,17 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     let savedCloudflareId = "none";
     
-    // 🟢 THE FIX: Dynamically generate the ID based on the category
     const safeCategory = category ? category.toLowerCase().trim() : "premium";
     const internalId = `${safeCategory}_${Date.now()}`;
 
-    // 🟢 FFmpeg: Generate a Thumbnail locally before uploading
     try {
       const thumbPath = `${videoFile.path}.jpg`;
-      // Extract the frame at the 1-second mark, scale width to 400px (auto-height)
       await execPromise(`ffmpeg -i ${videoFile.path} -ss 00:00:01.000 -vframes 1 -vf scale=400:-1 -q:v 5 ${thumbPath} -y`);
 
       const thumbBuffer = fs.readFileSync(thumbPath);
       await r2.send(new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
-        Key: `thumbs/internal_${internalId}.jpg`, // Matched to chat_id = "internal", message_id = internalId
+        Key: `thumbs/internal_${internalId}.jpg`,
         Body: thumbBuffer,
         ContentType: "image/jpeg",
       }));
@@ -331,13 +328,12 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       console.log(`🖼️ R2 Thumbnail successfully generated: thumbs/internal_${internalId}.jpg`);
     } catch (ffmpegErr) {
       console.error("⚠️ FFmpeg thumbnail extraction failed:", ffmpegErr.message);
-      // Fails gracefully - upload will still proceed even if thumbnail fails
     }
 
     if (upload_target === "r2") {
       const fileStream = fs.createReadStream(videoFile.path);
       const extension = videoFile.originalname.split('.').pop() || "mp4";
-      const r2Key = `${safeCategory}/${internalId}.${extension}`; // Also organizing R2 storage cleanly!
+      const r2Key = `${safeCategory}/${internalId}.${extension}`; 
       
       await r2.send(new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -372,7 +368,6 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     fs.unlinkSync(videoFile.path);
 
-    // 🟢 Ensuring the internalId (message_id) is passed back to React for the auto-share link
     res.json({ 
       success: true, 
       videoId: savedCloudflareId,
@@ -392,7 +387,9 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 ===================== */
 app.get("/api/video", async (req, res) => {
   try {
+    // 🟢 Keep this to ensure the database views count and API response are fresh
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    
     const { chat_id, message_id } = req.query;
     if (!chat_id || !message_id) return res.status(400).json({ error: "Missing parameters" });
 
@@ -413,14 +410,12 @@ app.get("/api/video", async (req, res) => {
       if (video.cloudflare_id.startsWith("r2:")) {
         const r2Key = video.cloudflare_id.replace("r2:", "");
         
-        const command = new GetObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME,
-          Key: r2Key
-        });
-        const signedUrl = await getSignedUrl(r2, command, { expiresIn: 21600 }); 
+        // 🟢 THE FIX: Serve highly cacheable static URL via custom public domain
+        const publicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://bucket.naijahomemade.com';
+        const staticUrl = `${publicDomain}/${r2Key}`;
         
-        console.log(`[PLAYBACK] Serving Secure R2 Link: ${r2Key}`);
-        return res.json({ video_url: signedUrl });
+        console.log(`[PLAYBACK] Serving Cached Static R2 Link: ${staticUrl}`);
+        return res.json({ video_url: staticUrl });
       } else {
         const cleanId = video.cloudflare_id.split('?')[0];
         const video_url = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
@@ -473,8 +468,6 @@ function signThumbnail(chatId, messageId) {
 const mapVideoToResponse = (v, apiBaseUrl) => {
   let thumbnailUrl = "";
   
-  // 🟢 THE FIX: Only route Standard Stream videos to videodelivery.net. 
-  // R2 and Telegram videos will BOTH use your local /api/thumbnail endpoint!
   if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
       const cleanId = v.cloudflare_id.split('?')[0];
       thumbnailUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
@@ -583,6 +576,9 @@ app.get("/api/videos", async (req, res) => {
 ===================== */
 app.get("/api/group", async (req, res) => {
   try {
+    // 🟢 Added Cache-Control here to prevent stale group content
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    
     const { media_group_id } = req.query;
     if (!media_group_id || media_group_id === 'none') return res.status(400).json({error: "Invalid group"});
     
@@ -616,6 +612,9 @@ const searchSchema = z.object({
 });
 
 app.get("/api/search", async (req, res) => {
+  // 🟢 Added Cache-Control to ensure search always yields live results
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  
   const parsed = searchSchema.safeParse(req.query);
   
   if (!parsed.success) {
@@ -643,7 +642,6 @@ app.get("/api/search", async (req, res) => {
     const formattedVideos = rows.map(v => {
       let thumbUrl = "";
       
-      // 🟢 THE FIX applied to the search endpoint as well
       if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
          const cleanId = v.cloudflare_id.split('?')[0];
          thumbUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
@@ -726,8 +724,6 @@ app.get("/api/thumbnail", async (req, res) => {
 
     const dbRes = await pool.query("SELECT thumb_file_id FROM videos WHERE chat_id=$1 AND message_id=$2", [chat_id, message_id]);
     
-    // 🟢 THE FIX: If there is no thumbnail file ID (e.g. older R2 videos or extraction failed), 
-    // we safely redirect to the generic avatar instead of rendering a broken blank image.
     if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) {
         return res.redirect('/assets/default-avatar.png');
     }
