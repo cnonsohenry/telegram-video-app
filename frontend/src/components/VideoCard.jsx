@@ -29,7 +29,12 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
-    if (isVisible && isHovered) {
+
+    // 🟢 THE FIX 1: Detect touch devices to prevent mobile preview errors
+    const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+    // Only attempt hover playback if it's a desktop device
+    if (isVisible && isHovered && !isTouchDevice) {
       el.play().catch(() => {});
     } else {
       el.pause();
@@ -41,8 +46,8 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
     <a
       href={`/v/${video.message_id}`}
       onClick={(e) => {
-        e.preventDefault(); // 🟢 THE FIX: Stops browser from leaving the page
-        onOpen(video, e);   // 🟢 THE FIX: Triggers your modal instead
+        e.preventDefault(); 
+        onOpen(video, e);   
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -57,8 +62,8 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
         transform: (isHovered && showDetails) ? "translateY(-4px)" : "translateY(0)",
         zIndex: isHovered ? 10 : 1,
-        textDecoration: "none", // 🟢 Prevents the ugly blue link underline
-        color: "inherit"        // 🟢 Inherits text color properly
+        textDecoration: "none", 
+        color: "inherit"        
       }}
     >
       <div style={{ 
@@ -94,7 +99,8 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
               width: "100%", height: "100%", objectFit: "cover",
               position: "absolute", inset: 0, zIndex: 2,
               opacity: 1, 
-              transition: "opacity 0.2s ease-in"
+              transition: "opacity 0.2s ease-in",
+              pointerEvents: "none" // 🟢 THE FIX 2: Let clicks pass through to the <a> tag
             }}
           />
         )}
@@ -109,7 +115,8 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
             width: "100%", height: "100%", objectFit: "cover", 
             position: "absolute", inset: 0, zIndex: 3,
             opacity: (isHovered && isVideoReady) ? 1 : 0, 
-            transition: "opacity 0.3s ease"
+            transition: "opacity 0.3s ease",
+            pointerEvents: "none" // 🟢 THE FIX 2: Let clicks pass through to the <a> tag
           }}
         />
         
@@ -150,7 +157,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
       {showDetails && (
         <div style={{ padding: "12px 4px", display: "flex", flexDirection: "column", flexShrink: 0 }}>
           <p style={captionTextStyle}>
-            {/* 🟢 THE FIX: Dynamic fallback caption */}
             {video.caption || APP_CONFIG.defaultCaption}
           </p>
           
@@ -164,7 +170,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
                />
             </div>
             <span style={uploaderNameStyle}>
-              {/* 🟢 THE FIX: Dynamic fallback username */}
               @{video.uploader_name || APP_CONFIG.defaultUploader}
             </span>
           </div>
