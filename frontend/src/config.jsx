@@ -75,6 +75,7 @@ export const APP_CONFIG = {
     { id: "-1001539197699", label: "Main Channel" },
     { id: "-1003952752560", label: "Link Channel" },
     { id: "-1003701122531", label: "X Channel" },
+    { id: "-1002190329728", label: "Full HD Membership" },
     { id: "-1003768125972", label: "VIP April 06" }
   ],
 
