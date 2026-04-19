@@ -364,7 +364,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                <div style={{ 
                  display: "grid", 
                  gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(2, 1fr)", 
-                 gap: isDesktop ? "20px" : "10px", 
+                 gap: isDesktop ? "20px" : "10px",
+                 alignItems: "start", 
                  animation: "fadeIn 0.3s ease-out" 
                }}>
                   {actualVideosToDisplay.map(v => (

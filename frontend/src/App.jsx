@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import Home from "./pages/Home";
+import Explore from "./pages/Explore"; // 🟢 NEW IMPORT
 import Profile from "./pages/Profile";
 import AdminDashboard from "./components/AdminDashboard"; 
 import AuthForm from "./components/AuthForm";
@@ -8,7 +9,7 @@ import FullscreenPlayer from "./components/FullscreenPlayer";
 import PaywallModal from "./components/PaywallModal"; 
 import LegalPages from "./pages/LegalPages"; 
 import { useAdZapper } from "./hooks/useAdZapper";
-import { Home as HomeIcon, User, ShieldCheck } from "lucide-react";
+import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react"; // 🟢 Added Compass
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "./config";
@@ -28,17 +29,14 @@ export default function App() {
   const isLoggedIn = !!token;
   const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
 
-  // 🟢 DYNAMIC BROWSER TAB TITLE
   useEffect(() => {
     document.title = `${APP_CONFIG.appNamePrefix}${APP_CONFIG.appNameSuffix}`;
   }, []);
 
-  // 🟢 AdFreeZone logic
   const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView);
   
   useAdZapper(isAdFreeZone);
 
-  // 🟢 ABSOLUTE NUCLEAR AD BLOCKER (CSS + JS TERMINATOR)
   useEffect(() => {
     const styleId = "nuclear-ad-blocker";
     let styleEl = document.getElementById(styleId);
@@ -90,7 +88,6 @@ export default function App() {
     };
   }, [isAdFreeZone]);
 
-  // TELEGRAM IN-APP BROWSER FIX
   useEffect(() => {
     const preventOverscroll = (e) => {
       const scrollable = e.target.closest('[style*="overflow-y: auto"], [style*="overflowY: auto"]');
@@ -129,13 +126,11 @@ export default function App() {
       setIsSharedVideoView(true);
       const fetchSharedVideo = async () => {
         try {
-          // 🟢 THE FIX: Use dynamic APP_CONFIG API URL
           const res = await fetch(`${APP_CONFIG.apiUrl}/api/video/details?message_id=${sharedVideoId}`);
           if (res.ok) {
             const videoData = await res.json();
             setActiveVideo({ ...videoData, video_url: null });
             
-            // 🟢 THE FIX: Use dynamic APP_CONFIG API URL
             const playRes = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`);
             if (playRes.ok) {
               const playData = await playRes.json();
@@ -171,7 +166,6 @@ export default function App() {
 
   useEffect(() => {
     if (token && !user) {
-      // 🟢 THE FIX: Use dynamic APP_CONFIG API URL
       fetch(`${APP_CONFIG.apiUrl}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -186,7 +180,6 @@ export default function App() {
       });
     }
     
-    // 🟢 ROUTING LOGIC
     const params = new URLSearchParams(window.location.search);
     if (params.get("admin") === "true") setActiveTab("admin");
     
@@ -195,15 +188,30 @@ export default function App() {
       setActiveLegalPage(legalParam);
     }
 
-    // 🟢 NEW: Route /login directly to AuthForm
     if (window.location.pathname === "/login") {
-      setActiveTab("profile"); // AuthForm lives in the profile slide
-      setHasSeenPitch(true);   // Skip the pitch overlay
-      window.history.replaceState({}, document.title, "/"); // Clean the URL
+      setActiveTab("profile"); 
+      setHasSeenPitch(true);   
+      window.history.replaceState({}, document.title, "/"); 
     }
   }, [token, user, applyTheme]);
 
   const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin"; 
+
+  // 🟢 HELPER TO HANDLE VIDEO CLICKS
+  const handleOpenVideo = async (video) => {
+    try {
+      setActiveVideo({ ...video, video_url: null }); 
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+      if (!res.ok) throw new Error("Server error");
+      const data = await res.json();
+      if (data.video_url) {
+        setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
+      }
+    } catch (e) { 
+      setActiveVideo(null);
+      alert(`🚨 Playback Error: ${e.message}`); 
+    }
+  };
 
   if (needsPitch) {
     return <PitchView onComplete={() => setHasSeenPitch(true)} />;
@@ -241,11 +249,24 @@ export default function App() {
             setShowPaywall={setShowPaywall} 
           />
         </div>
+
+        {/* 🟢 EXPLORE SLIDE */}
+        <div style={{ 
+          ...slideContainerStyle,
+          // Slides right if going to Home, left if going to Profile
+          transform: activeTab === "explore" ? "translateX(0)" : (activeTab === "home" ? "translateX(100%)" : "translateX(-100%)"),
+          opacity: activeTab === "explore" ? 1 : 0,
+          pointerEvents: activeTab === "explore" ? "auto" : "none"
+        }}>
+          <Explore 
+            onVideoClick={handleOpenVideo}
+          />
+        </div>
         
         {/* 🟢 PROFILE SLIDE */}
         <div style={{ 
           ...slideContainerStyle,
-          transform: activeTab === "profile" ? "translateX(0)" : (activeTab === "home" ? "translateX(100%)" : "translateX(-100%)"),
+          transform: activeTab === "profile" ? "translateX(0)" : "translateX(100%)",
           opacity: activeTab === "profile" ? 1 : 0,
           pointerEvents: activeTab === "profile" ? "auto" : "none"
         }}>
@@ -263,7 +284,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* 🟢 ADMIN DASHBOARD PORTAL */}
+      {/* 🟢 ADMIN DASHBOARD */}
       {activeTab === "admin" && (
         <AdminDashboard 
           user={user}
@@ -283,6 +304,15 @@ export default function App() {
           >
             <HomeIcon size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} fill={activeTab === 'home' ? 'currentColor' : 'none'} />
             <span style={labelStyle}>Home</span>
+          </button>
+
+          {/* 🟢 EXPLORE TAB */}
+          <button 
+            onClick={() => setActiveTab("explore")} 
+            style={{...btnStyle, color: activeTab === 'explore' ? 'var(--primary-color)' : '#8e8e8e'}}
+          >
+            <Compass size={24} strokeWidth={activeTab === 'explore' ? 2.5 : 2} fill={activeTab === 'explore' ? 'currentColor' : 'none'} />
+            <span style={labelStyle}>Explore</span>
           </button>
 
           <button 
@@ -305,7 +335,7 @@ export default function App() {
         </nav>
       )}
 
-      {/* 🟢 MODALS & OVERLAYS */}
+      {/* 🟢 MODALS */}
       {showPaywall && (
         <PaywallModal user={user} onClose={() => setShowPaywall(false)} />
       )}
