@@ -178,7 +178,6 @@ export default function Explore({ onVideoClick }) {
       const validCategories = APP_CONFIG.categories.filter(c => c.toLowerCase() !== "premium");
       
       const fetches = validCategories.map(async (cat) => {
-        // Dig into random pages for endless variety
         const randomPage = Math.floor(Math.random() * 5) + 1; 
         let res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${cat}&limit=8&page=${randomPage}`);
         let data = res.ok ? await res.json() : { videos: [] };
@@ -199,12 +198,17 @@ export default function Explore({ onVideoClick }) {
       });
 
       const uniqueMap = new Map();
-      combined.forEach(video => uniqueMap.set(video.message_id, video));
+      combined.forEach(video => {
+        // 🟢 THE FIX: Strictly block any premium video that snuck in via the suggestions array
+        if (video.category && video.category.toLowerCase() !== "premium") {
+          uniqueMap.set(video.message_id, video);
+        }
+      });
+      
       const shuffled = Array.from(uniqueMap.values()).sort(() => 0.5 - Math.random());
       
       if (isLoadMore) {
         setFeed(prev => {
-          // Prevent duplicates when appending
           const newMap = new Map();
           prev.forEach(v => newMap.set(v.message_id, v));
           shuffled.forEach(v => newMap.set(v.message_id, v));
@@ -234,10 +238,14 @@ export default function Explore({ onVideoClick }) {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchQuery)}&limit=15&page=${pageNum}`);
       if (res.ok) {
         const data = await res.json();
+        
+        // 🟢 THE FIX: Strictly block premium videos from appearing in search results
+        const safeVideos = (data.videos || []).filter(v => v.category && v.category.toLowerCase() !== "premium");
+
         if (isLoadMore) {
-          setFeed(prev => [...prev, ...data.videos]);
+          setFeed(prev => [...prev, ...safeVideos]);
         } else {
-          setFeed(data.videos || []);
+          setFeed(safeVideos);
         }
         setHasMoreSearch(data.hasMore);
         setSearchPage(pageNum);
