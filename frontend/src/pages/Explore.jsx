@@ -1,14 +1,125 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark } from "lucide-react";
+import { Search, Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, X, Send } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
 
+// 🟢 NEW: TIKTOK STYLE COMMENT MODAL
+const CommentSectionModal = ({ video, onClose }) => {
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [isPosting, setIsPosting] = useState(false);
+  const videoRef = useRef(null);
+  const hlsRef = useRef(null);
+
+  useEffect(() => {
+    // 1. Fetch Video Stream
+    fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`)
+      .then(res => res.ok ? res.json() : {})
+      .then(data => { if (data.video_url) setVideoUrl(data.video_url); });
+
+    // 2. Fetch Comments
+    fetch(`${APP_CONFIG.apiUrl}/api/comments/${video.message_id}`)
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setComments(data));
+  }, [video]);
+
+  // 3. Initialize HLS for the mini-player
+  useEffect(() => {
+    if (!videoUrl || !videoRef.current) return;
+    if (videoUrl.includes('.m3u8') && window.Hls && window.Hls.isSupported()) {
+      if (!hlsRef.current) {
+        hlsRef.current = new window.Hls({ startLevel: 1 });
+        hlsRef.current.loadSource(videoUrl);
+        hlsRef.current.attachMedia(videoRef.current);
+      }
+    } else {
+      if (videoRef.current.src !== videoUrl) videoRef.current.src = videoUrl;
+    }
+  }, [videoUrl]);
+
+  // 4. Submit Comment
+  const handlePost = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    const token = localStorage.getItem("token");
+    setIsPosting(true);
+
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message_id: video.message_id, content: newComment })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setComments([data.comment, ...comments]); // Inject new comment at the top instantly
+          setNewComment("");
+        }
+      }
+    } catch (err) { console.error("Post failed", err); }
+    
+    setIsPosting(false);
+  };
+
+  return (
+    <div style={commentModalOverlayStyle}>
+      
+      {/* TOP SECTION: Mini Video Player */}
+      <div style={commentModalTopStyle}>
+        <button onClick={onClose} style={closeModalBtnStyle}>
+          <X size={24} color="#fff" />
+        </button>
+        {videoUrl ? (
+          <video ref={videoRef} src={videoUrl} style={commentModalVideoStyle} autoPlay playsInline loop controls />
+        ) : (
+          <img src={video.thumbnail_url} alt="thumbnail" style={commentModalVideoStyle} />
+        )}
+      </div>
+
+      {/* BOTTOM SECTION: Comments & Input */}
+      <div style={commentModalBottomStyle}>
+        <h3 style={commentHeaderStyle}>{comments.length} Comments</h3>
+        
+        <div style={commentsListStyle} className="custom-scrollbar">
+          {comments.length === 0 ? (
+            <p style={{ textAlign: "center", color: "#888", marginTop: "30px" }}>No comments yet. Be the first to reply!</p>
+          ) : (
+            comments.map(c => (
+              <div key={c.id} style={commentItemStyle}>
+                <img src={c.avatar_url || '/assets/default-avatar.png'} alt="avatar" style={commentAvatarStyle} />
+                <div style={commentContentWrapper}>
+                  <span style={commentUsernameStyle}>@{c.username} <span style={commentDateStyle}>{new Date(c.created_at).toLocaleDateString()}</span></span>
+                  <p style={commentText}>{c.content}</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <form onSubmit={handlePost} style={commentInputWrapperStyle}>
+          <input 
+            type="text" 
+            value={newComment} 
+            onChange={e => setNewComment(e.target.value)} 
+            placeholder="Add a comment..." 
+            style={commentInputStyle} 
+          />
+          <button type="submit" disabled={isPosting || !newComment.trim()} style={{...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1}}>
+            {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // 🟢 INDIVIDUAL POST COMPONENT
-const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
+const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
   
-  // 🟢 Interaction States
   const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
   const [isLiked, setIsLiked] = useState(false);
   
@@ -16,13 +127,12 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
   const [isSaved, setIsSaved] = useState(false);
   
   const [sharesCount, setSharesCount] = useState(Number(video.shares_count || 0));
-  const [commentsCount] = useState(Number(video.comments_count || 0));
+  const [commentsCount, setCommentsCount] = useState(Number(video.comments_count || 0));
   
   const containerRef = useRef(null);
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
 
-  // 1. Fetch Initial Personal State (Has this user liked/saved it?)
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -38,7 +148,6 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
     .catch(err => console.error("Failed to fetch interaction state", err));
   }, [video.message_id]);
 
-  // 2. Monitor Visibility for Autoplay
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => setIsPlaying(entry.isIntersecting),
@@ -48,7 +157,6 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
     return () => { if (containerRef.current) observer.unobserve(containerRef.current); };
   }, []);
 
-  // 3. Fetch Video URL when on screen
   useEffect(() => {
     let timer;
     if (isPlaying && !videoUrl) {
@@ -59,13 +167,12 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
             const data = await res.json();
             if (data.video_url) setVideoUrl(data.video_url);
           }
-        } catch (e) { console.error("Auto-fetch failed", e); }
+        } catch (e) {}
       }, 300); 
     }
     return () => clearTimeout(timer);
   }, [isPlaying, videoUrl, video.chat_id, video.message_id]);
 
-  // 4. Handle HLS / Playback
   useEffect(() => {
     if (!videoUrl || !videoRef.current) return;
     if (videoUrl.includes('.m3u8') && window.Hls && window.Hls.isSupported()) {
@@ -79,14 +186,17 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
     }
   }, [videoUrl]);
 
+  // 🟢 Auto-Pause feed video if the comment modal is open!
   useEffect(() => {
     if (videoRef.current) {
-      if (isPlaying) videoRef.current.play().catch(() => {});
-      else videoRef.current.pause();
+      if (isPlaying && !isAnyModalOpen) {
+        videoRef.current.play().catch(() => {});
+      } else {
+        videoRef.current.pause();
+      }
     }
-  }, [isPlaying, videoUrl]);
+  }, [isPlaying, videoUrl, isAnyModalOpen]);
 
-  // 🟢 INTERACTION HANDLERS
   const handleLike = async (e) => {
     e.stopPropagation();
     const token = localStorage.getItem("token");
@@ -101,7 +211,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message_id: video.message_id })
       });
-    } catch (err) { console.error("Like failed", err); }
+    } catch (err) {}
   };
 
   const handleSave = async (e) => {
@@ -118,7 +228,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message_id: video.message_id })
       });
-    } catch (err) { console.error("Save failed", err); }
+    } catch (err) {}
   };
 
   const handleShare = async (e) => {
@@ -138,6 +248,16 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message_id: video.message_id })
     }).catch(() => {});
+  };
+
+  const handleCommentClick = (e) => {
+    e.stopPropagation();
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please log in to comment!");
+    
+    // Updates internal count instantly anticipating a comment
+    setCommentsCount(prev => prev + 1); 
+    onCommentClick(video);
   };
 
   return (
@@ -169,30 +289,23 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
           {video.is_group && <div style={groupBadgeStyle}>Album</div>}
         </div>
 
-        {/* 🟢 WIRED UP ACTION BAR */}
         <div style={actionBarStyle}>
           <div style={actionItemStyle}>
             <Eye size={18} />
             <span>{Number(video.views || 0).toLocaleString()}</span>
           </div>
           
-          <div style={actionItemStyle} onClick={(e) => { e.stopPropagation(); onVideoClick(video); }}>
+          <div style={actionItemStyle} onClick={handleCommentClick}>
             <MessageCircle size={18} />
             <span>{commentsCount > 0 ? commentsCount : ''}</span>
           </div>
 
-          <div 
-            style={{ ...actionItemStyle, color: isLiked ? "#f91880" : "#71767b" }} 
-            onClick={handleLike}
-          >
+          <div style={{ ...actionItemStyle, color: isLiked ? "#f91880" : "#71767b" }} onClick={handleLike}>
             <Heart size={18} fill={isLiked ? "#f91880" : "none"} />
             <span>{likesCount > 0 ? likesCount : ''}</span>
           </div>
 
-          <div 
-            style={{ ...actionItemStyle, color: isSaved ? "var(--primary-color)" : "#71767b" }} 
-            onClick={handleSave}
-          >
+          <div style={{ ...actionItemStyle, color: isSaved ? "var(--primary-color)" : "#71767b" }} onClick={handleSave}>
             <Bookmark size={18} fill={isSaved ? "var(--primary-color)" : "none"} />
             <span>{savesCount > 0 ? savesCount : ''}</span>
           </div>
@@ -214,6 +327,9 @@ export default function Explore({ onVideoClick }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchPage, setSearchPage] = useState(1);
   const [hasMoreSearch, setHasMoreSearch] = useState(true);
+  
+  // 🟢 Tracks which video's comment section is open
+  const [activeCommentVideo, setActiveCommentVideo] = useState(null);
 
   const observer = useRef();
   const lastElementRef = useCallback(node => {
@@ -368,6 +484,8 @@ export default function Explore({ onVideoClick }) {
                   isLast={isLast}
                   lastElementRef={lastElementRef}
                   onVideoClick={onVideoClick}
+                  onCommentClick={setActiveCommentVideo}
+                  isAnyModalOpen={!!activeCommentVideo} // Pauses feed if modal is open
                 />
               );
             })
@@ -381,10 +499,22 @@ export default function Explore({ onVideoClick }) {
         </div>
       </PullToRefresh>
 
+      {/* 🟢 THE MODAL OVERLAY */}
+      {activeCommentVideo && (
+        <CommentSectionModal 
+          video={activeCommentVideo} 
+          onClose={() => setActiveCommentVideo(null)} 
+        />
+      )}
+
       <style>{`
         @keyframes skeleton-loading { 0% { background-color: #222; } 50% { background-color: #333; } 100% { background-color: #222; } }
+        @keyframes slideUpModal { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
         .animate-spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
       `}</style>
     </div>
   );
@@ -413,3 +543,21 @@ const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", col
 const skeletonAvatar = { width: "40px", height: "40px", borderRadius: "50%", animation: "skeleton-loading 1.5s infinite" };
 const skeletonTextBase = { width: "150px", height: "20px", borderRadius: "4px", marginTop: "4px", animation: "skeleton-loading 1.5s infinite" };
 const skeletonVideo = { width: "100%", height: "300px", borderRadius: "16px", animation: "skeleton-loading 1.5s infinite" };
+
+// 🟢 MODAL STYLES
+const commentModalOverlayStyle = { position: "fixed", inset: 0, zIndex: 999999, display: "flex", flexDirection: "column", background: "#000", animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)" };
+const commentModalTopStyle = { flex: "0 0 35vh", position: "relative", background: "#000", display: "flex", justifyContent: "center", alignItems: "center" };
+const commentModalVideoStyle = { width: "100%", height: "100%", objectFit: "contain" };
+const closeModalBtnStyle = { position: "absolute", top: "20px", left: "20px", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", padding: "8px", cursor: "pointer", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" };
+const commentModalBottomStyle = { flex: 1, background: "#1c1c1e", borderRadius: "24px 24px 0 0", marginTop: "-20px", zIndex: 2, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 -4px 20px rgba(0,0,0,0.5)" };
+const commentHeaderStyle = { padding: "20px", margin: 0, fontSize: "16px", fontWeight: 800, borderBottom: "1px solid #333", textAlign: "center", color: "#fff" };
+const commentsListStyle = { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "20px" };
+const commentItemStyle = { display: "flex", gap: "12px" };
+const commentAvatarStyle = { width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" };
+const commentContentWrapper = { display: "flex", flexDirection: "column" };
+const commentUsernameStyle = { fontSize: "13px", fontWeight: 700, color: "#aaa" };
+const commentDateStyle = { fontWeight: 400, color: "#666", marginLeft: "6px" };
+const commentText = { fontSize: "15px", color: "#fff", margin: "4px 0 0 0", lineHeight: "1.4" };
+const commentInputWrapperStyle = { padding: "15px 20px", background: "#1c1c1e", borderTop: "1px solid #333", display: "flex", gap: "10px", alignItems: "center", paddingBottom: "env(safe-area-inset-bottom, 15px)" };
+const commentInputStyle = { flex: 1, background: "#2c2c2e", border: "none", borderRadius: "20px", padding: "12px 20px", color: "#fff", fontSize: "15px", outline: "none" };
+const commentSendBtnStyle = { background: "var(--primary-color)", border: "none", width: "42px", height: "42px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", cursor: "pointer", transition: "opacity 0.2s ease" };
