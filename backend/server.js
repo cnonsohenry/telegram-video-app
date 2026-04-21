@@ -9,19 +9,19 @@ import pkg from "pg";
 import https from "https";
 import crypto from "crypto";
 
-// 🟢 NEW: Imports for FFmpeg thumbnail extraction
+// 🟢 JWT for securing interaction routes
+import jwt from "jsonwebtoken";
+
 import { exec } from "child_process";
 import util from "util";
 const execPromise = util.promisify(exec);
 
-// Native imports needed for ES Modules to serve frontend files
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Import Prerender
 import prerender from "prerender-node";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; // Left here in case needed elsewhere, but no longer blocking video caching!
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; 
 import adminRoutes from "./admin.js";
 import authRoutes from "./auth.js";
 import multer from "multer";
@@ -59,13 +59,7 @@ app.use("/status", basicAuth({
 app.use(statusMonitor({
   title: `${process.env.APP_NAME || 'Platform'} Server Status`,
   path: '/status',
-  spans: [{
-    interval: 1, retention: 60
-  }, {
-    interval: 5, retention: 60
-  }, {
-    interval: 15, retention: 60
-  }]
+  spans: [{ interval: 1, retention: 60 }, { interval: 5, retention: 60 }, { interval: 15, retention: 60 }]
 }));
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -114,12 +108,9 @@ async function initDatabase() {
           role VARCHAR(20) DEFAULT 'user',
           created_at TIMESTAMP DEFAULT NOW(),
           settings JSONB DEFAULT '{}'::jsonb,
-          google_id VARCHAR(255) UNIQUE
+          google_id VARCHAR(255) UNIQUE,
+          is_premium BOOLEAN DEFAULT FALSE
         )
-      `);
-
-      await pool.query(`
-        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
       `);
 
       await pool.query(`
@@ -150,8 +141,45 @@ async function initDatabase() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
+
+      // 🟢 NEW: Interaction Tables
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS likes (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          message_id TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(user_id, message_id)
+        )
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS saves (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          message_id TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(user_id, message_id)
+        )
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS comments (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          message_id TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      // 🟢 NEW: Fast access counters for the Video feed
+      await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS likes_count BIGINT DEFAULT 0`);
+      await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS comments_count BIGINT DEFAULT 0`);
+      await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS shares_count BIGINT DEFAULT 0`);
+      await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS saves_count BIGINT DEFAULT 0`);
       
-      console.log("✅ Database initialized (Admins, App_Users, Videos & Transactions)");
+      console.log("✅ Database initialized (Users, Videos, Transactions, & Interactions)");
       break;
     } catch (err) {
       retries--;
@@ -185,7 +213,6 @@ app.get("/api/crypto/status/:order_id", (req, res) => checkCryptoTransaction(req
 ===================== */
 async function uploadThumbnailToR2(thumbFileId, chatId, messageId) {
   if (!thumbFileId) return null;
-  
   try {
     const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: thumbFileId } });
     const filePath = fileRes.data.result.file_path;
@@ -200,10 +227,8 @@ async function uploadThumbnailToR2(thumbFileId, chatId, messageId) {
       ContentType: "image/jpeg",
     }));
 
-    console.log(`✅ Webhook: Thumbnail saved to R2 -> ${key}`);
     return key;
   } catch (err) {
-    console.error("❌ Webhook Thumbnail Sync Failed:", err.message);
     return null;
   }
 }
@@ -268,9 +293,7 @@ app.post("/webhook", async (req, res) => {
     const thumb = media.thumb || media.thumbs?.[0] || media.thumbnail || null;
     const thumbFileId = thumb?.file_id || null;
 
-    if (thumbFileId) {
-      uploadThumbnailToR2(thumbFileId, chatId, messageId);
-    }
+    if (thumbFileId) uploadThumbnailToR2(thumbFileId, chatId, messageId);
 
     await pool.query(
       `INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id, uploader_id, category, caption, media_group_id)
@@ -287,13 +310,12 @@ app.post("/webhook", async (req, res) => {
 
     res.sendStatus(200);
   } catch (err) {
-    console.error("Webhook Error:", err.message);
     res.sendStatus(200);
   }
 });
 
 /* =====================
-   PREMIUM UPLOAD (STREAM & R2 THUMBNAIL SUPPORT)
+   PREMIUM UPLOAD
 ===================== */
 const upload = multer({ dest: "uploads/" }); 
 
@@ -302,21 +324,16 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     const { caption, category, uploader_id, media_group_id, upload_target } = req.body; 
     const videoFile = req.file;
 
-    if (!ALLOWED_USERS.includes(Number(uploader_id))) {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
-
+    if (!ALLOWED_USERS.includes(Number(uploader_id))) return res.status(403).json({ error: "Unauthorized" });
     if (!videoFile) return res.status(400).json({ error: "No video file provided" });
 
     let savedCloudflareId = "none";
-    
     const safeCategory = category ? category.toLowerCase().trim() : "premium";
     const internalId = `${safeCategory}_${Date.now()}`;
 
     try {
       const thumbPath = `${videoFile.path}.jpg`;
       await execPromise(`ffmpeg -i ${videoFile.path} -ss 00:00:01.000 -vframes 1 -vf scale=400:-1 -q:v 5 ${thumbPath} -y`);
-
       const thumbBuffer = fs.readFileSync(thumbPath);
       await r2.send(new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -325,10 +342,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
         ContentType: "image/jpeg",
       }));
       fs.unlinkSync(thumbPath); 
-      console.log(`🖼️ R2 Thumbnail successfully generated: thumbs/internal_${internalId}.jpg`);
-    } catch (ffmpegErr) {
-      console.error("⚠️ FFmpeg thumbnail extraction failed:", ffmpegErr.message);
-    }
+    } catch (ffmpegErr) {}
 
     if (upload_target === "r2") {
       const fileStream = fs.createReadStream(videoFile.path);
@@ -341,43 +355,22 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
         Body: fileStream,
         ContentType: videoFile.mimetype || "video/mp4",
       }));
-      
       savedCloudflareId = `r2:${r2Key}`;
     } else {
-      const cfResult = await uploadDirectToStream(videoFile.path, {
-        caption: caption || "Premium Content",
-        category: safeCategory
-      });
+      const cfResult = await uploadDirectToStream(videoFile.path, { caption: caption || "Premium Content", category: safeCategory });
       savedCloudflareId = cfResult.uid;
     }
 
     await pool.query(
       `INSERT INTO videos (chat_id, message_id, file_id, uploader_id, category, caption, cloudflare_id, status, media_group_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', $8)`,
-      [
-        "internal", 
-        internalId, 
-        "none", 
-        uploader_id, 
-        safeCategory, 
-        caption, 
-        savedCloudflareId,
-        media_group_id || null 
-      ]
+      [ "internal", internalId, "none", uploader_id, safeCategory, caption, savedCloudflareId, media_group_id || null ]
     );
 
     fs.unlinkSync(videoFile.path);
-
-    res.json({ 
-      success: true, 
-      videoId: savedCloudflareId,
-      message_id: internalId 
-    });
+    res.json({ success: true, videoId: savedCloudflareId, message_id: internalId });
   } catch (err) {
-    console.error("Admin Upload Error:", err.message);
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     res.status(500).json({ error: "Upload failed" });
   }
 });
@@ -387,87 +380,53 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 ===================== */
 app.get("/api/video", async (req, res) => {
   try {
-    // 🟢 Keep this to ensure the database views count and API response are fresh
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    
     const { chat_id, message_id } = req.query;
     if (!chat_id || !message_id) return res.status(400).json({ error: "Missing parameters" });
 
     const dbRes = await pool.query(
-      `UPDATE videos SET views = views + 1 
-       WHERE chat_id=$1 AND message_id=$2 
-       RETURNING file_id, cloudflare_id`,
+      `UPDATE videos SET views = views + 1 WHERE chat_id=$1 AND message_id=$2 RETURNING file_id, cloudflare_id`,
       [chat_id, message_id]
     );
 
-    if (!dbRes.rows.length) {
-      return res.status(404).json({ error: "Video not found in database" });
-    }
+    if (!dbRes.rows.length) return res.status(404).json({ error: "Video not found in database" });
 
     const video = dbRes.rows[0];
 
     if (video.cloudflare_id && video.cloudflare_id !== "none") {
       if (video.cloudflare_id.startsWith("r2:")) {
         const r2Key = video.cloudflare_id.replace("r2:", "");
-        
-        // 🟢 THE FIX: Serve highly cacheable static URL via custom public domain
         const publicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://bucket.naijahomemade.com';
-        const staticUrl = `${publicDomain}/${r2Key}`;
-        
-        console.log(`[PLAYBACK] Serving Cached Static R2 Link: ${staticUrl}`);
-        return res.json({ video_url: staticUrl });
+        return res.json({ video_url: `${publicDomain}/${r2Key}` });
       } else {
         const cleanId = video.cloudflare_id.split('?')[0];
-        const video_url = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
-        console.log(`[PLAYBACK] Serving Cloudflare Stream: ${cleanId}`);
-        return res.json({ video_url });
+        return res.json({ video_url: `https://videodelivery.net/${cleanId}/manifest/video.m3u8` });
       }
     }
 
-    if (!video.file_id || video.file_id === "none") {
-       return res.status(400).json({ error: "No video source (Telegram or Cloudflare) found" });
-    }
+    if (!video.file_id || video.file_id === "none") return res.status(400).json({ error: "No video source found" });
 
-    console.log(`[PLAYBACK] Fetching from Telegram: ${video.file_id.substring(0, 10)}...`);
-
-    const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { 
-      params: { file_id: video.file_id } 
-    });
-
-    if (!tgRes.data?.result?.file_path) {
-      return res.status(404).json({ error: "Telegram could not find this file" });
-    }
+    const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: video.file_id } });
+    if (!tgRes.data?.result?.file_path) return res.status(404).json({ error: "Telegram could not find this file" });
 
     const filePath = tgRes.data.result.file_path;
     const { exp, sig } = signWorkerUrl(filePath);
-
-    const workerUrl = `${process.env.WORKER_BASE_URL}/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}`;
-    
-    return res.json({ video_url: workerUrl });
-
+    return res.json({ video_url: `${process.env.WORKER_BASE_URL}/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}` });
   } catch (err) {
-    console.error("❌ Video API Error Detail:", err.response?.data || err.message);
     res.status(500).json({ error: "Playback failed", detail: err.message });
   }
 });
 
 /* =====================
-   HELPER: Sign Thumbnail URL
+   HELPER: Base Mapper 
 ===================== */
 function signThumbnail(chatId, messageId) {
   const payload = `${chatId}:${messageId}`;
-  return crypto
-    .createHmac("sha256", process.env.SIGNING_SECRET)
-    .update(payload)
-    .digest("hex");
+  return crypto.createHmac("sha256", process.env.SIGNING_SECRET).update(payload).digest("hex");
 }
 
-/* =====================
-   HELPER: Base Mapper (Used by Videos, Suggestions & Groups)
-===================== */
 const mapVideoToResponse = (v, apiBaseUrl) => {
   let thumbnailUrl = "";
-  
   if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
       const cleanId = v.cloudflare_id.split('?')[0];
       thumbnailUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
@@ -488,7 +447,12 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     thumbnail_url: thumbnailUrl,
     media_group_id: v.media_group_id || null,
     is_group: Number(v.group_count || 1) > 1, 
-    group_count: Number(v.group_count || 1)
+    group_count: Number(v.group_count || 1),
+    // 🟢 NEW: Maps the counter values
+    likes_count: Number(v.likes_count || 0),
+    comments_count: Number(v.comments_count || 0),
+    shares_count: Number(v.shares_count || 0),
+    saves_count: Number(v.saves_count || 0)
   };
 };
 
@@ -502,12 +466,9 @@ app.get("/api/videos", async (req, res) => {
     const limit = Number(req.query.limit || 12);
     const offset = (page - 1) * limit;
     const category = req.query.category || "hotties";
-    
     const apiBaseUrl = process.env.API_BASE_URL;
 
-    let query;
-    let queryValues;
-
+    let query, queryValues;
     if (category === "trends") {
       query = `
         WITH GroupedVideos AS (
@@ -539,71 +500,33 @@ app.get("/api/videos", async (req, res) => {
     if (page === 1) {
       const suggestQuery = `
         SELECT v.*, u.username as uploader_name 
-        FROM videos v 
-        LEFT JOIN users u ON v.uploader_id = u.user_id 
+        FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id 
         ORDER BY RANDOM() LIMIT 10
       `;
       const suggestRes = await pool.query(suggestQuery);
       suggestions = suggestRes.rows;
     }
 
-    let countQuery;
-    if (category === "trends") {
-      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos`;
-    } else {
-      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos WHERE category = $1`;
-    }
+    const countQuery = category === "trends" 
+      ? `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos`
+      : `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos WHERE category = $1`;
     
     const countValues = category === "trends" ? [] : [category];
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
 
     res.json({
-      page,
-      limit,
-      total,
+      page, limit, total,
       videos: videosRes.rows.map(v => mapVideoToResponse(v, apiBaseUrl)),
       suggestions: suggestions.map(v => mapVideoToResponse(v, apiBaseUrl))
     });
   } catch (err) {
-    console.error("DB Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
 /* =====================
-   Fetch Album Contents via Lazy Load
-===================== */
-app.get("/api/group", async (req, res) => {
-  try {
-    // 🟢 Added Cache-Control here to prevent stale group content
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    
-    const { media_group_id } = req.query;
-    if (!media_group_id || media_group_id === 'none') return res.status(400).json({error: "Invalid group"});
-    
-    const query = `
-      SELECT v.*, u.username as uploader_name 
-      FROM videos v 
-      LEFT JOIN users u ON v.uploader_id = u.user_id 
-      WHERE v.media_group_id = $1 
-      ORDER BY v.created_at ASC
-    `;
-    const { rows } = await pool.query(query, [media_group_id]);
-    const apiBaseUrl = process.env.API_BASE_URL;
-    
-    res.json(rows.map(v => ({ 
-      ...mapVideoToResponse(v, apiBaseUrl), 
-      is_group: false 
-    })));
-  } catch (err) {
-    console.error("Group fetch error:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-/* =====================
-   SEARCH ENDPOINT (PAGINATED & VALIDATED)
+   SEARCH ENDPOINT 
 ===================== */
 const searchSchema = z.object({
   q: z.string().trim().max(100, "Search query is too long").optional().default(""), 
@@ -612,264 +535,156 @@ const searchSchema = z.object({
 });
 
 app.get("/api/search", async (req, res) => {
-  // 🟢 Added Cache-Control to ensure search always yields live results
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  
   const parsed = searchSchema.safeParse(req.query);
-  
-  if (!parsed.success) {
-    const errorMessage = parsed.error?.issues?.[0]?.message || "Invalid search parameters";
-    return res.status(400).json({ error: errorMessage });
-  }
-
+  if (!parsed.success) return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid search" });
   const { q, page, limit } = parsed.data;
 
   try {
     const apiBaseUrl = process.env.API_BASE_URL; 
     const offset = (page - 1) * limit;
 
-    const searchQuery = `
+    const { rows } = await pool.query(`
       SELECT v.*, u.username as uploader_name 
-      FROM videos v 
-      LEFT JOIN users u ON v.uploader_id = u.user_id 
+      FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id 
       WHERE v.caption ILIKE $1 OR u.username ILIKE $1 
-      ORDER BY v.created_at DESC 
-      LIMIT $2 OFFSET $3
-    `;
-    
-    const { rows } = await pool.query(searchQuery, [`%${q}%`, limit, offset]);
-
-    const formattedVideos = rows.map(v => {
-      let thumbUrl = "";
-      
-      if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
-         const cleanId = v.cloudflare_id.split('?')[0];
-         thumbUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
-      } else {
-         const sig = signThumbnail(v.chat_id, v.message_id); 
-         thumbUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
-      }
-
-      return {
-        chat_id: v.chat_id,
-        message_id: v.message_id,
-        views: v.views,
-        caption: v.caption,
-        category: v.category,
-        uploader_id: v.uploader_id,
-        uploader_name: v.uploader_name || "Member",
-        created_at: v.created_at,
-        thumbnail_url: thumbUrl
-      };
-    });
+      ORDER BY v.created_at DESC LIMIT $2 OFFSET $3
+    `, [`%${q}%`, limit, offset]);
 
     res.json({ 
-      videos: formattedVideos,
-      hasMore: formattedVideos.length === limit 
+      videos: rows.map(v => mapVideoToResponse(v, apiBaseUrl)),
+      hasMore: rows.length === limit 
     });
   } catch (error) {
-    console.error("Search API Error:", error.message);
     res.status(500).json({ error: "Search failed" });
   }
 });
 
-/* =====================
-   Video Details Helper
-===================== */
-app.get("/api/video/details", async (req, res) => {
-  try {
-    const { message_id } = req.query;
-    if (!message_id) return res.status(400).json({ error: "Missing message_id" });
-
-    const result = await pool.query(`
-      SELECT v.chat_id, v.message_id, v.caption, v.views, v.uploader_id, u.username as uploader_name 
-      FROM videos v 
-      LEFT JOIN users u ON v.uploader_id = u.user_id 
-      WHERE v.message_id = $1 LIMIT 1
-    `, [message_id]);
-
-    if (!result.rows.length) return res.status(404).json({ error: "Video not found" });
-
-    res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-/* =====================
-   UPDATED: Thumbnail API (Bulletproof Fallback)
-===================== */
-app.get("/api/thumbnail", async (req, res) => {
-  const { chat_id, message_id } = req.query;
-  if (!chat_id || !message_id) return res.status(400).end();
+/* =======================================================
+   🟢 INTERACTION SUITE (LIKES, COMMENTS, SAVES, SHARES)
+======================================================= */
+const authenticateAppUser = (req, res, next) => {
+  const authHeader = req.header("Authorization");
+  if (!authHeader) return res.status(401).json({ error: "Access denied. Please log in." });
   
-  const fileName = `thumbs/${chat_id}_${message_id}.jpg`;
-
+  const token = authHeader.split(" ")[1];
   try {
-    try {
-      const r2Object = await r2.send(new GetObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: fileName
-      }));
-      
-      res.set({
-        "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=31536000, immutable", 
-        "Access-Control-Allow-Origin": "*"
-      });
-      return r2Object.Body.pipe(res);
-    } catch (r2Err) {
-      console.log(`Thumbnail ${fileName} not in R2, checking Database...`);
-    }
-
-    const dbRes = await pool.query("SELECT thumb_file_id FROM videos WHERE chat_id=$1 AND message_id=$2", [chat_id, message_id]);
-    
-    if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) {
-        return res.redirect('/assets/default-avatar.png');
-    }
-
-    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: dbRes.rows[0].thumb_file_id } });
-    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
-    const buffer = Buffer.from(imageRes.data);
-
-    r2.send(new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: fileName,
-      Body: buffer,
-      ContentType: "image/jpeg"
-    })).catch(e => console.error("R2 Upload Failed:", e.message));
-
-    res.set({
-      "Content-Type": "image/jpeg",
-      "Cache-Control": "public, max-age=604800, immutable",
-      "Access-Control-Allow-Origin": "*"
-    });
-    res.send(buffer);
-
+    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = verified;
+    next();
   } catch (err) {
-    console.error("Thumbnail Route Error:", err.message);
-    // Ultimate Failsafe
-    res.redirect('/assets/default-avatar.png');
+    res.status(400).json({ error: "Invalid or expired token." });
   }
-});
+};
 
-/* =====================
-   Share Link (Updated with JSON-LD SEO & Canonical Tag)
-===================== */
-app.get('/v/:message_id', async (req, res) => {
+// 1. Check Personal State (Has the user liked or saved this?)
+app.get("/api/interactions/state/:message_id", authenticateAppUser, async (req, res) => {
   try {
     const { message_id } = req.params;
-    const frontendUrl = process.env.FRONTEND_URL;
-    const appName = process.env.APP_NAME || "App";
+    const user_id = req.user.id;
     
-    const result = await pool.query(`
-      SELECT v.*, u.username as uploader_name 
-      FROM videos v 
-      LEFT JOIN users u ON v.uploader_id = u.user_id 
-      WHERE v.message_id = $1 LIMIT 1
-    `, [message_id]);
-
-    if (!result.rows.length) return res.redirect(frontendUrl);
-
-    const video = result.rows[0];
-    const sig = signThumbnail(video.chat_id, video.message_id);
+    const likeRes = await pool.query("SELECT 1 FROM likes WHERE user_id=$1 AND message_id=$2", [user_id, message_id]);
+    const saveRes = await pool.query("SELECT 1 FROM saves WHERE user_id=$1 AND message_id=$2", [user_id, message_id]);
     
-    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:"))
-      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
-      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
-
-    // 🟢 1. Define your hidden SEO Keywords here
-    const hiddenKeywords = [
-      "naijahomemade",
-      "naijahomemade channel telegram",
-      "nigerian trending videos",
-      "exclusive telegram shots",
-      "homemade naija sex",
-      "nigerian homemade sex",
-      "nigeria home made sex videos",
-      "naija homemade porn",
-      "naija homemade xxx",
-      "naija homemade fuck",
-      "naija homemade sex videos",
-      video.category // Dynamically drops in "hotties", "premium", etc.
-    ];
-
-    // 🟢 2. Build the JSON-LD Schema
-    const schemaJSON = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "VideoObject",
-      "name": video.caption || `Shot from @${video.uploader_name}`,
-      "description": `Watch this high-quality ${video.category} video on ${appName}.`,
-      "thumbnailUrl": [thumbUrl],
-      "uploadDate": video.created_at || new Date().toISOString(),
-      "keywords": hiddenKeywords, // Crawlers read this, users don't!
-      "author": {
-        "@type": "Person",
-        "name": video.uploader_name || "Member"
-      }
+    res.json({
+      isLiked: likeRes.rows.length > 0,
+      isSaved: saveRes.rows.length > 0
     });
-
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${video.caption || "Watch exclusive shots"}</title>
-          <meta charset="utf-8">
-          
-          <link rel="canonical" href="${frontendUrl}/v/${message_id}" />
-          
-          <meta property="og:type" content="video.other">
-          <meta property="og:site_name" content="${appName}">
-          <meta property="og:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
-          <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
-          <meta property="og:image" content="${thumbUrl}">
-          
-          <script type="application/ld+json">
-            ${schemaJSON}
-          </script>
-
-          <script>
-            window.location.href = "${frontendUrl}/?v=${message_id}";
-          </script>
-        </head>
-        <body style="background:#000; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
-          <p>Redirecting to ${appName}...</p>
-        </body>
-      </html>
-    `);
   } catch (err) {
-    console.error("Share Link Error:", err.message);
-    res.redirect(process.env.FRONTEND_URL);
+    res.status(500).json({ error: "State fetch failed" });
   }
 });
 
-/* =====================
-   User Profile Photo
-===================== */
-app.get("/api/avatar", async (req, res) => {
+// 2. Toggle Like
+app.post("/api/interactions/like", authenticateAppUser, async (req, res) => {
   try {
-    const { user_id } = req.query;
-    if (!user_id) return res.status(400).end();
+    const { message_id } = req.body;
+    const user_id = req.user.id; 
 
-    const photosRes = await axios.get(`${TELEGRAM_API}/getUserProfilePhotos`, {
-      params: { user_id, limit: 1 }
-    });
-
-    const photos = photosRes.data.result.photos;
-    if (!photos || photos.length === 0) return res.status(204).end();
-
-    const fileId = photos[0][0].file_id;
-    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId } });
-    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
-    
-    res.set({
-      "Content-Type": "image/jpeg",
-      "Cache-Control": "public, max-age=86400", 
-      "Access-Control-Allow-Origin": "*"
-    });
-    res.send(Buffer.from(imageRes.data));
+    const existing = await pool.query("SELECT id FROM likes WHERE user_id=$1 AND message_id=$2", [user_id, message_id]);
+    if (existing.rows.length > 0) {
+      await pool.query("DELETE FROM likes WHERE id=$1", [existing.rows[0].id]);
+      await pool.query("UPDATE videos SET likes_count = GREATEST(likes_count - 1, 0) WHERE message_id=$1", [message_id]);
+      res.json({ liked: false });
+    } else {
+      await pool.query("INSERT INTO likes (user_id, message_id) VALUES ($1, $2)", [user_id, message_id]);
+      await pool.query("UPDATE videos SET likes_count = likes_count + 1 WHERE message_id=$1", [message_id]);
+      res.json({ liked: true });
+    }
   } catch (err) {
-    res.status(500).end();
+    res.status(500).json({ error: "Like toggle failed" });
+  }
+});
+
+// 3. Toggle Save (Bookmark)
+app.post("/api/interactions/save", authenticateAppUser, async (req, res) => {
+  try {
+    const { message_id } = req.body;
+    const user_id = req.user.id; 
+
+    const existing = await pool.query("SELECT id FROM saves WHERE user_id=$1 AND message_id=$2", [user_id, message_id]);
+    if (existing.rows.length > 0) {
+      await pool.query("DELETE FROM saves WHERE id=$1", [existing.rows[0].id]);
+      await pool.query("UPDATE videos SET saves_count = GREATEST(saves_count - 1, 0) WHERE message_id=$1", [message_id]);
+      res.json({ saved: false });
+    } else {
+      await pool.query("INSERT INTO saves (user_id, message_id) VALUES ($1, $2)", [user_id, message_id]);
+      await pool.query("UPDATE videos SET saves_count = saves_count + 1 WHERE message_id=$1", [message_id]);
+      res.json({ saved: true });
+    }
+  } catch (err) {
+    res.status(500).json({ error: "Save toggle failed" });
+  }
+});
+
+// 4. Record Share (Public route, just bumps the counter)
+app.post("/api/interactions/share", async (req, res) => {
+  try {
+    const { message_id } = req.body;
+    await pool.query("UPDATE videos SET shares_count = shares_count + 1 WHERE message_id=$1", [message_id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Share logging failed" });
+  }
+});
+
+// 5. Post a Comment
+app.post("/api/comments", authenticateAppUser, async (req, res) => {
+  try {
+    const { message_id, content } = req.body;
+    const user_id = req.user.id;
+
+    if (!content || !content.trim()) return res.status(400).json({ error: "Comment cannot be empty" });
+
+    const result = await pool.query(
+      "INSERT INTO comments (user_id, message_id, content) VALUES ($1, $2, $3) RETURNING *",
+      [user_id, message_id, content.trim()]
+    );
+    await pool.query("UPDATE videos SET comments_count = comments_count + 1 WHERE message_id=$1", [message_id]);
+    
+    // Fetch the user's avatar to immediately append the comment on the frontend
+    const user = await pool.query("SELECT username, avatar_url FROM app_users WHERE id=$1", [user_id]);
+    
+    res.json({ success: true, comment: { ...result.rows[0], ...user.rows[0] } });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to post comment" });
+  }
+});
+
+// 6. Fetch all Comments for a video
+app.get("/api/comments/:message_id", async (req, res) => {
+  try {
+    const { message_id } = req.params;
+    const { rows } = await pool.query(`
+      SELECT c.id, c.content, c.created_at, u.username, u.avatar_url 
+      FROM comments c
+      JOIN app_users u ON c.user_id = u.id
+      WHERE c.message_id = $1
+      ORDER BY c.created_at DESC
+    `, [message_id]);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch comments" });
   }
 });
 
@@ -878,66 +693,33 @@ app.get("/api/avatar", async (req, res) => {
 ===================== */
 app.get('/sitemap.xml', async (req, res) => {
   try {
-    // Fetch the latest 5,000 videos (Google's limit per sitemap is 50k)
-    const result = await pool.query(`
-      SELECT message_id, created_at 
-      FROM videos 
-      ORDER BY created_at DESC 
-      LIMIT 5000
-    `);
-
+    const result = await pool.query(`SELECT message_id, created_at FROM videos ORDER BY created_at DESC LIMIT 5000`);
     const baseUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+    xml += `  <url>\n    <loc>${baseUrl}/</loc>\n    <changefreq>hourly</changefreq>\n    <priority>1.0</priority>\n  </url>\n`;
 
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
-
-    // Add the homepage
-    xml += `  <url>\n`;
-    xml += `    <loc>${baseUrl}/</loc>\n`;
-    xml += `    <changefreq>hourly</changefreq>\n`;
-    xml += `    <priority>1.0</priority>\n`;
-    xml += `  </url>\n`;
-
-    // Add every single video page
     result.rows.forEach(video => {
-      xml += `  <url>\n`;
-      xml += `    <loc>${baseUrl}/v/${video.message_id}</loc>\n`;
-      // Use the video creation date as the lastmod
-      xml += `    <lastmod>${new Date(video.created_at).toISOString()}</lastmod>\n`;
-      xml += `    <changefreq>never</changefreq>\n`;
-      xml += `    <priority>0.8</priority>\n`;
-      xml += `  </url>\n`;
+      xml += `  <url>\n    <loc>${baseUrl}/v/${video.message_id}</loc>\n    <lastmod>${new Date(video.created_at).toISOString()}</lastmod>\n    <changefreq>never</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
     });
 
     xml += `</urlset>`;
-
     res.header('Content-Type', 'application/xml');
     res.send(xml);
-  } catch (err) {
-    console.error('Sitemap error:', err);
-    res.status(500).end();
-  }
+  } catch (err) { res.status(500).end(); }
 });
 
 /* =======================================================
    🤖 PRERENDER MIDDLEWARE (SEO & EXOCLICK FIX)
 ======================================================= */
 prerender.set('prerenderToken', process.env.PRERENDER_TOKEN);
-prerender.crawlerUserAgents.push('ExoBot');
-prerender.crawlerUserAgents.push('exobot');
-prerender.crawlerUserAgents.push('TelegramBot');
-prerender.crawlerUserAgents.push('Twitterbot');
-
+prerender.crawlerUserAgents.push('ExoBot', 'exobot', 'TelegramBot', 'Twitterbot');
 app.use(prerender);
 
 /* =======================================================
    SERVE THE COMPILED FRONTEND
 ======================================================= */
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
-
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
-});
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html')));
 
 const PORT = process.env.PORT || 3000;
 await initDatabase();

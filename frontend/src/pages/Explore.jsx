@@ -1,34 +1,54 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Heart, MessageCircle, Share2, Eye, Play, Loader2 } from "lucide-react";
+import { Search, Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
 
-// 🟢 NEW: INDIVIDUAL POST COMPONENT (Handles Inline Autoplay)
+// 🟢 INDIVIDUAL POST COMPONENT
 const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
+  
+  // 🟢 Interaction States
+  const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
+  const [isLiked, setIsLiked] = useState(false);
+  
+  const [savesCount, setSavesCount] = useState(Number(video.saves_count || 0));
+  const [isSaved, setIsSaved] = useState(false);
+  
+  const [sharesCount, setSharesCount] = useState(Number(video.shares_count || 0));
+  const [commentsCount] = useState(Number(video.comments_count || 0));
   
   const containerRef = useRef(null);
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
 
-  // 1. Monitor when the video scrolls into view
+  // 1. Fetch Initial Personal State (Has this user liked/saved it?)
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch(`${APP_CONFIG.apiUrl}/api/interactions/state/${video.message_id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    .then(res => res.ok ? res.json() : {})
+    .then(data => {
+      if (data.isLiked) setIsLiked(true);
+      if (data.isSaved) setIsSaved(true);
+    })
+    .catch(err => console.error("Failed to fetch interaction state", err));
+  }, [video.message_id]);
+
+  // 2. Monitor Visibility for Autoplay
   useEffect(() => {
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        // Play when at least 60% of the video is visible
-        setIsPlaying(entry.isIntersecting); 
-      },
+      ([entry]) => setIsPlaying(entry.isIntersecting),
       { threshold: 0.6 }
     );
-
     if (containerRef.current) observer.observe(containerRef.current);
-    return () => {
-      if (containerRef.current) observer.unobserve(containerRef.current);
-    };
+    return () => { if (containerRef.current) observer.unobserve(containerRef.current); };
   }, []);
 
-  // 2. Fetch the video URL only if it stays on screen (prevents API spam on fast scrolls)
+  // 3. Fetch Video URL when on screen
   useEffect(() => {
     let timer;
     if (isPlaying && !videoUrl) {
@@ -40,43 +60,88 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
             if (data.video_url) setVideoUrl(data.video_url);
           }
         } catch (e) { console.error("Auto-fetch failed", e); }
-      }, 300); // 300ms debounce
+      }, 300); 
     }
     return () => clearTimeout(timer);
   }, [isPlaying, videoUrl, video.chat_id, video.message_id]);
 
-  // 3. Handle HLS Streaming and HTML5 Autoplay
+  // 4. Handle HLS / Playback
   useEffect(() => {
     if (!videoUrl || !videoRef.current) return;
-
     if (videoUrl.includes('.m3u8') && window.Hls && window.Hls.isSupported()) {
       if (!hlsRef.current) {
-        hlsRef.current = new window.Hls({ startLevel: 1 }); // Start low res for fast feed scroll
+        hlsRef.current = new window.Hls({ startLevel: 1 }); 
         hlsRef.current.loadSource(videoUrl);
         hlsRef.current.attachMedia(videoRef.current);
       }
     } else {
-      if (videoRef.current.src !== videoUrl) {
-        videoRef.current.src = videoUrl;
-      }
+      if (videoRef.current.src !== videoUrl) videoRef.current.src = videoUrl;
     }
   }, [videoUrl]);
 
-  // 4. Play/Pause based on visibility
   useEffect(() => {
     if (videoRef.current) {
-      if (isPlaying) {
-        // Muted is strictly required by mobile browsers for autoplay
-        videoRef.current.play().catch(() => console.log("Autoplay blocked by browser"));
-      } else {
-        videoRef.current.pause();
-      }
+      if (isPlaying) videoRef.current.play().catch(() => {});
+      else videoRef.current.pause();
     }
   }, [isPlaying, videoUrl]);
 
+  // 🟢 INTERACTION HANDLERS
+  const handleLike = async (e) => {
+    e.stopPropagation();
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please log in to like videos!");
+
+    setIsLiked(!isLiked);
+    setLikesCount(prev => isLiked ? Math.max(0, prev - 1) : prev + 1);
+
+    try {
+      await fetch(`${APP_CONFIG.apiUrl}/api/interactions/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message_id: video.message_id })
+      });
+    } catch (err) { console.error("Like failed", err); }
+  };
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please log in to save videos!");
+
+    setIsSaved(!isSaved);
+    setSavesCount(prev => isSaved ? Math.max(0, prev - 1) : prev + 1);
+
+    try {
+      await fetch(`${APP_CONFIG.apiUrl}/api/interactions/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message_id: video.message_id })
+      });
+    } catch (err) { console.error("Save failed", err); }
+  };
+
+  const handleShare = async (e) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/v/${video.message_id}`;
+    
+    if (navigator.share) {
+      navigator.share({ title: video.caption, url: shareUrl }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      alert("Link copied to clipboard!");
+    }
+
+    setSharesCount(prev => prev + 1);
+    fetch(`${APP_CONFIG.apiUrl}/api/interactions/share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: video.message_id })
+    }).catch(() => {});
+  };
+
   return (
     <div ref={isLast ? lastElementRef : null} style={postStyle}>
-      {/* LEFT COLUMN: AVATAR */}
       <div style={avatarColumnStyle}>
         <img 
           src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
@@ -86,7 +151,6 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
         />
       </div>
 
-      {/* RIGHT COLUMN: CONTENT */}
       <div style={contentColumnStyle}>
         <div style={postHeaderStyle}>
           <span style={usernameStyle}>@{video.uploader_name || "Member"}</span>
@@ -95,45 +159,48 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
 
         <p style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</p>
 
-        {/* 🟢 AUTOPLAY CONTAINER */}
-        <div 
-          ref={containerRef}
-          style={videoContainerStyle}
-          onClick={() => onVideoClick(video)} // Fullscreen open
-        >
+        <div ref={containerRef} style={videoContainerStyle} onClick={() => onVideoClick(video)}>
           {videoUrl ? (
-            <video 
-              ref={videoRef}
-              style={thumbnailImgStyle}
-              muted 
-              loop 
-              playsInline
-              poster={video.thumbnail_url} // Show thumbnail until video loads
-            />
+            <video ref={videoRef} style={thumbnailImgStyle} muted loop playsInline poster={video.thumbnail_url} />
           ) : (
-            <img 
-              src={video.thumbnail_url} 
-              alt="thumbnail" 
-              style={thumbnailImgStyle} 
-              loading="lazy"
-            />
+            <img src={video.thumbnail_url} alt="thumbnail" style={thumbnailImgStyle} loading="lazy" />
           )}
-
-          {/* Hide play button if playing inline to mimic Twitter */}
-          {!isPlaying && (
-            <div style={playOverlayStyle}>
-              <Play size={24} fill="#fff" strokeWidth={0} />
-            </div>
-          )}
-          
+          {!isPlaying && <div style={playOverlayStyle}><Play size={24} fill="#fff" strokeWidth={0} /></div>}
           {video.is_group && <div style={groupBadgeStyle}>Album</div>}
         </div>
 
+        {/* 🟢 WIRED UP ACTION BAR */}
         <div style={actionBarStyle}>
-          <div style={actionItemStyle}><Eye size={18} /><span>{Number(video.views || 0).toLocaleString()}</span></div>
-          <div style={actionItemStyle}><MessageCircle size={18} /></div>
-          <div style={actionItemStyle}><Heart size={18} /></div>
-          <div style={actionItemStyle}><Share2 size={18} /></div>
+          <div style={actionItemStyle}>
+            <Eye size={18} />
+            <span>{Number(video.views || 0).toLocaleString()}</span>
+          </div>
+          
+          <div style={actionItemStyle} onClick={(e) => { e.stopPropagation(); onVideoClick(video); }}>
+            <MessageCircle size={18} />
+            <span>{commentsCount > 0 ? commentsCount : ''}</span>
+          </div>
+
+          <div 
+            style={{ ...actionItemStyle, color: isLiked ? "#f91880" : "#71767b" }} 
+            onClick={handleLike}
+          >
+            <Heart size={18} fill={isLiked ? "#f91880" : "none"} />
+            <span>{likesCount > 0 ? likesCount : ''}</span>
+          </div>
+
+          <div 
+            style={{ ...actionItemStyle, color: isSaved ? "var(--primary-color)" : "#71767b" }} 
+            onClick={handleSave}
+          >
+            <Bookmark size={18} fill={isSaved ? "var(--primary-color)" : "none"} />
+            <span>{savesCount > 0 ? savesCount : ''}</span>
+          </div>
+
+          <div style={actionItemStyle} onClick={handleShare}>
+            <Share2 size={18} />
+            <span>{sharesCount > 0 ? sharesCount : ''}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -143,21 +210,17 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick }) => {
 export default function Explore({ onVideoClick }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [feed, setFeed] = useState([]);
-  
-  // Pagination & Scroll States
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchPage, setSearchPage] = useState(1);
   const [hasMoreSearch, setHasMoreSearch] = useState(true);
 
-  // 🟢 INFINITE SCROLL OBSERVER
   const observer = useRef();
   const lastElementRef = useCallback(node => {
     if (loading || loadingMore) return;
     if (observer.current) observer.current.disconnect();
     
     observer.current = new IntersectionObserver(entries => {
-      // If the last element hits the screen, fetch more data
       if (entries[0].isIntersecting) {
         if (searchQuery.trim()) {
           if (hasMoreSearch) loadSearchFeed(searchPage + 1, true);
@@ -169,7 +232,6 @@ export default function Explore({ onVideoClick }) {
     if (node) observer.current.observe(node);
   }, [loading, loadingMore, searchQuery, hasMoreSearch, searchPage]);
 
-  // 🟢 FETCH RANDOM FEED
   const loadRandomFeed = async (isLoadMore = false) => {
     if (isLoadMore) setLoadingMore(true);
     else setLoading(true);
@@ -199,7 +261,6 @@ export default function Explore({ onVideoClick }) {
 
       const uniqueMap = new Map();
       combined.forEach(video => {
-        // 🟢 THE FIX: Strictly block any premium video that snuck in via the suggestions array
         if (video.category && video.category.toLowerCase() !== "premium") {
           uniqueMap.set(video.message_id, video);
         }
@@ -217,19 +278,14 @@ export default function Explore({ onVideoClick }) {
       } else {
         setFeed(shuffled);
       }
-    } catch (err) {
-      console.error("Failed to load explore feed", err);
-    }
+    } catch (err) { console.error("Failed to load explore feed", err); }
     
     setLoading(false);
     setLoadingMore(false);
   };
 
-  useEffect(() => {
-    loadRandomFeed();
-  }, []);
+  useEffect(() => { loadRandomFeed(); }, []);
 
-  // 🟢 FETCH SEARCH FEED
   const loadSearchFeed = async (pageNum = 1, isLoadMore = false) => {
     if (isLoadMore) setLoadingMore(true);
     else setLoading(true);
@@ -238,21 +294,15 @@ export default function Explore({ onVideoClick }) {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchQuery)}&limit=15&page=${pageNum}`);
       if (res.ok) {
         const data = await res.json();
-        
-        // 🟢 THE FIX: Strictly block premium videos from appearing in search results
         const safeVideos = (data.videos || []).filter(v => v.category && v.category.toLowerCase() !== "premium");
 
-        if (isLoadMore) {
-          setFeed(prev => [...prev, ...safeVideos]);
-        } else {
-          setFeed(safeVideos);
-        }
+        if (isLoadMore) setFeed(prev => [...prev, ...safeVideos]);
+        else setFeed(safeVideos);
+        
         setHasMoreSearch(data.hasMore);
         setSearchPage(pageNum);
       }
-    } catch (err) {
-      console.error("Search failed", err);
-    }
+    } catch (err) { console.error("Search failed", err); }
 
     setLoading(false);
     setLoadingMore(false);
@@ -293,8 +343,6 @@ export default function Explore({ onVideoClick }) {
         else loadRandomFeed();
       }}>
         <div style={feedWrapper}>
-          
-          {/* INITIAL SKELETON */}
           {loading ? (
             [...Array(5)].map((_, i) => (
               <div key={i} style={postStyle}>
@@ -311,7 +359,6 @@ export default function Explore({ onVideoClick }) {
                 No videos found. Try a different search.
              </div>
           ) : (
-            // FEED LIST
             feed.map((video, idx) => {
               const isLast = feed.length === idx + 1;
               return (
@@ -326,13 +373,11 @@ export default function Explore({ onVideoClick }) {
             })
           )}
 
-          {/* INFINITE SCROLL LOADER */}
           {loadingMore && (
             <div style={{ padding: "20px", display: "flex", justifyContent: "center", color: "var(--primary-color)" }}>
               <Loader2 className="animate-spin" size={24} />
             </div>
           )}
-          
         </div>
       </PullToRefresh>
 
@@ -345,7 +390,7 @@ export default function Explore({ onVideoClick }) {
   );
 }
 
-// 🖌 STYLES (Unchanged from previous iteration)
+// 🖌 STYLES 
 const containerStyle = { width: "100%", minHeight: "100%", display: "flex", flexDirection: "column", background: "var(--bg-color)" };
 const headerWrapper = { position: "sticky", top: 0, zIndex: 100, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border-color)", padding: "12px 16px" };
 const searchContainer = { display: "flex", alignItems: "center", background: "#16181c", borderRadius: "30px", border: "1px solid #333", height: "44px", overflow: "hidden" };
@@ -364,7 +409,7 @@ const thumbnailImgStyle = { width: "100%", height: "100%", objectFit: "cover" };
 const playOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.5)", border: "2px solid rgba(255,255,255,0.2)" };
 const groupBadgeStyle = { position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: "12px", fontWeight: "700", padding: "4px 8px", borderRadius: "12px", backdropFilter: "blur(4px)" };
 const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "12px", maxWidth: "425px" };
-const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", color: "#71767b", fontSize: "13px", cursor: "pointer" };
+const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", color: "#71767b", fontSize: "13px", cursor: "pointer", transition: "color 0.2s ease" };
 const skeletonAvatar = { width: "40px", height: "40px", borderRadius: "50%", animation: "skeleton-loading 1.5s infinite" };
 const skeletonTextBase = { width: "150px", height: "20px", borderRadius: "4px", marginTop: "4px", animation: "skeleton-loading 1.5s infinite" };
 const skeletonVideo = { width: "100%", height: "300px", borderRadius: "16px", animation: "skeleton-loading 1.5s infinite" };
