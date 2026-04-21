@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import Home from "./pages/Home";
-import Explore from "./pages/Explore"; // 🟢 NEW IMPORT
+import Explore from "./pages/Explore"; 
 import Profile from "./pages/Profile";
 import AdminDashboard from "./components/AdminDashboard"; 
 import AuthForm from "./components/AuthForm";
@@ -8,10 +8,10 @@ import PitchView from "./components/PitchView";
 import FullscreenPlayer from "./components/FullscreenPlayer"; 
 import PaywallModal from "./components/PaywallModal"; 
 import LegalPages from "./pages/LegalPages"; 
+import CommentSectionModal from "./components/CommentSectionModal"; // 🟢 NEW IMPORT
 import { useAdZapper } from "./hooks/useAdZapper";
-import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react"; // 🟢 Added Compass
+import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
-// 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "./config";
 
 export default function App() {
@@ -25,6 +25,9 @@ export default function App() {
   const [activeLegalPage, setActiveLegalPage] = useState(null); 
   
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
+  
+  // 🟢 NEW STATE: Tracks which video is active in the Comment Modal
+  const [activeCommentVideo, setActiveCommentVideo] = useState(null);
 
   const isLoggedIn = !!token;
   const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
@@ -33,7 +36,8 @@ export default function App() {
     document.title = `${APP_CONFIG.appNamePrefix}${APP_CONFIG.appNameSuffix}`;
   }, []);
 
-  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView);
+  // 🟢 Added activeCommentVideo to the AdFreeZone check so ads don't overlap comments
+  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo;
   
   useAdZapper(isAdFreeZone);
 
@@ -195,9 +199,8 @@ export default function App() {
     }
   }, [token, user, applyTheme]);
 
-  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin"; 
+  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo; 
 
-  // 🟢 HELPER TO HANDLE VIDEO CLICKS
   const handleOpenVideo = async (video) => {
     try {
       setActiveVideo({ ...video, video_url: null }); 
@@ -234,7 +237,6 @@ export default function App() {
           paddingBottom: shouldShowFooter ? "70px" : "0",
         }}
       > 
-        {/* 🟢 HOME SLIDE */}
         <div style={{ 
           ...slideContainerStyle,
           transform: activeTab === "home" ? "translateX(0)" : "translateX(-100%)",
@@ -250,20 +252,18 @@ export default function App() {
           />
         </div>
 
-        {/* 🟢 EXPLORE SLIDE */}
         <div style={{ 
           ...slideContainerStyle,
-          // Slides right if going to Home, left if going to Profile
           transform: activeTab === "explore" ? "translateX(0)" : (activeTab === "home" ? "translateX(100%)" : "translateX(-100%)"),
           opacity: activeTab === "explore" ? 1 : 0,
           pointerEvents: activeTab === "explore" ? "auto" : "none"
         }}>
           <Explore 
             onVideoClick={handleOpenVideo}
+            onCommentClick={setActiveCommentVideo} // 🟢 Passed down to Explore
           />
         </div>
         
-        {/* 🟢 PROFILE SLIDE */}
         <div style={{ 
           ...slideContainerStyle,
           transform: activeTab === "profile" ? "translateX(0)" : "translateX(100%)",
@@ -284,7 +284,6 @@ export default function App() {
         </div>
       </main>
 
-      {/* 🟢 ADMIN DASHBOARD */}
       {activeTab === "admin" && (
         <AdminDashboard 
           user={user}
@@ -295,7 +294,6 @@ export default function App() {
         />
       )}
 
-      {/* 🟢 NAVIGATION FOOTER */}
       {shouldShowFooter && (
         <nav style={navStyle}>
           <button 
@@ -306,7 +304,6 @@ export default function App() {
             <span style={labelStyle}>Home</span>
           </button>
 
-          {/* 🟢 EXPLORE TAB */}
           <button 
             onClick={() => setActiveTab("explore")} 
             style={{...btnStyle, color: activeTab === 'explore' ? 'var(--primary-color)' : '#8e8e8e'}}
@@ -335,7 +332,8 @@ export default function App() {
         </nav>
       )}
 
-      {/* 🟢 MODALS */}
+      {/* 🟢 MODALS AT THE ROOT LEVEL */}
+      
       {showPaywall && (
         <PaywallModal user={user} onClose={() => setShowPaywall(false)} />
       )}
@@ -362,6 +360,15 @@ export default function App() {
           />
         </div>
       )}
+
+      {/* 🟢 NEW ROOT LEVEL COMMENT MODAL */}
+      {activeCommentVideo && (
+        <CommentSectionModal 
+          video={activeCommentVideo} 
+          onClose={() => setActiveCommentVideo(null)} 
+        />
+      )}
+      
     </div>
   );
 }

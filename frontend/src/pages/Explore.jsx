@@ -1,107 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, X, Send } from "lucide-react";
+import { Search, Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
-
-// 🟢 UPDATED: TIKTOK / IG REELS STYLE BOTTOM SHEET MODAL
-const CommentSectionModal = ({ video, onClose }) => {
-  const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState("");
-  const [isPosting, setIsPosting] = useState(false);
-
-  // Fetch Comments on Mount
-  useEffect(() => {
-    fetch(`${APP_CONFIG.apiUrl}/api/comments/${video.message_id}`)
-      .then(res => res.ok ? res.json() : [])
-      .then(data => setComments(data))
-      .catch(err => console.error("Failed to load comments", err));
-  }, [video]);
-
-  const handlePost = async (e) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-    
-    const token = localStorage.getItem("token");
-    setIsPosting(true);
-
-    try {
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message_id: video.message_id, content: newComment })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          setComments([data.comment, ...comments]); // Inject new comment at the top instantly
-          setNewComment("");
-        }
-      }
-    } catch (err) { 
-      console.error("Post failed", err); 
-    }
-    
-    setIsPosting(false);
-  };
-
-  return (
-    // Backdrop click closes the modal
-    <div style={commentBackdropStyle} onClick={onClose}>
-      
-      // Stop propagation prevents clicking inside the modal from closing it
-      <div style={commentBottomSheetStyle} onClick={e => e.stopPropagation()}>
-        
-        {/* HEADER */}
-        <div style={commentHeaderWrapperStyle}>
-          <h3 style={commentHeaderTitleStyle}>{comments.length} Comments</h3>
-          <button onClick={onClose} style={closeBottomSheetBtnStyle}>
-            <X size={20} color="#fff" />
-          </button>
-        </div>
-
-        {/* COMMENTS LIST */}
-        <div style={commentsListStyle} className="custom-scrollbar">
-          {comments.length === 0 ? (
-            <p style={{ textAlign: "center", color: "#888", marginTop: "30px" }}>
-              No comments yet. Be the first to reply!
-            </p>
-          ) : (
-            comments.map(c => (
-              <div key={c.id} style={commentItemStyle}>
-                <img src={c.avatar_url || '/assets/default-avatar.png'} alt="avatar" style={commentAvatarStyle} />
-                <div style={commentContentWrapper}>
-                  <span style={commentUsernameStyle}>
-                    @{c.username} <span style={commentDateStyle}>{new Date(c.created_at).toLocaleDateString()}</span>
-                  </span>
-                  <p style={commentText}>{c.content}</p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* INPUT BOX */}
-        <form onSubmit={handlePost} style={commentInputWrapperStyle}>
-          <input 
-            type="text" 
-            value={newComment} 
-            onChange={e => setNewComment(e.target.value)} 
-            placeholder="Add a comment..." 
-            style={commentInputStyle} 
-          />
-          <button 
-            type="submit" 
-            disabled={isPosting || !newComment.trim()} 
-            style={{...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1}}
-          >
-            {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
-          </button>
-        </form>
-
-      </div>
-    </div>
-  );
-};
 
 // 🟢 INDIVIDUAL POST COMPONENT
 const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen }) => {
@@ -174,7 +74,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
     }
   }, [videoUrl]);
 
-  // 🟢 Auto-Pause feed video if the comment modal is open!
+  // 🟢 Auto-Pause feed video if the comment modal is open
   useEffect(() => {
     if (videoRef.current) {
       if (isPlaying && !isAnyModalOpen) {
@@ -243,7 +143,6 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
     const token = localStorage.getItem("token");
     if (!token) return alert("Please log in to comment!");
     
-    // Updates internal count instantly anticipating a comment
     setCommentsCount(prev => prev + 1); 
     onCommentClick(video);
   };
@@ -308,7 +207,8 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   );
 };
 
-export default function Explore({ onVideoClick }) {
+// 🟢 EXPLORE COMPONENT
+export default function Explore({ onVideoClick, onCommentClick, isAnyModalOpen }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [feed, setFeed] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -316,9 +216,6 @@ export default function Explore({ onVideoClick }) {
   const [searchPage, setSearchPage] = useState(1);
   const [hasMoreSearch, setHasMoreSearch] = useState(true);
   
-  // 🟢 Tracks which video's comment section is open
-  const [activeCommentVideo, setActiveCommentVideo] = useState(null);
-
   const observer = useRef();
   const lastElementRef = useCallback(node => {
     if (loading || loadingMore) return;
@@ -472,8 +369,8 @@ export default function Explore({ onVideoClick }) {
                   isLast={isLast}
                   lastElementRef={lastElementRef}
                   onVideoClick={onVideoClick}
-                  onCommentClick={setActiveCommentVideo}
-                  isAnyModalOpen={!!activeCommentVideo} // Pauses feed if modal is open
+                  onCommentClick={onCommentClick} // 🟢 Passes the action up to App.jsx
+                  isAnyModalOpen={isAnyModalOpen} // 🟢 Receives modal state from App.jsx
                 />
               );
             })
@@ -487,22 +384,10 @@ export default function Explore({ onVideoClick }) {
         </div>
       </PullToRefresh>
 
-      {/* 🟢 THE MODAL OVERLAY */}
-      {activeCommentVideo && (
-        <CommentSectionModal 
-          video={activeCommentVideo} 
-          onClose={() => setActiveCommentVideo(null)} 
-        />
-      )}
-
       <style>{`
         @keyframes skeleton-loading { 0% { background-color: #222; } 50% { background-color: #333; } 100% { background-color: #222; } }
-        @keyframes slideUpModal { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
         .animate-spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
       `}</style>
     </div>
   );
@@ -531,56 +416,3 @@ const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", col
 const skeletonAvatar = { width: "40px", height: "40px", borderRadius: "50%", animation: "skeleton-loading 1.5s infinite" };
 const skeletonTextBase = { width: "150px", height: "20px", borderRadius: "4px", marginTop: "4px", animation: "skeleton-loading 1.5s infinite" };
 const skeletonVideo = { width: "100%", height: "300px", borderRadius: "16px", animation: "skeleton-loading 1.5s infinite" };
-
-// 🟢 UPDATED MODAL STYLES (Bottom Sheet)
-const commentBackdropStyle = { 
-  position: "fixed", inset: 0, zIndex: 9999999, // Extremely high Z-index to beat FullscreenPlayer
-  background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
-  display: "flex", flexDirection: "column", justifyContent: "flex-end", 
-  animation: "fadeIn 0.2s ease" 
-};
-
-const commentBottomSheetStyle = { 
-  width: "100%", height: "75vh", background: "#1c1c1e", 
-  borderRadius: "24px 24px 0 0", display: "flex", flexDirection: "column", 
-  overflow: "hidden", animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-  boxShadow: "0 -10px 40px rgba(0,0,0,0.5)"
-};
-
-const commentHeaderWrapperStyle = { 
-  display: "flex", alignItems: "center", justifyContent: "space-between", 
-  padding: "20px", borderBottom: "1px solid #333" 
-};
-
-const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, color: "#fff" };
-
-const closeBottomSheetBtnStyle = { 
-  background: "#333", border: "none", borderRadius: "50%", 
-  width: "32px", height: "32px", display: "flex", alignItems: "center", 
-  justifyContent: "center", cursor: "pointer", transition: "background 0.2s" 
-};
-
-const commentsListStyle = { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "20px" };
-const commentItemStyle = { display: "flex", gap: "12px" };
-const commentAvatarStyle = { width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" };
-const commentContentWrapper = { display: "flex", flexDirection: "column" };
-const commentUsernameStyle = { fontSize: "13px", fontWeight: 700, color: "#aaa" };
-const commentDateStyle = { fontWeight: 400, color: "#666", marginLeft: "6px" };
-const commentText = { fontSize: "15px", color: "#fff", margin: "4px 0 0 0", lineHeight: "1.4" };
-
-const commentInputWrapperStyle = { 
-  padding: "15px 20px", background: "#1c1c1e", borderTop: "1px solid #333", 
-  display: "flex", gap: "10px", alignItems: "center", 
-  paddingBottom: "env(safe-area-inset-bottom, 15px)" // Respects iPhone home bar
-};
-
-const commentInputStyle = { 
-  flex: 1, background: "#2c2c2e", border: "none", borderRadius: "20px", 
-  padding: "12px 20px", color: "#fff", fontSize: "15px", outline: "none" 
-};
-
-const commentSendBtnStyle = { 
-  background: "var(--primary-color)", border: "none", width: "42px", height: "42px", 
-  borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", 
-  color: "#fff", cursor: "pointer", transition: "opacity 0.2s ease" 
-};
