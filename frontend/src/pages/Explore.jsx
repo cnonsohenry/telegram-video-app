@@ -3,45 +3,24 @@ import { Search, Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, X, 
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
 
-// 🟢 NEW: TIKTOK STYLE COMMENT MODAL
+// 🟢 UPDATED: TIKTOK / IG REELS STYLE BOTTOM SHEET MODAL
 const CommentSectionModal = ({ video, onClose }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
-  const [videoUrl, setVideoUrl] = useState(null);
   const [isPosting, setIsPosting] = useState(false);
-  const videoRef = useRef(null);
-  const hlsRef = useRef(null);
 
+  // Fetch Comments on Mount
   useEffect(() => {
-    // 1. Fetch Video Stream
-    fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`)
-      .then(res => res.ok ? res.json() : {})
-      .then(data => { if (data.video_url) setVideoUrl(data.video_url); });
-
-    // 2. Fetch Comments
     fetch(`${APP_CONFIG.apiUrl}/api/comments/${video.message_id}`)
       .then(res => res.ok ? res.json() : [])
-      .then(data => setComments(data));
+      .then(data => setComments(data))
+      .catch(err => console.error("Failed to load comments", err));
   }, [video]);
 
-  // 3. Initialize HLS for the mini-player
-  useEffect(() => {
-    if (!videoUrl || !videoRef.current) return;
-    if (videoUrl.includes('.m3u8') && window.Hls && window.Hls.isSupported()) {
-      if (!hlsRef.current) {
-        hlsRef.current = new window.Hls({ startLevel: 1 });
-        hlsRef.current.loadSource(videoUrl);
-        hlsRef.current.attachMedia(videoRef.current);
-      }
-    } else {
-      if (videoRef.current.src !== videoUrl) videoRef.current.src = videoUrl;
-    }
-  }, [videoUrl]);
-
-  // 4. Submit Comment
   const handlePost = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
+    
     const token = localStorage.getItem("token");
     setIsPosting(true);
 
@@ -58,39 +37,42 @@ const CommentSectionModal = ({ video, onClose }) => {
           setNewComment("");
         }
       }
-    } catch (err) { console.error("Post failed", err); }
+    } catch (err) { 
+      console.error("Post failed", err); 
+    }
     
     setIsPosting(false);
   };
 
   return (
-    <div style={commentModalOverlayStyle}>
+    // Backdrop click closes the modal
+    <div style={commentBackdropStyle} onClick={onClose}>
       
-      {/* TOP SECTION: Mini Video Player */}
-      <div style={commentModalTopStyle}>
-        <button onClick={onClose} style={closeModalBtnStyle}>
-          <X size={24} color="#fff" />
-        </button>
-        {videoUrl ? (
-          <video ref={videoRef} src={videoUrl} style={commentModalVideoStyle} autoPlay playsInline loop controls />
-        ) : (
-          <img src={video.thumbnail_url} alt="thumbnail" style={commentModalVideoStyle} />
-        )}
-      </div>
-
-      {/* BOTTOM SECTION: Comments & Input */}
-      <div style={commentModalBottomStyle}>
-        <h3 style={commentHeaderStyle}>{comments.length} Comments</h3>
+      // Stop propagation prevents clicking inside the modal from closing it
+      <div style={commentBottomSheetStyle} onClick={e => e.stopPropagation()}>
         
+        {/* HEADER */}
+        <div style={commentHeaderWrapperStyle}>
+          <h3 style={commentHeaderTitleStyle}>{comments.length} Comments</h3>
+          <button onClick={onClose} style={closeBottomSheetBtnStyle}>
+            <X size={20} color="#fff" />
+          </button>
+        </div>
+
+        {/* COMMENTS LIST */}
         <div style={commentsListStyle} className="custom-scrollbar">
           {comments.length === 0 ? (
-            <p style={{ textAlign: "center", color: "#888", marginTop: "30px" }}>No comments yet. Be the first to reply!</p>
+            <p style={{ textAlign: "center", color: "#888", marginTop: "30px" }}>
+              No comments yet. Be the first to reply!
+            </p>
           ) : (
             comments.map(c => (
               <div key={c.id} style={commentItemStyle}>
                 <img src={c.avatar_url || '/assets/default-avatar.png'} alt="avatar" style={commentAvatarStyle} />
                 <div style={commentContentWrapper}>
-                  <span style={commentUsernameStyle}>@{c.username} <span style={commentDateStyle}>{new Date(c.created_at).toLocaleDateString()}</span></span>
+                  <span style={commentUsernameStyle}>
+                    @{c.username} <span style={commentDateStyle}>{new Date(c.created_at).toLocaleDateString()}</span>
+                  </span>
                   <p style={commentText}>{c.content}</p>
                 </div>
               </div>
@@ -98,6 +80,7 @@ const CommentSectionModal = ({ video, onClose }) => {
           )}
         </div>
 
+        {/* INPUT BOX */}
         <form onSubmit={handlePost} style={commentInputWrapperStyle}>
           <input 
             type="text" 
@@ -106,10 +89,15 @@ const CommentSectionModal = ({ video, onClose }) => {
             placeholder="Add a comment..." 
             style={commentInputStyle} 
           />
-          <button type="submit" disabled={isPosting || !newComment.trim()} style={{...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1}}>
+          <button 
+            type="submit" 
+            disabled={isPosting || !newComment.trim()} 
+            style={{...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1}}
+          >
             {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
           </button>
         </form>
+
       </div>
     </div>
   );
@@ -544,13 +532,34 @@ const skeletonAvatar = { width: "40px", height: "40px", borderRadius: "50%", ani
 const skeletonTextBase = { width: "150px", height: "20px", borderRadius: "4px", marginTop: "4px", animation: "skeleton-loading 1.5s infinite" };
 const skeletonVideo = { width: "100%", height: "300px", borderRadius: "16px", animation: "skeleton-loading 1.5s infinite" };
 
-// 🟢 MODAL STYLES
-const commentModalOverlayStyle = { position: "fixed", inset: 0, zIndex: 999999, display: "flex", flexDirection: "column", background: "#000", animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)" };
-const commentModalTopStyle = { flex: "0 0 35vh", position: "relative", background: "#000", display: "flex", justifyContent: "center", alignItems: "center" };
-const commentModalVideoStyle = { width: "100%", height: "100%", objectFit: "contain" };
-const closeModalBtnStyle = { position: "absolute", top: "20px", left: "20px", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", padding: "8px", cursor: "pointer", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" };
-const commentModalBottomStyle = { flex: 1, background: "#1c1c1e", borderRadius: "24px 24px 0 0", marginTop: "-20px", zIndex: 2, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 -4px 20px rgba(0,0,0,0.5)" };
-const commentHeaderStyle = { padding: "20px", margin: 0, fontSize: "16px", fontWeight: 800, borderBottom: "1px solid #333", textAlign: "center", color: "#fff" };
+// 🟢 UPDATED MODAL STYLES (Bottom Sheet)
+const commentBackdropStyle = { 
+  position: "fixed", inset: 0, zIndex: 9999999, // Extremely high Z-index to beat FullscreenPlayer
+  background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+  display: "flex", flexDirection: "column", justifyContent: "flex-end", 
+  animation: "fadeIn 0.2s ease" 
+};
+
+const commentBottomSheetStyle = { 
+  width: "100%", height: "75vh", background: "#1c1c1e", 
+  borderRadius: "24px 24px 0 0", display: "flex", flexDirection: "column", 
+  overflow: "hidden", animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+  boxShadow: "0 -10px 40px rgba(0,0,0,0.5)"
+};
+
+const commentHeaderWrapperStyle = { 
+  display: "flex", alignItems: "center", justifyContent: "space-between", 
+  padding: "20px", borderBottom: "1px solid #333" 
+};
+
+const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, color: "#fff" };
+
+const closeBottomSheetBtnStyle = { 
+  background: "#333", border: "none", borderRadius: "50%", 
+  width: "32px", height: "32px", display: "flex", alignItems: "center", 
+  justifyContent: "center", cursor: "pointer", transition: "background 0.2s" 
+};
+
 const commentsListStyle = { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "20px" };
 const commentItemStyle = { display: "flex", gap: "12px" };
 const commentAvatarStyle = { width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" };
@@ -558,6 +567,20 @@ const commentContentWrapper = { display: "flex", flexDirection: "column" };
 const commentUsernameStyle = { fontSize: "13px", fontWeight: 700, color: "#aaa" };
 const commentDateStyle = { fontWeight: 400, color: "#666", marginLeft: "6px" };
 const commentText = { fontSize: "15px", color: "#fff", margin: "4px 0 0 0", lineHeight: "1.4" };
-const commentInputWrapperStyle = { padding: "15px 20px", background: "#1c1c1e", borderTop: "1px solid #333", display: "flex", gap: "10px", alignItems: "center", paddingBottom: "env(safe-area-inset-bottom, 15px)" };
-const commentInputStyle = { flex: 1, background: "#2c2c2e", border: "none", borderRadius: "20px", padding: "12px 20px", color: "#fff", fontSize: "15px", outline: "none" };
-const commentSendBtnStyle = { background: "var(--primary-color)", border: "none", width: "42px", height: "42px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", cursor: "pointer", transition: "opacity 0.2s ease" };
+
+const commentInputWrapperStyle = { 
+  padding: "15px 20px", background: "#1c1c1e", borderTop: "1px solid #333", 
+  display: "flex", gap: "10px", alignItems: "center", 
+  paddingBottom: "env(safe-area-inset-bottom, 15px)" // Respects iPhone home bar
+};
+
+const commentInputStyle = { 
+  flex: 1, background: "#2c2c2e", border: "none", borderRadius: "20px", 
+  padding: "12px 20px", color: "#fff", fontSize: "15px", outline: "none" 
+};
+
+const commentSendBtnStyle = { 
+  background: "var(--primary-color)", border: "none", width: "42px", height: "42px", 
+  borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", 
+  color: "#fff", cursor: "pointer", transition: "opacity 0.2s ease" 
+};
