@@ -754,7 +754,7 @@ app.get("/api/thumbnail", async (req, res) => {
 });
 
 /* =====================
-   Share Link (Updated with JSON-LD SEO)
+   Share Link (Updated with JSON-LD SEO & Canonical Tag)
 ===================== */
 app.get('/v/:message_id', async (req, res) => {
   try {
@@ -815,6 +815,8 @@ app.get('/v/:message_id', async (req, res) => {
         <head>
           <title>${video.caption || "Watch exclusive shots"}</title>
           <meta charset="utf-8">
+          
+          <link rel="canonical" href="${frontendUrl}/v/${message_id}" />
           
           <meta property="og:type" content="video.other">
           <meta property="og:site_name" content="${appName}">

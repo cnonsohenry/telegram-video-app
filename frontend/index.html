@@ -179,11 +179,17 @@
         const ageGate = document.getElementById('age-gate');
         const isVerified = localStorage.getItem('ageVerified');
         
-        if (isVerified === 'true') {
-          // Hide gate, allow scroll, AND load ads
+        // 🟢 THE FIX: Detect Googlebot, Twitterbot, and Prerender
+        const isBot = /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent);
+        
+        if (isVerified === 'true' || isBot) {
+          // Hide gate, allow scroll, AND load ads (if human)
           ageGate.style.display = 'none';
           document.body.classList.remove('no-scroll');
-          loadAdNetwork(); 
+          
+          if (!isBot) {
+            loadAdNetwork(); 
+          }
         } else {
           // Show gate, DO NOT load ads yet
           ageGate.style.display = 'flex';
