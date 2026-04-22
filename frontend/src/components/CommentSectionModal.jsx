@@ -7,19 +7,16 @@ export default function CommentSectionModal({ video, onClose }) {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
-  // 🟢 Tracks how far up the keyboard has pushed the viewport
   const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   const inputRef = useRef(null);
 
-  // 🟢 Lock background scroll
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = originalOverflow; };
   }, []);
 
-  // 🟢 Fetch comments
   useEffect(() => {
     fetch(`${APP_CONFIG.apiUrl}/api/comments/${video.message_id}`)
       .then(res => res.ok ? res.json() : [])
@@ -27,18 +24,18 @@ export default function CommentSectionModal({ video, onClose }) {
       .catch(err => console.error("Failed to load comments", err));
   }, [video]);
 
-  // 🟢 THE KEY: Visual Viewport API tracks the keyboard in real time.
-  // When the keyboard opens, visualViewport.height shrinks.
-  // We compute the gap between window.innerHeight and the viewport bottom
-  // to get the exact keyboard height — and push ONLY the composer up by that amount.
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
 
     const handleResize = () => {
-      // keyboardHeight = how much the keyboard is covering from the bottom
       const keyboardHeight = window.innerHeight - vv.height - vv.offsetTop;
       setKeyboardOffset(Math.max(0, keyboardHeight));
+      
+      // 🟢 Native Failsafe: If the user swipes the keyboard down or hits "Done", close the overlay
+      if (keyboardHeight <= 10 && document.activeElement !== inputRef.current) {
+        setIsComposerOpen(false);
+      }
     };
 
     vv.addEventListener("resize", handleResize);
@@ -52,15 +49,20 @@ export default function CommentSectionModal({ video, onClose }) {
 
   const openComposer = () => {
     setIsComposerOpen(true);
-    setTimeout(() => {
-      if (inputRef.current) inputRef.current.focus();
-    }, 50);
+    // 🟢 Instant focus (works 100% reliably now because the input is never unmounted)
+    if (inputRef.current) inputRef.current.focus(); 
   };
 
   const closeComposer = () => {
+    // 🟢 1. Natively dismiss the keyboard BEFORE hiding the UI
+    if (inputRef.current) inputRef.current.blur(); 
+    
+    // 🟢 2. Hide the UI
     setIsComposerOpen(false);
     setKeyboardOffset(0);
-    if (inputRef.current) inputRef.current.blur();
+    
+    // 🟢 3. Final failsafe to brutally reset the browser's native scroll engine
+    window.scrollTo(0, 0); 
   };
 
   const handlePost = async (e) => {
@@ -93,7 +95,6 @@ export default function CommentSectionModal({ video, onClose }) {
 
   return (
     <>
-      {/* 1. BACKDROP + BOTTOM SHEET — never moves, keyboard does not affect it */}
       <div style={commentBackdropStyle} onClick={onClose}>
         <div style={commentBottomSheetStyle} onClick={e => e.stopPropagation()}>
 
@@ -124,7 +125,6 @@ export default function CommentSectionModal({ video, onClose }) {
             )}
           </div>
 
-          {/* 2. FAKE INPUT — always sits at the bottom of the sheet, never moves */}
           <div style={fakeInputWrapperStyle} onClick={openComposer}>
             <div style={fakeInputStyle}>Add a comment...</div>
           </div>
@@ -132,51 +132,49 @@ export default function CommentSectionModal({ video, onClose }) {
         </div>
       </div>
 
-      {/* 3. COMPOSER — floats above the keyboard using keyboardOffset */}
-      {isComposerOpen && (
-        <div
-          style={composerOverlayStyle}
-          onClick={closeComposer}
+      {/* 🟢 THE FIX: Composer is permanently rendered to prevent iOS unmount panics */}
+      <div
+        style={{
+          ...composerOverlayStyle,
+          opacity: isComposerOpen ? 1 : 0,
+          pointerEvents: isComposerOpen ? "auto" : "none",
+          transition: "opacity 0.2s ease"
+        }}
+        onClick={closeComposer}
+      >
+        <form
+          onSubmit={handlePost}
+          style={{
+            ...composerFormStyle,
+            bottom: keyboardOffset,
+            transition: keyboardOffset > 0
+              ? "bottom 0.02s linear"   
+              : "bottom 0.25s ease-out" 
+          }}
+          onClick={e => e.stopPropagation()}
         >
-          <form
-            onSubmit={handlePost}
-            // 🟢 `bottom` is driven by the keyboard height from the Visual Viewport API.
-            // This slides the composer up exactly as much as the keyboard rises —
-            // the sheet behind it stays completely still.
-            style={{
-              ...composerFormStyle,
-              bottom: keyboardOffset,
-              // Smooth follow as keyboard animates open/closed
-              transition: keyboardOffset > 0
-                ? "bottom 0.02s linear"   // nearly instant while keyboard is rising
-                : "bottom 0.25s ease-out" // spring back when keyboard drops
-            }}
-            onClick={e => e.stopPropagation()}
+          <input
+            ref={inputRef}
+            type="text"
+            value={newComment}
+            onChange={e => setNewComment(e.target.value)}
+            placeholder="Add a comment..."
+            style={composerInputStyle}
+          />
+          <button
+            type="submit"
+            disabled={isPosting || !newComment.trim()}
+            onMouseDown={e => e.preventDefault()}
+            onTouchStart={e => e.preventDefault()}
+            style={{ ...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1 }}
           >
-            <input
-              ref={inputRef}
-              type="text"
-              value={newComment}
-              onChange={e => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
-              style={composerInputStyle}
-            />
-            <button
-              type="submit"
-              disabled={isPosting || !newComment.trim()}
-              onMouseDown={e => e.preventDefault()}
-              onTouchStart={e => e.preventDefault()}
-              style={{ ...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1 }}
-            >
-              {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
-            </button>
-          </form>
-        </div>
-      )}
+            {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
+          </button>
+        </form>
+      </div>
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes fadeOverlay { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUpModal { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -243,7 +241,6 @@ const commentText = {
   margin: "4px 0 0 0", lineHeight: "1.4", wordBreak: "break-word"
 };
 
-// Fake input — anchored to the sheet, never moves
 const fakeInputWrapperStyle = {
   padding: "15px 20px",
   background: "#1c1c1e",
@@ -259,19 +256,15 @@ const fakeInputStyle = {
   padding: "12px 20px", fontSize: "15px", color: "#888"
 };
 
-// Composer overlay — dim backdrop, click-outside to dismiss
 const composerOverlayStyle = {
   position: "fixed", inset: 0,
   zIndex: 9999999,
-  backgroundColor: "rgba(0,0,0,0.0)", // invisible — sheet is already dimmed
-  animation: "fadeOverlay 0.15s ease"
+  backgroundColor: "rgba(0,0,0,0.0)"
 };
 
-// Composer form — fixed to bottom, slides up by keyboardOffset
 const composerFormStyle = {
   position: "fixed",
   left: 0, right: 0,
-  // bottom is set dynamically via inline style above
   background: "#1c1c1e",
   padding: "12px 16px",
   paddingBottom: "max(12px, env(safe-area-inset-bottom))",
