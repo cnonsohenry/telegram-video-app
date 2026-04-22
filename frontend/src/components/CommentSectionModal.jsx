@@ -9,7 +9,10 @@ export default function CommentSectionModal({ video, onClose }) {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  
+  // 🟢 The flawless Visual Viewport tracker
+  const [vvHeight, setVvHeight] = useState(window.innerHeight);
+  const [vvOffset, setVvOffset] = useState(0);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -17,18 +20,21 @@ export default function CommentSectionModal({ video, onClose }) {
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // 🟢 Track keyboard height manually because the meta tag stops the browser from doing it
+    // Track the EXACT visible pixels of the screen. 
+    // When keyboard opens, vvHeight drops instantly.
     const handleResize = () => {
       if (window.visualViewport) {
-        const kbHeight = window.innerHeight - window.visualViewport.height;
-        // If difference is > 50px, keyboard is open. Otherwise, it's closed.
-        setKeyboardHeight(kbHeight > 50 ? kbHeight : 0);
+        setVvHeight(window.visualViewport.height);
+        setVvOffset(window.visualViewport.offsetTop);
+      } else {
+        setVvHeight(window.innerHeight);
       }
     };
 
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", handleResize);
       window.visualViewport.addEventListener("scroll", handleResize);
+      handleResize(); // Trigger immediately to get baseline
     }
 
     return () => {
@@ -72,7 +78,7 @@ export default function CommentSectionModal({ video, onClose }) {
         if (data.success) {
           setComments([data.comment, ...comments]); 
           setNewComment("");
-          setIsComposerOpen(false); // Close composer on success
+          setIsComposerOpen(false); // Close composer on success, dropping keyboard
         }
       }
     } catch (err) { 
@@ -123,15 +129,18 @@ export default function CommentSectionModal({ video, onClose }) {
         </div>
       </div>
 
-      {/* 🟢 3. THE COMPOSER OVERLAY (Rides on top of the keyboard) */}
+      {/* 🟢 3. THE COMPOSER OVERLAY (Rides flawlessly on the keyboard) */}
       {isComposerOpen && (
         <div style={composerOverlayStyle} onClick={() => setIsComposerOpen(false)}>
           <form 
             onSubmit={handlePost} 
             style={{ 
               ...composerFormStyle, 
-              // This single line magically pushes the input above the keyboard overlay
-              bottom: `${keyboardHeight}px` 
+              // 🟢 THE FIX: 
+              // 1. Calculate the exact top pixel coordinate of the keyboard
+              top: `${vvOffset + vvHeight}px`, 
+              // 2. Shift the form upwards by 100% of its own height so it sits perfectly above that coordinate
+              transform: "translateY(-100%)",
             }} 
             onClick={e => e.stopPropagation()} 
           >
@@ -176,7 +185,7 @@ const commentBottomSheetStyle = { width: "100%", height: "75%", background: "#1c
 const commentHeaderWrapperStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px", borderBottom: "1px solid #333", flexShrink: 0 };
 const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, color: "#fff" };
 const closeBottomSheetBtnStyle = { background: "#333", border: "none", borderRadius: "50%", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "background 0.2s", flexShrink: 0 };
-const commentsListStyle = { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "20px", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" };
+const commentsListStyle = { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "20px", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", paddingBottom: "50px" };
 const commentItemStyle = { display: "flex", gap: "12px" };
 const commentAvatarStyle = { width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 };
 const commentContentWrapper = { display: "flex", flexDirection: "column" };
@@ -184,12 +193,12 @@ const commentUsernameStyle = { fontSize: "13px", fontWeight: 700, color: "#aaa" 
 const commentDateStyle = { fontWeight: 400, color: "#666", marginLeft: "6px" };
 const commentText = { fontSize: "15px", color: "#fff", margin: "4px 0 0 0", lineHeight: "1.4", wordBreak: "break-word" };
 
-// 🟢 Fake Input Styles
 const fakeInputWrapperStyle = { padding: "15px 20px", background: "#1c1c1e", borderTop: "1px solid #333", paddingBottom: "env(safe-area-inset-bottom, 15px)", cursor: "text", marginTop: "auto", flexShrink: 0 };
 const fakeInputStyle = { background: "#2c2c2e", borderRadius: "20px", padding: "12px 20px", fontSize: "15px", color: "#888" };
 
-// 🟢 Real Composer Styles
-const composerOverlayStyle = { position: "fixed", inset: 0, zIndex: 9999999, backgroundColor: "rgba(0,0,0,0.4)", animation: "fadeOverlay 0.2s ease" };
-const composerFormStyle = { position: "absolute", left: 0, right: 0, background: "#1c1c1e", padding: "15px 20px", display: "flex", gap: "10px", alignItems: "center", borderTop: "1px solid #333", transition: "bottom 0.1s cubic-bezier(0.2, 0.8, 0.2, 1)" };
+// 🟢 Composer Styles
+const composerOverlayStyle = { position: "fixed", inset: 0, zIndex: 9999999, backgroundColor: "transparent" };
+// NOTE: I removed the CSS `transition` from the form. We want it to instantly snap with the keyboard at 60fps via Javascript, not fight a CSS animation delay.
+const composerFormStyle = { position: "absolute", left: 0, right: 0, background: "#1c1c1e", padding: "15px 20px", paddingBottom: "max(15px, env(safe-area-inset-bottom))", display: "flex", gap: "10px", alignItems: "center", borderTop: "1px solid #333" };
 const composerInputStyle = { flex: 1, background: "#2c2c2e", border: "none", borderRadius: "20px", padding: "12px 20px", color: "#fff", fontSize: "15px", outline: "none" };
 const commentSendBtnStyle = { background: "var(--primary-color)", border: "none", width: "42px", height: "42px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", cursor: "pointer", transition: "opacity 0.2s ease", flexShrink: 0 };
