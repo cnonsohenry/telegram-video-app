@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react"; // 🟢 Added useRef
+import { useEffect, useState, useCallback, useRef } from "react"; 
 import Home from "./pages/Home";
 import Explore from "./pages/Explore"; 
 import Profile from "./pages/Profile";
@@ -26,7 +26,6 @@ export default function App() {
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
   
   const [activeCommentVideo, setActiveCommentVideo] = useState(null);
-  const [latestComment, setLatestComment] = useState(null); 
 
   // 🟢 THE FIX: App Height Lock Architecture
   const windowWidth = useRef(window.innerWidth);
@@ -52,7 +51,7 @@ export default function App() {
     document.title = `${APP_CONFIG.appNamePrefix}${APP_CONFIG.appNameSuffix}`;
   }, []);
 
-  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo || showComposer;
+  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo;
   
   useAdZapper(isAdFreeZone);
 
@@ -214,7 +213,8 @@ export default function App() {
     }
   }, [token, user, applyTheme]);
 
-  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo && !showComposer; 
+  // 🟢 FIXED: Removed showComposer from this check
+  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo; 
 
   const handleOpenVideo = async (video) => {
     try {
@@ -376,15 +376,11 @@ export default function App() {
         </div>
       )}
 
+      {/* 🟢 NEW ROOT LEVEL COMMENT MODAL */}
       {activeCommentVideo && (
         <CommentSectionModal 
           video={activeCommentVideo} 
-          onClose={() => {
-            setActiveCommentVideo(null);
-            setLatestComment(null); 
-          }} 
-          onOpenComposer={() => setShowComposer(true)} 
-          latestComment={latestComment} 
+          onClose={() => setActiveCommentVideo(null)} 
         />
       )}
 
