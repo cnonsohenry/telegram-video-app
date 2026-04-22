@@ -7,18 +7,18 @@ export default function CommentSectionModal({ video, onClose }) {
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   
-  // 🟢 NEW: States for Mobile Keyboard Fixes
-  const [sheetHeight, setSheetHeight] = useState("75vh");
+  // 🟢 NEW: The Magic Bullet for Mobile Keyboards
+  const [viewportHeight, setViewportHeight] = useState("100vh");
   const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
-    // 1. Lock the body to prevent background scrolling
+    // Lock the true screen height in pixels before the keyboard ever opens
+    setViewportHeight(`${window.innerHeight}px`);
+    
+    // Lock the body to prevent background scrolling
     const originalStyle = window.getComputedStyle(document.body).overflow;
     document.body.style.overflow = "hidden";
     
-    // 2. Freeze the modal height in pixels so the mobile keyboard doesn't squish it
-    setSheetHeight(`${window.innerHeight * 0.75}px`);
-
     return () => {
       document.body.style.overflow = originalStyle;
     };
@@ -60,11 +60,8 @@ export default function CommentSectionModal({ video, onClose }) {
   };
 
   return (
-    <div style={commentBackdropStyle} onClick={onClose}>
-      <div 
-        style={{ ...commentBottomSheetStyle, height: sheetHeight }} 
-        onClick={e => e.stopPropagation()}
-      >
+    <div style={{ ...commentBackdropStyle, height: viewportHeight }} onClick={onClose}>
+      <div style={commentBottomSheetStyle} onClick={e => e.stopPropagation()}>
         
         <div style={commentHeaderWrapperStyle}>
           <h3 style={commentHeaderTitleStyle}>{comments.length} Comments</h3>
@@ -92,34 +89,35 @@ export default function CommentSectionModal({ video, onClose }) {
             ))
           )}
         </div>
-
-        <form 
-          onSubmit={handlePost} 
-          style={{
-            ...commentInputWrapperStyle,
-            // Solid background when typing, blurred glass effect when viewing
-            background: isFocused ? "#1c1c1e" : "rgba(28, 28, 30, 0.85)"
-          }}
-        >
-          <input 
-            type="text" 
-            value={newComment} 
-            onChange={e => setNewComment(e.target.value)} 
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder="Add a comment..." 
-            style={commentInputStyle} 
-          />
-          <button 
-            type="submit" 
-            disabled={isPosting || !newComment.trim()} 
-            style={{...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1}}
-          >
-            {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
-          </button>
-        </form>
-
       </div>
+
+      {/* 🟢 INPUT IS MOVED OUTSIDE THE BOTTOM SHEET FLEX FLOW */}
+      <form 
+        onSubmit={handlePost} 
+        style={{
+          ...commentInputWrapperStyle,
+          background: isFocused ? "#1c1c1e" : "rgba(28, 28, 30, 0.85)"
+        }}
+        onClick={e => e.stopPropagation()} // Prevent modal close when tapping input wrapper
+      >
+        <input 
+          type="text" 
+          value={newComment} 
+          onChange={e => setNewComment(e.target.value)} 
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder="Add a comment..." 
+          style={commentInputStyle} 
+        />
+        <button 
+          type="submit" 
+          disabled={isPosting || !newComment.trim()} 
+          style={{...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1}}
+        >
+          {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
+        </button>
+      </form>
+
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUpModal { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -132,20 +130,20 @@ export default function CommentSectionModal({ video, onClose }) {
 }
 
 // 🖌 MODAL STYLES
+
 const commentBackdropStyle = { 
-  position: "fixed", inset: 0, zIndex: 9999999, 
+  position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999999, 
   background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", 
   display: "flex", flexDirection: "column", justifyContent: "flex-end", 
   animation: "fadeIn 0.2s ease" 
 };
 
+// Height is now 75% of the frozen backdrop, completely ignoring keyboard shifts
 const commentBottomSheetStyle = { 
-  width: "100%", 
-  background: "#1c1c1e", 
+  width: "100%", height: "75%", background: "#1c1c1e", 
   borderRadius: "24px 24px 0 0", display: "flex", flexDirection: "column", 
   overflow: "hidden", animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)", 
-  boxShadow: "0 -10px 40px rgba(0,0,0,0.5)",
-  position: "relative" // 🟢 Crucial for absolute positioning the input bar
+  boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" 
 };
 
 const commentHeaderWrapperStyle = { 
@@ -165,7 +163,8 @@ const commentsListStyle = {
   flex: 1, overflowY: "auto", padding: "20px", display: "flex", 
   flexDirection: "column", gap: "20px", 
   overscrollBehavior: "contain", WebkitOverflowScrolling: "touch",
-  paddingBottom: "100px" // 🟢 Extra padding ensures the last comment isn't hidden behind the floating input
+  // 🟢 Massive bottom padding so the user can scroll the last comment up past the keyboard
+  paddingBottom: "50vh" 
 };
 
 const commentItemStyle = { display: "flex", gap: "12px" };
@@ -175,17 +174,13 @@ const commentUsernameStyle = { fontSize: "13px", fontWeight: 700, color: "#aaa" 
 const commentDateStyle = { fontWeight: 400, color: "#666", marginLeft: "6px" };
 const commentText = { fontSize: "15px", color: "#fff", margin: "4px 0 0 0", lineHeight: "1.4" };
 
-// 🟢 Input Wrapper is now detached from the flex flow and floats at the bottom
+// 🟢 Input wrapper is now FIXED to the viewport, detaching it from the sliding box
 const commentInputWrapperStyle = { 
-  position: "absolute",
-  bottom: 0, left: 0, right: 0,
-  padding: "15px 20px", 
-  borderTop: "1px solid rgba(255,255,255,0.05)", 
+  position: "fixed", bottom: 0, left: 0, right: 0,
+  padding: "15px 20px", borderTop: "1px solid rgba(255,255,255,0.05)", 
   display: "flex", gap: "10px", alignItems: "center", 
   paddingBottom: "env(safe-area-inset-bottom, 15px)",
-  backdropFilter: "blur(12px)",
-  zIndex: 10,
-  transition: "background 0.3s ease"
+  backdropFilter: "blur(12px)", zIndex: 99999999, transition: "background 0.3s ease"
 };
 
 const commentInputStyle = { 
