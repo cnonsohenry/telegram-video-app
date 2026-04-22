@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom"; // 🟢 This is the magic key
 import { X, Send, Loader2 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 
@@ -7,41 +8,20 @@ export default function CommentSectionModal({ video, onClose }) {
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   
-  // 🟢 STATE: Mobile Keyboard Architecture
-  const [modalHeight, setModalHeight] = useState("100vh");
-  const [isFocused, setIsFocused] = useState(false);
+  // 🟢 TIKTOK COMPOSER STATE
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [sheetHeight, setSheetHeight] = useState("100vh");
 
-  // 🟢 THE FIX: Ultimate Body Lock & Frozen Viewport
   useEffect(() => {
-    // 1. Freeze the modal height in pixels so Android can't squish it
-    setModalHeight(`${window.innerHeight}px`);
-
-    // 2. Capture current scroll position and original styles
-    const scrollY = window.scrollY;
-    const body = document.body;
-    const html = document.documentElement;
+    // Lock the true screen height in pixels before the keyboard opens
+    setSheetHeight(`${window.innerHeight}px`);
     
-    const prevBodyPos = body.style.position;
-    const prevBodyTop = body.style.top;
-    const prevBodyWidth = body.style.width;
-    const prevBodyOverflow = body.style.overflow;
-    const prevHtmlOverflow = html.style.overflow;
-
-    // 3. Brutally lock the document body to prevent iOS scroll push
-    body.style.position = 'fixed';
-    body.style.top = `-${scrollY}px`;
-    body.style.width = '100%';
-    body.style.overflow = 'hidden';
-    html.style.overflow = 'hidden';
-
-    // 4. Cleanup when modal closes
+    // Lock the body to prevent background scrolling
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = "hidden";
+    
     return () => {
-      body.style.position = prevBodyPos;
-      body.style.top = prevBodyTop;
-      body.style.width = prevBodyWidth;
-      body.style.overflow = prevBodyOverflow;
-      html.style.overflow = prevHtmlOverflow;
-      window.scrollTo(0, scrollY);
+      document.body.style.overflow = originalStyle;
     };
   }, []);
 
@@ -71,7 +51,7 @@ export default function CommentSectionModal({ video, onClose }) {
         if (data.success) {
           setComments([data.comment, ...comments]); 
           setNewComment("");
-          setIsFocused(false); // Drop keyboard on success
+          setIsComposerOpen(false); // Drop keyboard and hide overlay
         }
       }
     } catch (err) { 
@@ -81,10 +61,43 @@ export default function CommentSectionModal({ video, onClose }) {
     setIsPosting(false);
   };
 
+  // 🟢 3. THE TIKTOK COMPOSER OVERLAY (Portaled to document.body)
+  const ComposerOverlay = () => {
+    return createPortal(
+      <div style={composerOverlayStyle} onClick={() => setIsComposerOpen(false)}>
+        <form 
+          onSubmit={handlePost} 
+          style={composerFormStyle} 
+          onClick={e => e.stopPropagation()} // Prevent tap from closing overlay
+        >
+          <input 
+            autoFocus // Instantly summons the keyboard when mounted
+            type="text" 
+            value={newComment} 
+            onChange={e => setNewComment(e.target.value)} 
+            placeholder="Add a comment..." 
+            style={composerInputStyle} 
+          />
+          <button 
+            type="submit" 
+            disabled={isPosting || !newComment.trim()} 
+            // PREVENT DEFAULT ensures clicking "Send" doesn't drop the keyboard first
+            onMouseDown={e => e.preventDefault()} 
+            onTouchStart={e => e.preventDefault()}
+            style={{...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1}}
+          >
+            {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
+          </button>
+        </form>
+      </div>,
+      document.body // 🟢 MOUNTS AT THE ROOT DOM LEVEL
+    );
+  };
+
   return (
     <>
-      {/* 🟢 1. FROZEN BACKDROP & BOTTOM SHEET */}
-      <div style={{ ...commentBackdropStyle, height: modalHeight }} onClick={onClose}>
+      {/* 🟢 1. THE MAIN BOTTOM SHEET */}
+      <div style={{ ...commentBackdropStyle, height: sheetHeight }} onClick={onClose}>
         <div style={commentBottomSheetStyle} onClick={e => e.stopPropagation()}>
           
           <div style={commentHeaderWrapperStyle}>
@@ -114,8 +127,11 @@ export default function CommentSectionModal({ video, onClose }) {
             )}
           </div>
 
-          {/* 🟢 2. THE FAKE INPUT (Triggers the real overlay) */}
-          <div style={fakeInputWrapperStyle} onClick={() => setIsFocused(true)}>
+          {/* 🟢 2. THE FAKE INPUT (Triggers the portal overlay) */}
+          <div 
+            style={fakeInputWrapperStyle} 
+            onClick={() => setIsComposerOpen(true)}
+          >
             <div style={{...fakeInputStyle, color: newComment ? "#fff" : "#888"}}>
               {newComment ? newComment : "Add a comment..."}
             </div>
@@ -124,32 +140,8 @@ export default function CommentSectionModal({ video, onClose }) {
         </div>
       </div>
 
-      {/* 🟢 3. THE TIKTOK COMPOSER OVERLAY (Slides up with keyboard) */}
-      {isFocused && (
-        <div style={composerOverlayStyle} onClick={() => setIsFocused(false)}>
-          <form 
-            onSubmit={handlePost} 
-            style={composerFormStyle} 
-            onClick={e => e.stopPropagation()}
-          >
-            <input 
-              autoFocus // Instantly summons keyboard
-              type="text" 
-              value={newComment} 
-              onChange={e => setNewComment(e.target.value)} 
-              placeholder="Add a comment..." 
-              style={composerInputStyle} 
-            />
-            <button 
-              type="submit" 
-              disabled={isPosting || !newComment.trim()} 
-              style={{...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1}}
-            >
-              {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
-            </button>
-          </form>
-        </div>
-      )}
+      {/* RENDER THE ROOT PORTAL WHEN TAPPED */}
+      {isComposerOpen && <ComposerOverlay />}
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -165,7 +157,7 @@ export default function CommentSectionModal({ video, onClose }) {
 // 🖌 MODAL STYLES
 
 const commentBackdropStyle = { 
-  position: "fixed", top: 0, left: 0, right: 0, zIndex: 999999, // Base layer
+  position: "fixed", top: 0, left: 0, right: 0, zIndex: 999999, 
   background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", 
   display: "flex", flexDirection: "column", justifyContent: "flex-end", 
   animation: "fadeIn 0.2s ease" 
@@ -207,7 +199,7 @@ const commentText = { fontSize: "15px", color: "#fff", margin: "4px 0 0 0", line
 // 🟢 Fake Input Styles
 const fakeInputWrapperStyle = { 
   padding: "15px 20px", background: "#1c1c1e", borderTop: "1px solid #333", 
-  paddingBottom: "env(safe-area-inset-bottom, 15px)", cursor: "pointer",
+  paddingBottom: "env(safe-area-inset-bottom, 15px)", cursor: "text",
   marginTop: "auto"
 };
 
@@ -216,10 +208,11 @@ const fakeInputStyle = {
   fontSize: "15px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
 };
 
-// 🟢 Composer Overlay Styles
+// 🟢 Composer Overlay Styles (Mounts at root over the whole screen)
 const composerOverlayStyle = {
-  position: "fixed", inset: 0, zIndex: 9999999, // Rests completely above the modal
-  background: "rgba(0,0,0,0.5)", 
+  position: "fixed", top: 0, left: 0, right: 0, bottom: 0, 
+  zIndex: 99999999, // Rests completely above everything
+  backgroundColor: "rgba(0,0,0,0.4)", // Dims the underlying comment sheet
   display: "flex", flexDirection: "column", justifyContent: "flex-end"
 };
 
@@ -227,7 +220,7 @@ const composerFormStyle = {
   background: "#1c1c1e", padding: "15px 20px", display: "flex", gap: "10px", 
   alignItems: "center", borderTop: "1px solid #333",
   paddingBottom: "env(safe-area-inset-bottom, 15px)",
-  width: "100%", boxSizing: "border-box" // Prevents overflow off the side
+  width: "100%", boxSizing: "border-box" 
 };
 
 const composerInputStyle = { 
