@@ -22,7 +22,7 @@ import { fileURLToPath } from "url";
 // Import Prerender
 import prerender from "prerender-node";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; // Left here in case needed elsewhere
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; 
 import adminRoutes from "./admin.js";
 import authRoutes from "./auth.js";
 import multer from "multer";
@@ -146,7 +146,7 @@ async function initDatabase() {
         )
       `);
 
-      // 🟢 RESTORED: Interaction Tables & Counters
+      // Interaction Tables & Counters
       await pool.query(`
         CREATE TABLE IF NOT EXISTS likes (
           id SERIAL PRIMARY KEY,
@@ -443,12 +443,10 @@ app.get("/api/video", async (req, res) => {
         const publicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://bucket.naijahomemade.com';
         const staticUrl = `${publicDomain}/${r2Key}`;
         
-        console.log(`[PLAYBACK] Serving Cached Static R2 Link: ${staticUrl}`);
         return res.json({ video_url: staticUrl });
       } else {
         const cleanId = video.cloudflare_id.split('?')[0];
         const video_url = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
-        console.log(`[PLAYBACK] Serving Cloudflare Stream: ${cleanId}`);
         return res.json({ video_url });
       }
     }
@@ -456,8 +454,6 @@ app.get("/api/video", async (req, res) => {
     if (!video.file_id || video.file_id === "none") {
        return res.status(400).json({ error: "No video source (Telegram or Cloudflare) found" });
     }
-
-    console.log(`[PLAYBACK] Fetching from Telegram: ${video.file_id.substring(0, 10)}...`);
 
     const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { 
       params: { file_id: video.file_id } 
@@ -518,7 +514,6 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     media_group_id: v.media_group_id || null,
     is_group: Number(v.group_count || 1) > 1, 
     group_count: Number(v.group_count || 1),
-    // 🟢 RESTORED: Appended interaction counters to response
     likes_count: Number(v.likes_count || 0),
     comments_count: Number(v.comments_count || 0),
     shares_count: Number(v.shares_count || 0),
@@ -636,7 +631,7 @@ app.get("/api/group", async (req, res) => {
 });
 
 /* =====================
-   SEARCH ENDPOINT (PAGINATED & VALIDATED)
+   SEARCH ENDPOINT 
 ===================== */
 const searchSchema = z.object({
   q: z.string().trim().max(100, "Search query is too long").optional().default(""), 
@@ -692,7 +687,6 @@ app.get("/api/search", async (req, res) => {
         uploader_name: v.uploader_name || "Member",
         created_at: v.created_at,
         thumbnail_url: thumbUrl,
-        // Also map counters here for search results
         likes_count: Number(v.likes_count || 0),
         comments_count: Number(v.comments_count || 0),
         shares_count: Number(v.shares_count || 0),
@@ -734,7 +728,7 @@ app.get("/api/video/details", async (req, res) => {
 });
 
 /* =======================================================
-   🟢 RESTORED: INTERACTION SUITE (LIKES, COMMENTS, SAVES)
+   INTERACTION SUITE (LIKES, COMMENTS, SAVES)
 ======================================================= */
 const authenticateAppUser = (req, res, next) => {
   const authHeader = req.header("Authorization");
@@ -750,7 +744,6 @@ const authenticateAppUser = (req, res, next) => {
   }
 };
 
-// 1. Check Personal State (Has the user liked or saved this?)
 app.get("/api/interactions/state/:message_id", authenticateAppUser, async (req, res) => {
   try {
     const { message_id } = req.params;
@@ -768,7 +761,6 @@ app.get("/api/interactions/state/:message_id", authenticateAppUser, async (req, 
   }
 });
 
-// 2. Toggle Like
 app.post("/api/interactions/like", authenticateAppUser, async (req, res) => {
   try {
     const { message_id } = req.body;
@@ -789,7 +781,6 @@ app.post("/api/interactions/like", authenticateAppUser, async (req, res) => {
   }
 });
 
-// 3. Toggle Save (Bookmark)
 app.post("/api/interactions/save", authenticateAppUser, async (req, res) => {
   try {
     const { message_id } = req.body;
@@ -810,7 +801,6 @@ app.post("/api/interactions/save", authenticateAppUser, async (req, res) => {
   }
 });
 
-// 4. Record Share (Public route, just bumps the counter)
 app.post("/api/interactions/share", async (req, res) => {
   try {
     const { message_id } = req.body;
@@ -821,7 +811,6 @@ app.post("/api/interactions/share", async (req, res) => {
   }
 });
 
-// 5. Post a Comment
 app.post("/api/comments", authenticateAppUser, async (req, res) => {
   try {
     const { message_id, content } = req.body;
@@ -835,7 +824,6 @@ app.post("/api/comments", authenticateAppUser, async (req, res) => {
     );
     await pool.query("UPDATE videos SET comments_count = comments_count + 1 WHERE message_id=$1", [message_id]);
     
-    // Fetch the user's avatar to immediately append the comment on the frontend
     const user = await pool.query("SELECT username, avatar_url FROM app_users WHERE id=$1", [user_id]);
     
     res.json({ success: true, comment: { ...result.rows[0], ...user.rows[0] } });
@@ -844,7 +832,6 @@ app.post("/api/comments", authenticateAppUser, async (req, res) => {
   }
 });
 
-// 6. Fetch all Comments for a video
 app.get("/api/comments/:message_id", async (req, res) => {
   try {
     const { message_id } = req.params;
@@ -861,32 +848,36 @@ app.get("/api/comments/:message_id", async (req, res) => {
   }
 });
 
-/* =====================
-   Thumbnail API (Bulletproof Fallback)
-===================== */
+/* =======================================================
+   🟢 BULLETPROOF THUMBNAIL ROUTE 
+======================================================= */
 app.get("/api/thumbnail", async (req, res) => {
   const { chat_id, message_id } = req.query;
-  if (!chat_id || !message_id) return res.status(400).end();
+  // If invalid request, redirect to fallback silently
+  if (!chat_id || !message_id) return res.redirect('/assets/default-avatar.png');
   
   const fileName = `thumbs/${chat_id}_${message_id}.jpg`;
 
   try {
+    // 1. Try serving from R2 using transformToByteArray (prevents .pipe() crash)
     try {
       const r2Object = await r2.send(new GetObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
         Key: fileName
       }));
       
+      const byteArray = await r2Object.Body.transformToByteArray();
       res.set({
         "Content-Type": "image/jpeg",
         "Cache-Control": "public, max-age=31536000, immutable", 
         "Access-Control-Allow-Origin": "*"
       });
-      return r2Object.Body.pipe(res);
+      return res.send(Buffer.from(byteArray));
     } catch (r2Err) {
-      console.log(`Thumbnail ${fileName} not in R2, checking Database...`);
+      // Not in R2 yet, fall through to Telegram DB fetch
     }
 
+    // 2. Fetch from Telegram DB
     const dbRes = await pool.query("SELECT thumb_file_id FROM videos WHERE chat_id=$1 AND message_id=$2", [chat_id, message_id]);
     
     if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) {
@@ -897,29 +888,68 @@ app.get("/api/thumbnail", async (req, res) => {
     const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
     const buffer = Buffer.from(imageRes.data);
 
+    // 3. Upload to R2 in the background for future requests
     r2.send(new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
       Key: fileName,
       Body: buffer,
       ContentType: "image/jpeg"
-    })).catch(e => console.error("R2 Upload Failed:", e.message));
+    })).catch(e => console.error("R2 Background Upload Failed:", e.message));
 
     res.set({
       "Content-Type": "image/jpeg",
       "Cache-Control": "public, max-age=604800, immutable",
       "Access-Control-Allow-Origin": "*"
     });
-    res.send(buffer);
+    return res.send(buffer);
 
   } catch (err) {
-    console.error("Thumbnail Route Error:", err.message);
-    // Ultimate Failsafe
-    res.redirect('/assets/default-avatar.png');
+    // Ultimate Failsafe: Never show a broken image icon
+    return res.redirect('/assets/default-avatar.png');
+  }
+});
+
+/* =======================================================
+   🟢 BULLETPROOF AVATAR ROUTE 
+======================================================= */
+app.get("/api/avatar", async (req, res) => {
+  try {
+    const { user_id } = req.query;
+    
+    // Prevent bad requests from breaking the image
+    if (!user_id || user_id === 'undefined' || user_id === 'null') {
+      return res.redirect('/assets/default-avatar.png');
+    }
+
+    const photosRes = await axios.get(`${TELEGRAM_API}/getUserProfilePhotos`, {
+      params: { user_id, limit: 1 }
+    });
+
+    const photos = photosRes.data.result.photos;
+    
+    // If user has no photos, redirect to default gracefully instead of returning 204
+    if (!photos || photos.length === 0) {
+      return res.redirect('/assets/default-avatar.png');
+    }
+
+    const fileId = photos[0][0].file_id;
+    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId } });
+    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
+    
+    res.set({
+      "Content-Type": "image/jpeg",
+      "Cache-Control": "public, max-age=86400", 
+      "Access-Control-Allow-Origin": "*"
+    });
+    return res.send(Buffer.from(imageRes.data));
+  } catch (err) {
+    // Ultimate Failsafe: Never show a broken image icon
+    return res.redirect('/assets/default-avatar.png');
   }
 });
 
 /* =====================
-   Share Link (Updated with JSON-LD SEO & Canonical Tag)
+   Share Link 
 ===================== */
 app.get('/v/:message_id', async (req, res) => {
   try {
@@ -943,7 +973,6 @@ app.get('/v/:message_id', async (req, res) => {
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
       : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
 
-    // 🟢 1. Define your hidden SEO Keywords here
     const hiddenKeywords = [
       "naijahomemade",
       "naijahomemade channel telegram",
@@ -959,7 +988,6 @@ app.get('/v/:message_id', async (req, res) => {
       video.category 
     ];
 
-    // 🟢 2. Build the JSON-LD Schema
     const schemaJSON = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "VideoObject",
@@ -1009,41 +1037,10 @@ app.get('/v/:message_id', async (req, res) => {
 });
 
 /* =====================
-   User Profile Photo
-===================== */
-app.get("/api/avatar", async (req, res) => {
-  try {
-    const { user_id } = req.query;
-    if (!user_id) return res.status(400).end();
-
-    const photosRes = await axios.get(`${TELEGRAM_API}/getUserProfilePhotos`, {
-      params: { user_id, limit: 1 }
-    });
-
-    const photos = photosRes.data.result.photos;
-    if (!photos || photos.length === 0) return res.status(204).end();
-
-    const fileId = photos[0][0].file_id;
-    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId } });
-    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
-    
-    res.set({
-      "Content-Type": "image/jpeg",
-      "Cache-Control": "public, max-age=86400", 
-      "Access-Control-Allow-Origin": "*"
-    });
-    res.send(Buffer.from(imageRes.data));
-  } catch (err) {
-    res.status(500).end();
-  }
-});
-
-/* =====================
    DYNAMIC SITEMAP.XML
 ===================== */
 app.get('/sitemap.xml', async (req, res) => {
   try {
-    // Fetch the latest 5,000 videos (Google's limit per sitemap is 50k)
     const result = await pool.query(`
       SELECT message_id, created_at 
       FROM videos 
@@ -1056,18 +1053,15 @@ app.get('/sitemap.xml', async (req, res) => {
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
 
-    // Add the homepage
     xml += `  <url>\n`;
     xml += `    <loc>${baseUrl}/</loc>\n`;
     xml += `    <changefreq>hourly</changefreq>\n`;
     xml += `    <priority>1.0</priority>\n`;
     xml += `  </url>\n`;
 
-    // Add every single video page
     result.rows.forEach(video => {
       xml += `  <url>\n`;
       xml += `    <loc>${baseUrl}/v/${video.message_id}</loc>\n`;
-      // Use the video creation date as the lastmod
       xml += `    <lastmod>${new Date(video.created_at).toISOString()}</lastmod>\n`;
       xml += `    <changefreq>never</changefreq>\n`;
       xml += `    <priority>0.8</priority>\n`;
