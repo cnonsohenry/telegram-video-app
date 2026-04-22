@@ -51,6 +51,9 @@ export default function CommentSectionModal({ video, onClose }) {
   }, []);
 
   const openComposer = () => {
+    // 🟢 Always reset to 0 first — prevents stale offset from a previous session
+    // pre-shifting the composer before the Visual Viewport fires its first event.
+    setKeyboardOffset(0);
     setIsComposerOpen(true);
     setTimeout(() => {
       if (inputRef.current) inputRef.current.focus();
