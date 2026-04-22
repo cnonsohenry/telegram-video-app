@@ -10,40 +10,13 @@ export default function CommentSectionModal({ video, onClose }) {
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   
-  // 🟢 The flawless Visual Viewport tracker
-  const [vvHeight, setVvHeight] = useState(window.innerHeight);
-  const [vvOffset, setVvOffset] = useState(0);
   const inputRef = useRef(null);
 
   useEffect(() => {
     // Lock background scroll
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
-    // Track the EXACT visible pixels of the screen. 
-    // When keyboard opens, vvHeight drops instantly.
-    const handleResize = () => {
-      if (window.visualViewport) {
-        setVvHeight(window.visualViewport.height);
-        setVvOffset(window.visualViewport.offsetTop);
-      } else {
-        setVvHeight(window.innerHeight);
-      }
-    };
-
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", handleResize);
-      window.visualViewport.addEventListener("scroll", handleResize);
-      handleResize(); // Trigger immediately to get baseline
-    }
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener("resize", handleResize);
-        window.visualViewport.removeEventListener("scroll", handleResize);
-      }
-    };
+    return () => { document.body.style.overflow = originalOverflow; };
   }, []);
 
   useEffect(() => {
@@ -53,12 +26,13 @@ export default function CommentSectionModal({ video, onClose }) {
       .catch(err => console.error("Failed to load comments", err));
   }, [video]);
 
-  // Auto-focus the real input when the composer overlay opens
-  useEffect(() => {
-    if (isComposerOpen && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isComposerOpen]);
+  const openComposer = () => {
+    setIsComposerOpen(true);
+    // 🟢 Slight delay ensures the DOM mounts the real input before focusing
+    setTimeout(() => {
+      if (inputRef.current) inputRef.current.focus();
+    }, 50);
+  };
 
   const handlePost = async (e) => {
     e.preventDefault();
@@ -78,7 +52,7 @@ export default function CommentSectionModal({ video, onClose }) {
         if (data.success) {
           setComments([data.comment, ...comments]); 
           setNewComment("");
-          setIsComposerOpen(false); // Close composer on success, dropping keyboard
+          setIsComposerOpen(false); // Drops keyboard automatically
         }
       }
     } catch (err) { 
@@ -121,27 +95,20 @@ export default function CommentSectionModal({ video, onClose }) {
             )}
           </div>
 
-          {/* 🟢 2. THE FAKE INPUT (Opens the Composer Overlay) */}
-          <div style={fakeInputWrapperStyle} onClick={() => setIsComposerOpen(true)}>
+          {/* 🟢 2. THE FAKE INPUT */}
+          <div style={fakeInputWrapperStyle} onClick={openComposer}>
             <div style={fakeInputStyle}>Add a comment...</div>
           </div>
 
         </div>
       </div>
 
-      {/* 🟢 3. THE COMPOSER OVERLAY (Rides flawlessly on the keyboard) */}
+      {/* 🟢 3. THE COMPOSER OVERLAY (Relies purely on CSS flex-end) */}
       {isComposerOpen && (
         <div style={composerOverlayStyle} onClick={() => setIsComposerOpen(false)}>
           <form 
             onSubmit={handlePost} 
-            style={{ 
-              ...composerFormStyle, 
-              // 🟢 THE FIX: 
-              // 1. Calculate the exact top pixel coordinate of the keyboard
-              top: `${vvOffset + vvHeight}px`, 
-              // 2. Shift the form upwards by 100% of its own height so it sits perfectly above that coordinate
-              transform: "translateY(-100%)",
-            }} 
+            style={composerFormStyle} 
             onClick={e => e.stopPropagation()} 
           >
             <input 
@@ -185,7 +152,7 @@ const commentBottomSheetStyle = { width: "100%", height: "75%", background: "#1c
 const commentHeaderWrapperStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px", borderBottom: "1px solid #333", flexShrink: 0 };
 const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, color: "#fff" };
 const closeBottomSheetBtnStyle = { background: "#333", border: "none", borderRadius: "50%", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "background 0.2s", flexShrink: 0 };
-const commentsListStyle = { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "20px", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch", paddingBottom: "50px" };
+const commentsListStyle = { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "20px", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" };
 const commentItemStyle = { display: "flex", gap: "12px" };
 const commentAvatarStyle = { width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", flexShrink: 0 };
 const commentContentWrapper = { display: "flex", flexDirection: "column" };
@@ -196,9 +163,8 @@ const commentText = { fontSize: "15px", color: "#fff", margin: "4px 0 0 0", line
 const fakeInputWrapperStyle = { padding: "15px 20px", background: "#1c1c1e", borderTop: "1px solid #333", paddingBottom: "env(safe-area-inset-bottom, 15px)", cursor: "text", marginTop: "auto", flexShrink: 0 };
 const fakeInputStyle = { background: "#2c2c2e", borderRadius: "20px", padding: "12px 20px", fontSize: "15px", color: "#888" };
 
-// 🟢 Composer Styles
-const composerOverlayStyle = { position: "fixed", inset: 0, zIndex: 9999999, backgroundColor: "transparent" };
-// NOTE: I removed the CSS `transition` from the form. We want it to instantly snap with the keyboard at 60fps via Javascript, not fight a CSS animation delay.
-const composerFormStyle = { position: "absolute", left: 0, right: 0, background: "#1c1c1e", padding: "15px 20px", paddingBottom: "max(15px, env(safe-area-inset-bottom))", display: "flex", gap: "10px", alignItems: "center", borderTop: "1px solid #333" };
+// 🟢 THE FIX: Pure CSS positioning using flexbox. Natively handled by the mobile browser.
+const composerOverlayStyle = { position: "fixed", inset: 0, zIndex: 9999999, backgroundColor: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeOverlay 0.2s ease" };
+const composerFormStyle = { background: "#1c1c1e", width: "100%", padding: "15px 20px", paddingBottom: "max(15px, env(safe-area-inset-bottom))", display: "flex", gap: "10px", alignItems: "center", borderTop: "1px solid #333" };
 const composerInputStyle = { flex: 1, background: "#2c2c2e", border: "none", borderRadius: "20px", padding: "12px 20px", color: "#fff", fontSize: "15px", outline: "none" };
 const commentSendBtnStyle = { background: "var(--primary-color)", border: "none", width: "42px", height: "42px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", cursor: "pointer", transition: "opacity 0.2s ease", flexShrink: 0 };
