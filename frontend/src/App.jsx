@@ -8,7 +8,8 @@ import PitchView from "./components/PitchView";
 import FullscreenPlayer from "./components/FullscreenPlayer"; 
 import PaywallModal from "./components/PaywallModal"; 
 import LegalPages from "./pages/LegalPages"; 
-import CommentSectionModal from "./components/CommentSectionModal"; // 🟢 NEW IMPORT
+import CommentSectionModal from "./components/CommentSectionModal"; 
+import CommentComposer from "./components/CommentComposer"; // 🟢 NEW IMPORT
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
@@ -26,8 +27,10 @@ export default function App() {
   
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
   
-  // 🟢 NEW STATE: Tracks which video is active in the Comment Modal
+  // 🟢 STATE: Modal and Composer
   const [activeCommentVideo, setActiveCommentVideo] = useState(null);
+  const [showComposer, setShowComposer] = useState(false);
+  const [latestComment, setLatestComment] = useState(null); 
 
   const isLoggedIn = !!token;
   const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
@@ -36,8 +39,8 @@ export default function App() {
     document.title = `${APP_CONFIG.appNamePrefix}${APP_CONFIG.appNameSuffix}`;
   }, []);
 
-  // 🟢 Added activeCommentVideo to the AdFreeZone check so ads don't overlap comments
-  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo;
+  // 🟢 Added showComposer to the AdFreeZone check
+  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo || showComposer;
   
   useAdZapper(isAdFreeZone);
 
@@ -199,7 +202,7 @@ export default function App() {
     }
   }, [token, user, applyTheme]);
 
-  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo; 
+  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo && !showComposer; 
 
   const handleOpenVideo = async (video) => {
     try {
@@ -260,7 +263,7 @@ export default function App() {
         }}>
           <Explore 
             onVideoClick={handleOpenVideo}
-            onCommentClick={setActiveCommentVideo} // 🟢 Passed down to Explore
+            onCommentClick={setActiveCommentVideo} 
           />
         </div>
         
@@ -361,11 +364,28 @@ export default function App() {
         </div>
       )}
 
-      {/* 🟢 NEW ROOT LEVEL COMMENT MODAL */}
+      {/* 🟢 MODAL: Read-Only Comment Feed */}
       {activeCommentVideo && (
         <CommentSectionModal 
           video={activeCommentVideo} 
-          onClose={() => setActiveCommentVideo(null)} 
+          onClose={() => {
+            setActiveCommentVideo(null);
+            setLatestComment(null); 
+          }} 
+          onOpenComposer={() => setShowComposer(true)} 
+          latestComment={latestComment} 
+        />
+      )}
+
+      {/* 🟢 MODAL: Root Composer Input */}
+      {showComposer && activeCommentVideo && (
+        <CommentComposer 
+          video={activeCommentVideo}
+          onClose={() => setShowComposer(false)} 
+          onSuccess={(newCommentData) => {
+            setLatestComment({ ...newCommentData, _videoId: activeCommentVideo.message_id });
+            setShowComposer(false); 
+          }}
         />
       )}
       
