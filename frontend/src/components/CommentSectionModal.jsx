@@ -80,7 +80,7 @@ export default function CommentSectionModal({ video, onClose, onOpenComposer, la
 
 // 🖌 MODAL STYLES
 const commentBackdropStyle = { position: "fixed", inset: 0, zIndex: 999999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 0.2s ease" };
-const commentBottomSheetStyle = { width: "100%", height: "75dvh", background: "#1c1c1e", borderRadius: "24px 24px 0 0", display: "flex", flexDirection: "column", overflow: "hidden", animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)", boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" };
+const commentBottomSheetStyle = { width: "100%", height: "75%", background: "#1c1c1e", borderRadius: "24px 24px 0 0", display: "flex", flexDirection: "column", overflow: "hidden", animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)", boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" };
 const commentHeaderWrapperStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px", borderBottom: "1px solid #333", flexShrink: 0 };
 const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, color: "#fff" };
 const closeBottomSheetBtnStyle = { background: "#333", border: "none", borderRadius: "50%", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "background 0.2s", flexShrink: 0 };

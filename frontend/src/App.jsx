@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react"; // 🟢 Added useRef
 import Home from "./pages/Home";
 import Explore from "./pages/Explore"; 
 import Profile from "./pages/Profile";
@@ -9,7 +9,7 @@ import FullscreenPlayer from "./components/FullscreenPlayer";
 import PaywallModal from "./components/PaywallModal"; 
 import LegalPages from "./pages/LegalPages"; 
 import CommentSectionModal from "./components/CommentSectionModal"; 
-import CommentComposer from "./components/CommentComposer"; // 🟢 NEW IMPORT
+import CommentComposer from "./components/CommentComposer"; 
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
@@ -24,13 +24,28 @@ export default function App() {
   const [activeVideo, setActiveVideo] = useState(null); 
   const [showPaywall, setShowPaywall] = useState(false);
   const [activeLegalPage, setActiveLegalPage] = useState(null); 
-  
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
   
-  // 🟢 STATE: Modal and Composer
   const [activeCommentVideo, setActiveCommentVideo] = useState(null);
   const [showComposer, setShowComposer] = useState(false);
   const [latestComment, setLatestComment] = useState(null); 
+
+  // 🟢 THE FIX: App Height Lock Architecture
+  const windowWidth = useRef(window.innerWidth);
+  const [appHeight, setAppHeight] = useState(`${window.innerHeight}px`);
+
+  useEffect(() => {
+    const handleResize = () => {
+      // Only recalculate height if the phone rotates (width changes). 
+      // This completely ignores the vertical height shrinkage from the keyboard!
+      if (window.innerWidth !== windowWidth.current) {
+        setAppHeight(`${window.innerHeight}px`);
+        windowWidth.current = window.innerWidth;
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const isLoggedIn = !!token;
   const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
@@ -39,7 +54,6 @@ export default function App() {
     document.title = `${APP_CONFIG.appNamePrefix}${APP_CONFIG.appNameSuffix}`;
   }, []);
 
-  // 🟢 Added showComposer to the AdFreeZone check
   const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo || showComposer;
   
   useAdZapper(isAdFreeZone);
@@ -225,12 +239,14 @@ export default function App() {
 
   return (
     <div style={{ 
-      height: '100dvh', 
+      height: appHeight, // 🟢 NO MORE 100dvh! Frozen rigid height.
       width: '100vw', 
       backgroundColor: 'var(--bg-color)', 
       color: '#fff', 
       overflow: 'hidden',
-      position: 'fixed' 
+      position: 'fixed',
+      top: 0, 
+      left: 0
     }}>
       <main 
         style={{ 
@@ -335,8 +351,6 @@ export default function App() {
         </nav>
       )}
 
-      {/* 🟢 MODALS AT THE ROOT LEVEL */}
-      
       {showPaywall && (
         <PaywallModal user={user} onClose={() => setShowPaywall(false)} />
       )}
@@ -364,7 +378,6 @@ export default function App() {
         </div>
       )}
 
-      {/* 🟢 MODAL: Read-Only Comment Feed */}
       {activeCommentVideo && (
         <CommentSectionModal 
           video={activeCommentVideo} 
@@ -377,7 +390,6 @@ export default function App() {
         />
       )}
 
-      {/* 🟢 MODAL: Root Composer Input */}
       {showComposer && activeCommentVideo && (
         <CommentComposer 
           video={activeCommentVideo}

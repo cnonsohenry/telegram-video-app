@@ -81,7 +81,7 @@ const composerBackdropStyle = {
 };
 
 const composerWrapperStyle = { 
-  position: "absolute", bottom: 0, left: 0, right: 0,
+  position: "fixed", bottom: 0, left: 0, right: 0,
   padding: "15px 20px", background: "#1c1c1e", borderTop: "1px solid #333", 
   display: "flex", gap: "10px", alignItems: "center", 
   paddingBottom: "env(safe-area-inset-bottom, 15px)",
