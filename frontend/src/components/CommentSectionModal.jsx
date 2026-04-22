@@ -4,19 +4,18 @@ import { APP_CONFIG } from "../config";
 
 export default function CommentSectionModal({ video, onClose }) {
   const [comments, setComments] = useState([]);
-  const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const listRef = useRef(null);
 
-  const inputRef = useRef(null);
-
+  // 🟢 Lock background scroll so only the modal scrolls
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = originalOverflow; };
   }, []);
 
+  // 🟢 Fetch comments
   useEffect(() => {
     fetch(`${APP_CONFIG.apiUrl}/api/comments/${video.message_id}`)
       .then(res => res.ok ? res.json() : [])
@@ -24,46 +23,12 @@ export default function CommentSectionModal({ video, onClose }) {
       .catch(err => console.error("Failed to load comments", err));
   }, [video]);
 
+  // 🟢 Scroll to bottom when a new comment is added
   useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-
-    const handleResize = () => {
-      const keyboardHeight = window.innerHeight - vv.height - vv.offsetTop;
-      setKeyboardOffset(Math.max(0, keyboardHeight));
-      
-      // 🟢 Native Failsafe: If the user swipes the keyboard down or hits "Done", close the overlay
-      if (keyboardHeight <= 10 && document.activeElement !== inputRef.current) {
-        setIsComposerOpen(false);
-      }
-    };
-
-    vv.addEventListener("resize", handleResize);
-    vv.addEventListener("scroll", handleResize);
-
-    return () => {
-      vv.removeEventListener("resize", handleResize);
-      vv.removeEventListener("scroll", handleResize);
-    };
-  }, []);
-
-  const openComposer = () => {
-    setIsComposerOpen(true);
-    // 🟢 Instant focus (works 100% reliably now because the input is never unmounted)
-    if (inputRef.current) inputRef.current.focus(); 
-  };
-
-  const closeComposer = () => {
-    // 🟢 1. Natively dismiss the keyboard BEFORE hiding the UI
-    if (inputRef.current) inputRef.current.blur(); 
-    
-    // 🟢 2. Hide the UI
-    setIsComposerOpen(false);
-    setKeyboardOffset(0);
-    
-    // 🟢 3. Final failsafe to brutally reset the browser's native scroll engine
-    window.scrollTo(0, 0); 
-  };
+    if (listRef.current) {
+      listRef.current.scrollTop = 0; // Assuming we want newest at the top, or you can scroll to bottom
+    }
+  }, [comments.length]);
 
   const handlePost = async (e) => {
     e.preventDefault();
@@ -83,7 +48,8 @@ export default function CommentSectionModal({ video, onClose }) {
         if (data.success) {
           setComments([data.comment, ...comments]);
           setNewComment("");
-          closeComposer();
+          // Note: We deliberately DO NOT blur the input here. 
+          // This allows users to type multiple comments rapidly without the keyboard dropping!
         }
       }
     } catch (err) {
@@ -96,8 +62,11 @@ export default function CommentSectionModal({ video, onClose }) {
   return (
     <>
       <div style={commentBackdropStyle} onClick={onClose}>
+        
+        {/* 🟢 THE MODAL: Native flex column. The browser will shove this up natively when typing. */}
         <div style={commentBottomSheetStyle} onClick={e => e.stopPropagation()}>
 
+          {/* Header */}
           <div style={commentHeaderWrapperStyle}>
             <h3 style={commentHeaderTitleStyle}>{comments.length} Comments</h3>
             <button onClick={onClose} style={closeBottomSheetBtnStyle}>
@@ -105,7 +74,8 @@ export default function CommentSectionModal({ video, onClose }) {
             </button>
           </div>
 
-          <div style={commentsListStyle} className="custom-scrollbar">
+          {/* Comment List */}
+          <div style={commentsListStyle} className="custom-scrollbar" ref={listRef}>
             {comments.length === 0 ? (
               <p style={{ textAlign: "center", color: "#888", marginTop: "30px" }}>
                 No comments yet. Be the first to reply!
@@ -125,52 +95,27 @@ export default function CommentSectionModal({ video, onClose }) {
             )}
           </div>
 
-          <div style={fakeInputWrapperStyle} onClick={openComposer}>
-            <div style={fakeInputStyle}>Add a comment...</div>
-          </div>
+          {/* 🟢 THE REAL COMPOSER: Permanently docked at the bottom of the modal */}
+          <form onSubmit={handlePost} style={composerFormStyle}>
+            <input
+              type="text"
+              value={newComment}
+              onChange={e => setNewComment(e.target.value)}
+              placeholder="Add a comment..."
+              style={composerInputStyle}
+            />
+            <button
+              type="submit"
+              disabled={isPosting || !newComment.trim()}
+              onMouseDown={e => e.preventDefault()} 
+              onTouchStart={e => e.preventDefault()}
+              style={{ ...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1 }}
+            >
+              {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
+            </button>
+          </form>
 
         </div>
-      </div>
-
-      {/* 🟢 THE FIX: Composer is permanently rendered to prevent iOS unmount panics */}
-      <div
-        style={{
-          ...composerOverlayStyle,
-          opacity: isComposerOpen ? 1 : 0,
-          pointerEvents: isComposerOpen ? "auto" : "none",
-          transition: "opacity 0.2s ease"
-        }}
-        onClick={closeComposer}
-      >
-        <form
-          onSubmit={handlePost}
-          style={{
-            ...composerFormStyle,
-            bottom: keyboardOffset,
-            transition: keyboardOffset > 0
-              ? "bottom 0.02s linear"   
-              : "bottom 0.25s ease-out" 
-          }}
-          onClick={e => e.stopPropagation()}
-        >
-          <input
-            ref={inputRef}
-            type="text"
-            value={newComment}
-            onChange={e => setNewComment(e.target.value)}
-            placeholder="Add a comment..."
-            style={composerInputStyle}
-          />
-          <button
-            type="submit"
-            disabled={isPosting || !newComment.trim()}
-            onMouseDown={e => e.preventDefault()}
-            onTouchStart={e => e.preventDefault()}
-            style={{ ...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1 }}
-          >
-            {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
-          </button>
-        </form>
       </div>
 
       <style>{`
@@ -196,9 +141,13 @@ const commentBackdropStyle = {
 };
 
 const commentBottomSheetStyle = {
-  width: "100%", height: "75%",
-  background: "#1c1c1e", borderRadius: "24px 24px 0 0",
-  display: "flex", flexDirection: "column", overflow: "hidden",
+  width: "100%", 
+  height: "75dvh", // Uses dynamic viewport height so it sizes correctly on mobile
+  background: "#1c1c1e", 
+  borderRadius: "24px 24px 0 0",
+  display: "flex", 
+  flexDirection: "column", 
+  overflow: "hidden",
   animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
   boxShadow: "0 -10px 40px rgba(0,0,0,0.5)"
 };
@@ -241,41 +190,19 @@ const commentText = {
   margin: "4px 0 0 0", lineHeight: "1.4", wordBreak: "break-word"
 };
 
-const fakeInputWrapperStyle = {
-  padding: "15px 20px",
-  background: "#1c1c1e",
-  borderTop: "1px solid #333",
-  paddingBottom: "env(safe-area-inset-bottom, 15px)",
-  cursor: "text",
-  marginTop: "auto",
-  flexShrink: 0
-};
-
-const fakeInputStyle = {
-  background: "#2c2c2e", borderRadius: "20px",
-  padding: "12px 20px", fontSize: "15px", color: "#888"
-};
-
-const composerOverlayStyle = {
-  position: "fixed", inset: 0,
-  zIndex: 9999999,
-  backgroundColor: "rgba(0,0,0,0.0)"
-};
-
+// 🟢 COMPOSER (Now natively embedded in the flex column)
 const composerFormStyle = {
-  position: "fixed",
-  left: 0, right: 0,
   background: "#1c1c1e",
-  padding: "12px 16px",
-  paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+  padding: "15px 20px",
+  paddingBottom: "max(15px, env(safe-area-inset-bottom))",
   display: "flex", gap: "10px", alignItems: "center",
   borderTop: "1px solid #2a2a2c",
-  boxShadow: "0 -4px 20px rgba(0,0,0,0.4)"
+  flexShrink: 0 // Ensures the input box is never crushed by the comment list
 };
 
 const composerInputStyle = {
   flex: 1, background: "#2c2c2e", border: "none",
-  borderRadius: "20px", padding: "11px 18px",
+  borderRadius: "20px", padding: "12px 20px",
   color: "#fff", fontSize: "15px", outline: "none"
 };
 
