@@ -9,7 +9,6 @@ import FullscreenPlayer from "./components/FullscreenPlayer";
 import PaywallModal from "./components/PaywallModal"; 
 import LegalPages from "./pages/LegalPages"; 
 import CommentSectionModal from "./components/CommentSectionModal"; 
-import CommentComposer from "./components/CommentComposer"; 
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
@@ -27,7 +26,6 @@ export default function App() {
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
   
   const [activeCommentVideo, setActiveCommentVideo] = useState(null);
-  const [showComposer, setShowComposer] = useState(false);
   const [latestComment, setLatestComment] = useState(null); 
 
   // 🟢 THE FIX: App Height Lock Architecture
@@ -390,16 +388,6 @@ export default function App() {
         />
       )}
 
-      {showComposer && activeCommentVideo && (
-        <CommentComposer 
-          video={activeCommentVideo}
-          onClose={() => setShowComposer(false)} 
-          onSuccess={(newCommentData) => {
-            setLatestComment({ ...newCommentData, _videoId: activeCommentVideo.message_id });
-            setShowComposer(false); 
-          }}
-        />
-      )}
       
     </div>
   );
