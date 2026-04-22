@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { createPortal } from "react-dom"; // 🟢 This is the magic key
 import { X, Send, Loader2 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 
@@ -7,25 +6,49 @@ export default function CommentSectionModal({ video, onClose }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
-  
-  // 🟢 TIKTOK COMPOSER STATE
-  const [isComposerOpen, setIsComposerOpen] = useState(false);
-  const [sheetHeight, setSheetHeight] = useState("100vh");
+
+  // 🟢 THE MAGIC: Visual Viewport Tracking
+  const [initialHeight, setInitialHeight] = useState(0);
+  const [visualHeight, setVisualHeight] = useState(0);
+  const INPUT_HEIGHT = 70; // Fixed height for the composer bar
 
   useEffect(() => {
-    // Lock the true screen height in pixels before the keyboard opens
-    setSheetHeight(`${window.innerHeight}px`);
-    
-    // Lock the body to prevent background scrolling
-    const originalStyle = window.getComputedStyle(document.body).overflow;
+    // 1. Lock the document body to prevent iOS scroll push
+    const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    
+
+    // 2. Capture the true screen size before keyboard opens
+    const initH = window.innerHeight;
+    setInitialHeight(initH);
+    setVisualHeight(window.visualViewport ? window.visualViewport.height : initH);
+
+    // 3. Track the exact height of the screen above the keyboard
+    const handleResize = () => {
+      if (window.visualViewport) {
+        setVisualHeight(window.visualViewport.height);
+      } else {
+        setVisualHeight(window.innerHeight);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      window.visualViewport.addEventListener('scroll', handleResize); // Fixes iOS pinch bugs
+    } else {
+      window.addEventListener('resize', handleResize);
+    }
+
     return () => {
-      document.body.style.overflow = originalStyle;
+      document.body.style.overflow = originalOverflow;
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('scroll', handleResize);
+      } else {
+        window.removeEventListener('resize', handleResize);
+      }
     };
   }, []);
 
-  // Fetch Comments on Mount
   useEffect(() => {
     fetch(`${APP_CONFIG.apiUrl}/api/comments/${video.message_id}`)
       .then(res => res.ok ? res.json() : [])
@@ -51,7 +74,7 @@ export default function CommentSectionModal({ video, onClose }) {
         if (data.success) {
           setComments([data.comment, ...comments]); 
           setNewComment("");
-          setIsComposerOpen(false); // Drop keyboard and hide overlay
+          document.activeElement?.blur(); // Drop keyboard on send
         }
       }
     } catch (err) { 
@@ -61,87 +84,101 @@ export default function CommentSectionModal({ video, onClose }) {
     setIsPosting(false);
   };
 
-  // 🟢 3. THE TIKTOK COMPOSER OVERLAY (Portaled to document.body)
-  const ComposerOverlay = () => {
-    return createPortal(
-      <div style={composerOverlayStyle} onClick={() => setIsComposerOpen(false)}>
-        <form 
-          onSubmit={handlePost} 
-          style={composerFormStyle} 
-          onClick={e => e.stopPropagation()} // Prevent tap from closing overlay
-        >
-          <input 
-            autoFocus // Instantly summons the keyboard when mounted
-            type="text" 
-            value={newComment} 
-            onChange={e => setNewComment(e.target.value)} 
-            placeholder="Add a comment..." 
-            style={composerInputStyle} 
-          />
-          <button 
-            type="submit" 
-            disabled={isPosting || !newComment.trim()} 
-            // PREVENT DEFAULT ensures clicking "Send" doesn't drop the keyboard first
-            onMouseDown={e => e.preventDefault()} 
-            onTouchStart={e => e.preventDefault()}
-            style={{...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1}}
-          >
-            {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
-          </button>
-        </form>
-      </div>,
-      document.body // 🟢 MOUNTS AT THE ROOT DOM LEVEL
-    );
-  };
+  // Prevent rendering flash while heights calculate
+  if (initialHeight === 0) return null; 
+
+  const isKeyboardOpen = visualHeight < initialHeight - 100;
 
   return (
-    <>
-      {/* 🟢 1. THE MAIN BOTTOM SHEET */}
-      <div style={{ ...commentBackdropStyle, height: sheetHeight }} onClick={onClose}>
-        <div style={commentBottomSheetStyle} onClick={e => e.stopPropagation()}>
-          
-          <div style={commentHeaderWrapperStyle}>
-            <h3 style={commentHeaderTitleStyle}>{comments.length} Comments</h3>
-            <button onClick={onClose} style={closeBottomSheetBtnStyle}>
-              <X size={20} color="#fff" />
-            </button>
-          </div>
+    <div 
+      style={{
+        position: "fixed", top: 0, left: 0, right: 0, 
+        height: `${initialHeight}px`, // 🟢 Hardcoded pixel height prevents browser squish
+        zIndex: 999999,
+        background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(4px)",
+        animation: "fadeIn 0.2s ease"
+      }} 
+      onClick={onClose}
+    >
+      
+      {/* 🟢 1. THE FROZEN BOTTOM SHEET */}
+      <div 
+        style={{
+          position: "absolute", bottom: 0, left: 0, right: 0,
+          height: "75%", // 75% of the frozen wrapper, meaning it NEVER moves
+          background: "#1c1c1e",
+          borderRadius: "24px 24px 0 0",
+          display: "flex", flexDirection: "column",
+          animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+          boxShadow: "0 -10px 40px rgba(0,0,0,0.5)"
+        }} 
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={commentHeaderWrapperStyle}>
+          <h3 style={commentHeaderTitleStyle}>{comments.length} Comments</h3>
+          <button onClick={onClose} style={closeBottomSheetBtnStyle}>
+            <X size={20} color="#fff" />
+          </button>
+        </div>
 
-          <div style={commentsListStyle} className="custom-scrollbar">
-            {comments.length === 0 ? (
-              <p style={{ textAlign: "center", color: "#888", marginTop: "30px" }}>
-                No comments yet. Be the first to reply!
-              </p>
-            ) : (
-              comments.map(c => (
-                <div key={c.id} style={commentItemStyle}>
-                  <img src={c.avatar_url || '/assets/default-avatar.png'} alt="avatar" style={commentAvatarStyle} />
-                  <div style={commentContentWrapper}>
-                    <span style={commentUsernameStyle}>
-                      @{c.username} <span style={commentDateStyle}>{new Date(c.created_at).toLocaleDateString()}</span>
-                    </span>
-                    <p style={commentText}>{c.content}</p>
-                  </div>
+        <div style={commentsListStyle} className="custom-scrollbar">
+          {comments.length === 0 ? (
+            <p style={{ textAlign: "center", color: "#888", marginTop: "30px" }}>
+              No comments yet. Be the first to reply!
+            </p>
+          ) : (
+            comments.map(c => (
+              <div key={c.id} style={commentItemStyle}>
+                <img src={c.avatar_url || '/assets/default-avatar.png'} alt="avatar" style={commentAvatarStyle} />
+                <div style={commentContentWrapper}>
+                  <span style={commentUsernameStyle}>
+                    @{c.username} <span style={commentDateStyle}>{new Date(c.created_at).toLocaleDateString()}</span>
+                  </span>
+                  <p style={commentText}>{c.content}</p>
                 </div>
-              ))
-            )}
-          </div>
-
-          {/* 🟢 2. THE FAKE INPUT (Triggers the portal overlay) */}
-          <div 
-            style={fakeInputWrapperStyle} 
-            onClick={() => setIsComposerOpen(true)}
-          >
-            <div style={{...fakeInputStyle, color: newComment ? "#fff" : "#888"}}>
-              {newComment ? newComment : "Add a comment..."}
-            </div>
-          </div>
-
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* RENDER THE ROOT PORTAL WHEN TAPPED */}
-      {isComposerOpen && <ComposerOverlay />}
+      {/* 🟢 2. THE FLOATING INPUT (Slides independently over the sheet) */}
+      <form 
+        onSubmit={handlePost} 
+        style={{
+          position: "absolute",
+          // Interpolates top position perfectly to sit above the keyboard
+          top: `${visualHeight - INPUT_HEIGHT}px`, 
+          left: 0, right: 0, height: `${INPUT_HEIGHT}px`,
+          background: isKeyboardOpen ? "#1c1c1e" : "rgba(28, 28, 30, 0.85)",
+          backdropFilter: isKeyboardOpen ? "none" : "blur(12px)",
+          borderTop: "1px solid #333",
+          display: "flex", gap: "10px", alignItems: "center", padding: "0 20px",
+          transition: "top 0.1s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.3s ease",
+          // Add padding for iPhone home bar ONLY if keyboard is closed
+          paddingBottom: isKeyboardOpen ? "0" : "env(safe-area-inset-bottom)",
+          boxSizing: "border-box"
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <input 
+          type="text" 
+          value={newComment} 
+          onChange={e => setNewComment(e.target.value)} 
+          placeholder="Add a comment..." 
+          style={commentInputStyle} 
+        />
+        <button 
+          type="submit" 
+          disabled={isPosting || !newComment.trim()} 
+          onMouseDown={e => e.preventDefault()} // Don't steal focus from input on click
+          onTouchStart={e => e.preventDefault()}
+          style={{...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1}}
+        >
+          {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
+        </button>
+      </form>
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -150,29 +187,15 @@ export default function CommentSectionModal({ video, onClose }) {
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
       `}</style>
-    </>
+    </div>
   );
 }
 
-// 🖌 MODAL STYLES
-
-const commentBackdropStyle = { 
-  position: "fixed", top: 0, left: 0, right: 0, zIndex: 999999, 
-  background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", 
-  display: "flex", flexDirection: "column", justifyContent: "flex-end", 
-  animation: "fadeIn 0.2s ease" 
-};
-
-const commentBottomSheetStyle = { 
-  width: "100%", height: "75%", background: "#1c1c1e", 
-  borderRadius: "24px 24px 0 0", display: "flex", flexDirection: "column", 
-  overflow: "hidden", animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)", 
-  boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" 
-};
+// 🖌 STYLES
 
 const commentHeaderWrapperStyle = { 
   display: "flex", alignItems: "center", justifyContent: "space-between", 
-  padding: "20px", borderBottom: "1px solid #333" 
+  padding: "20px", borderBottom: "1px solid #333", flexShrink: 0
 };
 
 const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, color: "#fff" };
@@ -180,13 +203,15 @@ const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, 
 const closeBottomSheetBtnStyle = { 
   background: "#333", border: "none", borderRadius: "50%", 
   width: "32px", height: "32px", display: "flex", alignItems: "center", 
-  justifyContent: "center", cursor: "pointer", transition: "background 0.2s" 
+  justifyContent: "center", cursor: "pointer", transition: "background 0.2s", flexShrink: 0
 };
 
 const commentsListStyle = { 
   flex: 1, overflowY: "auto", padding: "20px", display: "flex", 
   flexDirection: "column", gap: "20px", 
-  overscrollBehavior: "contain", WebkitOverflowScrolling: "touch"
+  overscrollBehavior: "contain", WebkitOverflowScrolling: "touch",
+  // 🟢 Massive padding ensures the user can scroll the final comment UP past the keyboard
+  paddingBottom: "50vh" 
 };
 
 const commentItemStyle = { display: "flex", gap: "12px" };
@@ -196,34 +221,7 @@ const commentUsernameStyle = { fontSize: "13px", fontWeight: 700, color: "#aaa" 
 const commentDateStyle = { fontWeight: 400, color: "#666", marginLeft: "6px" };
 const commentText = { fontSize: "15px", color: "#fff", margin: "4px 0 0 0", lineHeight: "1.4" };
 
-// 🟢 Fake Input Styles
-const fakeInputWrapperStyle = { 
-  padding: "15px 20px", background: "#1c1c1e", borderTop: "1px solid #333", 
-  paddingBottom: "env(safe-area-inset-bottom, 15px)", cursor: "text",
-  marginTop: "auto"
-};
-
-const fakeInputStyle = { 
-  background: "#2c2c2e", borderRadius: "20px", padding: "12px 20px", 
-  fontSize: "15px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
-};
-
-// 🟢 Composer Overlay Styles (Mounts at root over the whole screen)
-const composerOverlayStyle = {
-  position: "fixed", top: 0, left: 0, right: 0, bottom: 0, 
-  zIndex: 99999999, // Rests completely above everything
-  backgroundColor: "rgba(0,0,0,0.4)", // Dims the underlying comment sheet
-  display: "flex", flexDirection: "column", justifyContent: "flex-end"
-};
-
-const composerFormStyle = {
-  background: "#1c1c1e", padding: "15px 20px", display: "flex", gap: "10px", 
-  alignItems: "center", borderTop: "1px solid #333",
-  paddingBottom: "env(safe-area-inset-bottom, 15px)",
-  width: "100%", boxSizing: "border-box" 
-};
-
-const composerInputStyle = { 
+const commentInputStyle = { 
   flex: 1, background: "#2c2c2e", border: "none", borderRadius: "20px", 
   padding: "12px 20px", color: "#fff", fontSize: "15px", outline: "none" 
 };
