@@ -1079,14 +1079,18 @@ app.get('/sitemap.xml', async (req, res) => {
 });
 
 /* =======================================================
-   🤖 PRERENDER MIDDLEWARE (SEO & EXOCLICK FIX)
+   🤖 PRERENDER MIDDLEWARE (SELF-HOSTED OPEN SOURCE)
 ======================================================= */
-prerender.set('prerenderToken', process.env.PRERENDER_TOKEN);
+// 1. Point it to your new local engine
+prerender.set('prerenderServiceUrl', 'http://127.0.0.1:3001/');
+
+// 2. Add the bots you want to trigger the renderer
 prerender.crawlerUserAgents.push('ExoBot');
 prerender.crawlerUserAgents.push('exobot');
 prerender.crawlerUserAgents.push('TelegramBot');
 prerender.crawlerUserAgents.push('Twitterbot');
 
+// 3. Use the middleware
 app.use(prerender);
 
 /* =======================================================
