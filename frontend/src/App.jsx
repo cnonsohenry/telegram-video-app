@@ -32,6 +32,18 @@ export default function App() {
   const [appHeight, setAppHeight] = useState(`${window.innerHeight}px`);
 
   useEffect(() => {
+    // 🟢 Let React mount and render the UI, then tell Prerender to take the snapshot instantly
+    // We use a small 1.5-second timeout to ensure your feed videos have fetched from the DB
+    const timer = setTimeout(() => {
+      if (window.prerenderReady === false) {
+        window.prerenderReady = true;
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     const handleResize = () => {
       // Only recalculate height if the phone rotates (width changes). 
       // This completely ignores the vertical height shrinkage from the keyboard!

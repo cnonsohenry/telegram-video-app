@@ -15,6 +15,11 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="icon" type="image/svg+xml" href="/naija.svg" />
+
+    <script>
+    // Tell Prerender to pause and wait for React to say it's done
+    window.prerenderReady = false;
+  </script>
     
     <style>
       body, html {
