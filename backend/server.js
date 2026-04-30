@@ -1011,12 +1011,19 @@ app.get('/v/:message_id', async (req, res) => {
           
           <link rel="canonical" href="${frontendUrl}/v/${message_id}" />
           
+          <!-- 🟢 Your Existing OpenGraph Tags -->
           <meta property="og:type" content="video.other">
           <meta property="og:site_name" content="${appName}">
           <meta property="og:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
           <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
           <meta property="og:image" content="${thumbUrl}">
           
+          <!-- 🟢 THE FIX: Force Telegram & Twitter to use the massive portrait layout -->
+          <meta name="twitter:card" content="summary_large_image">
+          <meta name="twitter:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
+          <meta name="twitter:description" content="Watch high-quality homegrown shots on our platform.">
+          <meta name="twitter:image" content="${thumbUrl}">
+
           <script type="application/ld+json">
             ${schemaJSON}
           </script>
