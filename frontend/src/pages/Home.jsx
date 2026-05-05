@@ -349,56 +349,59 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           )}
           
           <PullToRefresh onRefresh={handleRefresh}>
-            <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
-               
-               {activeGroup && (
-                 <div style={groupHeaderStyle}>
-                   <button onClick={() => setActiveGroup(null)} style={backButtonStyle}>
-                     <ArrowLeft size={20} />
-                     <span>Back to {currentCategory.toUpperCase()}</span>
-                   </button>
-                   <span style={groupTitleStyle}>{activeGroup.videos.length} clips in collection</span>
+            {/* 🟢 THE FIX: Wrap everything in ONE single root div */}
+            <div>
+              <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
+                 
+                 {activeGroup && (
+                   <div style={groupHeaderStyle}>
+                     <button onClick={() => setActiveGroup(null)} style={backButtonStyle}>
+                       <ArrowLeft size={20} />
+                       <span>Back to {currentCategory.toUpperCase()}</span>
+                     </button>
+                     <span style={groupTitleStyle}>{activeGroup.videos.length} clips in collection</span>
+                   </div>
+                 )}
+
+                 <div style={{ 
+                   display: "grid", 
+                   gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(2, 1fr)", 
+                   gap: isDesktop ? "20px" : "10px",
+                   alignItems: "start", 
+                   animation: "fadeIn 0.3s ease-out" 
+                 }}>
+                    {actualVideosToDisplay.map(v => (
+                      <VideoCard 
+                        key={`${v.chat_id}:${v.message_id}`} 
+                        video={v} 
+                        onOpen={(vData, e) => handleOpenVideo(vData, e)} 
+                      />
+                    ))}
+                    
+                    {(loading || isChangingTab) && !activeGroup && actualVideosToDisplay.length === 0 && (
+                      [...Array(fetchLimit)].map((_, i) => <div key={i} style={skeletonSocket} />)
+                    )}
                  </div>
-               )}
 
-               <div style={{ 
-                 display: "grid", 
-                 gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(2, 1fr)", 
-                 gap: isDesktop ? "20px" : "10px",
-                 alignItems: "start", 
-                 animation: "fadeIn 0.3s ease-out" 
-               }}>
-                  {actualVideosToDisplay.map(v => (
-                    <VideoCard 
-                      key={`${v.chat_id}:${v.message_id}`} 
-                      video={v} 
-                      onOpen={(vData, e) => handleOpenVideo(vData, e)} 
-                    />
-                  ))}
-                  
-                  {(loading || isChangingTab) && !activeGroup && actualVideosToDisplay.length === 0 && (
-                    [...Array(fetchLimit)].map((_, i) => <div key={i} style={skeletonSocket} />)
-                  )}
-               </div>
-
-               {actualVideosToDisplay.length > 0 && !activeGroup && (
-                 <ExoClickWidget />
-               )}
-               
-               {(!loading && !isChangingTab && !activeGroup) && actualVideosToDisplay.length > 0 && (
-                 <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
-               )}
-            </div>
-            
-            {/* 🟢 SEO Footer Block Added Here */}
-            {actualVideosToDisplay.length > 0 && (
-              <div style={seoFooterStyle}>
-                Naijahomemade provides you with unlimited free Naija homemade videos with the hottest models. Enjoy the largest community on the net as well as full-length scenes from the top Models. We update our videos daily to ensure you always get the best quality Homemade movies.
+                 {actualVideosToDisplay.length > 0 && !activeGroup && (
+                   <ExoClickWidget />
+                 )}
+                 
+                 {(!loading && !isChangingTab && !activeGroup) && actualVideosToDisplay.length > 0 && (
+                   <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
+                 )}
               </div>
-            )}
-            
-            {actualVideosToDisplay.length > 0 && <LegalFooter />}
-            
+              
+              {/* 🟢 SEO Footer Block is now safely inside the wrapper */}
+              {actualVideosToDisplay.length > 0 && (
+                <div style={seoFooterStyle}>
+                  Naijahomemade provides you with unlimited free homemade videos with the hottest models. Enjoy the largest community on the net as well as full-length scenes from the top Naija homemade videos. We update our videos daily to ensure you always get the best quality Homemade movies.
+                </div>
+              )}
+              
+              {actualVideosToDisplay.length > 0 && <LegalFooter />}
+            </div>
+            {/* 🟢 END OF FIX */}
           </PullToRefresh>
         </div>
 
