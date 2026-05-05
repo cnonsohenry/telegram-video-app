@@ -349,8 +349,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           )}
           
           <PullToRefresh onRefresh={handleRefresh}>
-            {/* 🟢 THE FIX: Wrap everything in ONE single root div */}
-            <div>
+            {/* 🟢 THE FIX: Android-specific touch and scroll handling applied to the wrapper */}
+            <div style={{ 
+              touchAction: "pan-y", 
+              overscrollBehaviorY: "contain",
+              overflowAnchor: "none",
+              minHeight: "100vh" // Ensures the wrapper is always tall enough to scroll
+            }}>
               <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
                  
                  {activeGroup && (
@@ -363,6 +368,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                    </div>
                  )}
 
+                 {/* Keep your grid exactly the same */}
                  <div style={{ 
                    display: "grid", 
                    gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(2, 1fr)", 
@@ -392,16 +398,14 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                  )}
               </div>
               
-              {/* 🟢 SEO Footer Block is now safely inside the wrapper */}
               {actualVideosToDisplay.length > 0 && (
                 <div style={seoFooterStyle}>
-                  Naijahomemade provides you with unlimited free homemade videos with the hottest models. Enjoy the largest community on the net as well as full-length scenes from the top Naija homemade videos. We update our videos daily to ensure you always get the best quality Homemade movies.
+                  Naijahomemade provides you with unlimited free Naija homemade videos with the hottest models. Enjoy the largest community on the net as well as full-length scenes from the top Naija homemade videos. We update our Naijahomemade videos daily to ensure you always get the best quality Naija Homemade movies.
                 </div>
               )}
               
               {actualVideosToDisplay.length > 0 && <LegalFooter />}
             </div>
-            {/* 🟢 END OF FIX */}
           </PullToRefresh>
         </div>
 
