@@ -39,7 +39,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
 
   return (
     <a
-      href={`/v/${video.message_id}`}
+      href={`${APP_CONFIG.apiUrl}/v/${video.message_id}`}
       onClick={(e) => {
         e.preventDefault(); // 🟢 THE FIX: Stops browser from leaving the page
         onOpen(video, e);   // 🟢 THE FIX: Triggers your modal instead

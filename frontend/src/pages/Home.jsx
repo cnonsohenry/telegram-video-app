@@ -390,6 +390,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                )}
             </div>
             
+            {/* 🟢 SEO Footer Block Added Here */}
+            {actualVideosToDisplay.length > 0 && (
+              <div style={seoFooterStyle}>
+                Naijahomemade provides you with unlimited free Naija homemade videos with the hottest models. Enjoy the largest community on the net as well as full-length scenes from the top Models. We update our videos daily to ensure you always get the best quality Homemade movies.
+              </div>
+            )}
+            
             {actualVideosToDisplay.length > 0 && <LegalFooter />}
             
           </PullToRefresh>
@@ -443,6 +450,18 @@ const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px",
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 15px 0", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)" };
 const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
 const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
+
+// 🟢 NEW: SEO Footer Style
+const seoFooterStyle = { 
+  padding: "20px 25px", 
+  fontSize: "12px", 
+  color: "#666", 
+  textAlign: "center", 
+  lineHeight: "1.6", 
+  maxWidth: "800px", 
+  margin: "20px auto 0", 
+  borderTop: "1px solid rgba(255,255,255,0.05)" 
+};
 
 // 🟢 THE FULL-WIDTH EXOCLICK GRID
 const ExoClickWidget = () => {
