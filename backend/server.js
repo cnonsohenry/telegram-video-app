@@ -958,8 +958,8 @@ app.get('/v/:message_id', async (req, res) => {
     const appName = process.env.APP_NAME || "App";
     const userAgent = req.headers['user-agent'] || '';
 
-    // 🟢 1. Detect if the visitor is a Bot
-    const isBot = /Twitterbot|TelegramBot|facebookexternalhit|WhatsApp|Discordbot/i.test(userAgent);
+    // 🟢 1. Improved Bot Detection (Twitterbot is very specific)
+    const isBot = /Twitterbot|TelegramBot|facebookexternalhit|WhatsApp|Discordbot|Googlebot|AdsBot-Google/i.test(userAgent);
 
     const result = await pool.query(`
       SELECT v.*, u.username as uploader_name 
@@ -973,55 +973,64 @@ app.get('/v/:message_id', async (req, res) => {
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
     
-    // 🟢 2. Use the high-res 1280 height thumb for the player look
     const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:"))
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
       : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
 
-    // 🟢 3. Conditional Redirect Script
-    // Bots see the meta tags but stay on the page. Humans get redirected.
-    const redirectScript = isBot ? '' : `<script>window.location.href = "${frontendUrl}/?v=${message_id}";</script>`;
+    // 🟢 2. If it's a Bot, WE DO NOT REDIRECT. We serve only the metadata.
+    // This is the key to fixing Twitter.
+    if (isBot) {
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>${video.caption || "Exclusive Video"}</title>
+            
+            <!-- OpenGraph (Telegram/WhatsApp) -->
+            <meta property="og:type" content="video.other">
+            <meta property="og:title" content="${video.caption || "Watch exclusive shots"}">
+            <meta property="og:description" content="Watch high-quality homegrown shots on ${appName}.">
+            <meta property="og:image" content="${thumbUrl}">
+            <meta property="og:image:width" content="720">
+            <meta property="og:image:height" content="1280">
 
+            <!-- Twitter Player Card (X/Twitter Portrait Fix) -->
+            <meta name="twitter:card" content="player">
+            <meta name="twitter:site" content="@Naijahomemade">
+            <meta name="twitter:title" content="${video.caption || "Watch exclusive shots"}">
+            <meta name="twitter:description" content="Watch high-quality homegrown shots on ${appName}.">
+            
+            <!-- Use 'image:src' for maximum compatibility -->
+            <meta name="twitter:image" content="${thumbUrl}">
+            <meta name="twitter:image:src" content="${thumbUrl}">
+            
+            <!-- The 'player' URL should be the absolute link to this page -->
+            <meta name="twitter:player" content="${process.env.API_BASE_URL}/v/${message_id}">
+            <meta name="twitter:player:width" content="720">
+            <meta name="twitter:player:height" content="1280">
+          </head>
+          <body style="background: #000;"></body>
+        </html>
+      `);
+    }
+
+    // 🟢 3. For Humans: Immediate Redirect
+    // We send a tiny HTML page with a JS redirect as a backup, 
+    // but the Primary action is the window.location change.
     res.send(`
       <!DOCTYPE html>
-      <html lang="en">
+      <html>
         <head>
-          <title>${video.caption || "Watch exclusive shots"}</title>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <link rel="canonical" href="${frontendUrl}/v/${message_id}" />
-          
-          <!-- 🟢 OpenGraph (Telegram/WhatsApp) -->
-          <meta property="og:type" content="video.other">
-          <meta property="og:site_name" content="${appName}">
-          <meta property="og:title" content="${video.caption || "New Video from @" + (video.uploader_name || "Member")}">
-          <meta property="og:description" content="Watch high-quality homegrown shots on ${appName}.">
-          <meta property="og:image" content="${thumbUrl}">
-          <meta property="og:image:type" content="image/jpeg">
-          <meta property="og:image:width" content="720">
-          <meta property="og:image:height" content="1280">
-
-          <!-- 🟢 Twitter Player Card (The YouTube Shorts Secret) -->
-          <meta name="twitter:card" content="player">
-          <meta name="twitter:site" content="@Naijahomemade">
-          <meta name="twitter:title" content="${video.caption || "New Video from @" + (video.uploader_name || "Member")}">
-          <meta name="twitter:description" content="Watch high-quality homegrown shots on ${appName}.">
-          <meta name="twitter:image" content="${thumbUrl}">
-          <meta name="twitter:player" content="${process.env.API_BASE_URL}/v/${message_id}">
-          <meta name="twitter:player:width" content="720">
-          <meta name="twitter:player:height" content="1280">
-
-          ${redirectScript}
+          <script>window.location.href = "${frontendUrl}/?v=${message_id}";</script>
+          <meta http-equiv="refresh" content="0;url=${frontendUrl}/?v=${message_id}">
         </head>
-        <body style="background:#000; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; text-align:center; padding:20px;">
-          <div style="max-width:400px;">
-            <img src="${thumbUrl}" style="width:100%; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5); margin-bottom:20px;" />
-            <p>Redirecting to ${appName}...</p>
-            <a href="${frontendUrl}/?v=${message_id}" style="color:#ff3b30; text-decoration:none; font-weight:bold;">Click here if not redirected</a>
-          </div>
+        <body style="background:#000; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
+          <p>Loading Video...</p>
         </body>
       </html>
     `);
+
   } catch (err) {
     console.error("Share Link Error:", err.message);
     res.redirect(process.env.FRONTEND_URL);
