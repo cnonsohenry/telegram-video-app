@@ -949,6 +949,44 @@ app.get("/api/avatar", async (req, res) => {
 });
 
 /* =====================
+   Twitter Embed Player Route (Required for Portrait Previews)
+===================== */
+app.get('/embed/:message_id', async (req, res) => {
+  try {
+    const { message_id } = req.params;
+    
+    const result = await pool.query(`SELECT chat_id, message_id, cloudflare_id FROM videos WHERE message_id = $1 LIMIT 1`, [message_id]);
+    if (!result.rows.length) return res.status(404).send("Not found");
+    
+    const video = result.rows[0];
+    const sig = signThumbnail(video.chat_id, video.message_id);
+    
+    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:"))
+      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
+      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+
+    // We serve a static, full-screen image mimicking a video player for Twitter's iframe
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            img { width: 100%; height: 100%; object-fit: contain; }
+          </style>
+        </head>
+        <body>
+          <img src="${thumbUrl}" alt="Video Preview">
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send("Error");
+  }
+});
+
+/* =====================
    Share Link 
 ===================== */
 app.get('/v/:message_id', async (req, res) => {
@@ -1001,12 +1039,10 @@ app.get('/v/:message_id', async (req, res) => {
             <meta name="twitter:title" content="${video.caption || "Watch exclusive shots"}">
             <meta name="twitter:description" content="Watch high-quality homegrown shots on ${appName}.">
             
-            <!-- Use 'image:src' for maximum compatibility -->
             <meta name="twitter:image" content="${thumbUrl}">
-            <meta name="twitter:image:src" content="${thumbUrl}">
             
-            <!-- The 'player' URL should be the absolute link to this page -->
-            <meta name="twitter:player" content="${process.env.API_BASE_URL}/v/${message_id}">
+            <!-- 🟢 POINT THIS TO THE NEW EMBED ROUTE -->
+            <meta name="twitter:player" content="${process.env.API_BASE_URL}/embed/${message_id}">
             <meta name="twitter:player:width" content="720">
             <meta name="twitter:player:height" content="1280">
           </head>
