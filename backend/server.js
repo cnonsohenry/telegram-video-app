@@ -1018,11 +1018,17 @@ app.get('/v/:message_id', async (req, res) => {
           <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
           <meta property="og:image" content="${thumbUrl}">
           
-          <!-- 🟢 THE FIX: Force Telegram & Twitter to use the massive portrait layout -->
-          <meta name="twitter:card" content="summary_large_image">
+          <!-- 🟢 NEW FIX: Force Twitter to use the Portrait Player Card (Like YouTube Shorts/TikTok) -->
+          <meta name="twitter:card" content="player">
+          <meta name="twitter:site" content="@Naijahomemade">
           <meta name="twitter:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
           <meta name="twitter:description" content="Watch high-quality homegrown shots on our platform.">
           <meta name="twitter:image" content="${thumbUrl}">
+          
+          <!-- 🟢 The secret sauce for forcing Portrait mode -->
+          <meta name="twitter:player:width" content="720">
+          <meta name="twitter:player:height" content="1280">
+          <meta name="twitter:player" content="${frontendUrl}/v/${message_id}">
 
           <script type="application/ld+json">
             ${schemaJSON}
