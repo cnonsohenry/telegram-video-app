@@ -949,44 +949,6 @@ app.get("/api/avatar", async (req, res) => {
 });
 
 /* =====================
-   Twitter Embed Player Route (Required for Portrait Previews)
-===================== */
-app.get('/embed/:message_id', async (req, res) => {
-  try {
-    const { message_id } = req.params;
-    
-    const result = await pool.query(`SELECT chat_id, message_id, cloudflare_id FROM videos WHERE message_id = $1 LIMIT 1`, [message_id]);
-    if (!result.rows.length) return res.status(404).send("Not found");
-    
-    const video = result.rows[0];
-    const sig = signThumbnail(video.chat_id, video.message_id);
-    
-    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:"))
-      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
-      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
-
-    // We serve a static, full-screen image mimicking a video player for Twitter's iframe
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-            img { width: 100%; height: 100%; object-fit: contain; }
-          </style>
-        </head>
-        <body>
-          <img src="${thumbUrl}" alt="Video Preview">
-        </body>
-      </html>
-    `);
-  } catch (err) {
-    res.status(500).send("Error");
-  }
-});
-
-/* =====================
    Share Link 
 ===================== */
 app.get('/v/:message_id', async (req, res) => {
@@ -994,11 +956,7 @@ app.get('/v/:message_id', async (req, res) => {
     const { message_id } = req.params;
     const frontendUrl = process.env.FRONTEND_URL;
     const appName = process.env.APP_NAME || "App";
-    const userAgent = req.headers['user-agent'] || '';
-
-    // 🟢 1. Improved Bot Detection (Twitterbot is very specific)
-    const isBot = /Twitterbot|TelegramBot|facebookexternalhit|WhatsApp|Discordbot|Googlebot|AdsBot-Google/i.test(userAgent);
-
+    
     const result = await pool.query(`
       SELECT v.*, u.username as uploader_name 
       FROM videos v 
@@ -1011,80 +969,74 @@ app.get('/v/:message_id', async (req, res) => {
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
     
-    // 🟢 SECURE URLs ONLY. Twitter rejects HTTP. Force HTTPS.
-    const secureBaseUrl = (process.env.API_BASE_URL || "").replace("http://", "https://");
-    const secureFrontendUrl = (process.env.FRONTEND_URL || "").replace("http://", "https://");
+    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:"))
+      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
+      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
 
-    // Generate Signature
-    const sig = signThumbnail(video.chat_id, video.message_id);
-    
-    let thumbUrl = "";
-    let playerUrl = "";
+    const hiddenKeywords = [
+      "naijahomemade",
+      "naijahomemade channel telegram",
+      "nigerian trending videos",
+      "exclusive telegram shots",
+      "homemade naija sex",
+      "nigerian homemade sex",
+      "nigeria home made sex videos",
+      "naija homemade porn",
+      "naija homemade xxx",
+      "naija homemade fuck",
+      "naija homemade sex videos",
+      video.category 
+    ];
 
-    // 🟢 THE CLOUDFLARE TRUST FIX: 
-    if (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:")) {
-      const cleanId = video.cloudflare_id.split('?')[0];
-      // Use Cloudflare's official URL for the thumbnail
-      thumbUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=1280`;
-      // Use Cloudflare's officially trusted iframe player for Twitter
-      playerUrl = `https://iframe.videodelivery.net/${cleanId}`;
-    } else {
-      // Fallback for R2 / Telegram Videos
-      thumbUrl = `${secureBaseUrl}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
-      playerUrl = `${secureBaseUrl}/embed/${message_id}`;
-    }
+    const schemaJSON = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "VideoObject",
+      "name": video.caption || `Shot from @${video.uploader_name}`,
+      "description": `Watch this high-quality ${video.category} video on ${appName}.`,
+      "thumbnailUrl": [thumbUrl],
+      "uploadDate": video.created_at || new Date().toISOString(),
+      "keywords": hiddenKeywords, 
+      "author": {
+        "@type": "Person",
+        "name": video.uploader_name || "Member"
+      }
+    });
 
-    if (isBot) {
-      return res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <title>${video.caption || "Exclusive Video"}</title>
-            
-            <!-- OpenGraph (Telegram/WhatsApp) -->
-            <meta property="og:type" content="video.other">
-            <meta property="og:title" content="${video.caption || "Watch exclusive shots"}">
-            <meta property="og:description" content="Watch high-quality homegrown shots on ${appName}.">
-            <meta property="og:image" content="${thumbUrl}">
-            <meta property="og:image:secure_url" content="${thumbUrl}">
-            <meta property="og:image:width" content="720">
-            <meta property="og:image:height" content="1280">
-
-            <!-- 🟢 Twitter Player Card (X/Twitter Portrait Fix) -->
-            <meta name="twitter:card" content="player">
-            <meta name="twitter:site" content="@Naijahomemade">
-            <meta name="twitter:title" content="${video.caption || "Watch exclusive shots"}">
-            <meta name="twitter:description" content="Watch high-quality homegrown shots on ${appName}.">
-            
-            <meta name="twitter:image" content="${thumbUrl}">
-            
-            <!-- 🟢 Twitter's Trusted Player URL -->
-            <meta name="twitter:player" content="${playerUrl}">
-            <meta name="twitter:player:width" content="720">
-            <meta name="twitter:player:height" content="1280">
-          </head>
-          <body style="background: #000;"></body>
-        </html>
-      `);
-    }
-
-    // 🟢 3. For Humans: Immediate Redirect
-    // We send a tiny HTML page with a JS redirect as a backup, 
-    // but the Primary action is the window.location change.
     res.send(`
       <!DOCTYPE html>
       <html>
         <head>
-          <script>window.location.href = "${frontendUrl}/?v=${message_id}";</script>
-          <meta http-equiv="refresh" content="0;url=${frontendUrl}/?v=${message_id}">
+          <title>${video.caption || "Watch exclusive shots"}</title>
+          <meta charset="utf-8">
+          
+          <link rel="canonical" href="${frontendUrl}/v/${message_id}" />
+          
+          <!-- 🟢 Your Existing OpenGraph Tags -->
+          <meta property="og:type" content="video.other">
+          <meta property="og:site_name" content="${appName}">
+          <meta property="og:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
+          <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
+          <meta property="og:image" content="${thumbUrl}">
+          
+          <!-- 🟢 THE FIX: Force Telegram & Twitter to use the massive portrait layout -->
+          <meta name="twitter:card" content="summary_large_image">
+          <meta name="twitter:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
+          <meta name="twitter:description" content="Watch high-quality homegrown shots on our platform.">
+          <meta name="twitter:image" content="${thumbUrl}">
+
+          <script type="application/ld+json">
+            ${schemaJSON}
+          </script>
+
+          <script>
+            window.location.href = "${frontendUrl}/?v=${message_id}";
+          </script>
         </head>
         <body style="background:#000; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
-          <p>Loading Video...</p>
+          <p>Redirecting to ${appName}...</p>
         </body>
       </html>
     `);
-
   } catch (err) {
     console.error("Share Link Error:", err.message);
     res.redirect(process.env.FRONTEND_URL);
