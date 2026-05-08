@@ -1011,16 +1011,33 @@ app.get('/v/:message_id', async (req, res) => {
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
     
-    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:"))
-      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
-      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+    // 🟢 SECURE URLs ONLY. Twitter rejects HTTP. Force HTTPS.
+    const secureBaseUrl = (process.env.API_BASE_URL || "").replace("http://", "https://");
+    const secureFrontendUrl = (process.env.FRONTEND_URL || "").replace("http://", "https://");
 
-    // 🟢 2. If it's a Bot, WE DO NOT REDIRECT. We serve only the metadata.
-    // This is the key to fixing Twitter.
+    // Generate Signature
+    const sig = signThumbnail(video.chat_id, video.message_id);
+    
+    let thumbUrl = "";
+    let playerUrl = "";
+
+    // 🟢 THE CLOUDFLARE TRUST FIX: 
+    if (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:")) {
+      const cleanId = video.cloudflare_id.split('?')[0];
+      // Use Cloudflare's official URL for the thumbnail
+      thumbUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=1280`;
+      // Use Cloudflare's officially trusted iframe player for Twitter
+      playerUrl = `https://iframe.videodelivery.net/${cleanId}`;
+    } else {
+      // Fallback for R2 / Telegram Videos
+      thumbUrl = `${secureBaseUrl}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+      playerUrl = `${secureBaseUrl}/embed/${message_id}`;
+    }
+
     if (isBot) {
       return res.send(`
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
           <head>
             <meta charset="utf-8">
             <title>${video.caption || "Exclusive Video"}</title>
@@ -1030,10 +1047,11 @@ app.get('/v/:message_id', async (req, res) => {
             <meta property="og:title" content="${video.caption || "Watch exclusive shots"}">
             <meta property="og:description" content="Watch high-quality homegrown shots on ${appName}.">
             <meta property="og:image" content="${thumbUrl}">
+            <meta property="og:image:secure_url" content="${thumbUrl}">
             <meta property="og:image:width" content="720">
             <meta property="og:image:height" content="1280">
 
-            <!-- Twitter Player Card (X/Twitter Portrait Fix) -->
+            <!-- 🟢 Twitter Player Card (X/Twitter Portrait Fix) -->
             <meta name="twitter:card" content="player">
             <meta name="twitter:site" content="@Naijahomemade">
             <meta name="twitter:title" content="${video.caption || "Watch exclusive shots"}">
@@ -1041,8 +1059,8 @@ app.get('/v/:message_id', async (req, res) => {
             
             <meta name="twitter:image" content="${thumbUrl}">
             
-            <!-- 🟢 POINT THIS TO THE NEW EMBED ROUTE -->
-            <meta name="twitter:player" content="${process.env.API_BASE_URL}/embed/${message_id}">
+            <!-- 🟢 Twitter's Trusted Player URL -->
+            <meta name="twitter:player" content="${playerUrl}">
             <meta name="twitter:player:width" content="720">
             <meta name="twitter:player:height" content="1280">
           </head>
