@@ -956,7 +956,11 @@ app.get('/v/:message_id', async (req, res) => {
     const { message_id } = req.params;
     const frontendUrl = process.env.FRONTEND_URL;
     const appName = process.env.APP_NAME || "App";
-    
+    const userAgent = req.headers['user-agent'] || '';
+
+    // 🟢 1. Detect if the visitor is a Bot
+    const isBot = /Twitterbot|TelegramBot|facebookexternalhit|WhatsApp|Discordbot/i.test(userAgent);
+
     const result = await pool.query(`
       SELECT v.*, u.username as uploader_name 
       FROM videos v 
@@ -969,77 +973,52 @@ app.get('/v/:message_id', async (req, res) => {
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
     
+    // 🟢 2. Use the high-res 1280 height thumb for the player look
     const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:"))
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
       : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
 
-    const hiddenKeywords = [
-      "naijahomemade",
-      "naijahomemade channel telegram",
-      "nigerian trending videos",
-      "exclusive telegram shots",
-      "homemade naija sex",
-      "nigerian homemade sex",
-      "nigeria home made sex videos",
-      "naija homemade porn",
-      "naija homemade xxx",
-      "naija homemade fuck",
-      "naija homemade sex videos",
-      video.category 
-    ];
-
-    const schemaJSON = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "VideoObject",
-      "name": video.caption || `Shot from @${video.uploader_name}`,
-      "description": `Watch this high-quality ${video.category} video on ${appName}.`,
-      "thumbnailUrl": [thumbUrl],
-      "uploadDate": video.created_at || new Date().toISOString(),
-      "keywords": hiddenKeywords, 
-      "author": {
-        "@type": "Person",
-        "name": video.uploader_name || "Member"
-      }
-    });
+    // 🟢 3. Conditional Redirect Script
+    // Bots see the meta tags but stay on the page. Humans get redirected.
+    const redirectScript = isBot ? '' : `<script>window.location.href = "${frontendUrl}/?v=${message_id}";</script>`;
 
     res.send(`
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
         <head>
           <title>${video.caption || "Watch exclusive shots"}</title>
           <meta charset="utf-8">
-          
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <link rel="canonical" href="${frontendUrl}/v/${message_id}" />
           
-          <!-- 🟢 Your Existing OpenGraph Tags -->
+          <!-- 🟢 OpenGraph (Telegram/WhatsApp) -->
           <meta property="og:type" content="video.other">
           <meta property="og:site_name" content="${appName}">
-          <meta property="og:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
-          <meta property="og:description" content="Watch high-quality homegrown shots on our platform.">
+          <meta property="og:title" content="${video.caption || "New Video from @" + (video.uploader_name || "Member")}">
+          <meta property="og:description" content="Watch high-quality homegrown shots on ${appName}.">
           <meta property="og:image" content="${thumbUrl}">
-          
-          <!-- 🟢 NEW FIX: Force Twitter to use the Portrait Player Card (Like YouTube Shorts/TikTok) -->
+          <meta property="og:image:type" content="image/jpeg">
+          <meta property="og:image:width" content="720">
+          <meta property="og:image:height" content="1280">
+
+          <!-- 🟢 Twitter Player Card (The YouTube Shorts Secret) -->
           <meta name="twitter:card" content="player">
           <meta name="twitter:site" content="@Naijahomemade">
-          <meta name="twitter:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
-          <meta name="twitter:description" content="Watch high-quality homegrown shots on our platform.">
+          <meta name="twitter:title" content="${video.caption || "New Video from @" + (video.uploader_name || "Member")}">
+          <meta name="twitter:description" content="Watch high-quality homegrown shots on ${appName}.">
           <meta name="twitter:image" content="${thumbUrl}">
-          
-          <!-- 🟢 The secret sauce for forcing Portrait mode -->
+          <meta name="twitter:player" content="${process.env.API_BASE_URL}/v/${message_id}">
           <meta name="twitter:player:width" content="720">
           <meta name="twitter:player:height" content="1280">
-          <meta name="twitter:player" content="${frontendUrl}/v/${message_id}">
 
-          <script type="application/ld+json">
-            ${schemaJSON}
-          </script>
-
-          <script>
-            window.location.href = "${frontendUrl}/?v=${message_id}";
-          </script>
+          ${redirectScript}
         </head>
-        <body style="background:#000; color:#fff; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
-          <p>Redirecting to ${appName}...</p>
+        <body style="background:#000; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; text-align:center; padding:20px;">
+          <div style="max-width:400px;">
+            <img src="${thumbUrl}" style="width:100%; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5); margin-bottom:20px;" />
+            <p>Redirecting to ${appName}...</p>
+            <a href="${frontendUrl}/?v=${message_id}" style="color:#ff3b30; text-decoration:none; font-weight:bold;">Click here if not redirected</a>
+          </div>
         </body>
       </html>
     `);
