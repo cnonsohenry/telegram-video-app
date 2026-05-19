@@ -219,7 +219,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           <div style={{ 
             ...gridStyle, 
             gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(2, 1fr)",
-            gap: isDesktop ? "28px" : "1px"
+            gap: isDesktop ? "20px" : "10px"
           }}>
             {videosToDisplay.map(v => (
               <VideoCard 

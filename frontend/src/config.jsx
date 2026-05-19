@@ -50,7 +50,8 @@ export const APP_CONFIG = {
   subscriptionPackages: [
     { id: '1_month', label: '1 Month', price: 15000, priceText: '₦15,000', priceUsd: 19, textUsd: '$19' },
     { id: '2_months', label: '2 Months', price: 25000, priceText: '₦25,000', priceUsd: 25, textUsd: '$25' },
-    { id: '1_year', label: '1 Year', price: 125000, priceText: '₦125,000', priceUsd: 95, textUsd: '$95' }
+    { id: '1_year', label: '1 Year', price: 125000, priceText: '₦125,000', priceUsd: 95, textUsd: '$95' },
+    { id: 'life_time', label: 'LifeTime', price: 250000, priceText: '₦250,000', priceUsd: 250, textUsd: '$250' }
   ],
 
   // 🟢 NEW: Crypto Payment Options (Controls the buttons on the paywall)
