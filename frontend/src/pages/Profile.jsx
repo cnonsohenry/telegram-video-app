@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Settings, Grid3X3, Heart, Lock, CheckCircle, Share2, ArrowLeft } from "lucide-react"; 
 import VideoCard from "../components/VideoCard"; 
 import SettingsView from "../components/SettingsView"; 
@@ -13,6 +13,9 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
   
   const [activeGroup, setActiveGroup] = useState(null);
+  
+  // 🟢 THE FIX: Add a reference for our infinite scroll trigger
+  const loaderRef = useRef(null);
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth > 1024);
@@ -38,6 +41,34 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
   const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots", fetchLimit);
   const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium", fetchLimit);
 
+  const { data: rawVideosToDisplay, loading, loadMore } = activeTab === "premium" 
+    ? { data: premium || [], loading: premiumLoading, loadMore: loadMorePremium }
+    : { data: shots || [], loading: shotsLoading, loadMore: loadMoreShots };
+
+  const videosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
+
+  // 🟢 THE FIX: Set up the Intersection Observer for Infinite Scrolling
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0];
+        // If the trigger div is visible, we aren't already loading, and we aren't in a group folder -> Load more!
+        if (target.isIntersecting && !loading && !activeGroup) {
+          loadMore();
+        }
+      },
+      { 
+        root: null, 
+        rootMargin: "200px", // Trigger the load 200px BEFORE the user hits the absolute bottom for a seamless experience
+        threshold: 0.1 
+      }
+    );
+
+    if (loaderRef.current) observer.observe(loaderRef.current);
+
+    return () => observer.disconnect();
+  }, [loading, loadMore, activeGroup]);
+
   const handleOpenVideo = useCallback(async (video, e) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
@@ -47,7 +78,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
 
     if (video.is_group && !activeGroup) {
       try {
-        // 🟢 THE FIX: Dynamic API URL
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
         
@@ -71,7 +101,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
 
     try {
       setActiveVideo({ ...video, video_url: null }); 
-      // 🟢 THE FIX: Dynamic API URL
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       if (!res.ok) throw new Error("Fetch failed");
       const data = await res.json();
@@ -81,12 +110,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
       setActiveVideo(null);
     }
   }, [user, activeTab, setActiveVideo, activeGroup, isDesktop]); 
-
-  const { data: rawVideosToDisplay, loading, loadMore } = activeTab === "premium" 
-    ? { data: premium || [], loading: premiumLoading, loadMore: loadMorePremium }
-    : { data: shots || [], loading: shotsLoading, loadMore: loadMoreShots };
-
-  const videosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
 
   if (currentView === "settings") {
     return <SettingsView onBack={() => setCurrentView("profile")} onLogout={onLogout} />;
@@ -137,7 +160,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
               </div>
 
               <p style={{ ...bioStyle, fontSize: isDesktop ? "16px" : "12px", color: "#ccc", lineHeight: "1.4" }}>
-                {/* 🟢 THE FIX: Dynamic Profile Bio */}
                 <b style={{ color: "#fff" }}>{APP_CONFIG.profileBioTitle}</b><br/>
                 {APP_CONFIG.profileBioSubtitle}
               </p>
@@ -148,7 +170,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
                     style={premiumButtonStyle}
                     onClick={() => (!user || !user.is_premium) ? setShowPaywall(true) : alert("You are already Premium!")}
                   >
-                    {/* 🟢 THE FIX: Dynamic Subscribe Text */}
                     {user?.is_premium ? APP_CONFIG.profileVipText : APP_CONFIG.profileSubscribeText}
                   </button>
                   <button style={secondaryButtonStyle} onClick={() => alert("Link Copied")}><Share2 size={18} /></button>
@@ -163,7 +184,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
                 style={{ ...premiumButtonStyle, flex: 1, padding: "8px 16px", fontSize: "13px" }}
                 onClick={() => (!user || !user.is_premium) ? setShowPaywall(true) : alert("You are already Premium!")}
               >
-                {/* 🟢 THE FIX: Dynamic Subscribe Text */}
                 {user?.is_premium ? APP_CONFIG.profileVipText : APP_CONFIG.profileSubscribeText}
               </button>
               <button style={{ ...secondaryButtonStyle, padding: "0 15px" }} onClick={() => alert("Link Copied")}><Share2 size={18} /></button>
@@ -179,7 +199,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           borderTop: isDesktop ? "1px solid var(--border-color)" : "none",
           top: isDesktop ? "0" : "48px"
         }}>
-          {/* 🟢 THE FIX: Dynamic Tab Labels */}
           <TabButton 
             isDesktop={isDesktop} 
             active={activeTab === "videos"} 
@@ -231,10 +250,14 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
             ))}
           </div>
           
+          {/* Loading state message */}
           {loading && !activeGroup && <div style={loaderStyle}>Refreshing shots...</div>}
+          
+          {/* 🟢 THE FIX: The invisible trigger for our IntersectionObserver */}
           {!loading && !activeGroup && rawVideosToDisplay.length > 0 && (
-            <button onClick={loadMore} style={loadMoreBtnStyle}>Load More</button>
+            <div ref={loaderRef} style={{ height: "10px", width: "100%" }} />
           )}
+
         </div>
       </div>
     </div>
@@ -260,7 +283,7 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
   </button>
 );
 
-// 🖌 STYLES (Unchanged)
+// 🖌 STYLES
 const containerStyle = { minHeight: "100%", background: "var(--bg-color)", color: "#fff", position: "relative", overflowX: "hidden" };
 const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%" };
 const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid var(--border-color)", position: "sticky", top: 0, background: "var(--bg-color)", zIndex: 100, backdropFilter: "blur(15px)" };
@@ -275,9 +298,7 @@ const premiumButtonStyle = { background: "var(--primary-color)", color: "#fff", 
 const secondaryButtonStyle = { background: "#1a1a1a", color: "#fff", border: "1px solid #333", borderRadius: "8px", padding: "0 15px", display: "flex", alignItems: "center" };
 const desktopEditBtnStyle = { background: "#363636", color: "#fff", border: "none", borderRadius: "8px", padding: "5px 15px", fontWeight: "600", fontSize: "14px", cursor: "pointer" };
 const tabsContainerStyle = { display: "flex", position: "sticky", background: "var(--bg-color)", zIndex: 90 };
-const contentAreaStyle = { width: "100%", paddingBottom: "100px" };
 const gridStyle = { display: "grid" };
-const loadMoreBtnStyle = { display: "block", width: "100%", padding: "20px", background: "none", border: "none", color: "#8e8e8e", fontSize: "13px", fontWeight: "600", cursor: "pointer" };
 const loaderStyle = { padding: "40px", textAlign: "center", color: "#666", fontSize: "14px" };
 
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px", background: "var(--bg-color)", borderBottom: "1px solid rgba(255,255,255,0.05)" };
