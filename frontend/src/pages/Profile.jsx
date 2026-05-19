@@ -204,7 +204,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
         </div>
 
         {/* VIDEO GRID */}
-        <div style={contentAreaStyle}>
+        <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
           
           {activeGroup && (
             <div style={groupHeaderStyle}>
