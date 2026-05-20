@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, Share2, Download, Check, Heart, MessageCircle, Bookmark, Volume2, VolumeX } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
@@ -8,17 +8,17 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
   const videoRef = useRef(null);
   const containerRef = useRef(null); 
   const lastTap = useRef(0);
-  const hideTimeout = useRef(null); 
   
   // Video States
   const [isPlaying, setIsPlaying] = useState(false); 
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
+  const [sliderTime, setSliderTime] = useState(0); // 🟢 THE FIX: Local ultra-fast state for sliding
   const [duration, setDuration] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showControls, setShowControls] = useState(true); 
-  const [isDragging, setIsDragging] = useState(false); // 🟢 Tracks manual sliding
-  const [isMuted, setIsMuted] = useState(false); // 🟢 Volume state
+  const [isDragging, setIsDragging] = useState(false); 
+  const [isMuted, setIsMuted] = useState(false); 
   
   // Action States
   const [copied, setCopied] = useState(false); 
@@ -47,22 +47,11 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     .catch(err => console.error("Failed to fetch interaction state", err));
   }, [video.message_id]);
 
-  const resetHideTimer = useCallback(() => {
-    setShowControls(true);
-    if (hideTimeout.current) clearTimeout(hideTimeout.current);
-    
-    hideTimeout.current = setTimeout(() => {
-      setIsPlaying(playing => {
-        if (playing) setShowControls(false); 
-        return playing;
-      });
-    }, 4000); 
-  }, []);
-
   const handleTimeUpdate = () => {
-    // 🟢 Don't update time from video if the user is currently dragging the slider!
+    // 🟢 Only update times from the video if the user isn't currently holding the slider
     if (videoRef.current && !isDragging) {
       setCurrentTime(videoRef.current.currentTime);
+      setSliderTime(videoRef.current.currentTime);
       setDuration(videoRef.current.duration || 0);
     }
   };
@@ -74,7 +63,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // 🟢 Screen Tap to clear details completely
+  // 🟢 Screen Tap strictly toggles UI visibility (Auto-hide timeout removed completely)
   const handleInteraction = (e) => {
     if (e) e.stopPropagation();
     const now = Date.now();
@@ -83,16 +72,11 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
       setIsZoomed(z => !z);
       lastTap.current = 0; 
-      resetHideTimer();
     } else {
       lastTap.current = now;
       setTimeout(() => {
         if (lastTap.current === now && videoRef.current) {
-          setShowControls(prev => {
-            if (!prev) resetHideTimer();
-            else if (hideTimeout.current) clearTimeout(hideTimeout.current);
-            return !prev;
-          });
+          setShowControls(prev => !prev);
         }
       }, DOUBLE_TAP_DELAY);
     }
@@ -100,7 +84,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
   const handleTogglePlay = (e) => {
     e.stopPropagation();
-    resetHideTimer();
     if (videoRef.current) {
       if (isPlaying) videoRef.current.pause();
       else videoRef.current.play().catch(() => {});
@@ -110,7 +93,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
   // 🟢 ENGAGEMENT HANDLERS
   const handleLike = async (e) => {
     e.stopPropagation();
-    resetHideTimer();
     const token = localStorage.getItem("token");
     if (!token) return alert("Please log in to like videos!");
 
@@ -128,7 +110,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
   const handleSaveToProfile = async (e) => {
     e.stopPropagation();
-    resetHideTimer();
     const token = localStorage.getItem("token");
     if (!token) return alert("Please log in to save videos!");
 
@@ -146,7 +127,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
   const handleShare = async (e) => {
     e.stopPropagation();
-    resetHideTimer();
     const shareUrl = `${window.location.origin}/v/${video.message_id}`;
     const brandName = `${APP_CONFIG.appNamePrefix} ${APP_CONFIG.appNameSuffix}`;
 
@@ -174,7 +154,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
   const handleCommentClick = (e) => {
     e.stopPropagation();
-    resetHideTimer();
     const token = localStorage.getItem("token");
     if (!token) return alert("Please log in to comment!");
     
@@ -186,7 +165,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
   const handleDownload = async (e) => {
     e.stopPropagation();
-    resetHideTimer();
     if (isDownloading) return;
     
     setIsDownloading(true);
@@ -222,7 +200,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     document.body.style.top = `-${scrollY}px`;
     document.body.style.width = "100%";
 
-    resetHideTimer();
     if (videoRef.current) {
       const playPromise = videoRef.current.play();
       if (playPromise !== undefined) playPromise.catch(() => { setIsPlaying(false); setShowControls(true); });
@@ -234,20 +211,20 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
       document.body.style.top = originalStyle.top;
       document.body.style.width = originalStyle.width;
       window.scrollTo(0, scrollY);
-      if (hideTimeout.current) clearTimeout(hideTimeout.current);
     };
-  }, [resetHideTimer]);
+  }, []);
 
   if (!video) return null;
 
-  // 🟢 Calculate the exact percentage of the video played for the white slider fill
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  // 🟢 Track percentage against either the active drag value or the static player position
+  const activeDisplayTime = isDragging ? sliderTime : currentTime;
+  const progressPercent = duration > 0 ? (activeDisplayTime / duration) * 100 : 0;
 
   return (
     <div ref={containerRef} style={overlayStyle} onClick={onClose}>
       <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />
 
-      {/* 🟢 Close Buttons now properly respect the showControls state */}
+      {/* Close Buttons */}
       {!isDesktop ? (
         <button 
           onClick={(e) => { e.stopPropagation(); onClose(); }} 
@@ -266,7 +243,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
       <div style={stageStyle} onClick={(e) => e.stopPropagation()}>
         <div onClick={handleInteraction} style={videoWrapperStyle}>
-          {isLoading && (
+          
+          {/* 🟢 Spinner will only show on true native buffering pauses now, not when dragging */}
+          {isLoading && !isDragging && (
             <div style={loaderContainerStyle}>
               <Loader2 size={48} color="var(--primary-color)" className="spin-animation" />
             </div>
@@ -294,13 +273,12 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
           <div style={{ ...bottomUIWrapper, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
             
-            {/* Video Controls (Right Aligned above progress bar) */}
+            {/* Video Controls */}
             <div style={floatingControlsRow}>
-                {/* 🟢 Mute Toggle */}
-                <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); resetHideTimer(); }} style={floatingBtnStyle}>
+                <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} style={floatingBtnStyle}>
                   {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); resetHideTimer(); }} style={floatingBtnStyle}>
+                <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }} style={floatingBtnStyle}>
                   {isZoomed ? <Minimize size={18} /> : <Maximize size={18} />}
                 </button>
                 <button onClick={handleDownload} style={floatingBtnStyle}>
@@ -310,27 +288,41 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
             {/* Play/Pause & Progress Bar */}
             <div style={progressRowStyle}>
+               {/* 🟢 Play/Pause Button is now substantially larger with comfortable padding */}
                <button onClick={handleTogglePlay} style={playPauseBtnStyle}>
-                 {isPlaying ? <Pause size={20} fill="#fff" /> : <Play size={20} fill="#fff" />}
+                 {isPlaying ? <Pause size={32} fill="#fff" color="#fff" /> : <Play size={32} fill="#fff" color="#fff" />}
                </button>
+               
                <input 
                  type="range" min="0" max={duration || 100} step="0.1"
-                 value={currentTime || 0} 
-                 onPointerDown={() => setIsDragging(true)} // Prevents stuttering
-                 onPointerUp={() => setIsDragging(false)}
+                 value={activeDisplayTime || 0} 
+                 
+                 // Desktop Pointer Handlers
+                 onPointerDown={() => setIsDragging(true)}
+                 onPointerUp={(e) => {
+                   setIsDragging(false);
+                   const targetTime = parseFloat(e.target.value);
+                   setCurrentTime(targetTime);
+                   if (videoRef.current) videoRef.current.currentTime = targetTime;
+                 }}
+                 
+                 // Mobile Specific Touch Handlers (Fallback assurance)
+                 onTouchStart={() => setIsDragging(true)}
+                 onTouchEnd={(e) => {
+                   setIsDragging(false);
+                   const targetTime = parseFloat(e.target.value);
+                   setCurrentTime(targetTime);
+                   if (videoRef.current) videoRef.current.currentTime = targetTime;
+                 }}
+                 
                  onChange={(e) => {
                    e.stopPropagation();
-                   const newTime = parseFloat(e.target.value);
-                   setCurrentTime(newTime);
-                   if (videoRef.current) {
-                     videoRef.current.currentTime = newTime;
-                   }
-                   resetHideTimer();
+                   // Instant visual updating during moving
+                   setSliderTime(parseFloat(e.target.value));
                  }}
                  className="x-range"
                  style={{
                    ...rangeInputBaseStyle,
-                   // 🟢 Dynamic Linear Gradient fills the left side white, right side transparent
                    background: `linear-gradient(to right, #ffffff ${progressPercent}%, rgba(255,255,255,0.3) ${progressPercent}%)`
                  }}
                />
@@ -338,7 +330,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
             {/* Time Display */}
             <div style={timeDisplayRow}>
-               {formatTime(currentTime)} / {formatTime(duration)}
+               {formatTime(activeDisplayTime)} / {formatTime(duration)}
             </div>
 
             {/* Avatar, Name, and Caption */}
@@ -383,8 +375,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .spin-animation { animation: spin 1s linear infinite; }
         
-        .x-range { width: 100%; cursor: pointer; height: 4px; border-radius: 2px; appearance: none; outline: none; transition: background 0.1s ease; }
-        .x-range::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; background: #fff; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        .x-range { width: 100%; cursor: pointer; height: 6px; border-radius: 3px; appearance: none; outline: none; transition: background 0.05s linear; }
+        .x-range::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; background: #fff; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        .x-range::-moz-range-thumb { width: 14px; height: 14px; background: #fff; border-radius: 50%; border: none; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
       `}</style>
     </div>
   );
@@ -397,19 +390,19 @@ const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "fl
 const loaderContainerStyle = { position: "absolute", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" };
 
 const topGradientStyle = { position: "absolute", top: 0, left: 0, right: 0, height: "120px", background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)", zIndex: 10005, transition: "opacity 0.4s ease" };
-const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "250px", background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.4s ease", pointerEvents: "none" };
+const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "280px", background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.4s ease", pointerEvents: "none" };
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease" };
 
-const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area-inset-bottom))", left: 0, right: 0, padding: "0 15px", zIndex: 10002, display: "flex", flexDirection: "column", transition: "opacity 0.3s ease" };
-const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "8px" };
-const floatingBtnStyle = { background: "rgba(0,0,0,0.6)", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)", cursor: "pointer" };
+const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area-inset-bottom))", left: 0, right: 0, padding: "0 15px", zIndex: 10002, display: "flex", flexDirection: "column", transition: "opacity 0.4s ease" };
+const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "12px" };
+const floatingBtnStyle = { background: "rgba(0,0,0,0.6)", border: "none", color: "#fff", width: "40px", height: "40px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)", cursor: "pointer" };
 
-const progressRowStyle = { display: "flex", alignItems: "center", gap: "10px", width: "100%" };
-const playPauseBtnStyle = { background: "transparent", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" };
+const progressRowStyle = { display: "flex", alignItems: "center", gap: "14px", width: "100%" };
+const playPauseBtnStyle = { background: "transparent", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", minWidth: "48px", minHeight: "48px" };
 const rangeInputBaseStyle = { flex: 1 };
 
-const timeDisplayRow = { display: "flex", justifyContent: "flex-end", fontSize: "12px", fontWeight: "500", color: "#e7e9ea", marginTop: "4px", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
+const timeDisplayRow = { display: "flex", justifyContent: "flex-end", fontSize: "12px", fontWeight: "500", color: "#e7e9ea", marginTop: "4px", paddingRight: "4px", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
 
 const postInfoStyle = { display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "12px", marginBottom: "16px" };
 const avatarStyle = { width: "42px", height: "42px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(255,255,255,0.2)", flexShrink: 0 };
@@ -417,5 +410,5 @@ const textDetailsStyle = { display: "flex", flexDirection: "column", gap: "4px",
 const usernameStyle = { fontSize: "16px", fontWeight: "700", color: "#fff", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
 const captionStyle = { fontSize: "14px", color: "#e7e9ea", lineHeight: "1.4", wordWrap: "break-word", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
 
-const engagementBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 10px", borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: "12px" };
+const engagementBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 10px", borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: "14px" };
 const engagementBtnStyle = { background: "transparent", border: "none", display: "flex", alignItems: "center", gap: "6px", color: "#e7e9ea", fontSize: "13px", fontWeight: "600", cursor: "pointer", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
