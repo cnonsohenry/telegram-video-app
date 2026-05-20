@@ -7,13 +7,11 @@ import { APP_CONFIG } from "../config";
 export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentClick }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null); 
-  const lastTap = useRef(0);
   
   // Video States
   const [isPlaying, setIsPlaying] = useState(false); 
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
-  const [sliderTime, setSliderTime] = useState(0); // 🟢 THE FIX: Local ultra-fast state for sliding
   const [duration, setDuration] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showControls, setShowControls] = useState(true); 
@@ -48,10 +46,9 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
   }, [video.message_id]);
 
   const handleTimeUpdate = () => {
-    // 🟢 Only update times from the video if the user isn't currently holding the slider
+    // Only read from the video if the user isn't dragging the thumb
     if (videoRef.current && !isDragging) {
       setCurrentTime(videoRef.current.currentTime);
-      setSliderTime(videoRef.current.currentTime);
       setDuration(videoRef.current.duration || 0);
     }
   };
@@ -63,23 +60,10 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // 🟢 Screen Tap strictly toggles UI visibility (Auto-hide timeout removed completely)
+  // 🟢 Screen Tap strictly toggles UI (No auto-hiding)
   const handleInteraction = (e) => {
     if (e) e.stopPropagation();
-    const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300;
-
-    if (now - lastTap.current < DOUBLE_TAP_DELAY) {
-      setIsZoomed(z => !z);
-      lastTap.current = 0; 
-    } else {
-      lastTap.current = now;
-      setTimeout(() => {
-        if (lastTap.current === now && videoRef.current) {
-          setShowControls(prev => !prev);
-        }
-      }, DOUBLE_TAP_DELAY);
-    }
+    setShowControls(prev => !prev);
   };
 
   const handleTogglePlay = (e) => {
@@ -216,9 +200,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
   if (!video) return null;
 
-  // 🟢 Track percentage against either the active drag value or the static player position
-  const activeDisplayTime = isDragging ? sliderTime : currentTime;
-  const progressPercent = duration > 0 ? (activeDisplayTime / duration) * 100 : 0;
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <div ref={containerRef} style={overlayStyle} onClick={onClose}>
@@ -244,7 +226,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
       <div style={stageStyle} onClick={(e) => e.stopPropagation()}>
         <div onClick={handleInteraction} style={videoWrapperStyle}>
           
-          {/* 🟢 Spinner will only show on true native buffering pauses now, not when dragging */}
           {isLoading && !isDragging && (
             <div style={loaderContainerStyle}>
               <Loader2 size={48} color="var(--primary-color)" className="spin-animation" />
@@ -269,11 +250,25 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
             }}
           />
 
+          {/* 🟢 MASSIVE CENTER PLAY/PAUSE BUTTON */}
+          <button 
+             onClick={handleTogglePlay} 
+             style={{
+               ...centerPlayButtonStyle,
+               opacity: showControls ? 1 : 0,
+               pointerEvents: showControls ? "auto" : "none"
+             }}
+          >
+             <div style={centerIconCircle}>
+               {isPlaying ? <Pause size={56} fill="#fff" color="#fff" /> : <Play size={56} fill="#fff" color="#fff" />}
+             </div>
+          </button>
+
           <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
 
           <div style={{ ...bottomUIWrapper, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
             
-            {/* Video Controls */}
+            {/* Top Row: Floating Controls (Right Aligned) */}
             <div style={floatingControlsRow}>
                 <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} style={floatingBtnStyle}>
                   {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
@@ -286,54 +281,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
                 </button>
             </div>
 
-            {/* Play/Pause & Progress Bar */}
-            <div style={progressRowStyle}>
-               {/* 🟢 Play/Pause Button is now substantially larger with comfortable padding */}
-               <button onClick={handleTogglePlay} style={playPauseBtnStyle}>
-                 {isPlaying ? <Pause size={32} fill="#fff" color="#fff" /> : <Play size={32} fill="#fff" color="#fff" />}
-               </button>
-               
-               <input 
-                 type="range" min="0" max={duration || 100} step="0.1"
-                 value={activeDisplayTime || 0} 
-                 
-                 // Desktop Pointer Handlers
-                 onPointerDown={() => setIsDragging(true)}
-                 onPointerUp={(e) => {
-                   setIsDragging(false);
-                   const targetTime = parseFloat(e.target.value);
-                   setCurrentTime(targetTime);
-                   if (videoRef.current) videoRef.current.currentTime = targetTime;
-                 }}
-                 
-                 // Mobile Specific Touch Handlers (Fallback assurance)
-                 onTouchStart={() => setIsDragging(true)}
-                 onTouchEnd={(e) => {
-                   setIsDragging(false);
-                   const targetTime = parseFloat(e.target.value);
-                   setCurrentTime(targetTime);
-                   if (videoRef.current) videoRef.current.currentTime = targetTime;
-                 }}
-                 
-                 onChange={(e) => {
-                   e.stopPropagation();
-                   // Instant visual updating during moving
-                   setSliderTime(parseFloat(e.target.value));
-                 }}
-                 className="x-range"
-                 style={{
-                   ...rangeInputBaseStyle,
-                   background: `linear-gradient(to right, #ffffff ${progressPercent}%, rgba(255,255,255,0.3) ${progressPercent}%)`
-                 }}
-               />
-            </div>
-
-            {/* Time Display */}
-            <div style={timeDisplayRow}>
-               {formatTime(activeDisplayTime)} / {formatTime(duration)}
-            </div>
-
-            {/* Avatar, Name, and Caption */}
+            {/* Middle Row: Avatar, Name, and Caption */}
             <div style={postInfoStyle}>
                <img 
                   src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
@@ -347,7 +295,43 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
                </div>
             </div>
 
-            {/* Engagement Action Bar */}
+            {/* 🟢 Bottom Row: Tight Progress Bar + Timer Grouping */}
+            <div style={progressContainerStyle}>
+               <input 
+                 type="range" min="0" max={duration || 100} step="0.1"
+                 value={currentTime || 0} 
+                 
+                 // 🟢 THE FIX: stopPropagation prevents the background from stealing the touch event
+                 onMouseDown={(e) => { e.stopPropagation(); setIsDragging(true); }}
+                 onTouchStart={(e) => { e.stopPropagation(); setIsDragging(true); }}
+                 
+                 onChange={(e) => {
+                   e.stopPropagation();
+                   setCurrentTime(parseFloat(e.target.value)); // Visual instantly updates
+                 }}
+                 
+                 onMouseUp={(e) => {
+                   e.stopPropagation();
+                   setIsDragging(false);
+                   if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
+                 }}
+                 onTouchEnd={(e) => {
+                   e.stopPropagation();
+                   setIsDragging(false);
+                   if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
+                 }}
+                 className="x-range"
+                 style={{
+                   ...rangeInputBaseStyle,
+                   background: `linear-gradient(to right, #ffffff ${progressPercent}%, rgba(255,255,255,0.3) ${progressPercent}%)`
+                 }}
+               />
+               <div style={timeDisplayStyle}>
+                 {formatTime(currentTime)} / {formatTime(duration)}
+               </div>
+            </div>
+
+            {/* Action Bar */}
             <div style={engagementBarStyle}>
                <button style={engagementBtnStyle} onClick={handleLike}>
                   <Heart size={22} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#fff"} />
@@ -375,9 +359,10 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .spin-animation { animation: spin 1s linear infinite; }
         
-        .x-range { width: 100%; cursor: pointer; height: 6px; border-radius: 3px; appearance: none; outline: none; transition: background 0.05s linear; }
-        .x-range::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; background: #fff; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
-        .x-range::-moz-range-thumb { width: 14px; height: 14px; background: #fff; border-radius: 50%; border: none; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        /* 🟢 Makes the slider thumb slightly bigger for easier grabbing */
+        .x-range { width: 100%; cursor: pointer; height: 6px; border-radius: 3px; appearance: none; outline: none; }
+        .x-range::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        .x-range::-moz-range-thumb { width: 16px; height: 16px; background: #fff; border-radius: 50%; border: none; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
       `}</style>
     </div>
   );
@@ -390,25 +375,28 @@ const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "fl
 const loaderContainerStyle = { position: "absolute", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" };
 
 const topGradientStyle = { position: "absolute", top: 0, left: 0, right: 0, height: "120px", background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)", zIndex: 10005, transition: "opacity 0.4s ease" };
-const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "280px", background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.4s ease", pointerEvents: "none" };
+const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "300px", background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.4s ease", pointerEvents: "none" };
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease" };
 
-const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area-inset-bottom))", left: 0, right: 0, padding: "0 15px", zIndex: 10002, display: "flex", flexDirection: "column", transition: "opacity 0.4s ease" };
-const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "12px" };
+// 🟢 New Center Play/Pause Button
+const centerPlayButtonStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "transparent", border: "none", cursor: "pointer", zIndex: 10005, transition: "opacity 0.2s ease" };
+const centerIconCircle = { background: "rgba(0,0,0,0.4)", borderRadius: "50%", padding: "20px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" };
+
+const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area-inset-bottom))", left: 0, right: 0, padding: "0 15px", zIndex: 10002, display: "flex", flexDirection: "column", transition: "opacity 0.2s ease" };
+const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "8px" };
 const floatingBtnStyle = { background: "rgba(0,0,0,0.6)", border: "none", color: "#fff", width: "40px", height: "40px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)", cursor: "pointer" };
 
-const progressRowStyle = { display: "flex", alignItems: "center", gap: "14px", width: "100%" };
-const playPauseBtnStyle = { background: "transparent", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center", minWidth: "48px", minHeight: "48px" };
-const rangeInputBaseStyle = { flex: 1 };
-
-const timeDisplayRow = { display: "flex", justifyContent: "flex-end", fontSize: "12px", fontWeight: "500", color: "#e7e9ea", marginTop: "4px", paddingRight: "4px", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
-
-const postInfoStyle = { display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "12px", marginBottom: "16px" };
+const postInfoStyle = { display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "12px" };
 const avatarStyle = { width: "42px", height: "42px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(255,255,255,0.2)", flexShrink: 0 };
 const textDetailsStyle = { display: "flex", flexDirection: "column", gap: "4px", overflow: "hidden" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", color: "#fff", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
 const captionStyle = { fontSize: "14px", color: "#e7e9ea", lineHeight: "1.4", wordWrap: "break-word", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
+
+// 🟢 Tightly grouped Progress and Timer
+const progressContainerStyle = { display: "flex", flexDirection: "column", gap: "4px", width: "100%", marginBottom: "16px" };
+const rangeInputBaseStyle = { flex: 1 };
+const timeDisplayStyle = { fontSize: "11px", fontWeight: "500", color: "#ccc", textAlign: "right", paddingRight: "4px", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
 
 const engagementBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 10px", borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: "14px" };
 const engagementBtnStyle = { background: "transparent", border: "none", display: "flex", alignItems: "center", gap: "6px", color: "#e7e9ea", fontSize: "13px", fontWeight: "600", cursor: "pointer", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
