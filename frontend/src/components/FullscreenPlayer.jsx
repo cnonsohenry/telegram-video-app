@@ -46,7 +46,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
   }, [video.message_id]);
 
   const handleTimeUpdate = () => {
-    // Only read from the video if the user isn't dragging the thumb
     if (videoRef.current && !isDragging) {
       setCurrentTime(videoRef.current.currentTime);
       setDuration(videoRef.current.duration || 0);
@@ -60,7 +59,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // 🟢 Screen Tap strictly toggles UI (No auto-hiding)
   const handleInteraction = (e) => {
     if (e) e.stopPropagation();
     setShowControls(prev => !prev);
@@ -206,7 +204,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     <div ref={containerRef} style={overlayStyle} onClick={onClose}>
       <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />
 
-      {/* Close Buttons */}
       {!isDesktop ? (
         <button 
           onClick={(e) => { e.stopPropagation(); onClose(); }} 
@@ -250,25 +247,11 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
             }}
           />
 
-          {/* 🟢 MASSIVE CENTER PLAY/PAUSE BUTTON */}
-          <button 
-             onClick={handleTogglePlay} 
-             style={{
-               ...centerPlayButtonStyle,
-               opacity: showControls ? 1 : 0,
-               pointerEvents: showControls ? "auto" : "none"
-             }}
-          >
-             <div style={centerIconCircle}>
-               {isPlaying ? <Pause size={56} fill="#fff" color="#fff" /> : <Play size={56} fill="#fff" color="#fff" />}
-             </div>
-          </button>
-
           <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
 
           <div style={{ ...bottomUIWrapper, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
             
-            {/* Top Row: Floating Controls (Right Aligned) */}
+            {/* Top Row: Floating Controls */}
             <div style={floatingControlsRow}>
                 <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} style={floatingBtnStyle}>
                   {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
@@ -295,39 +278,40 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
                </div>
             </div>
 
-            {/* 🟢 Bottom Row: Tight Progress Bar + Timer Grouping */}
-            <div style={progressContainerStyle}>
-               <input 
-                 type="range" min="0" max={duration || 100} step="0.1"
-                 value={currentTime || 0} 
-                 
-                 // 🟢 THE FIX: stopPropagation prevents the background from stealing the touch event
-                 onMouseDown={(e) => { e.stopPropagation(); setIsDragging(true); }}
-                 onTouchStart={(e) => { e.stopPropagation(); setIsDragging(true); }}
-                 
-                 onChange={(e) => {
-                   e.stopPropagation();
-                   setCurrentTime(parseFloat(e.target.value)); // Visual instantly updates
-                 }}
-                 
-                 onMouseUp={(e) => {
-                   e.stopPropagation();
-                   setIsDragging(false);
-                   if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
-                 }}
-                 onTouchEnd={(e) => {
-                   e.stopPropagation();
-                   setIsDragging(false);
-                   if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
-                 }}
-                 className="x-range"
-                 style={{
-                   ...rangeInputBaseStyle,
-                   background: `linear-gradient(to right, #ffffff ${progressPercent}%, rgba(255,255,255,0.3) ${progressPercent}%)`
-                 }}
-               />
-               <div style={timeDisplayStyle}>
-                 {formatTime(currentTime)} / {formatTime(duration)}
+            {/* 🟢 Bottom Row: Play/Pause firmly docked next to Progress Bar */}
+            <div style={controlBarContainer}>
+               <button onClick={handleTogglePlay} style={playPauseBtnStyle}>
+                 {isPlaying ? <Pause size={36} fill="#fff" color="#fff" /> : <Play size={36} fill="#fff" color="#fff" />}
+               </button>
+
+               <div style={progressContainerStyle}>
+                 <input 
+                   type="range" min="0" max={duration || 100} step="0.1"
+                   value={currentTime || 0} 
+                   
+                   onMouseDown={(e) => { e.stopPropagation(); setIsDragging(true); }}
+                   onTouchStart={(e) => { e.stopPropagation(); setIsDragging(true); }}
+                   onChange={(e) => { e.stopPropagation(); setCurrentTime(parseFloat(e.target.value)); }}
+                   
+                   onMouseUp={(e) => {
+                     e.stopPropagation();
+                     setIsDragging(false);
+                     if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
+                   }}
+                   onTouchEnd={(e) => {
+                     e.stopPropagation();
+                     setIsDragging(false);
+                     if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
+                   }}
+                   className="x-range"
+                   style={{
+                     ...rangeInputBaseStyle,
+                     background: `linear-gradient(to right, #ffffff ${progressPercent}%, rgba(255,255,255,0.3) ${progressPercent}%)`
+                   }}
+                 />
+                 <div style={timeDisplayStyle}>
+                   {formatTime(currentTime)} / {formatTime(duration)}
+                 </div>
                </div>
             </div>
 
@@ -359,7 +343,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .spin-animation { animation: spin 1s linear infinite; }
         
-        /* 🟢 Makes the slider thumb slightly bigger for easier grabbing */
         .x-range { width: 100%; cursor: pointer; height: 6px; border-radius: 3px; appearance: none; outline: none; }
         .x-range::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
         .x-range::-moz-range-thumb { width: 16px; height: 16px; background: #fff; border-radius: 50%; border: none; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
@@ -379,10 +362,6 @@ const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease" };
 
-// 🟢 New Center Play/Pause Button
-const centerPlayButtonStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "transparent", border: "none", cursor: "pointer", zIndex: 10005, transition: "opacity 0.2s ease" };
-const centerIconCircle = { background: "rgba(0,0,0,0.4)", borderRadius: "50%", padding: "20px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" };
-
 const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area-inset-bottom))", left: 0, right: 0, padding: "0 15px", zIndex: 10002, display: "flex", flexDirection: "column", transition: "opacity 0.2s ease" };
 const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "8px" };
 const floatingBtnStyle = { background: "rgba(0,0,0,0.6)", border: "none", color: "#fff", width: "40px", height: "40px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)", cursor: "pointer" };
@@ -393,9 +372,11 @@ const textDetailsStyle = { display: "flex", flexDirection: "column", gap: "4px",
 const usernameStyle = { fontSize: "16px", fontWeight: "700", color: "#fff", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
 const captionStyle = { fontSize: "14px", color: "#e7e9ea", lineHeight: "1.4", wordWrap: "break-word", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
 
-// 🟢 Tightly grouped Progress and Timer
-const progressContainerStyle = { display: "flex", flexDirection: "column", gap: "4px", width: "100%", marginBottom: "16px" };
-const rangeInputBaseStyle = { flex: 1 };
+// 🟢 Re-docked Control Row
+const controlBarContainer = { display: "flex", alignItems: "center", gap: "12px", width: "100%", marginBottom: "16px" };
+const playPauseBtnStyle = { background: "transparent", border: "none", cursor: "pointer", padding: "4px", display: "flex", alignItems: "center", justifyContent: "center" };
+const progressContainerStyle = { display: "flex", flexDirection: "column", gap: "4px", flex: 1 };
+const rangeInputBaseStyle = { width: "100%" };
 const timeDisplayStyle = { fontSize: "11px", fontWeight: "500", color: "#ccc", textAlign: "right", paddingRight: "4px", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
 
 const engagementBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 10px", borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: "14px" };
