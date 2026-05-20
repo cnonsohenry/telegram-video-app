@@ -25,8 +25,8 @@ export const APP_CONFIG = {
   
   // 🟢 5. Profile Grid Tabs
   profileTabs: {
-    posts: "POSTS",
-    premium: "PREMIUM",
+    posts: "PREVIEWS",
+    premium: "PREMIUM VIDEOS",
     liked: "LIKED"
   },
 
