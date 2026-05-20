@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, Share2, Download, Check, Heart, MessageCircle, Bookmark } from "lucide-react";
+import { X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, Share2, Download, Check, Heart, MessageCircle, Bookmark, Volume2, VolumeX } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -17,12 +17,14 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
   const [duration, setDuration] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showControls, setShowControls] = useState(true); 
+  const [isDragging, setIsDragging] = useState(false); // 🟢 Tracks manual sliding
+  const [isMuted, setIsMuted] = useState(false); // 🟢 Volume state
   
   // Action States
   const [copied, setCopied] = useState(false); 
   const [isDownloading, setIsDownloading] = useState(false); 
 
-  // Engagement States (Pulled from your FeedPost logic)
+  // Engagement States
   const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
   const [isLiked, setIsLiked] = useState(false);
   const [savesCount, setSavesCount] = useState(Number(video.saves_count || 0));
@@ -30,7 +32,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
   const [sharesCount, setSharesCount] = useState(Number(video.shares_count || 0));
   const [commentsCount, setCommentsCount] = useState(Number(video.comments_count || 0));
 
-  // 🟢 FETCH INTERACTION STATE ON LOAD
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -55,11 +56,12 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
         if (playing) setShowControls(false); 
         return playing;
       });
-    }, 4000); // Extended slightly so users can read captions
+    }, 4000); 
   }, []);
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
+    // 🟢 Don't update time from video if the user is currently dragging the slider!
+    if (videoRef.current && !isDragging) {
       setCurrentTime(videoRef.current.currentTime);
       setDuration(videoRef.current.duration || 0);
     }
@@ -72,6 +74,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  // 🟢 Screen Tap to clear details completely
   const handleInteraction = (e) => {
     if (e) e.stopPropagation();
     const now = Date.now();
@@ -85,8 +88,11 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
       lastTap.current = now;
       setTimeout(() => {
         if (lastTap.current === now && videoRef.current) {
-          setShowControls(prev => !prev);
-          resetHideTimer();
+          setShowControls(prev => {
+            if (!prev) resetHideTimer();
+            else if (hideTimeout.current) clearTimeout(hideTimeout.current);
+            return !prev;
+          });
         }
       }, DOUBLE_TAP_DELAY);
     }
@@ -178,7 +184,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     }
   };
 
-  // 🟢 CACHE-BUSTING DOWNLOAD HANDLER
   const handleDownload = async (e) => {
     e.stopPropagation();
     resetHideTimer();
@@ -235,17 +240,26 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
   if (!video) return null;
 
+  // 🟢 Calculate the exact percentage of the video played for the white slider fill
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   return (
     <div ref={containerRef} style={overlayStyle} onClick={onClose}>
       <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />
 
-      {/* Close Button */}
+      {/* 🟢 Close Buttons now properly respect the showControls state */}
       {!isDesktop ? (
-        <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ ...mobileBackButtonStyle, zIndex: 10006 }}>
+        <button 
+          onClick={(e) => { e.stopPropagation(); onClose(); }} 
+          style={{ ...mobileBackButtonStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none", zIndex: 10006 }}
+        >
           <ArrowLeft size={28} />
         </button>
       ) : (
-        <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ ...desktopCloseButtonStyle, zIndex: 10006 }}>
+        <button 
+          onClick={(e) => { e.stopPropagation(); onClose(); }} 
+          style={{ ...desktopCloseButtonStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none", zIndex: 10006 }}
+        >
           <X size={24} />
         </button>
       )}
@@ -262,6 +276,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
             ref={videoRef}
             src={video.video_url}
             crossOrigin="anonymous"
+            muted={isMuted}
             autoPlay playsInline loop
             onTimeUpdate={handleTimeUpdate}
             onWaiting={() => setIsLoading(true)}
@@ -277,11 +292,14 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
 
           <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
 
-          {/* 🟢 THE TWITTER/X BOTTOM UI STACK */}
           <div style={{ ...bottomUIWrapper, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
             
-            {/* 1. Video Controls (Right Aligned above progress bar) */}
+            {/* Video Controls (Right Aligned above progress bar) */}
             <div style={floatingControlsRow}>
+                {/* 🟢 Mute Toggle */}
+                <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); resetHideTimer(); }} style={floatingBtnStyle}>
+                  {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                </button>
                 <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); resetHideTimer(); }} style={floatingBtnStyle}>
                   {isZoomed ? <Minimize size={18} /> : <Maximize size={18} />}
                 </button>
@@ -290,7 +308,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
                 </button>
             </div>
 
-            {/* 2. Play/Pause & Progress Bar */}
+            {/* Play/Pause & Progress Bar */}
             <div style={progressRowStyle}>
                <button onClick={handleTogglePlay} style={playPauseBtnStyle}>
                  {isPlaying ? <Pause size={20} fill="#fff" /> : <Play size={20} fill="#fff" />}
@@ -298,25 +316,32 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
                <input 
                  type="range" min="0" max={duration || 100} step="0.1"
                  value={currentTime || 0} 
+                 onPointerDown={() => setIsDragging(true)} // Prevents stuttering
+                 onPointerUp={() => setIsDragging(false)}
                  onChange={(e) => {
                    e.stopPropagation();
+                   const newTime = parseFloat(e.target.value);
+                   setCurrentTime(newTime);
                    if (videoRef.current) {
-                     videoRef.current.currentTime = e.target.value;
-                     setCurrentTime(e.target.value);
-                     resetHideTimer();
+                     videoRef.current.currentTime = newTime;
                    }
+                   resetHideTimer();
                  }}
                  className="x-range"
-                 style={rangeInputBaseStyle}
+                 style={{
+                   ...rangeInputBaseStyle,
+                   // 🟢 Dynamic Linear Gradient fills the left side white, right side transparent
+                   background: `linear-gradient(to right, #ffffff ${progressPercent}%, rgba(255,255,255,0.3) ${progressPercent}%)`
+                 }}
                />
             </div>
 
-            {/* 3. Time Display (Extreme Right) */}
+            {/* Time Display */}
             <div style={timeDisplayRow}>
                {formatTime(currentTime)} / {formatTime(duration)}
             </div>
 
-            {/* 4. Avatar, Name, and Caption */}
+            {/* Avatar, Name, and Caption */}
             <div style={postInfoStyle}>
                <img 
                   src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
@@ -330,7 +355,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
                </div>
             </div>
 
-            {/* 5. Engagement Action Bar */}
+            {/* Engagement Action Bar */}
             <div style={engagementBarStyle}>
                <button style={engagementBtnStyle} onClick={handleLike}>
                   <Heart size={22} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#fff"} />
@@ -358,7 +383,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .spin-animation { animation: spin 1s linear infinite; }
         
-        .x-range { width: 100%; cursor: pointer; accent-color: #fff; background: rgba(255,255,255,0.3); height: 4px; border-radius: 2px; appearance: none; outline: none; }
+        .x-range { width: 100%; cursor: pointer; height: 4px; border-radius: 2px; appearance: none; outline: none; transition: background 0.1s ease; }
         .x-range::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; background: #fff; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
       `}</style>
     </div>
@@ -371,13 +396,11 @@ const stageStyle = { display: "flex", width: "100%", height: "100%", background:
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
 const loaderContainerStyle = { position: "absolute", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" };
 
-// Gradients & Buttons
 const topGradientStyle = { position: "absolute", top: 0, left: 0, right: 0, height: "120px", background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)", zIndex: 10005, transition: "opacity 0.4s ease" };
 const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "250px", background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.4s ease", pointerEvents: "none" };
-const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
-const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
+const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease" };
+const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease" };
 
-// Twitter/X Layout Elements
 const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area-inset-bottom))", left: 0, right: 0, padding: "0 15px", zIndex: 10002, display: "flex", flexDirection: "column", transition: "opacity 0.3s ease" };
 const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "8px" };
 const floatingBtnStyle = { background: "rgba(0,0,0,0.6)", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)", cursor: "pointer" };
