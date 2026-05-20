@@ -1,23 +1,50 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, Share2, Download, Check } from "lucide-react";
+import { X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, Share2, Download, Check, Heart, MessageCircle, Bookmark } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
 
-export default function FullscreenPlayer({ video, onClose, isDesktop }) {
+export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentClick }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null); 
   const lastTap = useRef(0);
   const hideTimeout = useRef(null); 
   
+  // Video States
   const [isPlaying, setIsPlaying] = useState(false); 
-  
   const [isLoading, setIsLoading] = useState(true);
-  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showControls, setShowControls] = useState(true); 
+  
+  // Action States
   const [copied, setCopied] = useState(false); 
   const [isDownloading, setIsDownloading] = useState(false); 
+
+  // Engagement States (Pulled from your FeedPost logic)
+  const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
+  const [isLiked, setIsLiked] = useState(false);
+  const [savesCount, setSavesCount] = useState(Number(video.saves_count || 0));
+  const [isSaved, setIsSaved] = useState(false);
+  const [sharesCount, setSharesCount] = useState(Number(video.shares_count || 0));
+  const [commentsCount, setCommentsCount] = useState(Number(video.comments_count || 0));
+
+  // 🟢 FETCH INTERACTION STATE ON LOAD
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch(`${APP_CONFIG.apiUrl}/api/interactions/state/${video.message_id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    .then(res => res.ok ? res.json() : {})
+    .then(data => {
+      if (data.isLiked) setIsLiked(true);
+      if (data.isSaved) setIsSaved(true);
+    })
+    .catch(err => console.error("Failed to fetch interaction state", err));
+  }, [video.message_id]);
 
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
@@ -28,20 +55,25 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
         if (playing) setShowControls(false); 
         return playing;
       });
-    }, 3000);
+    }, 4000); // Extended slightly so users can read captions
   }, []);
 
   const handleTimeUpdate = () => {
     if (videoRef.current) {
-      const current = videoRef.current.currentTime;
-      const duration = videoRef.current.duration;
-      if (duration > 0) setProgress((current / duration) * 100);
+      setCurrentTime(videoRef.current.currentTime);
+      setDuration(videoRef.current.duration || 0);
     }
+  };
+
+  const formatTime = (timeInSeconds) => {
+    if (isNaN(timeInSeconds)) return "0:00";
+    const m = Math.floor(timeInSeconds / 60);
+    const s = Math.floor(timeInSeconds % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   const handleInteraction = (e) => {
     if (e) e.stopPropagation();
-
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
 
@@ -53,23 +85,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
       lastTap.current = now;
       setTimeout(() => {
         if (lastTap.current === now && videoRef.current) {
-          if (!isDesktop) {
-            setShowControls(prev => {
-              if (!prev) {
-                resetHideTimer();
-                return true;
-              }
-              if (hideTimeout.current) clearTimeout(hideTimeout.current);
-              return false;
-            });
-          } else {
-            resetHideTimer();
-            if (videoRef.current.paused) {
-              videoRef.current.play().catch(() => {});
-            } else {
-              videoRef.current.pause();
-            }
-          }
+          setShowControls(prev => !prev);
+          resetHideTimer();
         }
       }, DOUBLE_TAP_DELAY);
     }
@@ -79,21 +96,52 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     e.stopPropagation();
     resetHideTimer();
     if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play().catch(() => {});
-      }
+      if (isPlaying) videoRef.current.pause();
+      else videoRef.current.play().catch(() => {});
     }
+  };
+
+  // 🟢 ENGAGEMENT HANDLERS
+  const handleLike = async (e) => {
+    e.stopPropagation();
+    resetHideTimer();
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please log in to like videos!");
+
+    setIsLiked(!isLiked);
+    setLikesCount(prev => isLiked ? Math.max(0, prev - 1) : prev + 1);
+
+    try {
+      await fetch(`${APP_CONFIG.apiUrl}/api/interactions/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message_id: video.message_id })
+      });
+    } catch (err) {}
+  };
+
+  const handleSaveToProfile = async (e) => {
+    e.stopPropagation();
+    resetHideTimer();
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please log in to save videos!");
+
+    setIsSaved(!isSaved);
+    setSavesCount(prev => isSaved ? Math.max(0, prev - 1) : prev + 1);
+
+    try {
+      await fetch(`${APP_CONFIG.apiUrl}/api/interactions/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message_id: video.message_id })
+      });
+    } catch (err) {}
   };
 
   const handleShare = async (e) => {
     e.stopPropagation();
     resetHideTimer();
-    
-    // 🟢 THE FIX: Dynamically construct the share URL based on the current domain
     const shareUrl = `${window.location.origin}/v/${video.message_id}`;
-    // 🟢 THE FIX: Dynamic App Name
     const brandName = `${APP_CONFIG.appNamePrefix} ${APP_CONFIG.appNameSuffix}`;
 
     if (navigator.share) {
@@ -103,16 +151,34 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
           text: video.caption || `Watch this video on ${brandName}`,
           url: shareUrl,
         });
-      } catch (err) {
-        console.log("Native share cancelled", err);
-      }
+      } catch (err) {}
     } else {
       navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+
+    setSharesCount(prev => prev + 1);
+    fetch(`${APP_CONFIG.apiUrl}/api/interactions/share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: video.message_id })
+    }).catch(() => {});
   };
 
+  const handleCommentClick = (e) => {
+    e.stopPropagation();
+    resetHideTimer();
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please log in to comment!");
+    
+    if (onCommentClick) {
+        setCommentsCount(prev => prev + 1); 
+        onCommentClick(video);
+    }
+  };
+
+  // 🟢 CACHE-BUSTING DOWNLOAD HANDLER
   const handleDownload = async (e) => {
     e.stopPropagation();
     resetHideTimer();
@@ -120,14 +186,15 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     
     setIsDownloading(true);
     try {
-      const response = await fetch(video.video_url);
+      const cacheBusterUrl = video.video_url + (video.video_url.includes('?') ? '&' : '?') + 'dl=' + Date.now();
+      const response = await fetch(cacheBusterUrl, { mode: 'cors' });
+      if (!response.ok) throw new Error("Network response was not ok");
+      
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       
       const link = document.createElement('a');
       link.href = blobUrl;
-      
-      // 🟢 THE FIX: Dynamic App Prefix for the downloaded file name
       link.download = `${APP_CONFIG.appNamePrefix.toLowerCase()}-${video.message_id}.mp4`;
       
       document.body.appendChild(link);
@@ -135,7 +202,6 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      console.error("Download failed:", err);
       alert("Download failed. Please try again.");
     } finally {
       setIsDownloading(false);
@@ -143,12 +209,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
   };
 
   useEffect(() => {
-    const originalStyle = {
-      overflow: document.body.style.overflow,
-      position: document.body.style.position,
-      top: document.body.style.top,
-      width: document.body.style.width,
-    };
+    const originalStyle = { overflow: document.body.style.overflow, position: document.body.style.position, top: document.body.style.top, width: document.body.style.width };
     const scrollY = window.scrollY;
 
     document.body.style.overflow = "hidden";
@@ -156,30 +217,13 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     document.body.style.top = `-${scrollY}px`;
     document.body.style.width = "100%";
 
-    const enterFullscreen = async () => {
-      try {
-        const elem = containerRef.current;
-        if (elem?.requestFullscreen) await elem.requestFullscreen();
-        else if (videoRef.current?.webkitEnterFullscreen) videoRef.current.webkitEnterFullscreen();
-      } catch (err) { console.warn("FS blocked"); }
-    };
-
-    enterFullscreen();
     resetHideTimer();
-
     if (videoRef.current) {
       const playPromise = videoRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((error) => {
-          console.warn("Autoplay blocked by mobile browser. Waiting for user interaction.");
-          setIsPlaying(false); 
-          setShowControls(true);
-        });
-      }
+      if (playPromise !== undefined) playPromise.catch(() => { setIsPlaying(false); setShowControls(true); });
     }
 
     return () => {
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       document.body.style.overflow = originalStyle.overflow;
       document.body.style.position = originalStyle.position;
       document.body.style.top = originalStyle.top;
@@ -195,6 +239,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
     <div ref={containerRef} style={overlayStyle} onClick={onClose}>
       <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />
 
+      {/* Close Button */}
       {!isDesktop ? (
         <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ ...mobileBackButtonStyle, zIndex: 10006 }}>
           <ArrowLeft size={28} />
@@ -216,6 +261,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
           <video
             ref={videoRef}
             src={video.video_url}
+            crossOrigin="anonymous"
             autoPlay playsInline loop
             onTimeUpdate={handleTimeUpdate}
             onWaiting={() => setIsLoading(true)}
@@ -229,66 +275,81 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             }}
           />
 
-          {(!isLoading && (showControls || !isPlaying)) && (
-            <button
-              onClick={handleTogglePlay}
-              style={{
-                ...centerControlStyle,
-                opacity: (showControls || !isPlaying) ? 1 : 0,
-                pointerEvents: (showControls || !isPlaying) ? "auto" : "none"
-              }}
-            >
-              <div style={centerIconCircleStyle}>
-                {isPlaying ? <Pause size={36} fill="white" color="white" /> : <Play size={36} fill="white" color="white" />}
-              </div>
-            </button>
-          )}
-
           <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
 
-          <div style={{ ...actionButtonsContainerStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
-            <button onClick={handleShare} style={actionButtonStyle}>
-              <div style={sideIconCircleStyle}>
-                {copied ? <Check size={20} color="#4ade80" /> : <Share2 size={20} />}
-              </div>
-              <span style={actionLabelStyle}>{copied ? "Copied!" : "Share"}</span>
-            </button>
+          {/* 🟢 THE TWITTER/X BOTTOM UI STACK */}
+          <div style={{ ...bottomUIWrapper, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
+            
+            {/* 1. Video Controls (Right Aligned above progress bar) */}
+            <div style={floatingControlsRow}>
+                <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); resetHideTimer(); }} style={floatingBtnStyle}>
+                  {isZoomed ? <Minimize size={18} /> : <Maximize size={18} />}
+                </button>
+                <button onClick={handleDownload} style={floatingBtnStyle}>
+                  {isDownloading ? <Loader2 size={18} className="spin-animation" /> : <Download size={18} />}
+                </button>
+            </div>
 
-            <button onClick={handleDownload} style={actionButtonStyle}>
-              <div style={sideIconCircleStyle}>
-                {isDownloading ? <Loader2 size={20} className="spin-animation" /> : <Download size={20} />}
-              </div>
-              <span style={actionLabelStyle}>Save</span>
-            </button>
+            {/* 2. Play/Pause & Progress Bar */}
+            <div style={progressRowStyle}>
+               <button onClick={handleTogglePlay} style={playPauseBtnStyle}>
+                 {isPlaying ? <Pause size={20} fill="#fff" /> : <Play size={20} fill="#fff" />}
+               </button>
+               <input 
+                 type="range" min="0" max={duration || 100} step="0.1"
+                 value={currentTime || 0} 
+                 onChange={(e) => {
+                   e.stopPropagation();
+                   if (videoRef.current) {
+                     videoRef.current.currentTime = e.target.value;
+                     setCurrentTime(e.target.value);
+                     resetHideTimer();
+                   }
+                 }}
+                 className="x-range"
+                 style={rangeInputBaseStyle}
+               />
+            </div>
 
-            <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); resetHideTimer(); }} style={actionButtonStyle}>
-               <div style={sideIconCircleStyle}>
-                 {isZoomed ? <Minimize size={20} /> : <Maximize size={20} />}
+            {/* 3. Time Display (Extreme Right) */}
+            <div style={timeDisplayRow}>
+               {formatTime(currentTime)} / {formatTime(duration)}
+            </div>
+
+            {/* 4. Avatar, Name, and Caption */}
+            <div style={postInfoStyle}>
+               <img 
+                  src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
+                  alt="avatar"
+                  onError={(e) => { e.target.src = '/assets/default-avatar.png'; }}
+                  style={avatarStyle}
+                />
+               <div style={textDetailsStyle}>
+                  <div style={usernameStyle}>@{video.uploader_name || "Member"}</div>
+                  <div style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</div>
                </div>
-               <span style={actionLabelStyle}>{isZoomed ? "Fit" : "Fill"}</span>
-            </button>
-          </div>
+            </div>
 
-          <div style={{ 
-              ...progressWrapperStyle, 
-              bottom: showControls ? "max(30px, env(safe-area-inset-bottom))" : "10px",
-              padding: showControls ? "0 20px" : "0",
-              opacity: 1 
-          }}>
-             <input 
-               type="range" min="0" max="100" step="0.1"
-               value={progress || 0} 
-               onChange={(e) => {
-                 e.stopPropagation();
-                 if (videoRef.current) {
-                   videoRef.current.currentTime = (e.target.value / 100) * videoRef.current.duration;
-                   setProgress(e.target.value);
-                   resetHideTimer();
-                 }
-               }}
-               className={showControls ? "range-active" : "range-mini"}
-               style={rangeInputBaseStyle}
-             />
+            {/* 5. Engagement Action Bar */}
+            <div style={engagementBarStyle}>
+               <button style={engagementBtnStyle} onClick={handleLike}>
+                  <Heart size={22} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#fff"} />
+                  <span>{likesCount > 0 ? likesCount : 'Like'}</span>
+               </button>
+               <button style={engagementBtnStyle} onClick={handleCommentClick}>
+                  <MessageCircle size={22} color="#fff" />
+                  <span>{commentsCount > 0 ? commentsCount : 'Reply'}</span>
+               </button>
+               <button style={engagementBtnStyle} onClick={handleSaveToProfile}>
+                  <Bookmark size={22} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#fff"} />
+                  <span>{savesCount > 0 ? savesCount : 'Save'}</span>
+               </button>
+               <button style={engagementBtnStyle} onClick={handleShare}>
+                  {copied ? <Check size={22} color="#4ade80" /> : <Share2 size={22} color="#fff" />}
+                  <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
+               </button>
+            </div>
+
           </div>
         </div>
       </div>
@@ -296,31 +357,42 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
       <style>{`
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .spin-animation { animation: spin 1s linear infinite; }
-        .range-mini::-webkit-slider-thumb { appearance: none; width: 0; height: 0; }
-        .range-mini { height: 2px !important; pointer-events: none; opacity: 0.5; }
-        .range-active::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
-        .range-active { height: 6px !important; pointer-events: auto; }
+        
+        .x-range { width: 100%; cursor: pointer; accent-color: #fff; background: rgba(255,255,255,0.3); height: 4px; border-radius: 2px; appearance: none; outline: none; }
+        .x-range::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; background: #fff; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
       `}</style>
     </div>
   );
 }
 
-// 🖌 STYLES (Unchanged)
+// 🖌 UI STYLES
 const overlayStyle = { position: "fixed", inset: 0, height: "100dvh", backgroundColor: "#000", zIndex: 999999, display: "flex", flexDirection: "column", overflow: "hidden", touchAction: "none" };
 const stageStyle = { display: "flex", width: "100%", height: "100%", background: "#000", position: "relative" };
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
 const loaderContainerStyle = { position: "absolute", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" };
+
+// Gradients & Buttons
 const topGradientStyle = { position: "absolute", top: 0, left: 0, right: 0, height: "120px", background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)", zIndex: 10005, transition: "opacity 0.4s ease" };
-const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "140px", background: "linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.4s ease", pointerEvents: "none" };
-const progressWrapperStyle = { position: "absolute", left: 0, right: 0, zIndex: 10002, transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
-const rangeInputBaseStyle = { width: "100%", cursor: "pointer", accentColor: "var(--primary-color)", background: "rgba(255,255,255,0.2)", appearance: "none", outline: "none" };
+const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "250px", background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.4s ease", pointerEvents: "none" };
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
 
-const centerControlStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "transparent", border: "none", cursor: "pointer", zIndex: 10005, transition: "opacity 0.3s ease", display: "flex", alignItems: "center", justifyContent: "center" };
-const centerIconCircleStyle = { background: "rgba(0,0,0,0.4)", borderRadius: "50%", padding: "20px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" };
+// Twitter/X Layout Elements
+const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area-inset-bottom))", left: 0, right: 0, padding: "0 15px", zIndex: 10002, display: "flex", flexDirection: "column", transition: "opacity 0.3s ease" };
+const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "8px" };
+const floatingBtnStyle = { background: "rgba(0,0,0,0.6)", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)", cursor: "pointer" };
 
-const actionButtonsContainerStyle = { position: "absolute", right: "15px", bottom: "80px", display: "flex", flexDirection: "column", gap: "20px", zIndex: 10005, transition: "opacity 0.4s ease", alignItems: "center" };
-const actionButtonStyle = { background: "transparent", border: "none", color: "#fff", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: 0 };
-const sideIconCircleStyle = { background: "rgba(0,0,0,0.5)", width: "45px", height: "45px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)" };
-const actionLabelStyle = { fontSize: "11px", fontWeight: "600", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
+const progressRowStyle = { display: "flex", alignItems: "center", gap: "10px", width: "100%" };
+const playPauseBtnStyle = { background: "transparent", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" };
+const rangeInputBaseStyle = { flex: 1 };
+
+const timeDisplayRow = { display: "flex", justifyContent: "flex-end", fontSize: "12px", fontWeight: "500", color: "#e7e9ea", marginTop: "4px", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
+
+const postInfoStyle = { display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "12px", marginBottom: "16px" };
+const avatarStyle = { width: "42px", height: "42px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(255,255,255,0.2)", flexShrink: 0 };
+const textDetailsStyle = { display: "flex", flexDirection: "column", gap: "4px", overflow: "hidden" };
+const usernameStyle = { fontSize: "16px", fontWeight: "700", color: "#fff", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
+const captionStyle = { fontSize: "14px", color: "#e7e9ea", lineHeight: "1.4", wordWrap: "break-word", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
+
+const engagementBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 10px", borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: "12px" };
+const engagementBtnStyle = { background: "transparent", border: "none", display: "flex", alignItems: "center", gap: "6px", color: "#e7e9ea", fontSize: "13px", fontWeight: "600", cursor: "pointer", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };

@@ -384,6 +384,7 @@ export default function App() {
               setIsSharedVideoView(false); 
             }} 
             isDesktop={window.innerWidth > 1024} 
+            onCommentClick={setActiveCommentVideo} /* 🟢 THE FIX: Passing the remote control! */
           />
         </div>
       )}
