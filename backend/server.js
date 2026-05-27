@@ -30,6 +30,7 @@ import { uploadDirectToStream } from "./controllers/upload_premium.js";
 import { verifyPayment } from "./controllers/payment.js";
 import { createCryptoPayment, cryptoWebhook, checkCryptoTransaction } from "./controllers/crypto.js";
 import { z } from "zod"; 
+import cron from "node-cron";
 
 const { Pool } = pkg;
 
@@ -1107,6 +1108,53 @@ app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
+});
+
+/* =======================================================
+   🛡️ AUTOMATED CLOUDFLARE R2 DATABASE BACKUPS
+======================================================= */
+async function backupDatabaseToR2() {
+  // Generate a clean, timezone-safe timestamp for the filename
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const fileName = `db-backup-${timestamp}.dump`;
+  const localBackupPath = path.join(__dirname, fileName);
+
+  console.log(`📦 [DB BACKUP] Starting automated PostgreSQL backup...`);
+
+  try {
+    // 1. Execute pg_dump directly using your existing connection string
+    // -F c specifies "Custom" compressed format (best for pg_restore)
+    await execPromise(`pg_dump "${process.env.DATABASE_URL}" -F c -f "${localBackupPath}"`);
+    console.log(`✅ [DB BACKUP] Local dump successful. Pushing to R2...`);
+
+    // 2. Stream the backup file to Cloudflare R2
+    const fileStream = fs.createReadStream(localBackupPath);
+    const r2Key = `database_backups/${fileName}`;
+
+    await r2.send(new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: r2Key,
+      Body: fileStream,
+      // Application/octet-stream is standard for binary dump files
+      ContentType: "application/octet-stream", 
+    }));
+
+    console.log(`✅ [DB BACKUP] Securely uploaded to R2: ${r2Key}`);
+
+  } catch (error) {
+    console.error(`❌ [DB BACKUP] Fatal backup error:`, error.message);
+  } finally {
+    // 3. Bulletproof Cleanup: Always wipe the local file to prevent SSD bloat
+    if (fs.existsSync(localBackupPath)) {
+      fs.unlinkSync(localBackupPath);
+      console.log(`🧹 [DB BACKUP] Local temporary file removed.`);
+    }
+  }
+}
+
+// 🟢 Schedule the backup to run automatically at 3:00 AM every single day
+cron.schedule("0 3 * * *", () => {
+  backupDatabaseToR2();
 });
 
 const PORT = process.env.PORT || 3000;
