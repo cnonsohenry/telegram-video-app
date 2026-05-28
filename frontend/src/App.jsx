@@ -155,24 +155,24 @@ export default function App() {
     if (sharedVideoId) {
       setIsSharedVideoView(true);
       const fetchSharedVideo = async () => {
-        try {
-          const res = await fetch(`${APP_CONFIG.apiUrl}/api/video/details?message_id=${sharedVideoId}`);
-          if (res.ok) {
-            const videoData = await res.json();
-            setActiveVideo({ ...videoData, video_url: null });
-            
-            const playRes = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`);
-            if (playRes.ok) {
-              const playData = await playRes.json();
-              setActiveVideo(prev => ({ ...prev, video_url: playData.video_url }));
-            }
-          }
-        } catch (error) {
-          console.error("Failed to load shared video:", error);
-        } finally {
-          window.history.replaceState({}, document.title, "/");
-        }
-      };
+  try {
+    const res = await fetch(`${APP_CONFIG.apiUrl}/api/video/details?message_id=${sharedVideoId}`);
+    if (res.ok) {
+      const videoData = await res.json();
+      
+      const playRes = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`);
+      if (playRes.ok) {
+        const playData = await playRes.json();
+        // 🟢 Set once cleanly with everything ready
+        setActiveVideo({ ...videoData, video_url: playData.video_url });
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load shared video:", error);
+  } finally {
+    window.history.replaceState({}, document.title, "/");
+  }
+};
       fetchSharedVideo();
     }
   }, []);
@@ -229,19 +229,29 @@ export default function App() {
   const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo; 
 
   const handleOpenVideo = async (video) => {
-    try {
-      setActiveVideo({ ...video, video_url: null }); 
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
-      if (!res.ok) throw new Error("Server error");
-      const data = await res.json();
-      if (data.video_url) {
-        setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
-      }
-    } catch (e) { 
-      setActiveVideo(null);
-      alert(`🚨 Playback Error: ${e.message}`); 
+  try {
+    // 🟢 Clear completely first
+    setActiveVideo(null);
+    
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    setActiveVideo({ ...video, video_url: null });
+    
+    const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+    if (!res.ok) throw new Error("Server error");
+    const data = await res.json();
+    
+    console.log("🎬 Playing:", data.video_url);
+    
+    if (data.video_url) {
+      // 🟢 Set fresh object, not merged
+      setActiveVideo({ ...video, video_url: data.video_url });
     }
-  };
+  } catch (e) { 
+    setActiveVideo(null);
+    alert(`🚨 Playback Error: ${e.message}`); 
+  }
+};
 
   if (needsPitch) {
     return <PitchView onComplete={() => setHasSeenPitch(true)} />;

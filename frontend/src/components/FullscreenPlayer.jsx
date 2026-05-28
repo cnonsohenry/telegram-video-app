@@ -45,6 +45,18 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     .catch(err => console.error("Failed to fetch interaction state", err));
   }, [video.message_id]);
 
+  // Add this useEffect to reset video when video prop changes
+useEffect(() => {
+  if (videoRef.current) {
+    videoRef.current.pause();
+    videoRef.current.load();
+  }
+  setIsLoading(true);
+  setCurrentTime(0);
+  setDuration(0);
+  setIsPlaying(false);
+}, [video.message_id]);
+
   const handleTimeUpdate = () => {
     if (videoRef.current && !isDragging) {
       setCurrentTime(videoRef.current.currentTime);
