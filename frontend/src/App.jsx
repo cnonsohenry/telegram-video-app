@@ -234,10 +234,15 @@ export default function App() {
       setActiveVideo(null);
       await new Promise(resolve => setTimeout(resolve, 50));
       
-      // 🟢 THE FIX: If the feed already grabbed the URL, use it instantly!
+      // 🟢 THE FIX: The Cache-Buster Trick
+      // We append ?fs=1 to the URL. This forces the browser to open a fresh, 
+      // clean connection, ignoring any aborted downloads from the background feed!
       if (video.video_url) {
-        console.log("⚡ Instant Fullscreen (URL passed from feed)");
-        setActiveVideo(video);
+        console.log("⚡ Instant Fullscreen (Busting browser cache lock)");
+        const separator = video.video_url.includes('?') ? '&' : '?';
+        const freshUrl = `${video.video_url}${separator}fs=1`;
+        
+        setActiveVideo({ ...video, video_url: freshUrl });
         return;
       }
 
@@ -248,7 +253,9 @@ export default function App() {
       const data = await res.json();
       
       if (data.video_url) {
-        setActiveVideo({ ...video, video_url: data.video_url });
+        const separator = data.video_url.includes('?') ? '&' : '?';
+        const freshUrl = `${data.video_url}${separator}fs=1`;
+        setActiveVideo({ ...video, video_url: freshUrl });
       }
     } catch (e) { 
       setActiveVideo(null);
