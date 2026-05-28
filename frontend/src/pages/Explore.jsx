@@ -167,8 +167,18 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
         <p style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</p>
 
         <div ref={containerRef} style={videoContainerStyle} onClick={() => onVideoClick(video)}>
-          {videoUrl ? (
-            <video ref={videoRef} style={thumbnailImgStyle} muted loop playsInline poster={video.thumbnail_url} />
+          {/* 🟢 THE FIX: Only render the video tag if it is ACTIVELY playing. 
+              If you scroll away, React destroys the tag and instantly kills the network connection! */}
+          {videoUrl && isPlaying && !isAnyModalOpen ? (
+            <video 
+              ref={videoRef} 
+              style={thumbnailImgStyle} 
+              muted 
+              loop 
+              playsInline 
+              poster={video.thumbnail_url} 
+              preload="none" 
+            />
           ) : (
             <img src={video.thumbnail_url} alt="thumbnail" style={thumbnailImgStyle} loading="lazy" />
           )}
