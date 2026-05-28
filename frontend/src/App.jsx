@@ -229,30 +229,32 @@ export default function App() {
   const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo; 
 
   const handleOpenVideo = async (video) => {
-  try {
-    // 🟢 Destructure immediately to capture values at click time
-    const { chat_id, message_id } = video;
-    
-    console.log("🎬 Requested:", chat_id, message_id, video.category);
-    
-    setActiveVideo(null);
-    await new Promise(resolve => setTimeout(resolve, 50));
-    setActiveVideo({ ...video, video_url: null });
-    
-    const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${chat_id}&message_id=${message_id}`);
-    if (!res.ok) throw new Error("Server error");
-    const data = await res.json();
-    
-    console.log("🎬 Playing:", data.video_url);
-    
-    if (data.video_url) {
-      setActiveVideo({ ...video, video_url: data.video_url });
+    try {
+      // Clear completely first
+      setActiveVideo(null);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // 🟢 THE FIX: If the feed already grabbed the URL, use it instantly!
+      if (video.video_url) {
+        console.log("⚡ Instant Fullscreen (URL passed from feed)");
+        setActiveVideo(video);
+        return;
+      }
+
+      // Fallback for shared links or components that don't pass the URL
+      setActiveVideo({ ...video, video_url: null });
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+      if (!res.ok) throw new Error("Server error");
+      const data = await res.json();
+      
+      if (data.video_url) {
+        setActiveVideo({ ...video, video_url: data.video_url });
+      }
+    } catch (e) { 
+      setActiveVideo(null);
+      alert(`🚨 Playback Error: ${e.message}`); 
     }
-  } catch (e) { 
-    setActiveVideo(null);
-    alert(`🚨 Playback Error: ${e.message}`); 
-  }
-};
+  };
 
   if (needsPitch) {
     return <PitchView onComplete={() => setHasSeenPitch(true)} />;
@@ -300,7 +302,8 @@ export default function App() {
         }}>
           <Explore 
             onVideoClick={handleOpenVideo}
-            onCommentClick={setActiveCommentVideo} 
+            onCommentClick={setActiveCommentVideo}
+            isAnyModalOpen={!!activeVideo || !!activeCommentVideo || showPaywall} 
           />
         </div>
         

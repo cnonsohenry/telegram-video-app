@@ -166,7 +166,8 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 
         <p style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</p>
 
-        <div ref={containerRef} style={videoContainerStyle} onClick={() => onVideoClick(video)}>
+        {/* 🟢 THE FIX: Pass the already-fetched Cloudflare URL up to App.jsx */}
+        <div ref={containerRef} style={videoContainerStyle} onClick={() => onVideoClick({ ...video, video_url: videoUrl })}>
           {/* 🟢 THE FIX: Only render the video tag if it is ACTIVELY playing. 
               If you scroll away, React destroys the tag and instantly kills the network connection! */}
           {videoUrl && isPlaying && !isAnyModalOpen ? (
