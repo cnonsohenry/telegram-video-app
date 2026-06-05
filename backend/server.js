@@ -1193,7 +1193,7 @@ app.get('/sitemap.xml', async (req, res) => {
    🤖 PRERENDER MIDDLEWARE (SELF-HOSTED OPEN SOURCE)
 ======================================================= */
 // 1. Point it to your new local engine
-prerender.set('prerenderServiceUrl', 'http://127.0.0.1:3001/');
+prerender.set('prerenderServiceUrl', 'https://codedloud.com/');
 
 // 2. Add the bots you want to trigger the renderer
 prerender.crawlerUserAgents.push('ExoBot');
