@@ -22,24 +22,29 @@ jobs:
           script: |
             set -e
 
-            cd /home/appuser/apps/telegram-video-app
+            # Navigate to the isolated app directory
+            cd /home/appuser/apps
             git fetch origin
             git reset --hard origin/main
             git clean -fd
 
-
-            # Backend
+            # 🟢 1. Build & Restart Backend API
             cd backend
             npm install
-            pm2 reload telegram-backend --update-env || pm2 start server.js --name telegram-backend
+            # Run with ecosystem awareness
+            pm2 reload naijahomemade-api --update-env || pm2 start server.js --name naijahomemade-api
             pm2 save
 
-            # Frontend
+            # 🟢 2. Build Frontend UI
             cd ../frontend
             npm install
             npm run build
 
-            # If serving frontend via nginx
-
-            rm -rf /var/www/videos/*
-            cp -r dist/* /var/www/videos/
+            # 🟢 3. Deploy Production Build to Nginx Root Safely
+            # We delete only files inside the root, leaving the folder structure intact
+            sudo rm -rf /var/www/videos/*
+            sudo cp -r dist/* /var/www/videos/
+            
+            # Ensure Nginx can read the newly generated files
+            sudo chown -R appuser:www-data /var/www/videos
+            sudo chmod -R 755 /var/www/videos
