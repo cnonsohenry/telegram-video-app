@@ -41,10 +41,6 @@ jobs:
             npm run build
 
             # 🟢 3. Deploy Production Build to Nginx Root Safely
-            # We delete only files inside the root, leaving the folder structure intact
-            sudo rm -rf /var/www/videos/*
-            sudo cp -r dist/* /var/www/videos/
-            
-            # Ensure Nginx can read the newly generated files
-            sudo chown -R appuser:www-data /var/www/videos
-            sudo chmod -R 755 /var/www/videos
+            # No sudo required! appuser now owns this directory
+            rm -rf /var/www/videos/*
+            cp -r dist/* /var/www/videos/
