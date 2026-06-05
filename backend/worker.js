@@ -4,7 +4,7 @@ export default {
       const url = new URL(request.url);
       
 /* =====================
-   Worker: Thumbnail Handler (The Final Boss Fix)
+   Worker: Thumbnail Handler
 ===================== */
 if (url.pathname.startsWith("/api/thumbnail")) {
   const chatId = url.searchParams.get("chat_id");
