@@ -167,12 +167,6 @@ export default function AdminUpload({ onClose }) {
         }),
       });
 
-      // 🟢 NEW: Check the Content-Type before parsing JSON
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("Server returned HTML instead of JSON. The Python engine is likely offline.");
-      }
-
       const data = await res.json();
 
       if (res.ok) {
