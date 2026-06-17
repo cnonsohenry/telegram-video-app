@@ -8,7 +8,7 @@ import {
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
 
-export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentClick }) {
+export default function FullscreenPlayer({ video, onClose, currentUser, isDesktop, onCommentClick }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null); 
   
@@ -51,16 +51,14 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     })
     .catch(err => console.error("Failed to fetch interaction state", err));
 
-    // Decode token to check if user is admin or uploader
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      if (payload.role === 'admin' || payload.id === video.uploader_id) {
-        setCanModify(true);
-      }
-    } catch (e) {
-      console.error("Could not parse token for permissions");
+    // 🟢 THE FIX: Check the passed-in user object instead of decoding the JWT
+    // We convert both IDs to strings to prevent loose equality bugs (e.g., Number vs String)
+    if (currentUser?.role === 'admin' || String(currentUser?.id) === String(video.uploader_id)) {
+      setCanModify(true);
+    } else {
+      setCanModify(false);
     }
-  }, [video.message_id, video.uploader_id]);
+  }, [video.message_id, video.uploader_id, currentUser]);
 
   useEffect(() => {
     if (videoRef.current) {

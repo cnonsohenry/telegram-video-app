@@ -399,7 +399,8 @@ export default function App() {
       {activeVideo && (
         <div style={{ position: "fixed", inset: 0, zIndex: 999999, background: "#000" }}>
           <FullscreenPlayer 
-            video={activeVideo} 
+            video={activeVideo}
+            currentUser={user} 
             onClose={() => {
               setActiveVideo(null);
               setIsSharedVideoView(false); 
