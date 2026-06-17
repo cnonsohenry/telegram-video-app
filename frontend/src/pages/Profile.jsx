@@ -18,6 +18,8 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
   const [deletedVideoIds, setDeletedVideoIds] = useState(new Set());
   
   const loaderRef = useRef(null);
+  const scrollContainerRef = useRef(null); // 🟢 ADD THIS
+  const scrollPositionRef = useRef(0);     // 🟢 ADD THIS
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth > 1024);
@@ -106,6 +108,11 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     if (!video) return;
 
     if (video.is_group && !activeGroup) {
+
+      if (scrollContainerRef.current) {
+        scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+      }
+
       try {
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
@@ -115,6 +122,12 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           videos: groupVideos
         });
         window.scrollTo({ top: 0, behavior: "smooth" });
+
+        // 🟢 Force scroll to top when entering album
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
+        }
+
       } catch (err) {
         alert("🚨 Failed to load album contents.");
       }
@@ -140,12 +153,29 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     }
   }, [user, activeTab, setActiveVideo, activeGroup, isDesktop]); 
 
+  // 🟢 Add restoration effect
+  useEffect(() => {
+    if (!activeGroup && scrollContainerRef.current) {
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollPositionRef.current;
+        }
+      });
+    }
+  }, [activeGroup]);
+
   if (currentView === "settings") {
     return <SettingsView onBack={() => setCurrentView("profile")} onLogout={onLogout} />;
   }
 
   return (
-    <div style={{ ...containerStyle, padding: isDesktop ? "30px 20px" : "0" }}>
+    <div
+    ref={scrollContainerRef} 
+    style={{ ...containerStyle, 
+      padding: isDesktop ? "30px 20px" : "0",
+      overflowY: 'auto',  // 🟢 Ensure this container scrolls
+        height: '100vh'     // 🟢 Fix the height 
+        }}>
       <div style={isDesktop ? desktopInnerWrapper : {}}>
         
         {/* TOP NAV (Mobile Only) */}
@@ -313,7 +343,16 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
 );
 
 // 🖌 STYLES
-const containerStyle = { minHeight: "100%", background: "var(--bg-color)", color: "#fff", position: "relative", overflowX: "hidden" };
+// Update this style object
+const containerStyle = { 
+  minHeight: "100%", 
+  background: "var(--bg-color)", 
+  color: "#fff", 
+  position: "relative", 
+  overflowX: "hidden" 
+  // Note: We are setting overflowY and height dynamically in the JSX now
+};
+
 const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%" };
 const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid var(--border-color)", position: "sticky", top: 0, background: "var(--bg-color)", zIndex: 100, backdropFilter: "blur(15px)" };
 const centerTitleContainer = { display: "flex", alignItems: "center" };

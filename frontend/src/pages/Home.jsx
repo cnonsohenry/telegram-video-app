@@ -32,7 +32,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [premiumPool, setPremiumPool] = useState([]);
   
   const premiumInjectionMap = useRef(new Map());
-  const premiumTracker = useRef(0); 
+  const premiumTracker = useRef(0);
+  const scrollContainerRef = useRef(null);
+  const scrollPositionRef = useRef(0); 
 
   // 🟢 Use dynamic current category
   const currentCategory = APP_CONFIG.categories[activeTab];
@@ -168,6 +170,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     if (!video) return;
 
     if (video.is_group && !activeGroup) {
+      if (scrollContainerRef.current) {
+        scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+      }
+
       try {
         // 🟢 Use dynamic API URL
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
@@ -178,6 +184,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           videos: groupVideos
         });
         window.scrollTo({ top: 0, behavior: "smooth" });
+
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = 0;
+        }
+
       } catch (err) {
         alert("🚨 Failed to load album contents.");
       }
@@ -221,7 +232,19 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     } else {
       playVideo(video);
     }
-  }, [user, unlockedVideos, activeGroup]); 
+  }, [user, unlockedVideos, activeGroup]);
+  
+  // 🟢 RESTORE SCROLL POSITION
+  useEffect(() => {
+    if (!activeGroup && scrollContainerRef.current) {
+      // Restore position to the custom container
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollPositionRef.current;
+        }
+      });
+    }
+  }, [activeGroup]);
 
   useEffect(() => {
     if (loading || videos.length === 0) return;
@@ -387,10 +410,14 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           
           <PullToRefresh onRefresh={handleRefresh}>
             {/* 🟢 THE FIX: Android-specific touch and scroll handling applied to the wrapper */}
-            <div style={{ 
+            <div 
+            ref={scrollContainerRef}
+            style={{ 
               touchAction: "pan-y", 
               overscrollBehaviorY: "contain",
               overflowAnchor: "none",
+              height: "100vh", // Force the height
+              overflowY: "auto", // Ensure this is where the scrolling happens
               minHeight: "100vh" // Ensures the wrapper is always tall enough to scroll
             }}>
               <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
