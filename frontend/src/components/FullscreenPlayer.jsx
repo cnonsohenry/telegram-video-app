@@ -1,5 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, Share2, Download, Check, Heart, MessageCircle, Bookmark, Volume2, VolumeX } from "lucide-react";
+import { 
+  X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, 
+  Share2, Download, Check, Heart, MessageCircle, Bookmark, 
+  Volume2, VolumeX, MoreVertical, Edit2, Trash2 
+} from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -21,6 +25,8 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
   // Action States
   const [copied, setCopied] = useState(false); 
   const [isDownloading, setIsDownloading] = useState(false); 
+  const [showMenu, setShowMenu] = useState(false);
+  const [canModify, setCanModify] = useState(false); // Controls Edit/Delete visibility
 
   // Engagement States
   const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
@@ -34,6 +40,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
     const token = localStorage.getItem("token");
     if (!token) return;
 
+    // Check interaction states
     fetch(`${APP_CONFIG.apiUrl}/api/interactions/state/${video.message_id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -43,19 +50,29 @@ export default function FullscreenPlayer({ video, onClose, isDesktop, onCommentC
       if (data.isSaved) setIsSaved(true);
     })
     .catch(err => console.error("Failed to fetch interaction state", err));
-  }, [video.message_id]);
 
-  // Add this useEffect to reset video when video prop changes
-useEffect(() => {
-  if (videoRef.current) {
-    videoRef.current.pause();
-    videoRef.current.load();
-  }
-  setIsLoading(true);
-  setCurrentTime(0);
-  setDuration(0);
-  setIsPlaying(false);
-}, [video.message_id]);
+    // Decode token to check if user is admin or uploader
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.role === 'admin' || payload.id === video.uploader_id) {
+        setCanModify(true);
+      }
+    } catch (e) {
+      console.error("Could not parse token for permissions");
+    }
+  }, [video.message_id, video.uploader_id]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.load();
+    }
+    setIsLoading(true);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+    setShowMenu(false); // Reset menu state on video change
+  }, [video.message_id]);
 
   const handleTimeUpdate = () => {
     if (videoRef.current && !isDragging) {
@@ -74,6 +91,7 @@ useEffect(() => {
   const handleInteraction = (e) => {
     if (e) e.stopPropagation();
     setShowControls(prev => !prev);
+    setShowMenu(false); // Hide menu if tapping screen
   };
 
   const handleTogglePlay = (e) => {
@@ -120,7 +138,7 @@ useEffect(() => {
   };
 
   const handleShare = async (e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     const shareUrl = `${window.location.origin}/v/${video.message_id}`;
     const brandName = `${APP_CONFIG.appNamePrefix} ${APP_CONFIG.appNameSuffix}`;
 
@@ -158,7 +176,7 @@ useEffect(() => {
   };
 
   const handleDownload = async (e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     if (isDownloading) return;
     
     setIsDownloading(true);
@@ -182,6 +200,23 @@ useEffect(() => {
       alert("Download failed. Please try again.");
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  // 🟢 ADMIN / UPLOADER HANDLERS
+  const handleEditCaption = (e) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    // TODO: Implement your edit caption modal or logic here
+    alert(`Edit caption for video: ${video.message_id}`);
+  };
+
+  const handleDeleteVideo = (e) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    if(window.confirm("Are you sure you want to delete this video?")) {
+      // TODO: Call your backend DELETE route
+      alert(`Delete triggered for video: ${video.message_id}`);
     }
   };
 
@@ -216,6 +251,7 @@ useEffect(() => {
     <div ref={containerRef} style={overlayStyle} onClick={onClose}>
       <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />
 
+      {/* Back / Close Button (Left for mobile, Right for desktop) */}
       {!isDesktop ? (
         <button 
           onClick={(e) => { e.stopPropagation(); onClose(); }} 
@@ -230,6 +266,50 @@ useEffect(() => {
         >
           <X size={24} />
         </button>
+      )}
+
+      {/* 🟢 NEW: 3-Dot Menu Button (Extreme Right) */}
+      <button 
+        onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
+        style={{ 
+          ...menuButtonStyle, 
+          right: isDesktop ? "90px" : "20px", // Adapts position so it doesn't overlap Desktop X
+          opacity: showControls ? 1 : 0, 
+          pointerEvents: showControls ? "auto" : "none", 
+          zIndex: 10006 
+        }}
+      >
+        <MoreVertical size={24} />
+      </button>
+
+      {/* 🟢 NEW: Dropdown Menu */}
+      {showMenu && (
+        <div 
+          style={{ position: "absolute", inset: 0, zIndex: 10007 }} 
+          onClick={(e) => { e.stopPropagation(); setShowMenu(false); }}
+        >
+          <div style={{ ...dropdownMenuStyle, right: isDesktop ? "90px" : "20px" }} onClick={(e) => e.stopPropagation()}>
+            
+            {canModify && (
+              <>
+                <button style={dropdownItemStyle} onClick={handleEditCaption}>
+                  <Edit2 size={16} /> Edit Caption
+                </button>
+                <button style={{ ...dropdownItemStyle, color: '#ef4444' }} onClick={handleDeleteVideo}>
+                  <Trash2 size={16} /> Delete Video
+                </button>
+                <div style={dropdownDividerStyle} />
+              </>
+            )}
+            
+            <button style={dropdownItemStyle} onClick={handleShare}>
+              <Share2 size={16} /> Share
+            </button>
+            <button style={dropdownItemStyle} onClick={handleDownload}>
+              <Download size={16} /> Download
+            </button>
+          </div>
+        </div>
       )}
 
       <div style={stageStyle} onClick={(e) => e.stopPropagation()}>
@@ -271,9 +351,6 @@ useEffect(() => {
                 <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }} style={floatingBtnStyle}>
                   {isZoomed ? <Minimize size={18} /> : <Maximize size={18} />}
                 </button>
-                <button onClick={handleDownload} style={floatingBtnStyle}>
-                  {isDownloading ? <Loader2 size={18} className="spin-animation" /> : <Download size={18} />}
-                </button>
             </div>
 
             {/* Middle Row: Avatar, Name, and Caption */}
@@ -290,7 +367,7 @@ useEffect(() => {
                </div>
             </div>
 
-            {/* 🟢 Bottom Row: Play/Pause firmly docked next to Progress Bar */}
+            {/* Bottom Row: Play/Pause firmly docked next to Progress Bar */}
             <div style={controlBarContainer}>
                <button onClick={handleTogglePlay} style={playPauseBtnStyle}>
                  {isPlaying ? <Pause size={36} fill="#fff" color="#fff" /> : <Play size={36} fill="#fff" color="#fff" />}
@@ -358,6 +435,9 @@ useEffect(() => {
         .x-range { width: 100%; cursor: pointer; height: 6px; border-radius: 3px; appearance: none; outline: none; }
         .x-range::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
         .x-range::-moz-range-thumb { width: 16px; height: 16px; background: #fff; border-radius: 50%; border: none; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        
+        /* 🟢 Clean Hover State for Dropdown Items */
+        .menu-btn-hover:hover { background: rgba(255, 255, 255, 0.1) !important; }
       `}</style>
     </div>
   );
@@ -371,8 +451,16 @@ const loaderContainerStyle = { position: "absolute", zIndex: 10, display: "flex"
 
 const topGradientStyle = { position: "absolute", top: 0, left: 0, right: 0, height: "120px", background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)", zIndex: 10005, transition: "opacity 0.4s ease" };
 const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "300px", background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.4s ease", pointerEvents: "none" };
+
+// Header buttons
 const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease" };
+
+// 🟢 NEW: Menu Styles
+const menuButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", background: "rgba(0,0,0,0.3)", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", transition: "opacity 0.4s ease", cursor: "pointer" };
+const dropdownMenuStyle = { position: "absolute", top: "max(75px, calc(env(safe-area-inset-top) + 75px))", background: "rgba(25, 25, 25, 0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", padding: "6px", display: "flex", flexDirection: "column", gap: "2px", minWidth: "170px", backdropFilter: "blur(15px)", boxShadow: "0 10px 40px rgba(0,0,0,0.8)" };
+const dropdownItemStyle = { background: "transparent", border: "none", color: "#fff", padding: "12px 14px", display: "flex", alignItems: "center", gap: "12px", fontSize: "14px", fontWeight: "500", cursor: "pointer", borderRadius: "8px", width: "100%", textAlign: "left", transition: "background 0.2s" };
+const dropdownDividerStyle = { height: "1px", background: "rgba(255,255,255,0.08)", margin: "4px 0" };
 
 const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area-inset-bottom))", left: 0, right: 0, padding: "0 15px", zIndex: 10002, display: "flex", flexDirection: "column", transition: "opacity 0.2s ease" };
 const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "8px" };
@@ -384,7 +472,6 @@ const textDetailsStyle = { display: "flex", flexDirection: "column", gap: "4px",
 const usernameStyle = { fontSize: "16px", fontWeight: "700", color: "#fff", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
 const captionStyle = { fontSize: "14px", color: "#e7e9ea", lineHeight: "1.4", wordWrap: "break-word", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
 
-// 🟢 Re-docked Control Row
 const controlBarContainer = { display: "flex", alignItems: "center", gap: "12px", width: "100%", marginBottom: "16px" };
 const playPauseBtnStyle = { background: "transparent", border: "none", cursor: "pointer", padding: "4px", display: "flex", alignItems: "center", justifyContent: "center" };
 const progressContainerStyle = { display: "flex", flexDirection: "column", gap: "4px", flex: 1 };
