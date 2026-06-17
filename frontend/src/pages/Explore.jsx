@@ -74,7 +74,6 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
     }
   }, [videoUrl]);
 
-  // 🟢 Auto-Pause feed video if the comment modal is open
   useEffect(() => {
     if (videoRef.current) {
       if (isPlaying && !isAnyModalOpen) {
@@ -166,10 +165,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 
         <p style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</p>
 
-        {/* 🟢 THE FIX: Pass the already-fetched Cloudflare URL up to App.jsx */}
         <div ref={containerRef} style={videoContainerStyle} onClick={() => onVideoClick({ ...video, video_url: videoUrl })}>
-          {/* 🟢 THE FIX: Only render the video tag if it is ACTIVELY playing. 
-              If you scroll away, React destroys the tag and instantly kills the network connection! */}
           {videoUrl && isPlaying && !isAnyModalOpen ? (
             <video 
               ref={videoRef} 
@@ -243,6 +239,17 @@ export default function Explore({ onVideoClick, onCommentClick, isAnyModalOpen }
     });
     if (node) observer.current.observe(node);
   }, [loading, loadingMore, searchQuery, hasMoreSearch, searchPage]);
+
+  // 🟢 THE FIX: Soft Delete Event Listener
+  useEffect(() => {
+    const handleVideoDeleted = (event) => {
+      const deletedId = String(event.detail);
+      setFeed(prevFeed => prevFeed.filter(v => String(v.id || v.message_id) !== deletedId));
+    };
+
+    window.addEventListener('videoDeleted', handleVideoDeleted);
+    return () => window.removeEventListener('videoDeleted', handleVideoDeleted);
+  }, []);
 
   const loadRandomFeed = async (isLoadMore = false) => {
     if (isLoadMore) setLoadingMore(true);
@@ -380,8 +387,8 @@ export default function Explore({ onVideoClick, onCommentClick, isAnyModalOpen }
                   isLast={isLast}
                   lastElementRef={lastElementRef}
                   onVideoClick={onVideoClick}
-                  onCommentClick={onCommentClick} // 🟢 Passes the action up to App.jsx
-                  isAnyModalOpen={isAnyModalOpen} // 🟢 Receives modal state from App.jsx
+                  onCommentClick={onCommentClick} 
+                  isAnyModalOpen={isAnyModalOpen} 
                 />
               );
             })

@@ -14,7 +14,9 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
   
   const [activeGroup, setActiveGroup] = useState(null);
   
-  // 🟢 THE FIX: Add a reference for our infinite scroll trigger
+  // 🟢 NEW: Local state to track soft-deleted videos instantly
+  const [deletedVideoIds, setDeletedVideoIds] = useState(new Set());
+  
   const loaderRef = useRef(null);
 
   useEffect(() => {
@@ -45,21 +47,48 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     ? { data: premium || [], loading: premiumLoading, loadMore: loadMorePremium }
     : { data: shots || [], loading: shotsLoading, loadMore: loadMoreShots };
 
-  const videosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
+  // 🟢 THE FIX: Soft Delete Event Listener
+  useEffect(() => {
+    const handleVideoDeleted = (event) => {
+      const deletedId = String(event.detail); // Normalize to string for safe comparison
 
-  // 🟢 THE FIX: Set up the Intersection Observer for Infinite Scrolling
+      // 1. Add to the hidden list to filter out from raw feeds
+      setDeletedVideoIds(prev => new Set(prev).add(deletedId));
+
+      // 2. Instantly remove from active album/group if open
+      setActiveGroup(prevGroup => {
+        if (!prevGroup) return null;
+        return {
+          ...prevGroup,
+          videos: prevGroup.videos.filter(v => 
+            String(v.id || v.message_id) !== deletedId
+          )
+        };
+      });
+    };
+
+    window.addEventListener('videoDeleted', handleVideoDeleted);
+    return () => window.removeEventListener('videoDeleted', handleVideoDeleted);
+  }, []);
+
+  // 🟢 Filter out any videos we just soft-deleted
+  const filteredRawVideos = rawVideosToDisplay.filter(v => 
+    !deletedVideoIds.has(String(v.id || v.message_id))
+  );
+
+  const videosToDisplay = activeGroup ? activeGroup.videos : filteredRawVideos;
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         const target = entries[0];
-        // If the trigger div is visible, we aren't already loading, and we aren't in a group folder -> Load more!
         if (target.isIntersecting && !loading && !activeGroup) {
           loadMore();
         }
       },
       { 
         root: null, 
-        rootMargin: "200px", // Trigger the load 200px BEFORE the user hits the absolute bottom for a seamless experience
+        rootMargin: "200px", 
         threshold: 0.1 
       }
     );
@@ -253,8 +282,8 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           {/* Loading state message */}
           {loading && !activeGroup && <div style={loaderStyle}>Refreshing shots...</div>}
           
-          {/* 🟢 THE FIX: The invisible trigger for our IntersectionObserver */}
-          {!loading && !activeGroup && rawVideosToDisplay.length > 0 && (
+          {/* The invisible trigger for our IntersectionObserver */}
+          {!loading && !activeGroup && filteredRawVideos.length > 0 && (
             <div ref={loaderRef} style={{ height: "10px", width: "100%" }} />
           )}
 

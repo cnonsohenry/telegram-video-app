@@ -259,6 +259,43 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // 🟢 SOFT DELETE LISTENER
+  useEffect(() => {
+    const handleVideoDeleted = (event) => {
+      const deletedId = event.detail;
+
+      // 1. Remove from local category cache
+      setVideoCache(prevCache => {
+        const newCache = { ...prevCache };
+        Object.keys(newCache).forEach(category => {
+          newCache[category] = newCache[category].filter(v => 
+            (v.id || v.message_id) !== deletedId
+          );
+        });
+        return newCache;
+      });
+
+      // 2. Remove from active group (if user is inside an album)
+      setActiveGroup(prevGroup => {
+        if (!prevGroup) return null;
+        return {
+          ...prevGroup,
+          videos: prevGroup.videos.filter(v => 
+            (v.id || v.message_id) !== deletedId
+          )
+        };
+      });
+      
+      // 3. Remove from premium pool (just in case it was a premium injection)
+      setPremiumPool(prevPool => 
+        prevPool.filter(v => (v.id || v.message_id) !== deletedId)
+      );
+    };
+
+    window.addEventListener('videoDeleted', handleVideoDeleted);
+    return () => window.removeEventListener('videoDeleted', handleVideoDeleted);
+  }, []);
+
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   
   const handleRefresh = async () => {

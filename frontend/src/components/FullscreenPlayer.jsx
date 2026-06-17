@@ -28,7 +28,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const [showMenu, setShowMenu] = useState(false);
   const [canModify, setCanModify] = useState(false); 
 
-  // 🟢 NEW: Edit States
+  // Edit States
   const [isEditingMode, setIsEditingMode] = useState(false);
   const [editForm, setEditForm] = useState({ 
     caption: video.caption || "", 
@@ -104,14 +104,110 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     }
   };
 
-  // 🟢 ENGAGEMENT HANDLERS
-  const handleLike = async (e) => { /*... existing code ...*/ };
-  const handleSaveToProfile = async (e) => { /*... existing code ...*/ };
-  const handleShare = async (e) => { /*... existing code ...*/ };
-  const handleCommentClick = (e) => { /*... existing code ...*/ };
-  const handleDownload = async (e) => { /*... existing code ...*/ };
+  // 🟢 FULLY RESTORED ENGAGEMENT HANDLERS
+  const handleLike = async (e) => {
+    e.stopPropagation();
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please log in to like videos!");
 
-  // 🟢 ACTUAL ADMIN / UPLOADER HANDLERS
+    setIsLiked(!isLiked);
+    setLikesCount(prev => isLiked ? Math.max(0, prev - 1) : prev + 1);
+
+    try {
+      await fetch(`${APP_CONFIG.apiUrl}/api/interactions/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message_id: video.message_id })
+      });
+    } catch (err) {}
+  };
+
+  const handleSaveToProfile = async (e) => {
+    e.stopPropagation();
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please log in to save videos!");
+
+    setIsSaved(!isSaved);
+    setSavesCount(prev => isSaved ? Math.max(0, prev - 1) : prev + 1);
+
+    try {
+      await fetch(`${APP_CONFIG.apiUrl}/api/interactions/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message_id: video.message_id })
+      });
+    } catch (err) {}
+  };
+
+  const handleShare = async (e) => {
+    if (e) e.stopPropagation();
+    setShowMenu(false);
+    const shareUrl = `${window.location.origin}/v/${video.message_id}`;
+    const brandName = `${APP_CONFIG.appNamePrefix} ${APP_CONFIG.appNameSuffix}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: brandName,
+          text: video.caption || `Watch this video on ${brandName}`,
+          url: shareUrl,
+        });
+      } catch (err) {}
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+
+    setSharesCount(prev => prev + 1);
+    fetch(`${APP_CONFIG.apiUrl}/api/interactions/share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: video.message_id })
+    }).catch(() => {});
+  };
+
+  const handleCommentClick = (e) => {
+    e.stopPropagation();
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please log in to comment!");
+    
+    if (onCommentClick) {
+        setCommentsCount(prev => prev + 1); 
+        onCommentClick(video);
+    }
+  };
+
+  const handleDownload = async (e) => {
+    if (e) e.stopPropagation();
+    setShowMenu(false);
+    if (isDownloading) return;
+    
+    setIsDownloading(true);
+    try {
+      const cacheBusterUrl = video.video_url + (video.video_url.includes('?') ? '&' : '?') + 'dl=' + Date.now();
+      const response = await fetch(cacheBusterUrl, { mode: 'cors' });
+      if (!response.ok) throw new Error("Network response was not ok");
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${APP_CONFIG.appNamePrefix.toLowerCase()}-${video.message_id}.mp4`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      alert("Download failed. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  // ADMIN / UPLOADER HANDLERS
   const handleEditCaption = (e) => {
     e.stopPropagation();
     setShowMenu(false);
@@ -122,7 +218,6 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     e.preventDefault();
     try {
       const token = localStorage.getItem("token");
-      // Fallback to message_id if id is not included in the feed response
       const identifier = video.id || video.message_id; 
       
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/video/${identifier}`, {
@@ -132,7 +227,6 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       });
 
       if (res.ok) {
-        // Optimistically update the local view
         video.caption = editForm.caption;
         video.category = editForm.category;
         setIsEditingMode(false);
@@ -160,7 +254,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
         
         if (res.ok) {
           onClose(); 
-          window.location.reload(); // Refresh feed to completely clear the deleted video
+          window.dispatchEvent(new CustomEvent('videoDeleted', { detail: identifier }));
         } else {
           alert("Failed to delete video. Make sure you have the right permissions.");
         }
@@ -252,11 +346,14 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
               </>
             )}
             
-            <button style={dropdownItemStyle} onClick={(e) => { e.stopPropagation(); alert('Share Logic Here')}}>
-              <Share2 size={16} /> Share
+            {/* 🟢 Re-Wired Dropdown Actions */}
+            <button style={dropdownItemStyle} onClick={handleShare}>
+              {copied ? <Check size={16} color="#4ade80" /> : <Share2 size={16} />} 
+              {copied ? "Copied!" : "Share"}
             </button>
-            <button style={dropdownItemStyle} onClick={(e) => { e.stopPropagation(); alert('Download Logic Here')}}>
-              <Download size={16} /> Download
+            <button style={dropdownItemStyle} onClick={handleDownload}>
+              {isDownloading ? <Loader2 size={16} className="spin-animation" /> : <Download size={16} />} 
+              Download
             </button>
           </div>
         </div>
@@ -351,11 +448,32 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                  </div>
                </div>
             </div>
+
+            {/* 🟢 RESTORED: Action Bar (Like, Comment, Save, Share) */}
+            <div style={engagementBarStyle}>
+               <button style={engagementBtnStyle} onClick={handleLike}>
+                  <Heart size={22} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#fff"} />
+                  <span>{likesCount > 0 ? likesCount : 'Like'}</span>
+               </button>
+               <button style={engagementBtnStyle} onClick={handleCommentClick}>
+                  <MessageCircle size={22} color="#fff" />
+                  <span>{commentsCount > 0 ? commentsCount : 'Reply'}</span>
+               </button>
+               <button style={engagementBtnStyle} onClick={handleSaveToProfile}>
+                  <Bookmark size={22} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#fff"} />
+                  <span>{savesCount > 0 ? savesCount : 'Save'}</span>
+               </button>
+               <button style={engagementBtnStyle} onClick={handleShare}>
+                  {copied ? <Check size={22} color="#4ade80" /> : <Share2 size={22} color="#fff" />}
+                  <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
+               </button>
+            </div>
+
           </div>
         </div>
       </div>
 
-      {/* 🟢 NEW: Edit Video Modal (Matches AdminDashboard) */}
+      {/* Edit Video Modal */}
       {isEditingMode && (
         <div style={modalOverlayStyle} onClick={(e) => { e.stopPropagation(); setIsEditingMode(false); }}>
           <form onSubmit={handleSaveEdit} style={modalBoxStyle} onClick={(e) => e.stopPropagation()}>
@@ -434,7 +552,10 @@ const progressContainerStyle = { display: "flex", flexDirection: "column", gap: 
 const rangeInputBaseStyle = { width: "100%" };
 const timeDisplayStyle = { fontSize: "11px", fontWeight: "500", color: "#ccc", textAlign: "right", paddingRight: "4px", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
 
-// 🟢 NEW: Modal Styles (Inherited from AdminDashboard)
+// 🟢 RESTORED: Engagement Bar Styles
+const engagementBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 10px", borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: "14px" };
+const engagementBtnStyle = { background: "transparent", border: "none", display: "flex", alignItems: "center", gap: "6px", color: "#e7e9ea", fontSize: "13px", fontWeight: "600", cursor: "pointer", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
+
 const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999999 };
 const modalBoxStyle = { background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "16px", padding: "25px", width: "100%", maxWidth: "400px", margin: "0 15px", zIndex: 10000000 };
 const modalHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" };
