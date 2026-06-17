@@ -124,25 +124,58 @@ router.get("/all-videos", authenticateToken, isAdmin, async (req, res) => {
 });
 
 // 🟢 6. UPDATE VIDEO (Edit Caption/Category)
-router.put("/video/:id", authenticateToken, isAdmin, async (req, res) => {
+router.put("/video/:identifier", authenticateToken, isAdmin, async (req, res) => {
   try {
+    const { identifier } = req.params;
     const { caption, category } = req.body;
-    await pool.query(
-      "UPDATE videos SET caption = $1, category = $2 WHERE id = $3",
-      [caption, category, req.params.id]
+
+    const result = await pool.query(
+      `UPDATE videos 
+       SET caption = $1, category = $2 
+       WHERE message_id = $3 OR id::text = $3 
+       RETURNING *`,
+      [caption, category, identifier]
     );
-    res.json({ success: true });
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Video not found" });
+    }
+
+    res.json({ success: true, video: result.rows[0] });
   } catch (err) {
+    console.error("Update failed", err);
     res.status(500).json({ error: "Update failed" });
   }
 });
 
 // 🟢 7. DELETE VIDEO
-router.delete("/video/:id", authenticateToken, isAdmin, async (req, res) => {
+router.delete("/video/:identifier", authenticateToken, isAdmin, async (req, res) => {
   try {
-    await pool.query("DELETE FROM videos WHERE id = $1", [req.params.id]);
+    const { identifier } = req.params;
+
+    // Find the exact message_id first to cleanly wipe dependencies
+    const videoQuery = await pool.query(
+      "SELECT message_id FROM videos WHERE message_id = $1 OR id::text = $1",
+      [identifier]
+    );
+
+    if (videoQuery.rowCount === 0) {
+      return res.status(404).json({ error: "Video not found" });
+    }
+
+    const targetMessageId = videoQuery.rows[0].message_id;
+
+    // Delete interactions tied to this video to prevent foreign key constraint errors
+    await pool.query("DELETE FROM likes WHERE message_id = $1", [targetMessageId]);
+    await pool.query("DELETE FROM saves WHERE message_id = $1", [targetMessageId]);
+    await pool.query("DELETE FROM comments WHERE message_id = $1", [targetMessageId]);
+
+    // Now delete the actual video
+    await pool.query("DELETE FROM videos WHERE message_id = $1", [targetMessageId]);
+
     res.json({ success: true });
   } catch (err) {
+    console.error("Delete failed", err);
     res.status(500).json({ error: "Delete failed" });
   }
 });
