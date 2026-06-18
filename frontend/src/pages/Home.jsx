@@ -427,7 +427,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
             }}>
               {/* 🟢 THE FIX: Push feed down via precise padding so it perfectly clears the floating UI */}
               <div style={{ 
-                 paddingTop: isDesktop ? "30px" : "115px", 
+                 paddingTop: isDesktop ? "30px" : "140px", 
                  paddingLeft: isDesktop ? "25px" : "15px",
                  paddingRight: isDesktop ? "25px" : "15px",
                  paddingBottom: "30px"
