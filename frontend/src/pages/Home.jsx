@@ -17,7 +17,6 @@ const MAX_CACHE_SIZE = 4;
 const AD_FREQUENCY = 3;
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
-  // 🟢 Use dynamic categories from config
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * APP_CONFIG.categories.length)); 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
@@ -29,23 +28,28 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [activeGroup, setActiveGroup] = useState(null);
 
+  // 🟢 NEW: Scroll tracking state
+  const [isUIHidden, setIsUIHidden] = useState(false);
+
   const [premiumPool, setPremiumPool] = useState([]);
   
   const premiumInjectionMap = useRef(new Map());
   const premiumTracker = useRef(0);
   const scrollContainerRef = useRef(null);
   const scrollPositionRef = useRef(0); 
+  const lastScrollY = useRef(0); // 🟢 Tracks the exact scroll direction
 
-  // 🟢 Use dynamic current category
   const currentCategory = APP_CONFIG.categories[activeTab];
   const isDesktop = windowWidth > 1024;
+  
+  // 🟢 Isolate hiding behavior to Mobile only (just like Twitter)
+  const shouldHideUI = isUIHidden && !isDesktop;
   
   const fetchLimit = isDesktop ? 15 : 12;
   
   const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory, fetchLimit);
 
   useEffect(() => {
-    // 🟢 Use dynamic API URL
     fetch(`${APP_CONFIG.apiUrl}/api/videos?category=premium&limit=20`)
       .then(res => res.json())
       .then(data => {
@@ -83,7 +87,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       baseList = videoCache[currentCategory];
     } 
     else if (!loading && videos.length > 0) {
-       // 🟢 Assuming "trends" is still a universal category, otherwise make this dynamic too
        const isCorrectCategory = currentCategory === APP_CONFIG.categories[3] || videos[0].category === currentCategory;
        if (isCorrectCategory) {
           baseList = videos;
@@ -127,7 +130,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   useEffect(() => {
     if (!loading && videos?.length > 0) {
-      // 🟢 Dynamic check
       const isCorrectCategory = currentCategory === APP_CONFIG.categories[3] || videos[0].category === currentCategory;
       if (isCorrectCategory) {
         updateCache(currentCategory, videos);
@@ -149,7 +151,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const playVideo = async (video) => {
     try {
       setActiveVideo({ ...video, video_url: null }); 
-      // 🟢 Use dynamic API URL
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
       if (!res.ok) throw new Error("Server error");
       const data = await res.json();
@@ -175,7 +176,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       }
 
       try {
-        // 🟢 Use dynamic API URL
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
         
@@ -188,7 +188,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         if (scrollContainerRef.current) {
             scrollContainerRef.current.scrollTop = 0;
         }
-
       } catch (err) {
         alert("🚨 Failed to load album contents.");
       }
@@ -234,10 +233,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
   }, [user, unlockedVideos, activeGroup]);
   
-  // 🟢 RESTORE SCROLL POSITION
   useEffect(() => {
     if (!activeGroup && scrollContainerRef.current) {
-      // Restore position to the custom container
       requestAnimationFrame(() => {
         if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollTop = scrollPositionRef.current;
@@ -249,13 +246,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   useEffect(() => {
     if (loading || videos.length === 0) return;
     const prefetch = async () => {
-      // 🟢 Dynamic length check
       const neighbors = [(activeTab + 1) % APP_CONFIG.categories.length, (activeTab - 1 + APP_CONFIG.categories.length) % APP_CONFIG.categories.length];
       for (const idx of neighbors) {
         const cat = APP_CONFIG.categories[idx];
         if (!videoCache[cat]) {
           try {
-            // 🟢 Dynamic API URL
             const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${cat}&limit=${fetchLimit}`);
             if (res.ok) {
               const data = await res.json();
@@ -269,11 +264,40 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return () => clearTimeout(timer);
   }, [activeTab, loading, videos, videoCache, updateCache, fetchLimit]);
 
+  // 🟢 NEW: Unified Scroll Listener for Hide/Show Behavior
   useEffect(() => {
-    const handleScroll = () => setShowScrollTop(window.scrollY > 400);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const currentY = container.scrollTop;
+      setShowScrollTop(currentY > 400);
+
+      // Failsafe: Always show UI at the absolute top
+      if (currentY < 50) {
+        setIsUIHidden(false);
+      } 
+      // If scrolled down more than 15px, hide UI
+      else if (currentY > lastScrollY.current + 15) {
+        setIsUIHidden(true);
+      } 
+      // If scrolled up more than 15px, show UI
+      else if (currentY < lastScrollY.current - 15) {
+        setIsUIHidden(false);
+      }
+
+      lastScrollY.current = currentY;
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // 🟢 NEW: Broadcast footer visibility to App.jsx
+  useEffect(() => {
+    setHideFooter(shouldHideUI);
+    return () => setHideFooter(false); // Cleanup on unmount
+  }, [shouldHideUI, setHideFooter]);
 
   useEffect(() => {
     expandApp();
@@ -282,12 +306,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 🟢 SOFT DELETE LISTENER
   useEffect(() => {
     const handleVideoDeleted = (event) => {
       const deletedId = event.detail;
 
-      // 1. Remove from local category cache
       setVideoCache(prevCache => {
         const newCache = { ...prevCache };
         Object.keys(newCache).forEach(category => {
@@ -298,7 +320,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         return newCache;
       });
 
-      // 2. Remove from active group (if user is inside an album)
       setActiveGroup(prevGroup => {
         if (!prevGroup) return null;
         return {
@@ -309,7 +330,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         };
       });
       
-      // 3. Remove from premium pool (just in case it was a premium injection)
       setPremiumPool(prevPool => 
         prevPool.filter(v => (v.id || v.message_id) !== deletedId)
       );
@@ -319,7 +339,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return () => window.removeEventListener('videoDeleted', handleVideoDeleted);
   }, []);
 
-  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  const scrollToTop = () => {
+    if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
   
   const handleRefresh = async () => {
     premiumInjectionMap.current.clear(); 
@@ -331,16 +355,27 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const actualVideosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
 
   return (
-    <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <AppHeader 
-        isDesktop={isDesktop} 
-        searchTerm={searchTerm} 
-        setSearchTerm={setSearchTerm} 
-        user={user} 
-        onProfileClick={onProfileClick} 
-        suggestions={sidebarSuggestions} 
-        onVideoClick={(v, e) => handleOpenVideo(v, e)} 
-      />
+    <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      
+      {/* 🟢 THE FIX: Wrap AppHeader in dynamic CSS transitions */}
+      <div style={{
+        transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-top 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+        transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)",
+        marginTop: shouldHideUI ? "-65px" : "0", 
+        opacity: shouldHideUI ? 0 : 1,
+        position: "relative",
+        zIndex: 1000
+      }}>
+        <AppHeader 
+          isDesktop={isDesktop} 
+          searchTerm={searchTerm} 
+          setSearchTerm={setSearchTerm} 
+          user={user} 
+          onProfileClick={onProfileClick} 
+          suggestions={sidebarSuggestions} 
+          onVideoClick={(v, e) => handleOpenVideo(v, e)} 
+        />
+      </div>
       
       <div style={{ display: "flex", flex: 1, position: "relative" }}>
         
@@ -363,7 +398,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                 borderRight: isSidebarHovered ? "1px solid #333" : "1px solid var(--border-color)"
               }}
             >
-              {/* 🟢 Render tabs dynamically from config */}
               {APP_CONFIG.tabs.map((tab, index) => (
                 <button 
                   key={index} 
@@ -391,9 +425,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
+          {/* 🟢 THE FIX: Wrap Mobile Nav in dynamic CSS transitions */}
           {!isDesktop && (
-            <nav style={mobileNavStyle}>
-              {/* 🟢 Render tabs dynamically from config */}
+            <nav style={{
+              ...mobileNavStyle,
+              transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)"
+            }}>
               {APP_CONFIG.tabs.map((tab, index) => (
                 <button 
                   key={index} 
@@ -409,16 +447,17 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           )}
           
           <PullToRefresh onRefresh={handleRefresh}>
-            {/* 🟢 THE FIX: Android-specific touch and scroll handling applied to the wrapper */}
             <div 
             ref={scrollContainerRef}
             style={{ 
               touchAction: "pan-y", 
               overscrollBehaviorY: "contain",
               overflowAnchor: "none",
-              height: "100vh", // Force the height
-              overflowY: "auto", // Ensure this is where the scrolling happens
-              minHeight: "100vh" // Ensures the wrapper is always tall enough to scroll
+              height: "100vh", 
+              overflowY: "auto", 
+              minHeight: "100vh",
+              paddingBottom: shouldHideUI ? "0px" : "70px", // Accommodates the footer seamlessly
+              transition: "padding-bottom 0.3s ease"
             }}>
               <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
                  
@@ -432,7 +471,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                    </div>
                  )}
 
-                 {/* Keep your grid exactly the same */}
                  <div style={{ 
                    display: "grid", 
                    gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(2, 1fr)", 
@@ -552,7 +590,6 @@ const ExoClickWidget = () => {
     <div style={{ width: "100%", marginTop: "20px", marginBottom: "20px" }}>
       <ins 
         className="eas6a97888e20" 
-        // 🟢 Inject Ad ID dynamically!
         data-zoneid={APP_CONFIG.exoClickZoneId}
         style={{ display: "block", width: "100%" }}
       ></ins>
