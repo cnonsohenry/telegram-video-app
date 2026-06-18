@@ -28,21 +28,18 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [activeGroup, setActiveGroup] = useState(null);
 
-  // 🟢 NEW: Scroll tracking state
   const [isUIHidden, setIsUIHidden] = useState(false);
-
   const [premiumPool, setPremiumPool] = useState([]);
   
   const premiumInjectionMap = useRef(new Map());
   const premiumTracker = useRef(0);
   const scrollContainerRef = useRef(null);
   const scrollPositionRef = useRef(0); 
-  const lastScrollY = useRef(0); // 🟢 Tracks the exact scroll direction
+  const lastScrollY = useRef(0); 
 
   const currentCategory = APP_CONFIG.categories[activeTab];
   const isDesktop = windowWidth > 1024;
   
-  // 🟢 Isolate hiding behavior to Mobile only (just like Twitter)
   const shouldHideUI = isUIHidden && !isDesktop;
   
   const fetchLimit = isDesktop ? 15 : 12;
@@ -183,11 +180,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           title: video.caption || "Collection",
           videos: groupVideos
         });
-        window.scrollTo({ top: 0, behavior: "smooth" });
-
+        
         if (scrollContainerRef.current) {
             scrollContainerRef.current.scrollTop = 0;
         }
+
       } catch (err) {
         alert("🚨 Failed to load album contents.");
       }
@@ -264,7 +261,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return () => clearTimeout(timer);
   }, [activeTab, loading, videos, videoCache, updateCache, fetchLimit]);
 
-  // 🟢 NEW: Unified Scroll Listener for Hide/Show Behavior
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -273,16 +269,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       const currentY = container.scrollTop;
       setShowScrollTop(currentY > 400);
 
-      // Failsafe: Always show UI at the absolute top
       if (currentY < 50) {
         setIsUIHidden(false);
-      } 
-      // If scrolled down more than 15px, hide UI
-      else if (currentY > lastScrollY.current + 15) {
+      } else if (currentY > lastScrollY.current + 15) {
         setIsUIHidden(true);
-      } 
-      // If scrolled up more than 15px, show UI
-      else if (currentY < lastScrollY.current - 15) {
+      } else if (currentY < lastScrollY.current - 15) {
         setIsUIHidden(false);
       }
 
@@ -293,10 +284,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // 🟢 NEW: Broadcast footer visibility to App.jsx
   useEffect(() => {
     setHideFooter(shouldHideUI);
-    return () => setHideFooter(false); // Cleanup on unmount
+    return () => setHideFooter(false);
   }, [shouldHideUI, setHideFooter]);
 
   useEffect(() => {
@@ -355,16 +345,20 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const actualVideosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
 
   return (
-    <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
       
-      {/* 🟢 THE FIX: Wrap AppHeader in dynamic CSS transitions */}
+      {/* 🟢 THE FIX: Group Header + Tabs into a single absolute overlay for Mobile */}
       <div style={{
-        transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-top 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+        position: isDesktop ? "relative" : "absolute",
+        top: 0, left: 0, right: 0,
+        zIndex: 1000,
+        transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
         transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)",
-        marginTop: shouldHideUI ? "-65px" : "0", 
         opacity: shouldHideUI ? 0 : 1,
-        position: "relative",
-        zIndex: 1000
+        pointerEvents: shouldHideUI ? "none" : "auto", 
+        display: "flex",
+        flexDirection: "column",
+        background: "var(--bg-color)" // Prevent transparency bleed during scroll
       }}>
         <AppHeader 
           isDesktop={isDesktop} 
@@ -375,48 +369,42 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           suggestions={sidebarSuggestions} 
           onVideoClick={(v, e) => handleOpenVideo(v, e)} 
         />
+
+        {!isDesktop && (
+          <nav style={{ ...mobileNavStyle, position: "relative" }}>
+            {APP_CONFIG.tabs.map((tab, index) => (
+              <button 
+                key={index} 
+                onClick={() => handleTabClick(index)} 
+                style={{ flex: 1, padding: "14px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", position: "relative" }}
+              >
+                {tab.icon}
+                <span style={{ fontSize: "10px", fontWeight: "700" }}>{tab.label}</span>
+              </button>
+            ))}
+            <div style={{ ...indicatorStyle, transform: `translateX(${activeTab * 100}%)`, width: `${100 / APP_CONFIG.tabs.length}%` }} />
+          </nav>
+        )}
       </div>
       
       <div style={{ display: "flex", flex: 1, position: "relative" }}>
         
         {isDesktop && (
-          <div style={{ 
-            width: "80px", 
-            flexShrink: 0, 
-            position: "sticky", 
-            top: "70px", 
-            height: "calc(100vh - 70px)", 
-            zIndex: 110 
-          }}>
+          <div style={{ width: "80px", flexShrink: 0, position: "sticky", top: "70px", height: "calc(100vh - 70px)", zIndex: 110 }}>
             <nav 
               onMouseEnter={() => setIsSidebarHovered(true)}
               onMouseLeave={() => setIsSidebarHovered(false)}
-              style={{ 
-                ...sidebarStyle, 
-                width: isSidebarHovered ? "240px" : "80px",
-                boxShadow: isSidebarHovered ? "10px 0 30px rgba(0,0,0,0.5)" : "none",
-                borderRight: isSidebarHovered ? "1px solid #333" : "1px solid var(--border-color)"
-              }}
+              style={{ ...sidebarStyle, width: isSidebarHovered ? "240px" : "80px", boxShadow: isSidebarHovered ? "10px 0 30px rgba(0,0,0,0.5)" : "none", borderRight: isSidebarHovered ? "1px solid #333" : "1px solid var(--border-color)" }}
             >
               {APP_CONFIG.tabs.map((tab, index) => (
                 <button 
                   key={index} 
                   onClick={() => handleTabClick(index)} 
-                  style={{ 
-                    ...desktopTabButtonStyle, 
-                    background: activeTab === index ? "rgba(255,255,255,0.12)" : "transparent",
-                    color: activeTab === index ? "var(--primary-color)" : "#fff",
-                    justifyContent: isSidebarHovered ? "flex-start" : "center",
-                    paddingLeft: isSidebarHovered ? "24px" : "0"
-                  }}
+                  style={{ ...desktopTabButtonStyle, background: activeTab === index ? "rgba(255,255,255,0.12)" : "transparent", color: activeTab === index ? "var(--primary-color)" : "#fff", justifyContent: isSidebarHovered ? "flex-start" : "center", paddingLeft: isSidebarHovered ? "24px" : "0" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                      {tab.icon} 
-                     {isSidebarHovered && (
-                       <span style={sidebarLabelStyle}>
-                         {tab.label}
-                       </span>
-                     )}
+                     {isSidebarHovered && <span style={sidebarLabelStyle}>{tab.label}</span>}
                   </div>
                 </button>
               ))}
@@ -425,27 +413,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* 🟢 THE FIX: Wrap Mobile Nav in dynamic CSS transitions */}
-          {!isDesktop && (
-            <nav style={{
-              ...mobileNavStyle,
-              transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)"
-            }}>
-              {APP_CONFIG.tabs.map((tab, index) => (
-                <button 
-                  key={index} 
-                  onClick={() => handleTabClick(index)} 
-                  style={{ flex: 1, padding: "14px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", position: "relative" }}
-                >
-                  {tab.icon}
-                  <span style={{ fontSize: "10px", fontWeight: "700" }}>{tab.label}</span>
-                </button>
-              ))}
-              <div style={{ ...indicatorStyle, transform: `translateX(${activeTab * 100}%)`, width: `${100 / APP_CONFIG.tabs.length}%` }} />
-            </nav>
-          )}
-          
           <PullToRefresh onRefresh={handleRefresh}>
             <div 
             ref={scrollContainerRef}
@@ -453,13 +420,18 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
               touchAction: "pan-y", 
               overscrollBehaviorY: "contain",
               overflowAnchor: "none",
-              height: "100vh", 
+              height: isDesktop ? "calc(100vh - 70px)" : "100vh", // Desktop has relative header, mobile is 100vh overlay
               overflowY: "auto", 
-              minHeight: "100vh",
-              paddingBottom: shouldHideUI ? "0px" : "70px", // Accommodates the footer seamlessly
+              paddingBottom: shouldHideUI ? "0px" : "70px", 
               transition: "padding-bottom 0.3s ease"
             }}>
-              <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
+              {/* 🟢 THE FIX: Push feed down via precise padding so it perfectly clears the floating UI */}
+              <div style={{ 
+                 paddingTop: isDesktop ? "30px" : "115px", 
+                 paddingLeft: isDesktop ? "25px" : "15px",
+                 paddingRight: isDesktop ? "25px" : "15px",
+                 paddingBottom: "30px"
+              }}>
                  
                  {activeGroup && (
                    <div style={groupHeaderStyle}>
@@ -545,7 +517,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
 // 🖌 STYLES
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "12px", animation: "pulse 1.5s infinite" };
-const mobileNavStyle = { display: "flex", position: "sticky", top: 0, zIndex: 1000, background: "var(--bg-color)", borderBottom: "1px solid var(--border-color)" };
+const mobileNavStyle = { display: "flex", zIndex: 1000, background: "var(--bg-color)", borderBottom: "1px solid var(--border-color)" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
 const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", padding: "20px 0" };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
@@ -560,19 +532,8 @@ const groupHeaderStyle = { display: "flex", justifyContent: "space-between", ali
 const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
 const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
 
-// 🟢 NEW: SEO Footer Style
-const seoFooterStyle = { 
-  padding: "20px 25px", 
-  fontSize: "12px", 
-  color: "#666", 
-  textAlign: "center", 
-  lineHeight: "1.6", 
-  maxWidth: "800px", 
-  margin: "20px auto 0", 
-  borderTop: "1px solid rgba(255,255,255,0.05)" 
-};
+const seoFooterStyle = { padding: "20px 25px", fontSize: "12px", color: "#666", textAlign: "center", lineHeight: "1.6", maxWidth: "800px", margin: "20px auto 0", borderTop: "1px solid rgba(255,255,255,0.05)" };
 
-// 🟢 THE FULL-WIDTH EXOCLICK GRID
 const ExoClickWidget = () => {
   useEffect(() => {
     if (!document.querySelector('script[src="https://a.magsrv.com/ad-provider.js"]')) {
@@ -588,11 +549,7 @@ const ExoClickWidget = () => {
 
   return (
     <div style={{ width: "100%", marginTop: "20px", marginBottom: "20px" }}>
-      <ins 
-        className="eas6a97888e20" 
-        data-zoneid={APP_CONFIG.exoClickZoneId}
-        style={{ display: "block", width: "100%" }}
-      ></ins>
+      <ins className="eas6a97888e20" data-zoneid={APP_CONFIG.exoClickZoneId} style={{ display: "block", width: "100%" }}></ins>
     </div>
   );
 };
