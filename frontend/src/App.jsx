@@ -31,6 +31,29 @@ export default function App() {
   const windowWidth = useRef(window.innerWidth);
   const [appHeight, setAppHeight] = useState(`${window.innerHeight}px`);
 
+  // 🟢 1. Track the active tab in a Ref so our callbacks can check it without re-rendering
+  const activeTabRef = useRef(activeTab);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+    // Reset footer to visible whenever the user switches tabs!
+    setIsFooterVisible(true);
+  }, [activeTab]);
+
+  // 🟢 2. Create exclusive, stable callbacks for each specific tab
+  const handleHomeHideFooter = useCallback((hide) => {
+    if (activeTabRef.current === "home") setIsFooterVisible(!hide);
+  }, []);
+
+  const handleProfileHideFooter = useCallback((hide) => {
+    if (activeTabRef.current === "profile") setIsFooterVisible(!hide);
+  }, []);
+
+  // 🟢 Add this right under handleProfileHideFooter
+  const handleExploreHideFooter = useCallback((hide) => {
+    if (activeTabRef.current === "explore") setIsFooterVisible(!hide);
+  }, []);
+
   useEffect(() => {
     // 🟢 Let React mount and render the UI, then tell Prerender to take the snapshot instantly
     // We use a small 1.5-second timeout to ensure your feed videos have fetched from the DB
@@ -295,7 +318,7 @@ export default function App() {
           <Home 
             user={user} 
             onProfileClick={() => setActiveTab("profile")}
-            setHideFooter={(val) => setIsFooterVisible(!val)}
+            setHideFooter={handleHomeHideFooter} // 🟢 UPDATED
             setActiveVideo={setActiveVideo}
             setShowPaywall={setShowPaywall} 
           />
@@ -308,6 +331,9 @@ export default function App() {
           pointerEvents: activeTab === "explore" ? "auto" : "none"
         }}>
           <Explore 
+            user={user} 
+            onProfileClick={() => setActiveTab("profile")}
+            setHideFooter={handleExploreHideFooter} // Make sure this matches whatever your callback is named in App.jsx!
             onVideoClick={handleOpenVideo}
             onCommentClick={setActiveCommentVideo}
             isAnyModalOpen={!!activeVideo || !!activeCommentVideo || showPaywall} 
@@ -325,7 +351,7 @@ export default function App() {
               user={user} 
               onLogout={onLogout} 
               setActiveVideo={setActiveVideo} 
-              setHideFooter={(val) => setIsFooterVisible(!val)} 
+              setHideFooter={handleProfileHideFooter} 
               setShowPaywall={setShowPaywall} 
             />
           ) : (

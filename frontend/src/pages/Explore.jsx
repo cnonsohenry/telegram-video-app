@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark } from "lucide-react";
+import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
+import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
 
 // 🟢 INDIVIDUAL POST COMPONENT
 const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen }) => {
@@ -215,13 +216,30 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 };
 
 // 🟢 EXPLORE COMPONENT
-export default function Explore({ onVideoClick, onCommentClick, isAnyModalOpen }) {
+export default function Explore({ 
+  user, // 🟢 ADDED
+  onProfileClick, // 🟢 ADDED
+  setHideFooter, // 🟢 ADDED
+  onVideoClick, 
+  onCommentClick, 
+  isAnyModalOpen 
+}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [feed, setFeed] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchPage, setSearchPage] = useState(1);
   const [hasMoreSearch, setHasMoreSearch] = useState(true);
+
+  // 🟢 SCROLL UI STATES
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
+  const [isUIHidden, setIsUIHidden] = useState(false);
+  
+  const scrollContainerRef = useRef(null);
+  const lastScrollY = useRef(0);
+  const isFirstMount = useRef(true);
+
+  const shouldHideUI = isUIHidden && !isDesktop;
   
   const observer = useRef();
   const lastElementRef = useCallback(node => {
@@ -240,7 +258,25 @@ export default function Explore({ onVideoClick, onCommentClick, isAnyModalOpen }
     if (node) observer.current.observe(node);
   }, [loading, loadingMore, searchQuery, hasMoreSearch, searchPage]);
 
-  // 🟢 THE FIX: Soft Delete Event Listener
+  // 🟢 Window Resize Listener
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth > 1024);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // 🟢 Split Footer Broadcast Effects
+  useEffect(() => {
+    if (setHideFooter) setHideFooter(shouldHideUI);
+  }, [shouldHideUI, setHideFooter]);
+
+  useEffect(() => {
+    return () => {
+      if (setHideFooter) setHideFooter(false);
+    };
+  }, [setHideFooter]);
+
+  // 🟢 Soft Delete Event Listener
   useEffect(() => {
     const handleVideoDeleted = (event) => {
       const deletedId = String(event.detail);
@@ -249,6 +285,29 @@ export default function Explore({ onVideoClick, onCommentClick, isAnyModalOpen }
 
     window.addEventListener('videoDeleted', handleVideoDeleted);
     return () => window.removeEventListener('videoDeleted', handleVideoDeleted);
+  }, []);
+
+  // 🟢 Scroll Listener
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const currentY = container.scrollTop;
+
+      if (currentY < 50) {
+        setIsUIHidden(false);
+      } else if (currentY > lastScrollY.current + 15) {
+        setIsUIHidden(true);
+      } else if (currentY < lastScrollY.current - 15) {
+        setIsUIHidden(false);
+      }
+
+      lastScrollY.current = currentY;
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
   const loadRandomFeed = async (isLoadMore = false) => {
@@ -303,8 +362,6 @@ export default function Explore({ onVideoClick, onCommentClick, isAnyModalOpen }
     setLoadingMore(false);
   };
 
-  useEffect(() => { loadRandomFeed(); }, []);
-
   const loadSearchFeed = async (pageNum = 1, isLoadMore = false) => {
     if (isLoadMore) setLoadingMore(true);
     else setLoading(true);
@@ -327,80 +384,112 @@ export default function Explore({ onVideoClick, onCommentClick, isAnyModalOpen }
     setLoadingMore(false);
   };
 
-  const handleSearchSubmit = (e) => {
-    if (e) e.preventDefault();
-    if (!searchQuery.trim()) {
-      setSearchPage(1);
-      setHasMoreSearch(true);
-      loadRandomFeed();
+  // 🟢 AUTO-SEARCH DEBOUNCE
+  // Whenever the user types in the AppHeader, wait 600ms then execute the search
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      loadRandomFeed(false);
       return;
     }
-    loadSearchFeed(1, false);
-  };
+
+    const delayDebounceFn = setTimeout(() => {
+      setSearchPage(1);
+      setHasMoreSearch(true);
+      if (!searchQuery.trim()) {
+        loadRandomFeed(false);
+      } else {
+        loadSearchFeed(1, false);
+      }
+    }, 600);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
 
   return (
-    <div style={containerStyle}>
-      <div style={headerWrapper}>
-        <div style={searchContainer}>
-          <Search size={18} color="#888" style={{ marginLeft: "15px" }} />
-          <form onSubmit={handleSearchSubmit} style={{ flex: 1, display: "flex" }}>
-            <input 
-              type="text" 
-              placeholder="Search trending shots..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={searchInputStyle}
-            />
-          </form>
-        </div>
+    <div style={{ background: "var(--bg-color)", height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+      
+      {/* 🟢 APP HEADER OVERLAY */}
+      <div style={{
+        position: isDesktop ? "relative" : "absolute",
+        top: 0, left: 0, right: 0,
+        zIndex: 1000,
+        transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+        transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)",
+        opacity: shouldHideUI ? 0 : 1,
+        pointerEvents: shouldHideUI ? "none" : "auto",
+        background: "var(--bg-color)"
+      }}>
+        <AppHeader 
+          isDesktop={isDesktop} 
+          searchTerm={searchQuery} 
+          setSearchTerm={setSearchQuery} 
+          user={user} 
+          onProfileClick={onProfileClick} 
+          onVideoClick={onVideoClick}
+        />
       </div>
 
-      <PullToRefresh onRefresh={() => {
-        setSearchPage(1);
-        setHasMoreSearch(true);
-        if (searchQuery.trim()) loadSearchFeed(1, false);
-        else loadRandomFeed();
-      }}>
-        <div style={feedWrapper}>
-          {loading ? (
-            [...Array(5)].map((_, i) => (
-              <div key={i} style={postStyle}>
-                <div style={avatarColumnStyle}><div style={skeletonAvatar} /></div>
-                <div style={contentColumnStyle}>
-                  <div style={skeletonTextBase} />
-                  <div style={{ ...skeletonTextBase, width: "80%", marginTop: "6px", marginBottom: "12px" }} />
-                  <div style={{ ...skeletonVideo, width: "75%" }} />
+      {/* 🟢 SCROLLABLE AREA */}
+      <div 
+        ref={scrollContainerRef}
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          // Push down to clear absolute header on mobile
+          paddingTop: isDesktop ? "0px" : "70px",
+          paddingBottom: shouldHideUI ? "0px" : "70px",
+          transition: "padding-bottom 0.3s ease"
+        }}
+      >
+        <PullToRefresh onRefresh={() => {
+          setSearchPage(1);
+          setHasMoreSearch(true);
+          if (searchQuery.trim()) loadSearchFeed(1, false);
+          else loadRandomFeed(false);
+        }}>
+          <div style={feedWrapper}>
+            {loading ? (
+              [...Array(5)].map((_, i) => (
+                <div key={i} style={postStyle}>
+                  <div style={avatarColumnStyle}><div style={skeletonAvatar} /></div>
+                  <div style={contentColumnStyle}>
+                    <div style={skeletonTextBase} />
+                    <div style={{ ...skeletonTextBase, width: "80%", marginTop: "6px", marginBottom: "12px" }} />
+                    <div style={{ ...skeletonVideo, width: "75%" }} />
+                  </div>
                 </div>
-              </div>
-            ))
-          ) : feed.length === 0 ? (
-             <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
-                No videos found. Try a different search.
-             </div>
-          ) : (
-            feed.map((video, idx) => {
-              const isLast = feed.length === idx + 1;
-              return (
-                <FeedPost 
-                  key={`${video.message_id}-${idx}`}
-                  video={video}
-                  isLast={isLast}
-                  lastElementRef={lastElementRef}
-                  onVideoClick={onVideoClick}
-                  onCommentClick={onCommentClick} 
-                  isAnyModalOpen={isAnyModalOpen} 
-                />
-              );
-            })
-          )}
+              ))
+            ) : feed.length === 0 ? (
+               <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
+                  No videos found. Try a different search.
+               </div>
+            ) : (
+              feed.map((video, idx) => {
+                const isLast = feed.length === idx + 1;
+                return (
+                  <FeedPost 
+                    key={`${video.message_id}-${idx}`}
+                    video={video}
+                    isLast={isLast}
+                    lastElementRef={lastElementRef}
+                    onVideoClick={onVideoClick}
+                    onCommentClick={onCommentClick} 
+                    isAnyModalOpen={isAnyModalOpen} 
+                  />
+                );
+              })
+            )}
 
-          {loadingMore && (
-            <div style={{ padding: "20px", display: "flex", justifyContent: "center", color: "var(--primary-color)" }}>
-              <Loader2 className="animate-spin" size={24} />
-            </div>
-          )}
-        </div>
-      </PullToRefresh>
+            {loadingMore && (
+              <div style={{ padding: "20px", display: "flex", justifyContent: "center", color: "var(--primary-color)" }}>
+                <Loader2 className="animate-spin" size={24} />
+              </div>
+            )}
+          </div>
+        </PullToRefresh>
+      </div>
 
       <style>{`
         @keyframes skeleton-loading { 0% { background-color: #222; } 50% { background-color: #333; } 100% { background-color: #222; } }
@@ -412,10 +501,6 @@ export default function Explore({ onVideoClick, onCommentClick, isAnyModalOpen }
 }
 
 // 🖌 STYLES 
-const containerStyle = { width: "100%", minHeight: "100%", display: "flex", flexDirection: "column", background: "var(--bg-color)" };
-const headerWrapper = { position: "sticky", top: 0, zIndex: 100, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border-color)", padding: "12px 16px" };
-const searchContainer = { display: "flex", alignItems: "center", background: "#16181c", borderRadius: "30px", border: "1px solid #333", height: "44px", overflow: "hidden" };
-const searchInputStyle = { background: "transparent", border: "none", color: "#fff", padding: "0 15px", width: "100%", fontSize: "15px", outline: "none" };
 const feedWrapper = { maxWidth: "600px", margin: "0 auto", width: "100%", borderLeft: window.innerWidth > 600 ? "1px solid var(--border-color)" : "none", borderRight: window.innerWidth > 600 ? "1px solid var(--border-color)" : "none", minHeight: "100vh" };
 const postStyle = { padding: "16px", borderBottom: "1px solid var(--border-color)", display: "flex", flexDirection: "row", animation: "fadeIn 0.3s ease-out" };
 const avatarColumnStyle = { marginRight: "12px", flexShrink: 0 };
