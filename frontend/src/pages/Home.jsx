@@ -284,10 +284,15 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // 🟢 1. Broadcast the scroll state whenever it changes
   useEffect(() => {
     setHideFooter(shouldHideUI);
-    return () => setHideFooter(false);
   }, [shouldHideUI, setHideFooter]);
+
+  // 🟢 2. ONLY reset the footer to visible when leaving the Home page (unmounting)
+  useEffect(() => {
+    return () => setHideFooter(false);
+  }, [setHideFooter]);
 
   useEffect(() => {
     expandApp();
