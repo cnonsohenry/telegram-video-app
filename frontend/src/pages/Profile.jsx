@@ -14,12 +14,17 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
   
   const [activeGroup, setActiveGroup] = useState(null);
   
-  // 🟢 NEW: Local state to track soft-deleted videos instantly
   const [deletedVideoIds, setDeletedVideoIds] = useState(new Set());
   
+  // 🟢 NEW: Scroll Tracking State
+  const [isUIHidden, setIsUIHidden] = useState(false);
+  
   const loaderRef = useRef(null);
-  const scrollContainerRef = useRef(null); // 🟢 ADD THIS
-  const scrollPositionRef = useRef(0);     // 🟢 ADD THIS
+  const scrollContainerRef = useRef(null); 
+  const scrollPositionRef = useRef(0);     
+  const lastScrollY = useRef(0); // 🟢 Tracks scroll direction
+
+  const shouldHideUI = isUIHidden && !isDesktop; // Mobile only
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth > 1024);
@@ -27,14 +32,15 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // 🟢 THE FIX: Footer broadcast logic updated to respect the scroll state
   useEffect(() => {
     if (currentView === "settings") {
       setHideFooter(true);
     } else {
-      setHideFooter(false);
+      setHideFooter(shouldHideUI);
     }
     return () => setHideFooter(false);
-  }, [currentView, setHideFooter]);
+  }, [currentView, shouldHideUI, setHideFooter]);
 
   useEffect(() => {
     setActiveGroup(null);
@@ -49,22 +55,15 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     ? { data: premium || [], loading: premiumLoading, loadMore: loadMorePremium }
     : { data: shots || [], loading: shotsLoading, loadMore: loadMoreShots };
 
-  // 🟢 THE FIX: Soft Delete Event Listener
   useEffect(() => {
     const handleVideoDeleted = (event) => {
-      const deletedId = String(event.detail); // Normalize to string for safe comparison
-
-      // 1. Add to the hidden list to filter out from raw feeds
+      const deletedId = String(event.detail); 
       setDeletedVideoIds(prev => new Set(prev).add(deletedId));
-
-      // 2. Instantly remove from active album/group if open
       setActiveGroup(prevGroup => {
         if (!prevGroup) return null;
         return {
           ...prevGroup,
-          videos: prevGroup.videos.filter(v => 
-            String(v.id || v.message_id) !== deletedId
-          )
+          videos: prevGroup.videos.filter(v => String(v.id || v.message_id) !== deletedId)
         };
       });
     };
@@ -73,7 +72,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     return () => window.removeEventListener('videoDeleted', handleVideoDeleted);
   }, []);
 
-  // 🟢 Filter out any videos we just soft-deleted
   const filteredRawVideos = rawVideosToDisplay.filter(v => 
     !deletedVideoIds.has(String(v.id || v.message_id))
   );
@@ -88,17 +86,40 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           loadMore();
         }
       },
-      { 
-        root: null, 
-        rootMargin: "200px", 
-        threshold: 0.1 
-      }
+      { root: null, rootMargin: "200px", threshold: 0.1 }
     );
 
     if (loaderRef.current) observer.observe(loaderRef.current);
-
     return () => observer.disconnect();
   }, [loading, loadMore, activeGroup]);
+
+  // 🟢 NEW: Scroll Listener
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const currentY = container.scrollTop;
+
+      // At the absolute top, always show UI
+      if (currentY < 50) {
+        setIsUIHidden(false);
+      } 
+      // Scrolling down more than 15px
+      else if (currentY > lastScrollY.current + 15) {
+        setIsUIHidden(true);
+      } 
+      // Scrolling up more than 15px
+      else if (currentY < lastScrollY.current - 15) {
+        setIsUIHidden(false);
+      }
+
+      lastScrollY.current = currentY;
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleOpenVideo = useCallback(async (video, e) => {
     if (e && typeof e.preventDefault === 'function') {
@@ -108,7 +129,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     if (!video) return;
 
     if (video.is_group && !activeGroup) {
-
       if (scrollContainerRef.current) {
         scrollPositionRef.current = scrollContainerRef.current.scrollTop;
       }
@@ -121,13 +141,10 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           title: video.caption || "Collection",
           videos: groupVideos
         });
-        window.scrollTo({ top: 0, behavior: "smooth" });
-
-        // 🟢 Force scroll to top when entering album
+        
         if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollTop = 0;
         }
-
       } catch (err) {
         alert("🚨 Failed to load album contents.");
       }
@@ -153,7 +170,6 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     }
   }, [user, activeTab, setActiveVideo, activeGroup, isDesktop]); 
 
-  // 🟢 Add restoration effect
   useEffect(() => {
     if (!activeGroup && scrollContainerRef.current) {
       requestAnimationFrame(() => {
@@ -170,17 +186,31 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
 
   return (
     <div
-    ref={scrollContainerRef} 
-    style={{ ...containerStyle, 
-      padding: isDesktop ? "30px 20px" : "0",
-      overflowY: 'auto',  // 🟢 Ensure this container scrolls
-        height: '100vh'     // 🟢 Fix the height 
-        }}>
+      ref={scrollContainerRef} 
+      style={{ 
+        ...containerStyle, 
+        paddingTop: isDesktop ? "30px" : "0", 
+        paddingLeft: isDesktop ? "20px" : "0",
+        paddingRight: isDesktop ? "20px" : "0",
+        // 🟢 THE FIX: Push feed down dynamically so the footer doesn't overlap it
+        paddingBottom: isDesktop ? "30px" : (shouldHideUI ? "0px" : "70px"),
+        transition: "padding-bottom 0.3s ease",
+        overflowY: 'auto',  
+        height: '100vh'     
+      }}
+    >
       <div style={isDesktop ? desktopInnerWrapper : {}}>
         
         {/* TOP NAV (Mobile Only) */}
         {!isDesktop && (
-          <div style={navGridStyle}>
+          <div style={{
+            ...navGridStyle,
+            // 🟢 THE FIX: CSS animation for sliding out
+            transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+            transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)",
+            opacity: shouldHideUI ? 0 : 1,
+            pointerEvents: shouldHideUI ? "none" : "auto"
+          }}>
             <div style={{ width: "40px" }}></div>
             <div style={centerTitleContainer}>
               <h2 style={usernameStyle}>{user?.username || APP_CONFIG.defaultUploader}</h2>
@@ -256,7 +286,9 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           justifyContent: isDesktop ? "center" : "space-around",
           gap: isDesktop ? "60px" : "0",
           borderTop: isDesktop ? "1px solid var(--border-color)" : "none",
-          top: isDesktop ? "0" : "48px"
+          // 🟢 THE FIX: Shift the sticky tabs up 48px when the top header hides
+          top: isDesktop ? "0" : (shouldHideUI ? "0px" : "48px"),
+          transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
         }}>
           <TabButton 
             isDesktop={isDesktop} 
@@ -309,10 +341,8 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
             ))}
           </div>
           
-          {/* Loading state message */}
           {loading && !activeGroup && <div style={loaderStyle}>Refreshing shots...</div>}
           
-          {/* The invisible trigger for our IntersectionObserver */}
           {!loading && !activeGroup && filteredRawVideos.length > 0 && (
             <div ref={loaderRef} style={{ height: "10px", width: "100%" }} />
           )}
@@ -343,14 +373,12 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
 );
 
 // 🖌 STYLES
-// Update this style object
 const containerStyle = { 
   minHeight: "100%", 
   background: "var(--bg-color)", 
   color: "#fff", 
   position: "relative", 
   overflowX: "hidden" 
-  // Note: We are setting overflowY and height dynamically in the JSX now
 };
 
 const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%" };
