@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Play, Copy } from 'lucide-react'; 
 
-// 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
 
 export default function VideoCard({ video, onOpen, showDetails = true }) {
@@ -41,15 +40,15 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
     <a
       href={`${APP_CONFIG.apiUrl}/v/${video.message_id}`}
       onClick={(e) => {
-        e.preventDefault(); // 🟢 THE FIX: Stops browser from leaving the page
-        onOpen(video, e);   // 🟢 THE FIX: Triggers your modal instead
+        e.preventDefault(); 
+        onOpen(video, e);   
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
         display: "flex", 
         flexDirection: "column",
-        background: "var(--bg-color)", 
+        background: "transparent", 
         borderRadius: showDetails ? "12px" : "4px",
         width: "100%", 
         cursor: "pointer", 
@@ -57,15 +56,15 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
         transform: (isHovered && showDetails) ? "translateY(-4px)" : "translateY(0)",
         zIndex: isHovered ? 10 : 1,
-        textDecoration: "none", // 🟢 Prevents the ugly blue link underline
-        color: "inherit"        // 🟢 Inherits text color properly
+        textDecoration: "none", 
+        color: "inherit"        
       }}
     >
       <div style={{ 
         position: "relative", 
         width: "100%", 
         aspectRatio: "9/16",
-        background: "#111", 
+        background: "#080808", // Softened from harsh #111
         overflow: "hidden",
         borderRadius: showDetails ? "12px" : "4px",
         flexShrink: 0 
@@ -74,7 +73,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         {!isImgLoaded && (
           <div style={{
             position: "absolute", inset: 0, zIndex: 1,
-            background: "linear-gradient(90deg, #121212 25%, #1a1a1a 50%, #121212 75%)",
+            background: "linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.03) 50%, transparent 75%)",
             backgroundSize: "200% 100%",
             animation: "skeleton-loading 1.5s infinite"
           }} />
@@ -91,8 +90,11 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
               e.target.style.display = 'none'; 
             }}
             style={{
-              width: "100%", height: "100%", objectFit: "cover",
+              width: "100%", height: "100%", 
+              objectFit: "cover", 
               position: "absolute", inset: 0, zIndex: 2,
+              // 🟢 OPTICAL FIX 1: Tame the peak whites & pull out vibrating neons
+              filter: "brightness(0.84) contrast(0.96) saturate(0.88)",
               opacity: 1, 
               transition: "opacity 0.2s ease-in"
             }}
@@ -108,17 +110,32 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           style={{ 
             width: "100%", height: "100%", objectFit: "cover", 
             position: "absolute", inset: 0, zIndex: 3,
+            // 🟢 MUST match the image filter so it doesn't flash bright when playback starts!
+            filter: "brightness(0.84) contrast(0.96) saturate(0.88)",
             opacity: (isHovered && isVideoReady) ? 1 : 0, 
             transition: "opacity 0.3s ease"
           }}
         />
+
+        {/* 🟢 OPTICAL FIX 2 & 3: The 360-Degree Snapchat Dampening Layer */}
+        <div style={{
+          position: "absolute", 
+          inset: 0, 
+          zIndex: 4, 
+          borderRadius: "inherit", // Crucial so the inner shadow rounds the corners
+          pointerEvents: "none", 
+          // Applies a 15% dimming film over the center + the heavy top/bottom fades
+          background: "linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 25%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0.85) 100%)",
+          // The Inset Airbrush: melts the left and right pixel edges into the black background
+          boxShadow: "inset 0px 0px 22px 3px rgba(0, 0, 0, 0.65)"
+        }} />
         
         {video.is_group && (
           <div style={{
             position: "absolute",
             top: "10px",
             right: "10px",
-            background: "rgba(0,0,0,0.6)",
+            background: "rgba(0,0,0,0.4)",
             padding: "6px",
             borderRadius: "8px",
             backdropFilter: "blur(4px)",
@@ -135,9 +152,10 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           <div style={{
             position: "absolute", bottom: 10, left: 10, zIndex: 10, 
             display: "flex", alignItems: "center", gap: 6, 
-            background: "rgba(0,0,0,0.6)", padding: "5px 10px", borderRadius: "100px",
-            backdropFilter: "blur(12px)",
-            border: "1px solid rgba(255,255,255,0.1)"
+            background: "rgba(0,0,0,0.4)", 
+            padding: "5px 10px", borderRadius: "100px",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.08)"
           }}>
             <Play size={10} fill="#fff" strokeWidth={0} />
             <span style={{ color: "#fff", fontSize: "11px", fontWeight: "800" }}>
@@ -150,7 +168,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
       {showDetails && (
         <div style={{ padding: "12px 4px", display: "flex", flexDirection: "column", flexShrink: 0 }}>
           <p style={captionTextStyle}>
-            {/* 🟢 THE FIX: Dynamic fallback caption */}
             {video.caption || APP_CONFIG.defaultCaption}
           </p>
           
@@ -164,7 +181,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
                />
             </div>
             <span style={uploaderNameStyle}>
-              {/* 🟢 THE FIX: Dynamic fallback username */}
               @{video.uploader_name || APP_CONFIG.defaultUploader}
             </span>
           </div>
@@ -181,8 +197,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
   );
 }
 
-// 🖌 Styles
-const captionTextStyle = { margin: "0 0 6px 0", fontSize: "12px", color: "#fff", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "600" };
+const captionTextStyle = { margin: "0 0 6px 0", fontSize: "12px", color: "#e0e0e0", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "500" }; // Dimmed text slightly from #fff to #e0e0e0
 const userInfoRowStyle = { display: "flex", alignItems: "center", gap: "8px" };
-const avatarWrapperStyle = { width: "14px", height: "14px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid #333" };
-const uploaderNameStyle = { fontSize: "10px", color: "#8e8e8e", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const avatarWrapperStyle = { width: "14px", height: "14px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid rgba(255,255,255,0.08)" };
+const uploaderNameStyle = { fontSize: "10px", color: "#777777", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
