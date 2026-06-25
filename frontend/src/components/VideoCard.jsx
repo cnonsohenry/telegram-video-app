@@ -64,7 +64,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         position: "relative", 
         width: "100%", 
         aspectRatio: "9/16",
-        background: "#080808", // Softened from harsh #111
+        background: "#080808", 
         overflow: "hidden",
         borderRadius: showDetails ? "12px" : "4px",
         flexShrink: 0 
@@ -93,9 +93,8 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
               width: "100%", height: "100%", 
               objectFit: "cover", 
               position: "absolute", inset: 0, zIndex: 2,
-              // 🟢 OPTICAL FIX 1: Tame the peak whites & pull out vibrating neons
-              filter: "brightness(0.84) contrast(0.96) saturate(0.88)",
               opacity: 1, 
+              // 🟢 FIX: Removed the dulling filters. Let the natural image POP.
               transition: "opacity 0.2s ease-in"
             }}
           />
@@ -110,24 +109,23 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           style={{ 
             width: "100%", height: "100%", objectFit: "cover", 
             position: "absolute", inset: 0, zIndex: 3,
-            // 🟢 MUST match the image filter so it doesn't flash bright when playback starts!
-            filter: "brightness(0.84) contrast(0.96) saturate(0.88)",
             opacity: (isHovered && isVideoReady) ? 1 : 0, 
+            // 🟢 FIX: Removed the dulling filters here too.
             transition: "opacity 0.3s ease"
           }}
         />
 
-        {/* 🟢 OPTICAL FIX 2 & 3: The 360-Degree Snapchat Dampening Layer */}
+        {/* 🟢 THE FIX: The Edge-Only Blending Layer */}
         <div style={{
           position: "absolute", 
           inset: 0, 
           zIndex: 4, 
-          borderRadius: "inherit", // Crucial so the inner shadow rounds the corners
+          borderRadius: "inherit", 
           pointerEvents: "none", 
-          // Applies a 15% dimming film over the center + the heavy top/bottom fades
-          background: "linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 25%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0.85) 100%)",
-          // The Inset Airbrush: melts the left and right pixel edges into the black background
-          boxShadow: "inset 0px 0px 22px 3px rgba(0, 0, 0, 0.65)"
+          // 1. Center is now "transparent" so the middle pops at 100% brightness
+          background: "linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 20%, transparent 75%, rgba(0,0,0,0.85) 100%)",
+          // 2. Slightly deeper edge shadow to maintain the smooth melt into the background
+          boxShadow: "inset 0px 0px 24px 2px rgba(0, 0, 0, 0.75)"
         }} />
         
         {video.is_group && (
@@ -197,7 +195,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
   );
 }
 
-const captionTextStyle = { margin: "0 0 6px 0", fontSize: "12px", color: "#e0e0e0", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "500" }; // Dimmed text slightly from #fff to #e0e0e0
+const captionTextStyle = { margin: "0 0 6px 0", fontSize: "12px", color: "#e0e0e0", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "500" };
 const userInfoRowStyle = { display: "flex", alignItems: "center", gap: "8px" };
 const avatarWrapperStyle = { width: "14px", height: "14px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid rgba(255,255,255,0.08)" };
 const uploaderNameStyle = { fontSize: "10px", color: "#777777", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
