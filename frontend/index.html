@@ -10,147 +10,221 @@
 
     <meta http-equiv="Delegate-CH" content="Sec-CH-UA https://s.magsrv.com; Sec-CH-UA-Mobile https://s.magsrv.com; Sec-CH-UA-Arch https://s.magsrv.com; Sec-CH-UA-Model https://s.magsrv.com; Sec-CH-UA-Platform https://s.magsrv.com; Sec-CH-UA-Platform-Version https://s.magsrv.com; Sec-CH-UA-Bitness https://s.magsrv.com; Sec-CH-UA-Full-Version-List https://s.magsrv.com; Sec-CH-UA-Full-Version https://s.magsrv.com;">
 
-
     <title>Free Naija Homemade Videos - Naija Tube | Naijahomemade</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="icon" type="image/svg+xml" href="/naija.svg" />
 
     <script>
-    // Tell Prerender to pause and wait for React to say it's done
-    window.prerenderReady = false;
-  </script>
+      window.prerenderReady = false;
+    </script>
     
     <style>
       body, html {
         margin: 0; padding: 0;
-        background-color: #000;
+        background-color: #050505; 
         color: #fff;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         -webkit-font-smoothing: antialiased;
-        overscroll-behavior-y: none; /* 🟢 Stops Telegram from trying to pull-to-refresh */
+        -moz-osx-font-smoothing: grayscale;
+        overscroll-behavior-y: none;
       }
 
-      /* Prevent background scroll when age gate is active */
       body.no-scroll { overflow: hidden; height: 100dvh; }
 
-      /* 🟢 18+ Age Gate Styles */
       #age-gate {
         position: fixed; inset: 0;
-        display: none; 
-        flex-direction: column; align-items: center; justify-content: center;
-        background-color: #000;
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center;
+        background: radial-gradient(circle at center, #1a0808 0%, #000000 100%);
         z-index: 2147483647; 
-        transition: opacity 0.3s ease;
-        padding: 20px;
+        transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        padding: 24px; /* 🟢 Ensures the card NEVER touches the edges of the screen */
+        box-sizing: border-box;
         text-align: center;
       }
 
-      .age-gate-content {
-        max-width: 600px;
-        background: #111;
-        border: 1px solid #333;
-        border-radius: 12px;
-        padding: 40px 30px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      #age-gate::before {
+        content: '';
+        position: absolute;
+        width: 300px; height: 300px;
+        background: rgba(255, 59, 48, 0.15);
+        filter: blur(80px);
+        border-radius: 50%;
+        animation: float 6s infinite ease-in-out alternate;
+        z-index: 0;
       }
 
-      .logo-text { color: #ffffff; font-size: 20px; font-weight: 900; margin-bottom: 20px; letter-spacing: 1px; }
-      .highlight { color: #ff3b30; }
+      @keyframes float {
+        0% { transform: scale(0.8) translate(0px, 0px); opacity: 0.5; }
+        100% { transform: scale(1.2) translate(0px, -20px); opacity: 1; }
+      }
+
+      .age-gate-content {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 420px; /* 🟢 Scaled down from 500px for a sleeker, centered look */
+        box-sizing: border-box;
+        background: rgba(20, 20, 20, 0.65);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-top: 1px solid rgba(255, 255, 255, 0.15); 
+        border-radius: 20px;
+        padding: 32px 24px; /* 🟢 Tighter padding to match smaller fonts */
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255,59,48,0.05);
+      }
+
+      .logo-text { 
+        color: #ffffff; 
+        font-size: 22px; /* 🟢 Reduced from 28px */
+        font-weight: 900; 
+        margin-bottom: 20px; 
+        letter-spacing: -0.5px; 
+      }
+      .highlight { 
+        color: #ff3b30; 
+        text-shadow: 0 0 15px rgba(255, 59, 48, 0.6);
+      }
 
       .age-gate-title {
-        font-size: 22px;
+        font-size: 18px; /* 🟢 Reduced from 26px */
         font-weight: 700;
-        margin: 0 0 10px 0;
+        margin: 0 0 6px 0;
+        letter-spacing: -0.3px;
       }
 
       .age-gate-subtitle {
-        font-size: 18px;
-        font-weight: 600;
+        font-size: 11px; /* 🟢 Reduced from 14px */
+        font-weight: 700;
         color: #ff3b30;
-        margin: 0 0 15px 0;
+        margin: 0 0 20px 0;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
       }
 
-      .age-gate-text {
-        font-size: 14px;
+      .age-gate-text-box {
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 16px; /* 🟢 Tighter spacing */
+        margin-bottom: 24px;
+        text-align: left; 
+      }
+
+      .age-gate-text-box p {
+        font-size: 13px; /* 🟢 Reduced from 15px */
         line-height: 1.6;
-        color: #bbb;
-        margin: 0 0 30px 0;
+        color: #d1d5db;
+        margin: 0 0 12px 0;
+      }
+
+      .age-gate-list {
+        margin: 0;
+        padding-left: 20px;
+        color: #9ca3af;
+        font-size: 12.5px; /* 🟢 Reduced from 14px */
+        line-height: 1.6;
+      }
+
+      .age-gate-list li {
+        margin-bottom: 6px;
+      }
+
+      .age-gate-list strong {
+        color: #ffffff;
       }
 
       .age-gate-buttons {
         display: flex;
         flex-direction: column;
-        gap: 15px;
-        margin-bottom: 30px;
+        gap: 10px;
+        margin-bottom: 24px;
       }
 
       .btn-enter {
-        background-color: #ff3b30;
+        background: linear-gradient(135deg, #ff453a 0%, #d63328 100%);
         color: #fff;
         border: none;
-        padding: 16px;
-        font-size: 16px;
-        font-weight: 800;
-        border-radius: 8px;
+        padding: 14px; /* 🟢 Reduced from 18px */
+        font-size: 14px; /* 🟢 Reduced from 16px */
+        font-weight: 700;
+        border-radius: 10px;
         cursor: pointer;
-        transition: background-color 0.2s;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
+        box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.5);
+        animation: pulse-red 2s infinite cubic-bezier(0.66, 0, 0, 1);
+        transition: transform 0.2s, filter 0.2s;
       }
 
-      .btn-enter:hover { background-color: #d63328; }
+      .btn-enter:hover { 
+        transform: translateY(-2px);
+        filter: brightness(1.1);
+      }
+
+      @keyframes pulse-red {
+        to { box-shadow: 0 0 0 15px rgba(255, 59, 48, 0); }
+      }
 
       .btn-enter img {
-        width: 20px;
-        height: 20px;
+        width: 18px; /* 🟢 Reduced icon size */
+        height: 18px;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
       }
 
-      /* 🟢 Telegram Button Styles */
       .btn-telegram {
-        background-color: #24A1DE; /* Official Telegram Blue */
+        background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
         color: #fff;
-        border: none;
-        padding: 16px;
-        font-size: 16px;
-        font-weight: 800;
-        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.1);
+        padding: 13px; /* 🟢 Reduced from 16px */
+        font-size: 13px; /* 🟢 Reduced from 15px */
+        font-weight: 600;
+        border-radius: 10px;
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: all 0.2s;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
       }
 
-      .btn-telegram:hover { background-color: #1d84b5; }
+      .btn-telegram:hover { 
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(42, 171, 238, 0.3);
+      }
       
-      /* Optional: Simple SVG icon for Telegram */
       .btn-telegram svg {
-        width: 20px;
-        height: 20px;
+        width: 16px; /* 🟢 Reduced icon size */
+        height: 16px;
         fill: currentColor;
       }
 
       .age-gate-footer {
-        font-size: 12px;
-        color: #666;
-        line-height: 1.5;
+        font-size: 11px; /* 🟢 Reduced from 12px */
+        color: #6b7280;
+        line-height: 1.6;
+        font-weight: 500;
       }
 
-      .age-gate-footer a { color: #888; text-decoration: underline; }
-      .age-gate-footer a:hover { color: #fff; }
+      .age-gate-footer a { color: #9ca3af; text-decoration: none; border-bottom: 1px dotted #6b7280; transition: color 0.2s; }
+      .age-gate-footer a:hover { color: #fff; border-bottom-color: #fff; }
 
       @media (min-width: 600px) {
         .age-gate-buttons { flex-direction: row; }
         .btn-enter, .btn-telegram { flex: 1; }
       }
 
-      /* Targets the Adsterra Social Bar iframe */
       iframe[id^="container-"][style*="z-index: 2147483647"] {
         bottom: auto !important;
         top: 110px !important;             
@@ -163,23 +237,28 @@
         margin-right: auto !important;
       }
     </style>
-    
   </head>
   
   <body class="no-scroll">
     <div id="age-gate">
       <div class="age-gate-content">
         <div class="logo-text">Naija<span class="highlight">homemade</span></div>
-        <h1 class="age-gate-title">This is an adult website</h1>
+        <h1 class="age-gate-title">Age Restricted Content</h1>
         <h2 class="age-gate-subtitle">Notice to Users</h2>
-        <p class="age-gate-text">
-          This website contains age-restricted materials including nudity and explicit depictions of sexual activity. By entering, you affirm that you are at least 18 years of age or the age of majority in the jurisdiction you are accessing the website from and you consent to viewing sexually explicit content.
-        </p>
+        
+        <div class="age-gate-text-box">
+          <p>This website contains age-restricted materials, including nudity and explicit depictions of sexual activity.</p>
+          <p style="margin-bottom: 6px; color: #fff; font-weight: 600;">By entering, you affirm that:</p>
+          <ul class="age-gate-list">
+            <li>You are at least <strong>18 years of age</strong>.</li>
+            <li>You willingly consent to viewing sexually explicit content.</li>
+          </ul>
+        </div>
         
         <div class="age-gate-buttons">
           <button id="btn-enter" class="btn-enter">
             <img src="/naija.svg" alt="NaijaHomemade Icon" />
-            Visit Website
+            Enter Site
           </button>
           <button id="btn-telegram" class="btn-telegram">
             <svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.94z"/></svg>
@@ -188,7 +267,7 @@
         </div>
 
         <div class="age-gate-footer">
-          Naija Homemade <a href="#">parental controls page</a> explains how you can easily block access to this site.<br>
+          Naija Homemade <a href="#">parental controls</a> explains how to block access to this site.<br>
           <a href="#">Terms of Service</a> &bull; Notice to Law Enforcement<br><br>
           &copy; NaijaHomemade.com, 2026
         </div>
@@ -200,7 +279,6 @@
     <script type="module" src="/src/main.jsx"></script>
 
     <script>
-      // 🟢 1. Helper function to inject the ad script safely
       function loadAdNetwork() {
         const script = document.createElement('script');
         script.src = "";
@@ -208,7 +286,6 @@
         document.body.appendChild(script);
       }
 
-      // 🟢 2. Check Verification Status & 24hr Expiry on Load
       (function() {
         const ageGate = document.getElementById('age-gate');
         const storedTime = localStorage.getItem('ageVerifiedTime');
@@ -216,7 +293,6 @@
         
         let isVerified = false;
 
-        // Check if the timestamp exists and is within 24 hours
         if (storedTime) {
           const now = Date.now();
           const twentyFourHours = 24 * 60 * 60 * 1000;
@@ -224,12 +300,11 @@
           if (now - parseInt(storedTime, 10) < twentyFourHours) {
             isVerified = true;
           } else {
-            localStorage.removeItem('ageVerifiedTime'); // Expired, clear it out
+            localStorage.removeItem('ageVerifiedTime'); 
           }
         }
         
         if (isVerified || isBot) {
-          // Hide gate, allow scroll, AND load ads (if human)
           ageGate.style.display = 'none';
           document.body.classList.remove('no-scroll');
           
@@ -237,29 +312,23 @@
             loadAdNetwork(); 
           }
         } else {
-          // Show gate, DO NOT load ads yet
           ageGate.style.display = 'flex';
         }
       })();
 
-      // 🟢 3. Handle User Clicking "Enter"
       document.getElementById('btn-enter').addEventListener('click', () => {
         const ageGate = document.getElementById('age-gate');
         
-        // Save the current timestamp (milliseconds)
         localStorage.setItem('ageVerifiedTime', Date.now().toString());
-        
-        // Load the ad network the moment they verify
         loadAdNetwork();
         
         ageGate.style.opacity = '0';
         setTimeout(() => {
           ageGate.style.display = 'none';
           document.body.classList.remove('no-scroll');
-        }, 300);
+        }, 400);
       });
 
-      // 🟢 4. Handle User Clicking "Join Telegram"
       document.getElementById('btn-telegram').addEventListener('click', () => {
         window.location.href = 'https://t.me/naijahomemadechannel007';
       });
@@ -268,8 +337,6 @@
     <script type="application/javascript">
 (function() {
     function randStr(e,t){for(var n="",r=t||"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",o=0;o<e;o++)n+=r.charAt(Math.floor(Math.random()*r.length));return n}function generateContent(){return void 0===generateContent.val&&(generateContent.val="document.dispatchEvent("+randStr(4*Math.random()+3)+");"),generateContent.val}try{Object.defineProperty(document.currentScript,"innerHTML",{get:generateContent}),Object.defineProperty(document.currentScript,"textContent",{get:generateContent})}catch(e){};
-
-    //version 8.0.0
 
     var adConfig = {
     "ads_host": "a.pemsrv.com",
@@ -291,8 +358,6 @@
 
 window.document.querySelectorAll||(document.querySelectorAll=document.body.querySelectorAll=Object.querySelectorAll=function(e,o,t,i,n){var r=document,a=r.createStyleSheet();for(n=r.all,o=[],t=(e=e.replace(/\[for\b/gi,"[htmlFor").split(",")).length;t--;){for(a.addRule(e[t],"k:v"),i=n.length;i--;)n[i].currentStyle.k&&o.push(n[i]);a.removeRule(0)}return o});var popMagic={version:8,cookie_name:"",url:"",config:{},open_count:0,top:null,browser:null,venor_loaded:!1,venor:!1,tcfData:null,remoteLicensedDomains:["exdynsrv.com","exosrv.com","exoclick.com","opoxv.com","exacdn.com","pemsrv.com"],configTpl:{ads_host:"",syndication_host:"",idzone:"",frequency_period:720,frequency_count:1,trigger_method:1,trigger_class:"",popup_force:!1,popup_fallback:!1,chrome_enabled:!0,new_tab:!1,cat:"",tags:"",el:"",sub:"",sub2:"",sub3:"",only_inline:!1,trigger_delay:0,capping_enabled:!0,tcf_enabled:!1,cookieconsent:!0,should_fire:function(){return!0},on_redirect:null},isAdsDomainLicensed:function(){for(var e=this.config.ads_host,o=this.remoteLicensedDomains.concat([".local","localhost","127.0.0.1"]),t=0;t<o.length;t++){var i=o[t];if("string"==typeof i)if("."===i.charAt(0)){var n=i,r=i.substring(1);if(e.slice(-n.length)===n||e===r)return!0}else{var a=e===i,c="."+i,p=e.slice(-c.length)===c;if(a||p)return!0}}return!1},init:function(e){if(void 0!==e.idzone&&e.idzone){void 0===e.customTargeting&&(e.customTargeting=[]),window.customTargeting=e.customTargeting||null;var o=Object.keys(e.customTargeting).filter(function(e){return e.search("ex_")>=0});for(var t in o.length&&o.forEach(function(e){return this.configTpl[e]=null}.bind(this)),this.configTpl)Object.prototype.hasOwnProperty.call(this.configTpl,t)&&(void 0!==e[t]?this.config[t]=e[t]:this.config[t]=this.configTpl[t]);if(void 0!==this.config.idzone&&""!==this.config.idzone){!0!==this.config.only_inline&&this.isAdsDomainLicensed()&&this.loadHosted();var i=this;this.checkTCFConsent(function(){"complete"===document.readyState?i.preparePopWait():i.addEventToElement(window,"load",i.preparePop)})}}},getCountFromCookie:function(){if(!this.config.cookieconsent)return 0;var e=popMagic.getCookie(popMagic.cookie_name),o=void 0===e?0:parseInt(e);return isNaN(o)&&(o=0),o},getLastOpenedTimeFromCookie:function(){var e=popMagic.getCookie(popMagic.cookie_name),o=null;if(void 0!==e){var t=e.split(";")[1];o=t>0?parseInt(t):0}return isNaN(o)&&(o=null),o},shouldShow:function(e){if(e=e||!1,!popMagic.config.capping_enabled){var o=!0,t=popMagic.config.should_fire;try{e||"function"!=typeof t||(o=Boolean(t()))}catch(e){console.error("Error executing should fire callback function:",e)}return o&&0===popMagic.open_count}if(popMagic.open_count>=popMagic.config.frequency_count)return!1;var i=popMagic.getCountFromCookie(),n=popMagic.getLastOpenedTimeFromCookie(),r=Math.floor(Date.now()/1e3),a=n+popMagic.config.trigger_delay;return!(n&&a>r)&&(popMagic.open_count=i,!(i>=popMagic.config.frequency_count))},venorShouldShow:function(){return popMagic.venor_loaded&&"0"===popMagic.venor},setAsOpened:function(e){var o=e?e.target||e.srcElement:null,t={id:"",tagName:"",classes:"",text:"",href:"",elm:""};void 0!==o&&null!=o&&(t={id:void 0!==o.id&&null!=o.id?o.id:"",tagName:void 0!==o.tagName&&null!=o.tagName?o.tagName:"",classes:void 0!==o.classList&&null!=o.classList?o.classList:"",text:void 0!==o.outerText&&null!=o.outerText?o.outerText:"",href:void 0!==o.href&&null!=o.href?o.href:"",elm:o});var i=new CustomEvent("creativeDisplayed-"+popMagic.config.idzone,{detail:t});if(document.dispatchEvent(i),popMagic.config.capping_enabled){var n=1;n=0!==popMagic.open_count?popMagic.open_count+1:popMagic.getCountFromCookie()+1;var r=Math.floor(Date.now()/1e3);popMagic.config.cookieconsent&&popMagic.setCookie(popMagic.cookie_name,n+";"+r,popMagic.config.frequency_period)}else++popMagic.open_count},loadHosted:function(){var e=document.createElement("script");for(var o in e.type="application/javascript",e.async=!0,e.src="//"+this.config.ads_host+"/popunder1000.js",e.id="popmagicldr",this.config)Object.prototype.hasOwnProperty.call(this.config,o)&&"ads_host"!==o&&"syndication_host"!==o&&e.setAttribute("data-exo-"+o,this.config[o]);var t=document.getElementsByTagName("body").item(0);t.firstChild?t.insertBefore(e,t.firstChild):t.appendChild(e)},preparePopWait:function(){setTimeout(popMagic.preparePop,400)},preparePop:function(){if("object"!=typeof exoJsPop101||!Object.prototype.hasOwnProperty.call(exoJsPop101,"add")){if(popMagic.top=self,popMagic.top!==self)try{top.document.location.toString()&&(popMagic.top=top)}catch(e){}if(popMagic.cookie_name="zone-cap-"+popMagic.config.idzone,popMagic.config.capping_enabled||(document.cookie=popMagic.cookie_name+"=;expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/"),popMagic.shouldShow(!0)){var e=new XMLHttpRequest;e.onreadystatechange=function(){e.readyState==XMLHttpRequest.DONE&&(popMagic.venor_loaded=!0,200==e.status?popMagic.venor=e.responseText:popMagic.venor="0")};var o="https:"!==document.location.protocol&&"http:"!==document.location.protocol?"https:":document.location.protocol;e.open("GET",o+"//"+popMagic.config.syndication_host+"/venor.php",!0);try{e.send()}catch(e){popMagic.venor_loaded=!0}}if(popMagic.buildUrl(),popMagic.browser=popMagic.browserDetector.getBrowserInfo(),popMagic.config.chrome_enabled||!popMagic.browser.isChrome){var t=popMagic.getPopMethod(popMagic.browser);popMagic.addEvent("click",t)}}},getPopMethod:function(e){return popMagic.config.popup_force||popMagic.config.popup_fallback&&e.isChrome&&e.version>=68&&!e.isMobile?popMagic.methods.popup:e.isMobile?popMagic.methods.default:e.isChrome?popMagic.methods.chromeTab:popMagic.methods.default},checkTCFConsent:function(e){if(this.config.tcf_enabled&&"function"==typeof window.__tcfapi){var o=this;window.__tcfapi("addEventListener",2,function(t,i){i&&(o.tcfData=t,"tcloaded"!==t.eventStatus&&"useractioncomplete"!==t.eventStatus||(window.__tcfapi("removeEventListener",2,function(){},t.listenerId),e()))})}else e()},buildUrl:function(){var e,o="https:"!==document.location.protocol&&"http:"!==document.location.protocol?"https:":document.location.protocol,t=top===self?document.URL:document.referrer,i={type:"inline",name:"popMagic",ver:this.version},n="";customTargeting&&Object.keys(customTargeting).length&&("object"==typeof customTargeting?Object.keys(customTargeting):customTargeting).forEach(function(o){"object"==typeof customTargeting?e=customTargeting[o]:Array.isArray(customTargeting)&&(e=scriptEl.getAttribute(o));var t=o.replace("data-exo-","");n+="&"+t+"="+e});var r=this.tcfData&&this.tcfData.gdprApplies&&!0===this.tcfData.gdprApplies?1:0,a=popMagic.getCookie("__suvt");this.url=o+"//"+this.config.syndication_host+"/v1/link.php?cat="+this.config.cat+"&idzone="+this.config.idzone+"&type=8&p="+encodeURIComponent(t)+"&sub="+this.config.sub+(""!==this.config.sub2?"&sub2="+this.config.sub2:"")+(""!==this.config.sub3?"&sub3="+this.config.sub3:"")+"&block=1&el="+this.config.el+"&tags="+this.config.tags+"&scr_info="+function(e){var o=e.type+"|"+e.name+"|"+e.ver;return encodeURIComponent(btoa(o))}(i)+n+"&gdpr="+r+"&cb="+Math.floor(1e9*Math.random())+(a?"&suvt="+a:""),this.tcfData&&this.tcfData.tcString?this.url+="&gdpr_consent="+encodeURIComponent(this.tcfData.tcString):this.url+="&cookieconsent="+this.config.cookieconsent},addEventToElement:function(e,o,t){e.addEventListener?e.addEventListener(o,t,!1):e.attachEvent?(e["e"+o+t]=t,e[o+t]=function(){e["e"+o+t](window.event)},e.attachEvent("on"+o,e[o+t])):e["on"+o]=e["e"+o+t]},getTriggerClasses:function(){var e,o=[];-1===popMagic.config.trigger_class.indexOf(",")?e=popMagic.config.trigger_class.split(" "):e=popMagic.config.trigger_class.replace(/\s/g,"").split(",");for(var t=0;t<e.length;t++)""!==e[t]&&o.push("."+e[t]);return o},addEvent:function(e,o){var t;if("3"!=popMagic.config.trigger_method)if("2"!=popMagic.config.trigger_method||""==popMagic.config.trigger_class)if("4"!=popMagic.config.trigger_method||""==popMagic.config.trigger_class)if("5"!=popMagic.config.trigger_method||""==popMagic.config.trigger_class)popMagic.addEventToElement(document,e,o);else{var i="a"+popMagic.getTriggerClasses().map(function(e){return":not("+e+")"}).join("");t=document.querySelectorAll(i);for(var n=0;n<t.length;n++)popMagic.addEventToElement(t[n],e,o)}else{var r=popMagic.getTriggerClasses();popMagic.addEventToElement(document,e,function(e){r.some(function(o){return null!==e.target.closest(o)})||o.call(e.target,e)})}else{var a=popMagic.getTriggerClasses();for(t=document.querySelectorAll(a.join(", ")),n=0;n<t.length;n++)popMagic.addEventToElement(t[n],e,o)}else for(t=document.querySelectorAll("a"),n=0;n<t.length;n++)popMagic.addEventToElement(t[n],e,o)},setCookie:function(e,o,t){if(!this.config.cookieconsent)return!1;t=parseInt(t,10);var i=new Date;i.setMinutes(i.getMinutes()+parseInt(t));var n=encodeURIComponent(o)+"; expires="+i.toUTCString()+"; path=/";document.cookie=e+"="+n},getCookie:function(e){if(!this.config.cookieconsent)return!1;var o,t,i,n=document.cookie.split(";");for(o=0;o<n.length;o++)if(t=n[o].substr(0,n[o].indexOf("=")),i=n[o].substr(n[o].indexOf("=")+1),(t=t.replace(/^\s+|\s+$/g,""))===e)return decodeURIComponent(i)},randStr:function(e,o){for(var t="",i=o||"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",n=0;n<e;n++)t+=i.charAt(Math.floor(Math.random()*i.length));return t},isValidUserEvent:function(e){return!(!("isTrusted"in e)||!e.isTrusted||"ie"===popMagic.browser.name||"safari"===popMagic.browser.name)||0!=e.screenX&&0!=e.screenY},isValidHref:function(e){if(void 0===e||""==e)return!1;return!/\s?javascript\s?:/i.test(e)},findLinkToOpen:function(e){var o=e,t=!1;try{for(var i=0;i<20&&!o.getAttribute("href")&&o!==document&&"html"!==o.nodeName.toLowerCase();)o=o.parentNode,i++;var n=o.getAttribute("target");n&&-1!==n.indexOf("_blank")||(t=o.getAttribute("href"))}catch(e){}return popMagic.isValidHref(t)||(t=!1),t||window.location.href},getPuId:function(){return"ok_"+Math.floor(89999999*Math.random()+1e7)},executeOnRedirect:function(){try{popMagic.config.capping_enabled||"function"!=typeof popMagic.config.on_redirect||popMagic.config.on_redirect()}catch(e){console.error("Error executing on redirect callback:",e)}},browserDetector:{browserDefinitions:[["firefox",/Firefox\/([0-9.]+)(?:\s|$)/],["opera",/Opera\/([0-9.]+)(?:\s|$)/],["opera",/OPR\/([0-9.]+)(:?\s|$)$/],["edge",/Edg(?:e|)\/([0-9._]+)/],["ie",/Trident\/7\.0.*rv:([0-9.]+)\).*Gecko$/],["ie",/MSIE\s([0-9.]+);.*Trident\/[4-7].0/],["ie",/MSIE\s(7\.0)/],["safari",/Version\/([0-9._]+).*Safari/],["chrome",/(?!Chrom.*Edg(?:e|))Chrom(?:e|ium)\/([0-9.]+)(:?\s|$)/],["chrome",/(?!Chrom.*OPR)Chrom(?:e|ium)\/([0-9.]+)(:?\s|$)/],["bb10",/BB10;\sTouch.*Version\/([0-9.]+)/],["android",/Android\s([0-9.]+)/],["ios",/Version\/([0-9._]+).*Mobile.*Safari.*/],["yandexbrowser",/YaBrowser\/([0-9._]+)/],["crios",/CriOS\/([0-9.]+)(:?\s|$)/]],isChromeOrChromium:function(){var e=window.navigator,o=(e.userAgent||"").toLowerCase(),t=e.vendor||"";if(-1!==o.indexOf("crios"))return!0;if(e.userAgentData&&Array.isArray(e.userAgentData.brands)&&e.userAgentData.brands.length>0){var i=e.userAgentData.brands,n=i.some(function(e){return"Google Chrome"===e.brand}),r=i.some(function(e){return"Chromium"===e.brand})&&2===i.length;return n||r}var a=!!window.chrome,c=-1!==o.indexOf("edg"),p=!!window.opr||-1!==o.indexOf("opr"),s=!(!e.brave||!e.brave.isBrave),g=-1!==o.indexOf("vivaldi"),l=-1!==o.indexOf("yabrowser"),d=-1!==o.indexOf("samsungbrowser"),u=-1!==o.indexOf("ucbrowser");return a&&"Google Inc."===t&&!c&&!p&&!s&&!g&&!l&&!d&&!u},getBrowserInfo:function(){var e=window.navigator.userAgent,o={name:"other",version:"1.0",versionNumber:1,isChrome:this.isChromeOrChromium(),isMobile:!!e.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WebOS|Windows Phone/i)};for(var t in this.browserDefinitions){var i=this.browserDefinitions[t];if(i[1].test(e)){var n=i[1].exec(e),r=n&&n[1].split(/[._]/).slice(0,3),a=Array.prototype.slice.call(r,1).join("")||"0";r&&r.length<3&&Array.prototype.push.apply(r,1===r.length?[0,0]:[0]),o.name=i[0],o.version=r.join("."),o.versionNumber=parseFloat(r[0]+"."+a);break}}return o}},methods:{default:function(e){if(!popMagic.shouldShow()||!popMagic.venorShouldShow()||!popMagic.isValidUserEvent(e))return!0;var o=e.target||e.srcElement,t=popMagic.findLinkToOpen(o);return window.open(t,"_blank"),popMagic.setAsOpened(e),popMagic.executeOnRedirect(),popMagic.top.document.location=popMagic.url,void 0!==e.preventDefault&&(e.preventDefault(),e.stopPropagation()),!0},chromeTab:function(e){if(!popMagic.shouldShow()||!popMagic.venorShouldShow()||!popMagic.isValidUserEvent(e))return!0;if(void 0===e.preventDefault)return!0;e.preventDefault(),e.stopPropagation();var o=top.window.document.createElement("a"),t=e.target||e.srcElement;o.href=popMagic.findLinkToOpen(t),document.getElementsByTagName("body")[0].appendChild(o);var i=new MouseEvent("click",{bubbles:!0,cancelable:!0,view:window,screenX:0,screenY:0,clientX:0,clientY:0,ctrlKey:!0,altKey:!1,shiftKey:!1,metaKey:!0,button:0});i.preventDefault=void 0,o.dispatchEvent(i),o.parentNode.removeChild(o),popMagic.executeOnRedirect(),window.open(popMagic.url,"_self"),popMagic.setAsOpened(e)},popup:function(e){if(!popMagic.shouldShow()||!popMagic.venorShouldShow()||!popMagic.isValidUserEvent(e))return!0;var o="";if(popMagic.config.popup_fallback&&!popMagic.config.popup_force){var t=Math.max(Math.round(.8*window.innerHeight),300);o="menubar=1,resizable=1,width="+Math.max(Math.round(.7*window.innerWidth),300)+",height="+t+",top="+(window.screenY+100)+",left="+(window.screenX+100)}var i=document.location.href,n=window.open(i,popMagic.getPuId(),o);popMagic.setAsOpened(e),setTimeout(function(){n.location.href=popMagic.url,popMagic.executeOnRedirect()},200),void 0!==e.preventDefault&&(e.preventDefault(),e.stopPropagation())}}};    popMagic.init(adConfig);
 })();
-
-
 </script>
   </body>
 </html>
