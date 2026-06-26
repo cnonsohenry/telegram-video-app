@@ -310,7 +310,8 @@ export default function AppHeader({
             {/* 🟢 THE FIX: Dynamic App Logo */}
             <h1 style={logoStyle}>
               {APP_CONFIG.appNamePrefix}
-              <span style={{ color: "var(--primary-color)" }}>{APP_CONFIG.appNameSuffix}</span>
+              <span style={{ color: "var(--primary-color)", textShadow: "0 0 15px" }}>{APP_CONFIG.appNameSuffix}</span>
+
             </h1>
           </div>
           
