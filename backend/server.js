@@ -49,6 +49,24 @@ app.use(cors({
   origin: allowedOrigins
 }));
 
+/* =======================================================
+   🟢 SEO MIDDLEWARE: CANONICALIZATION & DE-INDEXING
+======================================================= */
+app.use((req, res, next) => {
+  // 1. Prevent Google from indexing Legal/Admin query parameters
+  if (req.query.legal || req.path.includes('/legal') || req.path.includes('/admin')) {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  }
+
+  // 2. Force Canonical URLs: 301 Redirect /?v=123 to /v/123
+  // This consolidates all ranking power to a single clean URL structure
+  if (req.query.v && req.path === '/') {
+    return res.redirect(301, `/v/${req.query.v}`);
+  }
+
+  next();
+});
+
 /* =====================
    SERVER MONITORING (SECURED)
 ===================== */
@@ -951,13 +969,13 @@ app.get("/api/avatar", async (req, res) => {
 });
 
 /* =====================
-   Share Link 
+   Share Link & SEO Injector
 ===================== */
 app.get('/v/:message_id', async (req, res) => {
   try {
     const { message_id } = req.params;
-    const frontendUrl = process.env.FRONTEND_URL;
-    const appName = process.env.APP_NAME || "App";
+    const frontendUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
+    const appName = process.env.APP_NAME || "NaijaHomemade";
     
     const result = await pool.query(`
       SELECT v.*, u.username as uploader_name 
@@ -966,7 +984,7 @@ app.get('/v/:message_id', async (req, res) => {
       WHERE v.message_id = $1 LIMIT 1
     `, [message_id]);
 
-    if (!result.rows.length) return res.redirect(frontendUrl);
+    if (!result.rows.length) return res.redirect(302, '/');
 
     const video = result.rows[0];
     const sig = signThumbnail(video.chat_id, video.message_id);
@@ -975,175 +993,68 @@ app.get('/v/:message_id', async (req, res) => {
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
       : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
 
-    // 🟢 SEO: Build unique title and description per video
+    // 🟢 SEO: Keyword-Rich Dynamic Titles for Non-Branded Search
+    const safeCategory = video.category ? video.category.charAt(0).toUpperCase() + video.category.slice(1) : "Video";
     const pageTitle = video.caption
-      ? `${video.caption} | ${appName}`
-      : `Nigerian Homemade Video | ${appName}`;
+      ? `${video.caption} | Trending Naija ${safeCategory}`
+      : `Nigerian Homemade ${safeCategory} Leak - Watch Now`;
 
-    const pageDescription = video.caption
-      ? `Watch ${video.caption} and more exclusive Nigerian homemade videos on ${appName}.`
-      : `Watch exclusive Nigerian homemade ${video.category} videos on ${appName}.`;
-
-    // 🟢 SEO: Use cached description or generate and cache a new one
     let seoDescription = video.seo_description || null;
 
     if (!seoDescription) {
       try {
         const expandRes = await axios.post(
           `${process.env.PYTHON_SERVICE_URL}/api/expand-caption`,
-          {
-            caption: video.caption || "",
-            category: video.category
-          },
+          { caption: video.caption || "", category: video.category },
           { timeout: 5000 }
         );
-
         if (expandRes.data.status === "success") {
           seoDescription = expandRes.data.description;
-
-          // 🟢 Cache it — never call the API again for this video
-          await pool.query(
-            `UPDATE videos SET seo_description = $1 WHERE message_id = $2`,
-            [seoDescription, message_id]
-          );
+          await pool.query(`UPDATE videos SET seo_description = $1 WHERE message_id = $2`, [seoDescription, message_id]);
         }
-      } catch (e) {
-        // Silent fallback — page still works
-      }
+      } catch (e) { /* Silent fallback */ }
     }
 
-    // 🟢 Final description — AI expanded if available, basic fallback otherwise
-    const finalDescription = seoDescription || pageDescription;
-
-    // 🟢 SEO: Fetch related videos for internal linking
-    const relatedRes = await pool.query(`
-      SELECT v.message_id, v.caption, v.chat_id, v.cloudflare_id
-      FROM videos v
-      WHERE v.category = $1 
-      AND v.message_id != $2
-      ORDER BY RANDOM() 
-      LIMIT 6
-    `, [video.category, message_id]);
-
-    const relatedHtml = relatedRes.rows.map(v => {
-      const relatedSig = signThumbnail(v.chat_id, v.message_id);
-      const relatedThumb = (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:"))
-        ? `https://videodelivery.net/${v.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=300`
-        : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${relatedSig}`;
-
-      return `
-        <a href="/v/${v.message_id}" 
-           style="display:inline-block; margin:8px; text-decoration:none; vertical-align:top;">
-          <img 
-            src="${relatedThumb}" 
-            alt="${v.caption ? v.caption.replace(/"/g, '') : 'Related video'}"
-            style="width:150px; height:100px; object-fit:cover; border-radius:6px; display:block;"
-            loading="lazy"
-          />
-          <p style="color:#aaa; font-size:0.75rem; width:150px; margin:4px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${v.caption ? v.caption.substring(0, 40) + '...' : 'Watch video'}
-          </p>
-        </a>
-      `;
-    }).join('');
+    const finalDescription = seoDescription || `Watch exclusive Nigerian homemade ${safeCategory} videos. Raw, trending, and uncensored leaks from ${appName}.`;
 
     const schemaJSON = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "VideoObject",
-      "name": video.caption || `Shot from @${video.uploader_name}`,
+      "name": pageTitle,
       "description": finalDescription,
       "thumbnailUrl": [thumbUrl],
       "uploadDate": video.created_at || new Date().toISOString(),
-      "author": {
-        "@type": "Person",
-        "name": video.uploader_name || "Member"
-      }
+      "author": { "@type": "Person", "name": video.uploader_name || "Member" }
     });
 
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-        <head>
-          <title>${pageTitle}</title>
-          <meta charset="utf-8">
-          <meta name="description" content="${finalDescription}">
-          <meta name="robots" content="index, follow">
-          
-          <link rel="canonical" href="${frontendUrl}/v/${message_id}" />
-          
-          <!-- OpenGraph Tags -->
-          <meta property="og:type" content="video.other">
-          <meta property="og:site_name" content="${appName}">
-          <meta property="og:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
-          <meta property="og:description" content="${finalDescription}">
-          <meta property="og:image" content="${thumbUrl}">
-          <meta property="og:url" content="${frontendUrl}/v/${message_id}">
-          
-          <!-- Twitter Card -->
-          <meta name="twitter:card" content="summary_large_image">
-          <meta name="twitter:title" content="${video.caption || "New Shot from @" + (video.uploader_name || "Member")}">
-          <meta name="twitter:description" content="${finalDescription}">
-          <meta name="twitter:image" content="${thumbUrl}">
+    // 🟢 SEO: Inject metadata directly into the React build file
+    const indexPath = path.join(__dirname, '../frontend/dist', 'index.html');
+    let html = fs.readFileSync(indexPath, 'utf8');
 
-          <script type="application/ld+json">
-            ${schemaJSON}
-          </script>
+    // Replace default meta tags (Ensure your React index.html has a generic <title> and description to replace)
+    html = html.replace(/<title>.*?<\/title>/i, `<title>${pageTitle}</title>`);
+    html = html.replace(/<meta name="description" content=".*?">/i, `<meta name="description" content="${finalDescription}">`);
+    
+    const seoInjection = `
+      <link rel="canonical" href="${frontendUrl}/v/${message_id}" />
+      <meta property="og:type" content="video.other">
+      <meta property="og:site_name" content="${appName}">
+      <meta property="og:title" content="${pageTitle}">
+      <meta property="og:description" content="${finalDescription}">
+      <meta property="og:image" content="${thumbUrl}">
+      <meta property="og:url" content="${frontendUrl}/v/${message_id}">
+      <meta name="twitter:card" content="summary_large_image">
+      <script type="application/ld+json">${schemaJSON}</script>
+    </head>`;
 
-          <script>
-            setTimeout(() => {
-              window.location.href = "${frontendUrl}/?v=${message_id}";
-            }, 1500);
-          </script>
-        </head>
-        <body style="background:#111; color:#fff; font-family:sans-serif; max-width:860px; margin:0 auto; padding:20px;">
-          
-          <!-- 🟢 SEO: Crawlable H1 heading -->
-          <h1 style="font-size:1.3rem; color:#fff; margin-bottom:16px; line-height:1.4;">
-            ${video.caption || "Nigerian Homemade Video"}
-          </h1>
+    html = html.replace('</head>', seoInjection);
 
-          <!-- 🟢 SEO: Visible thumbnail with alt text -->
-          <img 
-            src="${thumbUrl}" 
-            alt="${video.caption ? video.caption.replace(/"/g, '') : 'Nigerian homemade video thumbnail'}"
-            style="width:100%; max-width:600px; border-radius:10px; display:block;"
-          />
+    // Serve the fully hydrated React app directly—NO redirects.
+    res.send(html);
 
-          <!-- 🟢 SEO: AI expanded description -->
-          <p style="color:#bbb; margin-top:16px; line-height:1.6; font-size:0.95rem;">
-            ${finalDescription}
-          </p>
-
-          <!-- 🟢 SEO: Metadata signals -->
-          <p style="color:#666; font-size:0.8rem; margin-top:8px;">
-            Category: ${video.category} &nbsp;|&nbsp; 
-            Views: ${Number(video.views || 0).toLocaleString()} &nbsp;|&nbsp; 
-            Uploaded by: ${video.uploader_name || "Member"}
-          </p>
-
-          <!-- 🟢 SEO: Redirect notice -->
-          <p style="color:#555; font-size:0.85rem; margin-top:12px;">
-            Redirecting to ${appName}...
-          </p>
-
-          <!-- 🟢 SEO: Related videos internal linking -->
-          ${relatedRes.rows.length > 0 ? `
-            <div style="margin-top:32px; border-top:1px solid #222; padding-top:20px;">
-              <h2 style="font-size:1rem; color:#ccc; margin-bottom:12px;">
-                More ${video.category} Videos
-              </h2>
-              <div style="display:flex; flex-wrap:wrap; gap:4px;">
-                ${relatedHtml}
-              </div>
-            </div>
-          ` : ''}
-
-        </body>
-      </html>
-    `);
   } catch (err) {
     console.error("Share Link Error:", err.message);
-    res.redirect(process.env.FRONTEND_URL);
+    res.redirect('/');
   }
 });
 

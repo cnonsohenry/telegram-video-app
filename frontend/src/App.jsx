@@ -178,24 +178,26 @@ export default function App() {
     if (sharedVideoId) {
       setIsSharedVideoView(true);
       const fetchSharedVideo = async () => {
-  try {
-    const res = await fetch(`${APP_CONFIG.apiUrl}/api/video/details?message_id=${sharedVideoId}`);
-    if (res.ok) {
-      const videoData = await res.json();
-      
-      const playRes = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`);
-      if (playRes.ok) {
-        const playData = await playRes.json();
-        // 🟢 Set once cleanly with everything ready
-        setActiveVideo({ ...videoData, video_url: playData.video_url });
-      }
-    }
-  } catch (error) {
-    console.error("Failed to load shared video:", error);
-  } finally {
-    window.history.replaceState({}, document.title, "/");
-  }
-};
+        try {
+          const res = await fetch(`${APP_CONFIG.apiUrl}/api/video/details?message_id=${sharedVideoId}`);
+          if (res.ok) {
+            const videoData = await res.json();
+            
+            const playRes = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`);
+            if (playRes.ok) {
+              const playData = await playRes.json();
+              setActiveVideo({ ...videoData, video_url: playData.video_url });
+            }
+          }
+        } catch (error) {
+          console.error("Failed to load shared video:", error);
+        } finally {
+          // 🟢 Tell Prerender the video is loaded and ready for snapshotting
+          if (window.prerenderReady === false) {
+            window.prerenderReady = true;
+          }
+        }
+      };
       fetchSharedVideo();
     }
   }, []);
@@ -430,19 +432,15 @@ export default function App() {
             onClose={() => {
               setActiveVideo(null);
               setIsSharedVideoView(false); 
+              // 🟢 Revert URL back to homepage only when user closes player
+              if (window.location.pathname.startsWith('/v/') || window.location.search.includes('v=')) {
+                window.history.replaceState({}, document.title, "/");
+              }
             }} 
             isDesktop={window.innerWidth > 1024} 
-            onCommentClick={setActiveCommentVideo} /* 🟢 THE FIX: Passing the remote control! */
+            onCommentClick={setActiveCommentVideo}
           />
         </div>
-      )}
-
-      {/* 🟢 NEW ROOT LEVEL COMMENT MODAL */}
-      {activeCommentVideo && (
-        <CommentSectionModal 
-          video={activeCommentVideo} 
-          onClose={() => setActiveCommentVideo(null)} 
-        />
       )}
 
       
