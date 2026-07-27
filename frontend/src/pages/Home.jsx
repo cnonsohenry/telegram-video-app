@@ -445,11 +445,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
                  <div style={{ 
                    display: "grid", 
-                   gridTemplateColumns: isDesktop ? "repeat(5, 1fr)" : "repeat(2, 1fr)", 
+                   // 🟢 THE FIX: Use minmax(0, 1fr) to prevent wide images from breaking the grid columns
+                   gridTemplateColumns: isDesktop ? "repeat(5, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", 
                    gap: isDesktop ? "20px" : "10px",
                    alignItems: "start", 
                    animation: "fadeIn 0.3s ease-out" 
                  }}>
+                  
                     {actualVideosToDisplay.map(v => (
                       <VideoCard 
                         key={`${v.chat_id}:${v.message_id}`} 
@@ -474,7 +476,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
               
               {actualVideosToDisplay.length > 0 && (
                 <div style={seoFooterStyle}>
-                  Naijahomemade provides you with unlimited free Naija homemade videos with the hottest models. Enjoy the largest community on the net as well as full-length scenes from the top Naija homemade videos. We update our Naijahomemade videos daily to ensure you always get the best quality Naija Homemade movies.
+                  Naijahomemade provides you with unlimited free Naija xxx homemade videos with the hottest models. Enjoy the largest community on the net as well as full-length scenes from the top Naija homemade videos. We update our Naijahomemade videos daily to ensure you always get the best quality xxx Naija Homemade movies.
                 </div>
               )}
               

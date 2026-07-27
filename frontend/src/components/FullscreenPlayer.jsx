@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { 
   X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, 
   Share2, Download, Check, Heart, MessageCircle, Bookmark, 
-  Volume2, VolumeX, MoreVertical, Edit2, Trash2 
+  Volume2, VolumeX, MoreVertical, Edit2, Trash2, RotateCw 
 } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
@@ -18,6 +18,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [isRotated, setIsRotated] = useState(false);
   const [showControls, setShowControls] = useState(true); 
   const [isDragging, setIsDragging] = useState(false); 
   const [isMuted, setIsMuted] = useState(false); 
@@ -382,7 +383,9 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
             style={{ 
                 width: "100%", height: "100%", 
                 objectFit: isZoomed ? "cover" : "contain",
-                transition: "object-fit 0.3s ease" 
+                // 🟢 NEW: Transition and Transform for flipping
+                transition: "all 0.3s ease",
+                transform: isRotated ? "rotate(90deg)" : "none" 
             }}
           />
 
@@ -392,6 +395,16 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
             
             {/* Top Row: Floating Controls */}
             <div style={floatingControlsRow}>
+                {/* 🟢 NEW: Flip/Rotate Button */}
+                <button onClick={(e) => { e.stopPropagation(); setIsRotated(!isRotated); }} style={floatingBtnStyle}>
+                  <RotateCw size={18} />
+                </button>
+
+                {/* 🟢 NEW: Direct Download Button */}
+                <button onClick={handleDownload} style={floatingBtnStyle}>
+                  {isDownloading ? <Loader2 size={18} className="spin-animation" /> : <Download size={18} />}
+                </button>
+
                 <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} style={floatingBtnStyle}>
                   {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                 </button>

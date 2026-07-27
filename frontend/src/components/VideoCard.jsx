@@ -64,6 +64,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         position: "relative", 
         width: "100%", 
         aspectRatio: "9/16",
+        objectFit: "cover",
         background: "#080808", 
         overflow: "hidden",
         borderRadius: showDetails ? "12px" : "4px",
@@ -157,7 +158,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           }}>
             <Play size={10} fill="#fff" strokeWidth={0} />
             <span style={{ color: "#fff", fontSize: "11px", fontWeight: "800" }}>
-              {Number(video.views || 0).toLocaleString()}
+              {Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}
             </span>
           </div>
         )}
