@@ -9,6 +9,9 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
   
+  // 🟢 FIX: State to track if the video is vertical. Default to true (75% width).
+  const [isPortrait, setIsPortrait] = useState(true);
+  
   const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
   const [isLiked, setIsLiked] = useState(false);
   
@@ -147,6 +150,15 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
     onCommentClick(video);
   };
 
+  // 🟢 FIX: Function to check media dimensions once it loads
+  const handleMediaLoad = (e) => {
+    const w = e.target.naturalWidth || e.target.videoWidth;
+    const h = e.target.naturalHeight || e.target.videoHeight;
+    if (w && h) {
+      setIsPortrait(h > w);
+    }
+  };
+
   return (
     <div ref={isLast ? lastElementRef : null} style={postStyle}>
       <div style={avatarColumnStyle}>
@@ -166,7 +178,12 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 
         <p style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</p>
 
-        <div ref={containerRef} style={videoContainerStyle} onClick={() => onVideoClick({ ...video, video_url: videoUrl })}>
+        {/* 🟢 FIX: Conditionally apply 75% or 100% width based on the isPortrait state */}
+        <div 
+          ref={containerRef} 
+          style={{ ...videoContainerStyle, width: isPortrait ? "75%" : "100%" }} 
+          onClick={() => onVideoClick({ ...video, video_url: videoUrl })}
+        >
           {videoUrl && isPlaying && !isAnyModalOpen ? (
             <video 
               ref={videoRef} 
@@ -176,9 +193,16 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
               playsInline 
               poster={video.thumbnail_url} 
               preload="none" 
+              onLoadedMetadata={handleMediaLoad} 
             />
           ) : (
-            <img src={video.thumbnail_url} alt="thumbnail" style={thumbnailImgStyle} loading="lazy" />
+            <img 
+              src={video.thumbnail_url} 
+              alt="thumbnail" 
+              style={thumbnailImgStyle} 
+              loading="lazy" 
+              onLoad={handleMediaLoad} 
+            />
           )}
           {!isPlaying && <div style={playOverlayStyle}><Play size={24} fill="#fff" strokeWidth={0} /></div>}
           {video.is_group && <div style={groupBadgeStyle}>Album</div>}
@@ -510,29 +534,12 @@ const avatarStyle = { width: "40px", height: "40px", borderRadius: "50%", object
 const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#fff" };
 const timeStyle = { fontSize: "13px", color: "#71767b", textTransform: "capitalize", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 const captionStyle = { fontSize: "15px", lineHeight: "1.5", color: "#e7e9ea", margin: "0 0 12px 0", wordWrap: "break-word" };
-// 🟢 FIX: Let the container shrink its width to wrap tall portrait videos (Twitter style)
-const videoContainerStyle = { 
-  position: "relative", 
-  borderRadius: "16px", 
-  overflow: "hidden", 
-  background: "#111", 
-  border: "1px solid #333", 
-  cursor: "pointer", 
-  maxHeight: "500px", // Twitter standardizes vertical media to around 500px height
-  display: "inline-flex", // This allows the container's width to shrink to fit the content
-  justifyContent: "center", 
-  alignItems: "center" 
-};
 
-// 🟢 FIX: Image dictates width naturally, strictly constrained by height
-const thumbnailImgStyle = { 
-  maxWidth: "100%", // Don't exceed the column width (for landscape)
-  maxHeight: "500px", // Don't exceed the container height (for portrait)
-  width: "auto", 
-  height: "auto", 
-  objectFit: "contain", 
-  display: "block" 
-};
+// 🟢 FIX: Removed hardcoded width (now handled inline by state). Removed aspectRatio.
+const videoContainerStyle = { position: "relative", borderRadius: "16px", overflow: "hidden", background: "#111", border: "1px solid #333", cursor: "pointer", maxHeight: "600px" };
+
+// 🟢 FIX: Let media scale naturally up to 600px tall
+const thumbnailImgStyle = { width: "100%", height: "auto", maxHeight: "600px", objectFit: "cover", display: "block" };
 const playOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.5)", border: "2px solid rgba(255,255,255,0.2)" };
 const groupBadgeStyle = { position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: "12px", fontWeight: "700", padding: "4px 8px", borderRadius: "12px", backdropFilter: "blur(4px)" };
 const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "12px", maxWidth: "425px" };
