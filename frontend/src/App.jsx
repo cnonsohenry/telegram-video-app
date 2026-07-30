@@ -250,9 +250,9 @@ export default function App() {
     }
   }, [token, user, applyTheme]);
 
-  // 🟢 FIX: Hide the footer whenever the user is logged out (showing AuthForm), or when modals/fullscreen views are active
-  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo && isLoggedIn;
-  
+  // 🟢 FIX: Only hide the footer when logged out if we are currently on the profile tab (showing AuthForm)
+  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo && (activeTab !== "profile" || isLoggedIn);
+
   const handleOpenVideo = async (video) => {
     try {
       // Clear completely first
