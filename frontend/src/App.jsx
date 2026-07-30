@@ -443,6 +443,13 @@ export default function App() {
         </div>
       )}
 
+      {/* 🟢 THE FIX: Actually render the Comment Modal when activeCommentVideo is set */}
+      {activeCommentVideo && (
+        <CommentSectionModal 
+          video={activeCommentVideo} 
+          onClose={() => setActiveCommentVideo(null)} 
+        />
+      )}
       
     </div>
   );
