@@ -32,6 +32,15 @@ import { createCryptoPayment, cryptoWebhook, checkCryptoTransaction } from "./co
 import { z } from "zod"; 
 import cron from "node-cron";
 
+// 🟢 FIX: Catch unhandled promises and exceptions to stop PM2 crash loops
+process.on('uncaughtException', (err) => {
+  console.error('🔥 Uncaught Exception:', err.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 const { Pool } = pkg;
 
 const __filename = fileURLToPath(import.meta.url);
@@ -91,6 +100,11 @@ const TELEGRAM_FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
+});
+
+// 🟢 FIX: Prevent Postgres connection drops from crashing the server
+pool.on('error', (err, client) => {
+  console.error('⚠️ Unexpected error on idle Postgres client:', err.message);
 });
 
 const r2 = new S3Client({
@@ -254,7 +268,8 @@ async function uploadThumbnailToR2(thumbFileId, chatId, messageId) {
     console.log(`✅ Webhook: Thumbnail saved to R2 -> ${key}`);
     return key;
   } catch (err) {
-    console.error("❌ Webhook Thumbnail Sync Failed:", err.message);
+    const errorDetail = err.response?.data?.description || err.message;
+    console.error(`❌ Webhook Thumbnail Sync Failed: ${errorDetail}`);
     return null;
   }
 }
