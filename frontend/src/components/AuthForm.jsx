@@ -58,7 +58,8 @@ const FloatingInput = ({ label, type = "text", value, onChange, rightIcon, statu
   );
 };
 
-export default function AuthForm({ onLoginSuccess }) {
+// 🟢 NEW: Added onClose prop
+export default function AuthForm({ onLoginSuccess, onClose }) {
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "", username: "" });
@@ -102,7 +103,6 @@ export default function AuthForm({ onLoginSuccess }) {
     setError("");
 
     try {
-      // 🟢 THE FIX: Dynamic API URL
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -136,7 +136,6 @@ export default function AuthForm({ onLoginSuccess }) {
     const endpoint = isRegistering ? "/api/auth/register" : "/api/auth/login";
     
     try {
-      // 🟢 THE FIX: Dynamic API URL
       const res = await fetch(`${APP_CONFIG.apiUrl}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -173,7 +172,6 @@ export default function AuthForm({ onLoginSuccess }) {
 
     debounceTimerRef.current = setTimeout(async () => {
       try {
-        // 🟢 THE FIX: Dynamic API URL
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/auth/check-username?username=${sanitizedValue}`);
         const data = await res.json();
         
@@ -194,9 +192,16 @@ export default function AuthForm({ onLoginSuccess }) {
 
   return (
     <div style={loginContainerStyle}>
+      
+      {/* 🟢 NEW: Top Bar with Close Button */}
+      <div style={topBarStyle}>
+        <button onClick={onClose} style={closeButtonStyle}>
+          <X size={24} color="#fff" />
+        </button>
+      </div>
+
       <div style={contentWrapper}>
         <div style={innerContainer}>
-          {/* 🟢 THE FIX: Dynamic App Logo */}
           <h1 style={logoStyle}>
             {APP_CONFIG.appNamePrefix}
             <span style={{ color: "var(--primary-color)" }}>{APP_CONFIG.appNameSuffix}</span>
@@ -267,18 +272,20 @@ export default function AuthForm({ onLoginSuccess }) {
             <div style={line} />
           </div>
           
-          <div id="googleSignInDiv" style={{ width: "100%", display: "flex", justifyContent: "center", minHeight: "45px" }}></div>
+          <div id="googleSignInDiv" style={{ width: "100%", display: "flex", justifyContent: "center", minHeight: "45px", marginBottom: "25px" }}></div>
+          
+          {/* 🟢 NEW: Integrated Toggle Text inside the main container */}
+          <p style={{ fontSize: "14px", color: "#8e8e8e", margin: 0, textAlign: "center" }}>
+            {isRegistering ? "Have an account? " : "Don't have an account? "}
+            <span 
+              onClick={() => { setIsRegistering(!isRegistering); setError(""); setUsernameStatus(null); setFormData({ email: "", password: "", username: "" }); }} 
+              style={{ color: "var(--primary-color)", fontWeight: "700", cursor: "pointer" }}
+            >
+              {isRegistering ? "Log in" : "Sign up"}
+            </span>
+          </p>
+
         </div>
-      </div>
-      
-      <div style={footerBox}>
-        <div style={{ height: "1px", background: "#262626", width: "100%", marginBottom: "15px" }} />
-        <p style={{ fontSize: "14px", color: "#fff", margin: 0 }}>
-          {isRegistering ? "Have an account? " : "Don't have an account? "}
-          <span onClick={() => { setIsRegistering(!isRegistering); setError(""); setUsernameStatus(null); setFormData({ email: "", password: "", username: "" }); }} style={{ color: "var(--primary-color)", fontWeight: "700", cursor: "pointer" }}>
-            {isRegistering ? "Log in" : "Sign up"}
-          </span>
-        </p>
       </div>
 
       <style>{`
@@ -293,9 +300,13 @@ export default function AuthForm({ onLoginSuccess }) {
   );
 }
 
+// 🖌 STYLES
+const loginContainerStyle = { height: "100dvh", background: "var(--bg-color)", display: "flex", flexDirection: "column", overflow: "hidden", position: "fixed", width: "100%", zIndex: 100000, top: 0, left: 0 };
+const topBarStyle = { width: "100%", height: "60px", display: "flex", alignItems: "center", padding: "0 20px", position: "absolute", top: "env(safe-area-inset-top)", left: 0, zIndex: 10 };
+const closeButtonStyle = { background: "rgba(255,255,255,0.1)", border: "none", width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
+
 const errorContainerStyle = { minHeight: "48px", width: "100%", display: "flex", alignItems: "center", marginBottom: "10px" };
 const errorBannerStyle = { background: "rgba(255, 59, 48, 0.1)", color: "#ff3b30", padding: "10px 14px", borderRadius: "12px", fontSize: "13px", fontWeight: "500", display: "flex", alignItems: "center", gap: "8px", width: "100%", border: "1px solid rgba(255, 59, 48, 0.2)", animation: "shake 0.3s ease-in-out" };
-const loginContainerStyle = { height: "100dvh", background: "var(--bg-color)", display: "flex", flexDirection: "column", overflow: "hidden", position: "fixed", width: "100%", zIndex: 100, top: 0, left: 0 };
 const contentWrapper = { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%" };
 const innerContainer = { width: "100%", maxWidth: "350px", display: "flex", flexDirection: "column", alignItems: "center", padding: "20px" };
 const logoStyle = { fontSize: "18px", marginBottom: "15px", color: "#fff", fontWeight: "900", letterSpacing: "-1px", };
@@ -305,4 +316,3 @@ const eyeButtonStyle = { background: "none", border: "none", color: "#666", disp
 const dividerContainer = { width: "100%", display: "flex", alignItems: "center", margin: "20px 0", gap: "15px" };
 const line = { flex: 1, height: "1px", background: "#262626" };
 const orText = { color: "#8e8e8e", fontSize: "13px", fontWeight: "600" };
-const footerBox = { width: "100%", textAlign: "center", paddingBottom: "80px", background: "var(--bg-color)" };

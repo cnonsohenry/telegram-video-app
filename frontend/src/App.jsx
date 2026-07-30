@@ -357,7 +357,10 @@ export default function App() {
               setShowPaywall={setShowPaywall} 
             />
           ) : (
-            <AuthForm onLoginSuccess={onLoginSuccess} />
+            <AuthForm 
+              onLoginSuccess={onLoginSuccess} 
+              onClose={() => setActiveTab("home")} 
+            />
           )}
         </div>
       </main>

@@ -510,8 +510,11 @@ const avatarStyle = { width: "40px", height: "40px", borderRadius: "50%", object
 const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#fff" };
 const timeStyle = { fontSize: "13px", color: "#71767b", textTransform: "capitalize", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 const captionStyle = { fontSize: "15px", lineHeight: "1.5", color: "#e7e9ea", margin: "0 0 12px 0", wordWrap: "break-word" };
-const videoContainerStyle = { width: "75%", position: "relative", borderRadius: "16px", overflow: "hidden", background: "#111", border: "1px solid #333", cursor: "pointer", aspectRatio: "9/16", maxHeight: "600px" };
-const thumbnailImgStyle = { width: "100%", height: "100%", objectFit: "cover" };
+// 🟢 FIX: Removed aspectRatio, allowed container to grow naturally, removed fixed width constraint
+const videoContainerStyle = { width: "100%", position: "relative", borderRadius: "16px", overflow: "hidden", background: "#111", border: "1px solid #333", cursor: "pointer", maxHeight: "600px", display: "flex", justifyContent: "center", alignItems: "center" };
+
+// 🟢 FIX: Let the image/video dictate its own height naturally, but fit within the container
+const thumbnailImgStyle = { width: "100%", maxHeight: "600px", height: "auto", objectFit: "contain", display: "block" };
 const playOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.5)", border: "2px solid rgba(255,255,255,0.2)" };
 const groupBadgeStyle = { position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: "12px", fontWeight: "700", padding: "4px 8px", borderRadius: "12px", backdropFilter: "blur(4px)" };
 const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "12px", maxWidth: "425px" };
