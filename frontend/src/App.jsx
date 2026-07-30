@@ -250,9 +250,9 @@ export default function App() {
     }
   }, [token, user, applyTheme]);
 
-  // 🟢 FIXED: Removed showComposer from this check
-  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo; 
-
+  // 🟢 FIX: Hide the footer whenever the user is logged out (showing AuthForm), or when modals/fullscreen views are active
+  const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo && isLoggedIn;
+  
   const handleOpenVideo = async (video) => {
     try {
       // Clear completely first
