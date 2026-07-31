@@ -67,11 +67,18 @@ export default function AdminUpload({ onClose }) {
       return; 
     }
 
-    const dataSource = responseData?.backend_response || responseData;
-    const videoId = dataSource?.video?.message_id || dataSource?.message_id || dataSource?.id;
+    // 🟢 THE FIX: Bulletproof Deep Extraction
+    // Digs through FastAPI wrappers (callback_response, backend_response, data) to find the ID
+    const dataSource = responseData?.backend_response || responseData?.callback_response || responseData?.data || responseData;
+    const videoId = dataSource?.video?.message_id 
+                 || dataSource?.message_id 
+                 || dataSource?.id 
+                 || dataSource?.video_id 
+                 || dataSource?.video?.id;
 
     if (!videoId) {
-      console.warn("⚠️ Cannot auto-share: No video ID was returned from the backend.");
+      // Added responseData to the log so you can see exactly what FastAPI returned if it ever fails again
+      console.warn("⚠️ Cannot auto-share: No video ID was returned from the backend.", responseData);
       return;
     }
 
