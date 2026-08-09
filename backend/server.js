@@ -523,6 +523,140 @@ function signThumbnail(chatId, messageId) {
 }
 
 /* =====================
+   HELPER: SEO template cache + escaping
+===================== */
+const INDEX_PATH = path.join(__dirname, '../frontend/dist', 'index.html');
+let templateCache = { html: null, mtimeMs: 0 };
+
+function getTemplate() {
+  const stat = fs.statSync(INDEX_PATH);
+  if (!templateCache.html || stat.mtimeMs !== templateCache.mtimeMs) {
+    templateCache = { html: fs.readFileSync(INDEX_PATH, 'utf8'), mtimeMs: stat.mtimeMs };
+  }
+  return templateCache.html;
+}
+
+function escapeHtml(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeJsonForScriptTag(obj) {
+  return JSON.stringify(obj).replace(/</g, '\\u003c');
+}
+
+function buildSeoTags({ pageTitle, description, thumbUrl, canonicalUrl, appName, schema }) {
+  const title = escapeHtml(pageTitle);
+  const desc = escapeHtml(description);
+  return `
+    <title>${title}</title>
+    <meta name="description" content="${desc}">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="${canonicalUrl}" />
+    <meta property="og:type" content="video.other">
+    <meta property="og:site_name" content="${escapeHtml(appName)}">
+    <meta property="og:title" content="${title}">
+    <meta property="og:description" content="${desc}">
+    <meta property="og:image" content="${thumbUrl}">
+    <meta property="og:url" content="${canonicalUrl}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${title}">
+    <meta name="twitter:description" content="${desc}">
+    <meta name="twitter:image" content="${thumbUrl}">
+    <script type="application/ld+json">${safeJsonForScriptTag(schema)}</script>
+  </head>`;
+}
+
+/* =====================
+   Share Link & SEO Injector
+===================== */
+app.get('/v/:message_id', async (req, res) => {
+  try {
+    const { message_id } = req.params;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
+    const appName = process.env.APP_NAME || 'NaijaHomemade';
+
+    const result = await pool.query(`
+      SELECT v.*, u.username as uploader_name
+      FROM videos v
+      LEFT JOIN users u ON v.uploader_id = u.user_id
+      WHERE v.message_id = $1 LIMIT 1
+    `, [message_id]);
+
+    if (!result.rows.length) return res.redirect(302, '/');
+
+    const video = result.rows[0];
+    const sig = signThumbnail(video.chat_id, video.message_id);
+
+    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== 'none' && !video.cloudflare_id.startsWith('r2:'))
+      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
+      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+
+    const safeCategory = video.category
+      ? video.category.charAt(0).toUpperCase() + video.category.slice(1)
+      : 'Video';
+
+    const pageTitle = video.caption
+      ? `${video.caption} | Trending Naija ${safeCategory}`
+      : `Nigerian Homemade ${safeCategory} — Watch Now`;
+
+    let seoDescription = video.seo_description || null;
+    if (!seoDescription) {
+      try {
+        const expandRes = await axios.post(
+          `${process.env.PYTHON_SERVICE_URL}/api/expand-caption`,
+          { caption: video.caption || '', category: video.category },
+          { timeout: 5000 }
+        );
+        if (expandRes.data.status === 'success') {
+          seoDescription = expandRes.data.description;
+          await pool.query(`UPDATE videos SET seo_description = $1 WHERE message_id = $2`, [seoDescription, message_id]);
+        }
+      } catch (e) {
+        console.error('expand-caption failed:', e.message);
+      }
+    }
+
+    const finalDescription = seoDescription
+      || `Watch exclusive Nigerian homemade ${safeCategory} videos on ${appName}.`;
+
+    const canonicalUrl = `${frontendUrl}/v/${message_id}`;
+
+    const schema = {
+      '@context': 'https://schema.org',
+      '@type': 'VideoObject',
+      name: pageTitle,
+      description: finalDescription,
+      thumbnailUrl: [thumbUrl],
+      uploadDate: video.created_at || new Date().toISOString(),
+      author: { '@type': 'Person', name: video.uploader_name || 'Member' },
+    };
+
+    const seoTags = buildSeoTags({ pageTitle, description: finalDescription, thumbUrl, canonicalUrl, appName, schema });
+
+    let html = getTemplate();
+
+    if (!/<\/head>/i.test(html)) {
+      throw new Error('SEO injector: no </head> tag in build template');
+    }
+
+    html = html
+      .replace(/<title>.*?<\/title>/i, '')
+      .replace(/<meta name="description" content=".*?">/i, '')
+      .replace('</head>', seoTags);
+
+    res.send(html);
+  } catch (err) {
+    console.error('Share Link Error:', err.message);
+    res.redirect('/');
+  }
+});
+
+/* =====================
    HELPER: Base Mapper (Used by Videos, Suggestions & Groups)
 ===================== */
 const mapVideoToResponse = (v, apiBaseUrl) => {
@@ -980,96 +1114,6 @@ app.get("/api/avatar", async (req, res) => {
   } catch (err) {
     // Ultimate Failsafe: Never show a broken image icon
     return res.redirect('/assets/default-avatar.png');
-  }
-});
-
-/* =====================
-   Share Link & SEO Injector
-===================== */
-app.get('/v/:message_id', async (req, res) => {
-  try {
-    const { message_id } = req.params;
-    const frontendUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
-    const appName = process.env.APP_NAME || "NaijaHomemade";
-    
-    const result = await pool.query(`
-      SELECT v.*, u.username as uploader_name 
-      FROM videos v 
-      LEFT JOIN users u ON v.uploader_id = u.user_id 
-      WHERE v.message_id = $1 LIMIT 1
-    `, [message_id]);
-
-    if (!result.rows.length) return res.redirect(302, '/');
-
-    const video = result.rows[0];
-    const sig = signThumbnail(video.chat_id, video.message_id);
-    
-    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== "none" && !video.cloudflare_id.startsWith("r2:"))
-      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
-      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
-
-    // 🟢 SEO: Keyword-Rich Dynamic Titles for Non-Branded Search
-    const safeCategory = video.category ? video.category.charAt(0).toUpperCase() + video.category.slice(1) : "Video";
-    const pageTitle = video.caption
-      ? `${video.caption} | Trending Naija ${safeCategory}`
-      : `Nigerian Homemade ${safeCategory} Leak - Watch Now`;
-
-    let seoDescription = video.seo_description || null;
-
-    if (!seoDescription) {
-      try {
-        const expandRes = await axios.post(
-          `${process.env.PYTHON_SERVICE_URL}/api/expand-caption`,
-          { caption: video.caption || "", category: video.category },
-          { timeout: 5000 }
-        );
-        if (expandRes.data.status === "success") {
-          seoDescription = expandRes.data.description;
-          await pool.query(`UPDATE videos SET seo_description = $1 WHERE message_id = $2`, [seoDescription, message_id]);
-        }
-      } catch (e) { /* Silent fallback */ }
-    }
-
-    const finalDescription = seoDescription || `Watch exclusive Nigerian homemade ${safeCategory} videos. Raw, trending, and uncensored leaks from ${appName}.`;
-
-    const schemaJSON = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "VideoObject",
-      "name": pageTitle,
-      "description": finalDescription,
-      "thumbnailUrl": [thumbUrl],
-      "uploadDate": video.created_at || new Date().toISOString(),
-      "author": { "@type": "Person", "name": video.uploader_name || "Member" }
-    });
-
-    // 🟢 SEO: Inject metadata directly into the React build file
-    const indexPath = path.join(__dirname, '../frontend/dist', 'index.html');
-    let html = fs.readFileSync(indexPath, 'utf8');
-
-    // Replace default meta tags (Ensure your React index.html has a generic <title> and description to replace)
-    html = html.replace(/<title>.*?<\/title>/i, `<title>${pageTitle}</title>`);
-    html = html.replace(/<meta name="description" content=".*?">/i, `<meta name="description" content="${finalDescription}">`);
-    
-    const seoInjection = `
-      <link rel="canonical" href="${frontendUrl}/v/${message_id}" />
-      <meta property="og:type" content="video.other">
-      <meta property="og:site_name" content="${appName}">
-      <meta property="og:title" content="${pageTitle}">
-      <meta property="og:description" content="${finalDescription}">
-      <meta property="og:image" content="${thumbUrl}">
-      <meta property="og:url" content="${frontendUrl}/v/${message_id}">
-      <meta name="twitter:card" content="summary_large_image">
-      <script type="application/ld+json">${schemaJSON}</script>
-    </head>`;
-
-    html = html.replace('</head>', seoInjection);
-
-    // Serve the fully hydrated React app directly—NO redirects.
-    res.send(html);
-
-  } catch (err) {
-    console.error("Share Link Error:", err.message);
-    res.redirect('/');
   }
 });
 

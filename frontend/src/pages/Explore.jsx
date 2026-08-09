@@ -211,7 +211,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
         <div style={actionBarStyle}>
           <div style={actionItemStyle}>
             <Eye size={18} />
-            <span>{Number(video.views || 0).toLocaleString()}</span>
+            <span>{Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}</span>
           </div>
           
           <div style={actionItemStyle} onClick={handleCommentClick}>
