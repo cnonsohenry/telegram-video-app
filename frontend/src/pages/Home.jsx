@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { ArrowUp, ArrowLeft } from "lucide-react"; 
+import { ArrowUp, ArrowLeft, ChevronsDown } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import SuggestedSidebar from "../components/SuggestedSidebar";
 import VideoCard from "../components/VideoCard";
@@ -343,6 +343,32 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   const actualVideosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
 
+  // 🟢 NEW: Extract 3 random thumbnails for the "Show More" button
+  const previewThumbnails = useMemo(() => {
+    if (!actualVideosToDisplay || actualVideosToDisplay.length === 0) return [];
+    
+    // Shuffle the current videos and pick the first 3
+    const shuffled = [...actualVideosToDisplay].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, 3);
+    
+    return selected.map(v => {
+      // 1. Grab the exact property used in VideoCard.jsx
+      let url = v.thumbnail_url;
+      
+      if (!url) return null;
+
+      // 2. Fix relative URLs if they don't have the domain attached
+      if (url.startsWith('/')) {
+        url = `${APP_CONFIG.apiUrl}${url}`;
+      }
+
+      // 3. Add the same width optimization from VideoCard so they load fast
+      url = url.includes('?') ? `${url}&w=100` : `${url}?w=100`; // Requested smaller width since it's just an avatar
+
+      return url;
+    }).filter(Boolean); // Clears out any nulls
+  }, [actualVideosToDisplay]);
+
   return (
     <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
       
@@ -469,7 +495,54 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                  )}
                  
                  {(!loading && !isChangingTab && !activeGroup) && actualVideosToDisplay.length > 0 && (
-                   <button onClick={loadMore} style={showMoreButtonStyle}>Show More</button>
+                   <button onClick={loadMore} style={showMoreButtonStyle}>
+                     
+                     {previewThumbnails.length > 0 && (
+                       <div style={{ display: 'flex', alignItems: 'center' }}>
+                         {previewThumbnails.map((thumb, i) => (
+                           <div 
+                             key={i} 
+                             style={{
+                               width: '32px',
+                               height: '32px',
+                               borderRadius: '50%',
+                               marginLeft: i === 0 ? '0' : '-12px',
+                               border: '2px solid #1c1c1e',
+                               backgroundImage: `url(${thumb})`,
+                               backgroundSize: 'cover',
+                               backgroundPosition: 'center',
+                               backgroundColor: '#333',
+                               zIndex: 3 - i,
+                               boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+                             }} 
+                           />
+                         ))}
+                       </div>
+                     )}
+                     
+                     <span>See more videos</span>
+
+                     <div style={{
+                       position: "absolute",
+                       bottom: "4px",
+                       left: "0",
+                       right: "0",
+                       display: "flex",
+                       justifyContent: "center",
+                       pointerEvents: "none"
+                     }}>
+                       <ChevronsDown 
+                         size={16} 
+                         color="#8e8e8e" 
+                         style={{ 
+                           // 🟢 THE FIX: scaleX(1.5) stretches it horizontally, making it wider and flatter
+                           transform: "scaleX(1.5)",
+                           animation: "bounce 1.5s infinite" 
+                         }} 
+                       />
+                     </div>
+                     
+                   </button>
                  )}
               </div>
               
@@ -506,6 +579,12 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       )}
 
       <style>{`
+        @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% { transform: scaleX(1.5) translateY(0); }
+        40% { transform: scaleX(1.5) translateY(4px); }
+        60% { transform: scaleX(1.5) translateY(2px); }
+        }
+
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 0.8; } 100% { opacity: 0.5; } }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
@@ -527,7 +606,23 @@ const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "no
 
 const suggestedSidebarRail = { width: "320px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", borderLeft: "1px solid var(--border-color)", padding: "30px 15px", background: "transparent", overflowY: "auto", flexShrink: 0 };
 
-const showMoreButtonStyle = { display: "block", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "14px 40px", borderRadius: "35px", border: "1px solid #333", fontWeight: "900", cursor: "pointer" };
+const showMoreButtonStyle = { 
+  position: "relative", // 🟢 Required to contain the absolutely positioned arrow
+  display: "flex", 
+  alignItems: "center", 
+  justifyContent: "center", 
+  gap: "12px", 
+  margin: "40px auto", 
+  background: "#1c1c1e", 
+  color: "#fff", 
+  padding: "10px 30px 20px 30px", // Extra padding at the bottom (20px) to make room for the arrow
+  borderRadius: "35px", 
+  border: "1px solid #333", 
+  fontWeight: "900", 
+  cursor: "pointer",
+  width: "fit-content", 
+  transition: "all 0.2s ease"
+};
 const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "pointer" };
 
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 15px 0", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)" };
