@@ -9,7 +9,6 @@ import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 import LegalFooter from "../components/LegalFooter";
-
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config"; 
 
@@ -479,6 +478,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                   Naijahomemade provides you with unlimited free Naija xxx homemade videos with the hottest models. Enjoy the largest community on the net as well as full-length scenes from the top Naija homemade videos. We update our Naijahomemade videos daily to ensure you always get the best quality xxx Naija Homemade movies.
                 </div>
               )}
+
               
               {actualVideosToDisplay.length > 0 && <LegalFooter />}
             </div>
