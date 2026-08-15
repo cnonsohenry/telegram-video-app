@@ -522,6 +522,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                      
                      <span>See more videos</span>
 
+                     {/* 🟢 Put the bounce animation on the wrapper */}
                      <div style={{
                        position: "absolute",
                        bottom: "4px",
@@ -529,16 +530,14 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                        right: "0",
                        display: "flex",
                        justifyContent: "center",
-                       pointerEvents: "none"
+                       pointerEvents: "none",
+                       animation: "bounce 1.5s infinite" 
                      }}>
+                       {/* 🟢 Put the scale on the icon */}
                        <ChevronsDown 
                          size={16} 
                          color="#8e8e8e" 
-                         style={{ 
-                           // 🟢 THE FIX: scaleX(1.5) stretches it horizontally, making it wider and flatter
-                           transform: "scaleX(1.5)",
-                           animation: "bounce 1.5s infinite" 
-                         }} 
+                         style={{ transform: "scaleX(3.5)" }} 
                        />
                      </div>
                      
@@ -579,10 +578,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       )}
 
       <style>{`
+        /* 🟢 Removed the scaleX so it just handles bouncing */
         @keyframes bounce {
-        0%, 20%, 50%, 80%, 100% { transform: scaleX(1.5) translateY(0); }
-        40% { transform: scaleX(1.5) translateY(4px); }
-        60% { transform: scaleX(1.5) translateY(2px); }
+        0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+        40% { transform: translateY(4px); }
+        60% { transform: translateY(2px); }
         }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
