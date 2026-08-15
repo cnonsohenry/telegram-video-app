@@ -1,3 +1,4 @@
+import "dotenv/config";
 import axios from "axios";
 
 export const verifyPayment = async (req, res, pool) => {
@@ -23,7 +24,7 @@ export const verifyPayment = async (req, res, pool) => {
     }
 
     // 2. Ping the Python AI Engine running on port 8000
-    const pythonRes = await axios.post('http://127.0.0.1:8000/api/verify-transfer', {
+    const pythonRes = await axios.post(`${process.env.PYTHON_SERVICE_URL}/api/verify-payment`, {
       sender_name: sender_name,
       expected_amount: amount.toString()
     });
