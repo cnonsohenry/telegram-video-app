@@ -24,7 +24,7 @@ export const verifyPayment = async (req, res, pool) => {
     }
 
     // 2. Ping the Python AI Engine running on port 8000
-    const pythonRes = await axios.post(`${process.env.PYTHON_SERVICE_URL}/api/verify-payment`, {
+    const pythonRes = await axios.post(`${process.env.PYTHON_SERVICE_URL}/api/verify-transfer`, {
       sender_name: sender_name,
       expected_amount: amount.toString()
     });
