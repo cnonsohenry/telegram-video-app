@@ -13,15 +13,11 @@ import { APP_CONFIG } from "../config";
 
 const MAX_CACHE_SIZE = 4;
 const AD_FREQUENCY = 3;
+const TREND_TIMEFRAMES = ["all_time", "monthly", "weekly"];
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * APP_CONFIG.categories.length)); 
-  
-  // 🟢 NEW: State to hold the current randomized trends timeframe
-  const [trendTimeframe, setTrendTimeframe] = useState(() => {
-    const timeframes = ["all_time", "monthly", "weekly"];
-    return timeframes[Math.floor(Math.random() * timeframes.length)];
-  });
+  const [trendsTimeframe, setTrendsTimeframe] = useState(() => TREND_TIMEFRAMES[Math.floor(Math.random() * TREND_TIMEFRAMES.length)]);
 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
@@ -43,18 +39,28 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const lastScrollY = useRef(0); 
 
   const currentCategory = APP_CONFIG.categories[activeTab];
-  
-  // 🟢 NEW: Intercept "trends" and apply the random timeframe modifier
-  const effectiveCategory = currentCategory === "trends" 
-    ? `trends_${trendTimeframe}` 
-    : currentCategory;
-
   const isDesktop = windowWidth > 1024;
+  
   const shouldHideUI = isUIHidden && !isDesktop;
   const fetchLimit = isDesktop ? 15 : 12;
   
-  // 🟢 FIX: Pass the effectiveCategory instead of currentCategory
-  const { videos, sidebarSuggestions, loading, loadMore } = useVideos(effectiveCategory, fetchLimit);
+  const categoryForFetch = activeTab === 3 
+    ? `${currentCategory}&timeframe=${trendsTimeframe}` 
+    : currentCategory;
+
+  const { videos, sidebarSuggestions, loading, loadMore } = useVideos(categoryForFetch, fetchLimit);
+
+  // 🟢 THE FIX: Track stale videos when changing categories to prevent bleeding old content into new tabs
+  const lastCategoryRef = useRef(categoryForFetch);
+  const staleVideosRef = useRef(null);
+
+  if (categoryForFetch !== lastCategoryRef.current) {
+    lastCategoryRef.current = categoryForFetch;
+    staleVideosRef.current = videos;
+  }
+
+  // If the hook's videos haven't changed since the category switched, they are stale!
+  const isVideosFresh = videos !== staleVideosRef.current;
 
   useEffect(() => {
     fetch(`${APP_CONFIG.apiUrl}/api/videos?category=premium&limit=20`)
@@ -90,13 +96,12 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     
     let baseList = [];
     
-    // 🟢 FIX: Use effectiveCategory for cache lookups
-    if (videoCache[effectiveCategory] && videoCache[effectiveCategory].length > 0) {
-      baseList = videoCache[effectiveCategory];
+    if (videoCache[currentCategory] && videoCache[currentCategory].length > 0) {
+      baseList = videoCache[currentCategory];
     } 
-    else if (!loading && videos.length > 0) {
-       // Relaxed strict category check to support our new dynamic trend strings
-       const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
+    // 🟢 Prevent displaying videos until we are 100% sure they belong to the new fetch
+    else if (!loading && videos.length > 0 && isVideosFresh) {
+       const isCorrectCategory = currentCategory === APP_CONFIG.categories[3] || videos[0].category === currentCategory;
        if (isCorrectCategory) {
           baseList = videos;
        }
@@ -107,7 +112,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       const totalChunks = Math.ceil(newList.length / fetchLimit);
 
       for (let i = 0; i < totalChunks; i++) {
-        const chunkKey = `${effectiveCategory}-page-${i}`;
+        const chunkKey = `${currentCategory}-page-${i}`;
         
         if (!premiumInjectionMap.current.has(chunkKey)) {
            const minOffset = isDesktop ? 2 : 1; 
@@ -131,20 +136,21 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
     
     return baseList;
-  }, [videoCache, effectiveCategory, currentCategory, loading, videos, isChangingTab, premiumPool, fetchLimit, isDesktop]);
+  }, [videoCache, currentCategory, loading, videos, isChangingTab, premiumPool, fetchLimit, isDesktop, isVideosFresh]);
 
   useEffect(() => {
     if (!loading) setIsChangingTab(false);
   }, [loading]);
 
   useEffect(() => {
-    if (!loading && videos?.length > 0) {
-      const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
+    // 🟢 Prevent the system from improperly caching the previous tab's videos as "Trends"
+    if (!loading && videos?.length > 0 && isVideosFresh) {
+      const isCorrectCategory = currentCategory === APP_CONFIG.categories[3] || videos[0].category === currentCategory;
       if (isCorrectCategory) {
-        updateCache(effectiveCategory, videos); // 🟢 FIX: Save cache under effectiveCategory
+        updateCache(currentCategory, videos);
       }
     }
-  }, [videos, currentCategory, effectiveCategory, loading, updateCache]);
+  }, [videos, currentCategory, loading, updateCache, isVideosFresh]);
 
   const handleTabClick = (index) => {
     setActiveGroup(null); 
@@ -154,11 +160,18 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       window.scrollTo(0, 0);
       setIsChangingTab(true); 
       setActiveTab(index);
-
-      // 🟢 NEW: Every time they click a new tab, randomize the trend timeframe in the background
-      // This ensures if they click back to Trends later, it shows something new.
-      const timeframes = ["all_time", "monthly", "weekly"];
-      setTrendTimeframe(timeframes[Math.floor(Math.random() * timeframes.length)]);
+      
+      if (index === 3) {
+        const newTimeframe = TREND_TIMEFRAMES[Math.floor(Math.random() * TREND_TIMEFRAMES.length)];
+        setTrendsTimeframe(newTimeframe);
+        
+        // 🟢 Always clear the cache for Trends so it pulls fresh data/timeframes on each visit
+        setVideoCache(prev => {
+          const newCache = { ...prev };
+          delete newCache[APP_CONFIG.categories[3]];
+          return newCache;
+        });
+      }
     }
   };
 
@@ -188,6 +201,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       if (scrollContainerRef.current) {
         scrollPositionRef.current = scrollContainerRef.current.scrollTop;
       }
+
       try {
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
@@ -217,6 +231,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
 
     const videoKey = `${video.chat_id}:${video.message_id}`;
+    
     if (unlockedVideos.has(videoKey)) { 
       playVideo(video); 
       return; 
@@ -261,16 +276,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       const neighbors = [(activeTab + 1) % APP_CONFIG.categories.length, (activeTab - 1 + APP_CONFIG.categories.length) % APP_CONFIG.categories.length];
       for (const idx of neighbors) {
         const cat = APP_CONFIG.categories[idx];
-        
-        // 🟢 FIX: Ensure we prefetch the randomized trend string if the neighbor is the Trends tab
-        const fetchCat = cat === "trends" ? `trends_${trendTimeframe}` : cat;
-        
-        if (!videoCache[fetchCat]) {
+        if (!videoCache[cat]) {
           try {
+            const fetchCat = idx === 3 ? `${cat}&timeframe=${trendsTimeframe}` : cat;
             const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${fetchCat}&limit=${fetchLimit}`);
             if (res.ok) {
               const data = await res.json();
-              updateCache(fetchCat, data.videos);
+              updateCache(cat, data.videos);
             }
           } catch (e) {}
         }
@@ -278,7 +290,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     };
     const timer = setTimeout(prefetch, 3000);
     return () => clearTimeout(timer);
-  }, [activeTab, loading, videos, videoCache, updateCache, fetchLimit, trendTimeframe]);
+  }, [activeTab, loading, videos, videoCache, updateCache, fetchLimit, trendsTimeframe]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -375,7 +387,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       if (url.startsWith('/')) {
         url = `${APP_CONFIG.apiUrl}${url}`;
       }
-      url = url.includes('?') ? `${url}&w=100` : `${url}?w=100`;
+      url = url.includes('?') ? `${url}&w=100` : `${url}?w=100`; 
       return url;
     }).filter(Boolean); 
   }, [actualVideosToDisplay]);
@@ -471,8 +483,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                    <div style={groupHeaderStyle}>
                      <button onClick={() => setActiveGroup(null)} style={backButtonStyle}>
                        <ArrowLeft size={20} />
-                       {/* 🟢 FIX: Display a clean name instead of the raw variable if it's trends */}
-                       <span>Back to {currentCategory === "trends" ? "TRENDS" : currentCategory.toUpperCase()}</span>
+                       <span>Back to {currentCategory.toUpperCase()}</span>
                      </button>
                      <span style={groupTitleStyle}>{activeGroup.videos.length} clips in collection</span>
                    </div>
@@ -608,32 +619,12 @@ const indicatorStyle = { position: "absolute", bottom: 0, left: 0, height: "3px"
 const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", padding: "20px 0" };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
-
 const suggestedSidebarRail = { width: "320px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", borderLeft: "1px solid var(--border-color)", padding: "30px 15px", background: "transparent", overflowY: "auto", flexShrink: 0 };
-
-const showMoreButtonStyle = { 
-  position: "relative",
-  display: "flex", 
-  alignItems: "center", 
-  justifyContent: "center", 
-  gap: "12px", 
-  margin: "40px auto", 
-  background: "#1c1c1e", 
-  color: "#fff", 
-  padding: "10px 30px 20px 30px", 
-  borderRadius: "35px", 
-  border: "1px solid #333", 
-  fontWeight: "900", 
-  cursor: "pointer",
-  width: "fit-content", 
-  transition: "all 0.2s ease"
-};
+const showMoreButtonStyle = { position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "10px 30px 20px 30px", borderRadius: "35px", border: "1px solid #333", fontWeight: "900", cursor: "pointer", width: "fit-content", transition: "all 0.2s ease" };
 const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "pointer" };
-
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 15px 0", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)" };
 const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
 const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
-
 const seoFooterStyle = { padding: "20px 25px", fontSize: "12px", color: "#666", textAlign: "center", lineHeight: "1.6", maxWidth: "800px", margin: "20px auto 0", borderTop: "1px solid rgba(255,255,255,0.05)" };
 
 const ExoClickWidget = () => {
