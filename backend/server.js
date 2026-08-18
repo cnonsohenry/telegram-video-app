@@ -701,18 +701,30 @@ app.get("/api/videos", async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category || "hotties";
     
+    // 🟢 NEW: Extract timeframe from query (defaults to all_time)
+    const timeframe = req.query.timeframe || "all_time";
+    
     const apiBaseUrl = process.env.API_BASE_URL;
 
     let query;
     let queryValues;
+    let timeFilter = ""; // 🟢 NEW: Placeholder for our time constraint
 
     if (category === "trends") {
+      // 🟢 NEW: Set the time filter based on the requested timeframe
+      if (timeframe === "weekly") {
+        timeFilter = "WHERE v.created_at >= NOW() - INTERVAL '7 days'";
+      } else if (timeframe === "monthly") {
+        timeFilter = "WHERE v.created_at >= NOW() - INTERVAL '30 days'";
+      }
+
       query = `
         WITH GroupedVideos AS (
           SELECT v.*, u.username as uploader_name,
             ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.views DESC) as rn,
             COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
           FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id
+          ${timeFilter}
         )
         SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY views DESC LIMIT $1 OFFSET $2
       `;
@@ -747,7 +759,8 @@ app.get("/api/videos", async (req, res) => {
 
     let countQuery;
     if (category === "trends") {
-      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos`;
+      // 🟢 NEW: Apply the time filter to the total count calculation as well
+      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v ${timeFilter}`;
     } else {
       countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos WHERE category = $1`;
     }

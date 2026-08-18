@@ -9,7 +9,6 @@ import { expandApp } from "../utils/telegram";
 import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 import LegalFooter from "../components/LegalFooter";
-// 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config"; 
 
 const MAX_CACHE_SIZE = 4;
@@ -17,6 +16,13 @@ const AD_FREQUENCY = 3;
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
   const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * APP_CONFIG.categories.length)); 
+  
+  // 🟢 NEW: State to hold the current randomized trends timeframe
+  const [trendTimeframe, setTrendTimeframe] = useState(() => {
+    const timeframes = ["all_time", "monthly", "weekly"];
+    return timeframes[Math.floor(Math.random() * timeframes.length)];
+  });
+
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState("");
@@ -37,13 +43,18 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const lastScrollY = useRef(0); 
 
   const currentCategory = APP_CONFIG.categories[activeTab];
+  
+  // 🟢 NEW: Intercept "trends" and apply the random timeframe modifier
+  const effectiveCategory = currentCategory === "trends" 
+    ? `trends_${trendTimeframe}` 
+    : currentCategory;
+
   const isDesktop = windowWidth > 1024;
-  
   const shouldHideUI = isUIHidden && !isDesktop;
-  
   const fetchLimit = isDesktop ? 15 : 12;
   
-  const { videos, sidebarSuggestions, loading, loadMore } = useVideos(currentCategory, fetchLimit);
+  // 🟢 FIX: Pass the effectiveCategory instead of currentCategory
+  const { videos, sidebarSuggestions, loading, loadMore } = useVideos(effectiveCategory, fetchLimit);
 
   useEffect(() => {
     fetch(`${APP_CONFIG.apiUrl}/api/videos?category=premium&limit=20`)
@@ -79,11 +90,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     
     let baseList = [];
     
-    if (videoCache[currentCategory] && videoCache[currentCategory].length > 0) {
-      baseList = videoCache[currentCategory];
+    // 🟢 FIX: Use effectiveCategory for cache lookups
+    if (videoCache[effectiveCategory] && videoCache[effectiveCategory].length > 0) {
+      baseList = videoCache[effectiveCategory];
     } 
     else if (!loading && videos.length > 0) {
-       const isCorrectCategory = currentCategory === APP_CONFIG.categories[3] || videos[0].category === currentCategory;
+       // Relaxed strict category check to support our new dynamic trend strings
+       const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
        if (isCorrectCategory) {
           baseList = videos;
        }
@@ -94,7 +107,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       const totalChunks = Math.ceil(newList.length / fetchLimit);
 
       for (let i = 0; i < totalChunks; i++) {
-        const chunkKey = `${currentCategory}-page-${i}`;
+        const chunkKey = `${effectiveCategory}-page-${i}`;
         
         if (!premiumInjectionMap.current.has(chunkKey)) {
            const minOffset = isDesktop ? 2 : 1; 
@@ -118,7 +131,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
     
     return baseList;
-  }, [videoCache, currentCategory, loading, videos, isChangingTab, premiumPool, fetchLimit, isDesktop]);
+  }, [videoCache, effectiveCategory, currentCategory, loading, videos, isChangingTab, premiumPool, fetchLimit, isDesktop]);
 
   useEffect(() => {
     if (!loading) setIsChangingTab(false);
@@ -126,12 +139,12 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   useEffect(() => {
     if (!loading && videos?.length > 0) {
-      const isCorrectCategory = currentCategory === APP_CONFIG.categories[3] || videos[0].category === currentCategory;
+      const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
       if (isCorrectCategory) {
-        updateCache(currentCategory, videos);
+        updateCache(effectiveCategory, videos); // 🟢 FIX: Save cache under effectiveCategory
       }
     }
-  }, [videos, currentCategory, loading, updateCache]);
+  }, [videos, currentCategory, effectiveCategory, loading, updateCache]);
 
   const handleTabClick = (index) => {
     setActiveGroup(null); 
@@ -141,6 +154,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       window.scrollTo(0, 0);
       setIsChangingTab(true); 
       setActiveTab(index);
+
+      // 🟢 NEW: Every time they click a new tab, randomize the trend timeframe in the background
+      // This ensures if they click back to Trends later, it shows something new.
+      const timeframes = ["all_time", "monthly", "weekly"];
+      setTrendTimeframe(timeframes[Math.floor(Math.random() * timeframes.length)]);
     }
   };
 
@@ -170,7 +188,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       if (scrollContainerRef.current) {
         scrollPositionRef.current = scrollContainerRef.current.scrollTop;
       }
-
       try {
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
@@ -200,7 +217,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
 
     const videoKey = `${video.chat_id}:${video.message_id}`;
-    
     if (unlockedVideos.has(videoKey)) { 
       playVideo(video); 
       return; 
@@ -245,12 +261,16 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       const neighbors = [(activeTab + 1) % APP_CONFIG.categories.length, (activeTab - 1 + APP_CONFIG.categories.length) % APP_CONFIG.categories.length];
       for (const idx of neighbors) {
         const cat = APP_CONFIG.categories[idx];
-        if (!videoCache[cat]) {
+        
+        // 🟢 FIX: Ensure we prefetch the randomized trend string if the neighbor is the Trends tab
+        const fetchCat = cat === "trends" ? `trends_${trendTimeframe}` : cat;
+        
+        if (!videoCache[fetchCat]) {
           try {
-            const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${cat}&limit=${fetchLimit}`);
+            const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${fetchCat}&limit=${fetchLimit}`);
             if (res.ok) {
               const data = await res.json();
-              updateCache(cat, data.videos);
+              updateCache(fetchCat, data.videos);
             }
           } catch (e) {}
         }
@@ -258,7 +278,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     };
     const timer = setTimeout(prefetch, 3000);
     return () => clearTimeout(timer);
-  }, [activeTab, loading, videos, videoCache, updateCache, fetchLimit]);
+  }, [activeTab, loading, videos, videoCache, updateCache, fetchLimit, trendTimeframe]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -343,36 +363,26 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   const actualVideosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
 
-  // 🟢 NEW: Extract 3 random thumbnails for the "Show More" button
   const previewThumbnails = useMemo(() => {
     if (!actualVideosToDisplay || actualVideosToDisplay.length === 0) return [];
     
-    // Shuffle the current videos and pick the first 3
     const shuffled = [...actualVideosToDisplay].sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, 3);
     
     return selected.map(v => {
-      // 1. Grab the exact property used in VideoCard.jsx
       let url = v.thumbnail_url;
-      
       if (!url) return null;
-
-      // 2. Fix relative URLs if they don't have the domain attached
       if (url.startsWith('/')) {
         url = `${APP_CONFIG.apiUrl}${url}`;
       }
-
-      // 3. Add the same width optimization from VideoCard so they load fast
-      url = url.includes('?') ? `${url}&w=100` : `${url}?w=100`; // Requested smaller width since it's just an avatar
-
+      url = url.includes('?') ? `${url}&w=100` : `${url}?w=100`;
       return url;
-    }).filter(Boolean); // Clears out any nulls
+    }).filter(Boolean); 
   }, [actualVideosToDisplay]);
 
   return (
     <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
       
-      {/* 🟢 THE FIX: Group Header + Tabs into a single absolute overlay for Mobile */}
       <div style={{
         position: isDesktop ? "relative" : "absolute",
         top: 0, left: 0, right: 0,
@@ -383,7 +393,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         pointerEvents: shouldHideUI ? "none" : "auto", 
         display: "flex",
         flexDirection: "column",
-        background: "var(--bg-color)" // Prevent transparency bleed during scroll
+        background: "var(--bg-color)" 
       }}>
         <AppHeader 
           isDesktop={isDesktop} 
@@ -445,12 +455,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
               touchAction: "pan-y", 
               overscrollBehaviorY: "contain",
               overflowAnchor: "none",
-              height: isDesktop ? "calc(100vh - 70px)" : "100vh", // Desktop has relative header, mobile is 100vh overlay
+              height: isDesktop ? "calc(100vh - 70px)" : "100vh", 
               overflowY: "auto", 
               paddingBottom: shouldHideUI ? "0px" : "70px", 
               transition: "padding-bottom 0.3s ease"
             }}>
-              {/* 🟢 THE FIX: Push feed down via precise padding so it perfectly clears the floating UI */}
               <div style={{ 
                  paddingTop: isDesktop ? "30px" : "140px", 
                  paddingLeft: isDesktop ? "25px" : "15px",
@@ -462,7 +471,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                    <div style={groupHeaderStyle}>
                      <button onClick={() => setActiveGroup(null)} style={backButtonStyle}>
                        <ArrowLeft size={20} />
-                       <span>Back to {currentCategory.toUpperCase()}</span>
+                       {/* 🟢 FIX: Display a clean name instead of the raw variable if it's trends */}
+                       <span>Back to {currentCategory === "trends" ? "TRENDS" : currentCategory.toUpperCase()}</span>
                      </button>
                      <span style={groupTitleStyle}>{activeGroup.videos.length} clips in collection</span>
                    </div>
@@ -470,7 +480,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
                  <div style={{ 
                    display: "grid", 
-                   // 🟢 THE FIX: Use minmax(0, 1fr) to prevent wide images from breaking the grid columns
                    gridTemplateColumns: isDesktop ? "repeat(5, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", 
                    gap: isDesktop ? "20px" : "10px",
                    alignItems: "start", 
@@ -522,7 +531,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                      
                      <span>See more videos</span>
 
-                     {/* 🟢 Put the bounce animation on the wrapper */}
                      <div style={{
                        position: "absolute",
                        bottom: "4px",
@@ -533,7 +541,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                        pointerEvents: "none",
                        animation: "bounce 1.5s infinite" 
                      }}>
-                       {/* 🟢 Put the scale on the icon */}
                        <ChevronsDown 
                          size={16} 
                          color="#8e8e8e" 
@@ -551,7 +558,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                 </div>
               )}
 
-              
               {actualVideosToDisplay.length > 0 && <LegalFooter />}
             </div>
           </PullToRefresh>
@@ -578,7 +584,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       )}
 
       <style>{`
-        /* 🟢 Removed the scaleX so it just handles bouncing */
         @keyframes bounce {
         0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
         40% { transform: translateY(4px); }
@@ -607,7 +612,7 @@ const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "no
 const suggestedSidebarRail = { width: "320px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", borderLeft: "1px solid var(--border-color)", padding: "30px 15px", background: "transparent", overflowY: "auto", flexShrink: 0 };
 
 const showMoreButtonStyle = { 
-  position: "relative", // 🟢 Required to contain the absolutely positioned arrow
+  position: "relative",
   display: "flex", 
   alignItems: "center", 
   justifyContent: "center", 
@@ -615,7 +620,7 @@ const showMoreButtonStyle = {
   margin: "40px auto", 
   background: "#1c1c1e", 
   color: "#fff", 
-  padding: "10px 30px 20px 30px", // Extra padding at the bottom (20px) to make room for the arrow
+  padding: "10px 30px 20px 30px", 
   borderRadius: "35px", 
   border: "1px solid #333", 
   fontWeight: "900", 
