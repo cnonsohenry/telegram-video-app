@@ -620,7 +620,24 @@ const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, di
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
 const suggestedSidebarRail = { width: "320px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", borderLeft: "1px solid var(--border-color)", padding: "30px 15px", background: "transparent", overflowY: "auto", flexShrink: 0 };
-const showMoreButtonStyle = { position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", margin: "40px auto", background: "#1c1c1e", color: "#fff", padding: "10px 30px 20px 30px", borderRadius: "35px", border: "1px solid #333", fontWeight: "900", cursor: "pointer", width: "fit-content", transition: "all 0.2s ease" };
+const showMoreButtonStyle = { 
+  position: "relative", 
+  display: "flex", 
+  alignItems: "center", 
+  justifyContent: "center", 
+  gap: "10px", // Slightly tighter gap between text and thumbnails
+  margin: "30px 0", // Tighter margins around the button
+  background: "transparent", 
+  color: "#fff", 
+  padding: "10px 20px 18px 20px", // 🟢 Drastically reduced height
+  borderRadius: "35px", // 🟢 Adjusted curve to look natural on a thinner button
+  border: "1px solid rgba(255, 255, 255, 0.15)", // 🟢 Softer border color for a premium feel
+  fontWeight: "700", // 🟢 Changed from 900 to 700 to look less bulky
+  fontSize: "14px", // Sleeker text size
+  cursor: "pointer", 
+  width: "100%", 
+  transition: "all 0.2s ease" 
+};
 const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "pointer" };
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 15px 0", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)" };
 const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
