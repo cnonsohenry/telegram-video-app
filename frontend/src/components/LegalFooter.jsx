@@ -27,12 +27,12 @@ export default function LegalFooter() {
 
       {/* Legal Links with the border moved to the top of this container */}
       <div style={linkRowStyle}>
-        <a href="/?legal=about" style={linkStyle}>About Us</a>
-        <a href="/?legal=terms" style={linkStyle}>Terms & Conditions</a>
-        <a href="/?legal=privacy" style={linkStyle}>Privacy Notice</a>
-        <a href="/?legal=cookies" style={linkStyle}>Cookie Notice</a>
+        <a href="/?legal=about" style={linkStyle}>About</a>
+        <a href="/?legal=terms" style={linkStyle}>T&C</a>
+        <a href="/?legal=privacy" style={linkStyle}>Privacy</a>
+        <a href="/?legal=cookies" style={linkStyle}>Cookies</a>
         <a href="/?legal=dmca" style={linkStyle}>DMCA</a>
-        <a href="/?legal=2257" style={linkStyle}>18 U.S.C. 2257</a>
+        <a href="/?legal=2257" style={linkStyle}>2257</a>
       </div>
       
       {/* 🟢 THE FIX: Dynamic Brand Name for the copyright */}

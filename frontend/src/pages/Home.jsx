@@ -565,7 +565,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
               
               {actualVideosToDisplay.length > 0 && (
                 <div style={seoFooterStyle}>
-                  Naijahomemade provides you with unlimited free Naija xxx homemade videos with the hottest models. Enjoy the largest community on the net as well as full-length scenes from the top Naija homemade videos. We update our Naijahomemade videos daily to ensure you always get the best quality xxx Naija Homemade movies.
+                  Join the largest community of Unlimited Naija homemade videos and hottest models.<br />
+                  Daily updates ensure you always get the best quality full length Naija xxx.
                 </div>
               )}
 
