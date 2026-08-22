@@ -3,6 +3,8 @@ import { Eye, EyeOff, Loader2, Check, X, AlertCircle } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
+// 🟢 NEW: Import LegalFooter
+import LegalFooter from "./LegalFooter";
 
 const FloatingInput = ({ label, type = "text", value, onChange, rightIcon, statusColor, ...props }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -274,7 +276,6 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
           
           <div id="googleSignInDiv" style={{ width: "100%", display: "flex", justifyContent: "center", minHeight: "45px", marginBottom: "25px" }}></div>
           
-          {/* 🟢 NEW: Integrated Toggle Text inside the main container */}
           <p style={{ fontSize: "14px", color: "#8e8e8e", margin: 0, textAlign: "center" }}>
             {isRegistering ? "Have an account? " : "Don't have an account? "}
             <span 
@@ -284,7 +285,11 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
               {isRegistering ? "Log in" : "Sign up"}
             </span>
           </p>
+        </div>
 
+        {/* 🟢 NEW: Added LegalFooter inside a wrapper at the bottom */}
+        <div style={footerWrapperStyle}>
+          <LegalFooter />
         </div>
       </div>
 
@@ -307,8 +312,10 @@ const closeButtonStyle = { background: "rgba(255,255,255,0.1)", border: "none", 
 
 const errorContainerStyle = { minHeight: "48px", width: "100%", display: "flex", alignItems: "center", marginBottom: "10px" };
 const errorBannerStyle = { background: "rgba(255, 59, 48, 0.1)", color: "#ff3b30", padding: "10px 14px", borderRadius: "12px", fontSize: "13px", fontWeight: "500", display: "flex", alignItems: "center", gap: "8px", width: "100%", border: "1px solid rgba(255, 59, 48, 0.2)", animation: "shake 0.3s ease-in-out" };
-const contentWrapper = { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%" };
-const innerContainer = { width: "100%", maxWidth: "350px", display: "flex", flexDirection: "column", alignItems: "center", padding: "20px" };
+// 🟢 THE FIX: Made the wrapper scrollable, added top padding for the close button, and used margins to vertically center the form while pinning the footer to the bottom.
+const contentWrapper = { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", width: "100%", overflowY: "auto", paddingTop: "60px" };
+const innerContainer = { width: "100%", maxWidth: "350px", display: "flex", flexDirection: "column", alignItems: "center", padding: "20px", marginTop: "auto" };
+const footerWrapperStyle = { width: "100%", marginTop: "auto" };
 const logoStyle = { fontSize: "18px", marginBottom: "15px", color: "#fff", fontWeight: "900", letterSpacing: "-1px", };
 const formStyle = { width: "100%", display: "flex", flexDirection: "column", gap: "12px" }; 
 const loginButtonStyle = { background: "var(--primary-color)", color: "#fff", border: "none", borderRadius: "30px", padding: "16px", fontSize: "15px", fontWeight: "800", marginTop: "10px", cursor: "pointer", transition: "opacity 0.2s" };
