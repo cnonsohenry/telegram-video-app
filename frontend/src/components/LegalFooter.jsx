@@ -45,7 +45,7 @@ export default function LegalFooter() {
 
 // 🖌 Styles
 const footerStyle = { 
-  padding: "40px 0 40px", // 🟢 THE FIX: Increased bottom padding from 20px to 40px
+  padding: "40px 0 80px", // 🟢 THE FIX: Increased bottom padding from 20px to 80px
   textAlign: "center", 
   marginTop: "20px",
   width: "100%", 
