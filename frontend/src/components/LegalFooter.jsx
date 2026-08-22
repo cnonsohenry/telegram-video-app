@@ -45,10 +45,11 @@ export default function LegalFooter() {
 
 // 🖌 Styles
 const footerStyle = { 
-  padding: "40px 20px 20px", 
+  padding: "40px 0 40px", // 🟢 THE FIX: Increased bottom padding from 20px to 40px
   textAlign: "center", 
-  marginTop: "20px" 
-  /* Removed borderTop from here so it can go below the icons */
+  marginTop: "20px",
+  width: "100%", 
+  boxSizing: "border-box" 
 };
 
 const socialFooterStyle = {

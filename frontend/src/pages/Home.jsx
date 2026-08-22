@@ -469,8 +469,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
               overflowAnchor: "none",
               height: isDesktop ? "calc(100vh - 70px)" : "100vh", 
               overflowY: "auto", 
-              paddingBottom: shouldHideUI ? "0px" : "70px", 
-              transition: "padding-bottom 0.3s ease"
+              paddingBottom: "0px", // 🟢 Fixed: No more shrinking scroll space
             }}>
               <div style={{ 
                  paddingTop: isDesktop ? "30px" : "140px", 
@@ -565,8 +564,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
               
               {actualVideosToDisplay.length > 0 && (
                 <div style={seoFooterStyle}>
-                  Join the largest community of Unlimited Naija homemade videos and hottest models.<br />
-                  Daily updates ensure you always get the best quality full length Naija xxx.
+                  Join the largest community of Unlimited Naija <br />homemade videos and hottest models.<br />
+                  Daily updates ensure you always get the best <br />quality full length Naija xxx.
                 </div>
               )}
 
