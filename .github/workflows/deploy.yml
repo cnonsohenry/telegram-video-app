@@ -32,10 +32,8 @@ jobs:
             cd backend
             npm install
             
-            # 🟢 THE FIX: Install tsx globally so PM2 can find it in the system PATH
-            npm install -g tsx
-            
-            pm2 reload naijahomemade-api --update-env || pm2 start server.js --interpreter tsx --name naijahomemade-api
+            # 🟢 ALTERNATIVE FIX: Point directly to the local node_modules binary
+            pm2 reload naijahomemade-api --update-env || pm2 start server.js --interpreter ./node_modules/.bin/tsx --name naijahomemade-api
             pm2 save
 
             # 🟢 2. Build Frontend UI
