@@ -180,13 +180,41 @@ router.delete("/video/:identifier", authenticateToken, isAdmin, async (req, res)
   }
 });
 
-// 🟢 8. DELETE USER
+// 🟢 8. DELETE USER (With Cascade Cleanup)
 router.delete("/user/:id", authenticateToken, isAdmin, async (req, res) => {
+  const userId = req.params.id;
+
   try {
-    await pool.query("DELETE FROM app_users WHERE id = $1", [req.params.id]);
-    res.json({ success: true });
+    // 1. Fetch the user first to get their Telegram user_id if linked
+    const userQuery = await pool.query("SELECT * FROM app_users WHERE id = $1", [userId]);
+    if (userQuery.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const user = userQuery.rows[0];
+
+    // 2. Clean up user interactions to prevent foreign key violations
+    await pool.query("DELETE FROM likes WHERE user_id = $1", [userId]);
+    await pool.query("DELETE FROM saves WHERE user_id = $1", [userId]);
+    await pool.query("DELETE FROM comments WHERE user_id = $1", [userId]);
+    await pool.query("DELETE FROM transactions WHERE app_user_id = $1", [userId]);
+
+    // 3. Unlink or reassign videos uploaded by this user (Sets uploader_id to NULL so videos aren't deleted)
+    if (user.username) {
+      // Find matching telegram user_id if applicable
+      await pool.query(`
+        UPDATE videos 
+        SET uploader_id = NULL 
+        WHERE uploader_id IN (SELECT user_id FROM users WHERE username = $1)
+      `, [user.username]);
+    }
+
+    // 4. Finally, delete the user from app_users
+    await pool.query("DELETE FROM app_users WHERE id = $1", [userId]);
+
+    res.json({ success: true, message: "User and associated records cleaned up successfully." });
   } catch (err) {
-    res.status(500).json({ error: "Delete failed" });
+    console.error("[DELETE USER ERROR]", err);
+    res.status(500).json({ error: "Failed to delete user due to database constraints." });
   }
 });
 
