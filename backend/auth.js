@@ -9,6 +9,9 @@ import jwt from "jsonwebtoken";
 import pkg from "pg";
 import { OAuth2Client } from "google-auth-library";
 import { z } from "zod"; // 🟢 IMPORT ZOD
+import { sendReactEmail } from "./utils/mailer.js";
+import WelcomeEmail from "./emails/WelcomeEmail.jsx";
+import React from "react";
 
 const { Pool } = pkg;
 const router = express.Router();
@@ -139,6 +142,13 @@ router.post("/register", async (req, res) => {
     const newUser = await pool.query(
       "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url, role, settings, is_premium", // 🟢 ADDED THIS
       [email, hash, username || email.split('@')[0], "https://videos.naijahomemade.com/assets/default-avatar.png"]
+    );
+
+    // Inside your register logic, after the user is saved:
+    sendReactEmail(
+      email,
+      "Welcome to the Community! 🚀",
+      React.createElement(WelcomeEmail, { username: username })
     );
 
     const token = jwt.sign({ id: newUser.rows[0].id }, JWT_SECRET, { expiresIn: "30d" });

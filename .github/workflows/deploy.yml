@@ -31,8 +31,8 @@ jobs:
             # 🟢 1. Build & Restart Backend API
             cd backend
             npm install
-            # Run with ecosystem awareness
-            pm2 reload naijahomemade-api --update-env || pm2 start server.js --name naijahomemade-api
+            # 🟢 THE FIX: Added --interpreter tsx to the start command
+            pm2 reload naijahomemade-api --update-env || pm2 start server.js --interpreter tsx --name naijahomemade-api
             pm2 save
 
             # 🟢 2. Build Frontend UI

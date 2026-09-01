@@ -28,7 +28,7 @@ export default function LegalFooter() {
       {/* Legal Links with the border moved to the top of this container */}
       <div style={linkRowStyle}>
         <a href="/?legal=about" style={linkStyle}>About</a>
-        <a href="/?legal=terms" style={linkStyle}>T&C</a>
+        <a href="/?legal=terms" style={linkStyle}>Terms</a>
         <a href="/?legal=privacy" style={linkStyle}>Privacy</a>
         <a href="/?legal=cookies" style={linkStyle}>Cookies</a>
         <a href="/?legal=dmca" style={linkStyle}>DMCA</a>
