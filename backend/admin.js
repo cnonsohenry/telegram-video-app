@@ -191,29 +191,49 @@ router.delete("/user/:id", authenticateToken, isAdmin, async (req, res) => {
 });
 
 // 🟢 GLOBAL DATABASE SEARCH
-router.get("/search", async (req, res) => {
+router.get("/search", authenticateToken, isAdmin, async (req, res) => {
   try {
     const { q } = req.query;
     if (!q) return res.json({ users: [], videos: [], transactions: [] });
 
     const searchParam = `%${q}%`;
 
-    // Query all three core tables simultaneously with a limit to prevent payload bloat
+    // Query all three core tables simultaneously
     const [usersRes, videosRes, txRes] = await Promise.all([
       pool.query(`SELECT * FROM app_users WHERE username ILIKE $1 OR email ILIKE $1 LIMIT 20`, [searchParam]),
+      
       pool.query(`SELECT * FROM videos WHERE caption ILIKE $1 OR category ILIKE $1 LIMIT 20`, [searchParam]),
+      
+      // 🟢 THE FIX: Query actual DB columns (status/sender_name) but return the aliases (amount/payment_method) the frontend expects
       pool.query(`
-        SELECT t.*, u.username, u.email 
+        SELECT 
+          t.*, 
+          t.expected_amount AS amount, 
+          COALESCE(t.status, 'PENDING') AS payment_method, 
+          u.username, 
+          u.email 
         FROM transactions t 
         LEFT JOIN app_users u ON t.app_user_id = u.id 
-        WHERE u.username ILIKE $1 OR u.email ILIKE $1 OR t.payment_method ILIKE $1 
+        WHERE u.username ILIKE $1 OR u.email ILIKE $1 OR t.status ILIKE $1 OR t.sender_name ILIKE $1
         LIMIT 20
       `, [searchParam])
     ]);
 
+    // Format videos to include thumbnails so the search results show images
+    const formattedVideos = videosRes.rows.map(v => {
+      let thumbUrl = "";
+      if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
+        thumbUrl = `https://videodelivery.net/${v.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=600`;
+      } else {
+        const baseUrl = process.env.API_BASE_URL || 'https://videos.naijahomemade.com';
+        thumbUrl = `${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`;
+      }
+      return { ...v, thumbnail_url: thumbUrl };
+    });
+
     res.json({
       users: usersRes.rows,
-      videos: videosRes.rows,
+      videos: formattedVideos,
       transactions: txRes.rows
     });
   } catch (err) {
