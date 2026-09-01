@@ -190,4 +190,36 @@ router.delete("/user/:id", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
+// 🟢 GLOBAL DATABASE SEARCH
+router.get("/search", async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) return res.json({ users: [], videos: [], transactions: [] });
+
+    const searchParam = `%${q}%`;
+
+    // Query all three core tables simultaneously with a limit to prevent payload bloat
+    const [usersRes, videosRes, txRes] = await Promise.all([
+      pool.query(`SELECT * FROM app_users WHERE username ILIKE $1 OR email ILIKE $1 LIMIT 20`, [searchParam]),
+      pool.query(`SELECT * FROM videos WHERE caption ILIKE $1 OR category ILIKE $1 LIMIT 20`, [searchParam]),
+      pool.query(`
+        SELECT t.*, u.username, u.email 
+        FROM transactions t 
+        LEFT JOIN app_users u ON t.app_user_id = u.id 
+        WHERE u.username ILIKE $1 OR u.email ILIKE $1 OR t.payment_method ILIKE $1 
+        LIMIT 20
+      `, [searchParam])
+    ]);
+
+    res.json({
+      users: usersRes.rows,
+      videos: videosRes.rows,
+      transactions: txRes.rows
+    });
+  } catch (err) {
+    console.error("Global search failed:", err);
+    res.status(500).json({ error: "Search failed" });
+  }
+});
+
 export default router;
