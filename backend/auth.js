@@ -6,20 +6,18 @@ import 'dotenv/config';
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import pkg from "pg";
 import { OAuth2Client } from "google-auth-library";
 import { z } from "zod"; // 🟢 IMPORT ZOD
 import { sendReactEmail } from "./utils/mailer.js";
 import WelcomeEmail from "./emails/WelcomeEmail.jsx";
 import React from "react";
+import pool from "./db.js";
 
-const { Pool } = pkg;
 const router = express.Router();
 
 // 🟢 1. SETUP
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_change_me";
+export const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_change_me";
 
 console.log(`[AUTH] System Start. Google Client ID: ${process.env.GOOGLE_CLIENT_ID ? "✅ Loaded" : "⚠️ MISSING"}`);
 
@@ -103,14 +101,31 @@ router.post("/google", async (req, res) => {
     const payload = ticket.getPayload();
     const { email, name, picture, sub: googleId } = payload;
 
+    // Ensure safe and unique username
+    let baseUsername = (name || email.split('@')[0])
+      .replace(/[^a-zA-Z0-9_-]/g, "")
+      .slice(0, 30);
+    if (!baseUsername || baseUsername.length < 3) baseUsername = `user_${Date.now().toString().slice(-6)}`;
+
+    let finalUsername = baseUsername;
+    const existingUser = await pool.query("SELECT id, username FROM app_users WHERE email = $1", [email]);
+    if (existingUser.rows.length > 0) {
+      finalUsername = existingUser.rows[0].username;
+    } else {
+      const usernameCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [finalUsername]);
+      if (usernameCheck.rows.length > 0) {
+        finalUsername = `${baseUsername.slice(0, 24)}_${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+    }
+
     const userQuery = await pool.query(
       `INSERT INTO app_users (email, username, avatar_url, google_id) 
        VALUES ($1, $2, $3, $4) 
        ON CONFLICT (email) DO UPDATE 
-       SET avatar_url = EXCLUDED.avatar_url, 
+       SET avatar_url = COALESCE(EXCLUDED.avatar_url, app_users.avatar_url), 
            google_id = COALESCE(app_users.google_id, EXCLUDED.google_id)
-       RETURNING id, email, username, avatar_url, role, settings, is_premium`, // 🟢 ADDED THIS
-      [email, name || email.split('@')[0], picture, googleId]
+       RETURNING id, email, username, avatar_url, role, settings, is_premium`,
+      [email, finalUsername, picture, googleId]
     );
 
     const user = userQuery.rows[0];
@@ -136,20 +151,24 @@ router.post("/register", async (req, res) => {
     const userCheck = await pool.query("SELECT id FROM app_users WHERE email = $1", [email]);
     if (userCheck.rows.length > 0) return res.status(400).json({ error: "Email already exists" });
 
+    const desiredUsername = username || email.split('@')[0];
+    const usernameCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [desiredUsername]);
+    if (usernameCheck.rows.length > 0) return res.status(400).json({ error: "Username already taken" });
+
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
     const newUser = await pool.query(
-      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url, role, settings, is_premium", // 🟢 ADDED THIS
-      [email, hash, username || email.split('@')[0], "https://videos.naijahomemade.com/assets/default-avatar.png"]
+      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url, role, settings, is_premium",
+      [email, hash, desiredUsername, "https://videos.naijahomemade.com/assets/default-avatar.png"]
     );
 
     // Inside your register logic, after the user is saved:
     sendReactEmail(
       email,
       "Welcome to the Community! 🚀",
-      React.createElement(WelcomeEmail, { username: username })
-    );
+      React.createElement(WelcomeEmail, { username: desiredUsername })
+    ).catch(e => console.error("[WELCOME EMAIL ERROR]", e.message));
 
     const token = jwt.sign({ id: newUser.rows[0].id }, JWT_SECRET, { expiresIn: "30d" });
     res.json({ token, user: newUser.rows[0] });

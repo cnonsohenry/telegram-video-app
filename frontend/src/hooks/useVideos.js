@@ -18,15 +18,30 @@ export function useVideos(currentCategory, limit = 12) {
     setLoading(true);
 
     try {
-      // 🟢 THE FIX: Swap the hardcoded domain for your dynamic config URL
-      let url = `${APP_CONFIG.apiUrl}/api/videos?page=${targetPage}&limit=${limit}&category=${currentCategory}`;
-      
-      // 🟢 THE FIX: Dynamically check if this is your "Trending" category (usually the 4th tab)
-      if (currentCategory === APP_CONFIG.categories[3] || currentCategory === "trends") {
-        url += `&sort=trending`;
+      let url;
+      const headers = {};
+      if (currentCategory === "likes") {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setVideos([]);
+          setHasMore(false);
+          setLoading(false);
+          isFetching.current = false;
+          return;
+        }
+        url = `${APP_CONFIG.apiUrl}/api/interactions/liked?page=${targetPage}&limit=${limit}`;
+        headers["Authorization"] = `Bearer ${token}`;
+      } else {
+        // 🟢 THE FIX: Swap the hardcoded domain for your dynamic config URL
+        url = `${APP_CONFIG.apiUrl}/api/videos?page=${targetPage}&limit=${limit}&category=${currentCategory}`;
+        
+        // 🟢 THE FIX: Dynamically check if this is your "Trending" category (usually the 4th tab)
+        if (currentCategory === APP_CONFIG.categories[3] || currentCategory === "trends") {
+          url += `&sort=trending`;
+        }
       }
       
-      const res = await fetch(url);
+      const res = await fetch(url, { headers });
       const data = await res.json();
       
       if (data?.videos) {
@@ -36,6 +51,10 @@ export function useVideos(currentCategory, limit = 12) {
           combined.forEach(v => uniqueMap.set(`${v.chat_id}:${v.message_id}`, v));
           return Array.from(uniqueMap.values());
         });
+
+        if (isNew && Array.isArray(data.suggestions)) {
+          setSidebarSuggestions(data.suggestions);
+        }
         
         // If the server couldn't fill the limit, we hit the end!
         if (data.videos.length < limit) {

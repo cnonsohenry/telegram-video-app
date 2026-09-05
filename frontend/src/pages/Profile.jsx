@@ -50,10 +50,21 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
 
   const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots", fetchLimit);
   const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium", fetchLimit);
+  const { videos: liked, loading: likedLoading, loadMore: loadMoreLiked } = useVideos("likes", fetchLimit);
 
-  const { data: rawVideosToDisplay, loading, loadMore } = activeTab === "premium" 
-    ? { data: premium || [], loading: premiumLoading, loadMore: loadMorePremium }
-    : { data: shots || [], loading: shotsLoading, loadMore: loadMoreShots };
+  let rawVideosToDisplay = shots || [];
+  let loading = shotsLoading;
+  let loadMore = loadMoreShots;
+
+  if (activeTab === "premium") {
+    rawVideosToDisplay = premium || [];
+    loading = premiumLoading;
+    loadMore = loadMorePremium;
+  } else if (activeTab === "likes") {
+    rawVideosToDisplay = liked || [];
+    loading = likedLoading;
+    loadMore = loadMoreLiked;
+  }
 
   useEffect(() => {
     const handleVideoDeleted = (event) => {
@@ -343,6 +354,12 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           
           {loading && !activeGroup && <div style={loaderStyle}>Refreshing shots...</div>}
           
+          {!loading && !activeGroup && filteredRawVideos.length === 0 && (
+            <div style={{ padding: "60px 20px", textAlign: "center", color: "#888" }}>
+              {activeTab === "likes" ? "No liked videos yet." : "No videos found."}
+            </div>
+          )}
+
           {!loading && !activeGroup && filteredRawVideos.length > 0 && (
             <div ref={loaderRef} style={{ height: "10px", width: "100%" }} />
           )}

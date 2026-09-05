@@ -119,8 +119,10 @@ export default function AdminUpload({ onClose }) {
     formData.append("apply_watermark", applyWatermark); 
 
     try {
+      const token = localStorage.getItem("token");
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/upload-premium`, {
         method: "POST",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {},
         body: formData,
       });
 

@@ -11,6 +11,7 @@ import { APP_CONFIG } from "../config";
 export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null); 
+  const hlsRef = useRef(null);
   
   // Video States
   const [isPlaying, setIsPlaying] = useState(false); 
@@ -66,16 +67,80 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   }, [video.message_id, video.uploader_id, currentUser]);
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.load();
-    }
     setIsLoading(true);
     setCurrentTime(0);
     setDuration(0);
     setIsPlaying(false);
     setShowMenu(false); 
   }, [video.message_id]);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    if (!video.video_url) {
+      setIsLoading(true);
+      return;
+    }
+
+    const playVideo = () => {
+      const playPromise = videoElement.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          setIsPlaying(false);
+          setShowControls(true);
+        });
+      }
+    };
+
+    if (video.video_url.includes('.m3u8') && window.Hls && window.Hls.isSupported()) {
+      const hls = new window.Hls({
+        startLevel: -1,
+        capLevelToPlayerSize: true,
+      });
+      hls.loadSource(video.video_url);
+      hls.attachMedia(videoElement);
+      hlsRef.current = hls;
+
+      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        setIsLoading(false);
+        playVideo();
+      });
+
+      hls.on(window.Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case window.Hls.ErrorTypes.NETWORK_ERROR:
+              hls.startLoad();
+              break;
+            case window.Hls.ErrorTypes.MEDIA_ERROR:
+              hls.recoverMediaError();
+              break;
+            default:
+              hls.destroy();
+              break;
+          }
+        }
+      });
+    } else {
+      if (videoElement.src !== video.video_url) {
+        videoElement.src = video.video_url;
+      }
+      playVideo();
+    }
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [video.video_url, video.message_id]);
 
   const handleTimeUpdate = () => {
     if (videoRef.current && !isDragging) {
@@ -274,11 +339,6 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     document.body.style.top = `-${scrollY}px`;
     document.body.style.width = "100%";
 
-    if (videoRef.current) {
-      const playPromise = videoRef.current.play();
-      if (playPromise !== undefined) playPromise.catch(() => { setIsPlaying(false); setShowControls(true); });
-    }
-
     return () => {
       document.body.style.overflow = originalStyle.overflow;
       document.body.style.position = originalStyle.position;
@@ -371,10 +431,9 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
 
           <video
             ref={videoRef}
-            src={video.video_url}
             crossOrigin="anonymous"
             muted={isMuted}
-            autoPlay playsInline loop
+            playsInline loop
             onTimeUpdate={handleTimeUpdate}
             onWaiting={() => setIsLoading(true)}
             onCanPlay={() => setIsLoading(false)}

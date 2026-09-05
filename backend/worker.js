@@ -13,6 +13,10 @@ if (url.pathname.startsWith("/api/thumbnail")) {
   const w = parseInt(url.searchParams.get("w")) || 400;
 
   // 1. Signature Verification
+  if (!chatId || !messageId || !sig || !/^[a-f0-9]{64}$/i.test(sig)) {
+    return new Response("Unauthorized", { status: 403 });
+  }
+
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw", encoder.encode(env.SIGNING_SECRET), 

@@ -23,8 +23,9 @@ import { fileURLToPath } from "url";
 import prerender from "prerender-node";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; 
-import adminRoutes from "./admin.js";
-import authRoutes from "./auth.js";
+import adminRoutes, { isAdmin } from "./admin.js";
+import authRoutes, { authenticateToken } from "./auth.js";
+import pool from "./db.js";
 import multer from "multer";
 import { uploadDirectToStream } from "./controllers/upload_premium.js";
 import { verifyPayment } from "./controllers/payment.js";
@@ -40,8 +41,6 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('🔥 Unhandled Rejection at:', promise, 'reason:', reason);
 });
-
-const { Pool } = pkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -96,16 +95,6 @@ if (!BOT_TOKEN) throw new Error("BOT_TOKEN is missing");
 
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const TELEGRAM_FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
-// 🟢 FIX: Prevent Postgres connection drops from crashing the server
-pool.on('error', (err, client) => {
-  console.error('⚠️ Unexpected error on idle Postgres client:', err.message);
-});
 
 const r2 = new S3Client({
   region: "auto",
@@ -215,6 +204,7 @@ async function initDatabase() {
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS shares_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS saves_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS seo_description TEXT`);
+      await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS media_group_id TEXT`);
       
       console.log("✅ Database initialized (Admins, App_Users, Videos, Transactions & Interactions)");
       break;
@@ -240,8 +230,8 @@ function signWorkerUrl(filePath) {
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 
-app.post("/api/verify-payment", (req, res) => verifyPayment(req, res, pool));
-app.post("/api/crypto/create", (req, res) => createCryptoPayment(req, res, pool));
+app.post("/api/verify-payment", authenticateToken, (req, res) => verifyPayment(req, res, pool));
+app.post("/api/crypto/create", authenticateToken, (req, res) => createCryptoPayment(req, res, pool));
 app.post("/api/crypto/webhook", (req, res) => cryptoWebhook(req, res, pool));
 app.get("/api/crypto/status/:order_id", (req, res) => checkCryptoTransaction(req, res, pool));
 
@@ -363,12 +353,13 @@ app.post("/webhook", async (req, res) => {
 ===================== */
 const upload = multer({ dest: "uploads/" }); 
 
-app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) => {
+app.post("/api/admin/upload-premium", authenticateToken, isAdmin, upload.single("video"), async (req, res) => {
   try {
     const { caption, category, uploader_id, media_group_id, upload_target } = req.body; 
     const videoFile = req.file;
 
-    if (!ALLOWED_USERS.includes(Number(uploader_id))) {
+    const uploaderId = uploader_id || req.user?.id;
+    if (!ALLOWED_USERS.includes(Number(uploaderId)) && req.user?.role !== 'admin') {
       return res.status(403).json({ error: "Unauthorized" });
     }
 
@@ -424,7 +415,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
         "internal", 
         internalId, 
         "none", 
-        uploader_id, 
+        uploaderId, 
         safeCategory, 
         caption, 
         savedCloudflareId,
@@ -458,12 +449,22 @@ app.get("/api/video", async (req, res) => {
     const { chat_id, message_id } = req.query;
     if (!chat_id || !message_id) return res.status(400).json({ error: "Missing parameters" });
 
-    const dbRes = await pool.query(
-      `UPDATE videos SET views = views + 1 
-       WHERE chat_id=$1 AND message_id=$2 
-       RETURNING file_id, cloudflare_id`,
-      [chat_id, message_id]
-    );
+    const shouldCountView = req.query.noview !== "1";
+    let dbRes;
+    if (shouldCountView) {
+      dbRes = await pool.query(
+        `UPDATE videos SET views = views + 1 
+         WHERE chat_id=$1 AND message_id=$2 
+         RETURNING file_id, cloudflare_id`,
+        [chat_id, message_id]
+      );
+    } else {
+      dbRes = await pool.query(
+        `SELECT file_id, cloudflare_id FROM videos 
+         WHERE chat_id=$1 AND message_id=$2`,
+        [chat_id, message_id]
+      );
+    }
 
     if (!dbRes.rows.length) {
       return res.status(404).json({ error: "Video not found in database" });
@@ -912,21 +913,7 @@ app.get("/api/video/details", async (req, res) => {
 /* =======================================================
    INTERACTION SUITE (LIKES, COMMENTS, SAVES)
 ======================================================= */
-const authenticateAppUser = (req, res, next) => {
-  const authHeader = req.header("Authorization");
-  if (!authHeader) return res.status(401).json({ error: "Access denied. Please log in." });
-  
-  const token = authHeader.split(" ")[1];
-  try {
-    const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified;
-    next();
-  } catch (err) {
-    res.status(400).json({ error: "Invalid or expired token." });
-  }
-};
-
-app.get("/api/interactions/state/:message_id", authenticateAppUser, async (req, res) => {
+app.get("/api/interactions/state/:message_id", authenticateToken, async (req, res) => {
   try {
     const { message_id } = req.params;
     const user_id = req.user.id;
@@ -943,7 +930,42 @@ app.get("/api/interactions/state/:message_id", authenticateAppUser, async (req, 
   }
 });
 
-app.post("/api/interactions/like", authenticateAppUser, async (req, res) => {
+app.get("/api/interactions/liked", authenticateToken, async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const user_id = req.user.id;
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 12);
+    const offset = (page - 1) * limit;
+    const apiBaseUrl = process.env.API_BASE_URL;
+
+    const countRes = await pool.query("SELECT COUNT(*) FROM likes WHERE user_id = $1", [user_id]);
+    const total = Number(countRes.rows[0]?.count || 0);
+
+    const query = `
+      SELECT v.*, u.username as uploader_name
+      FROM likes l
+      JOIN videos v ON l.message_id = v.message_id
+      LEFT JOIN users u ON v.uploader_id = u.user_id
+      WHERE l.user_id = $1
+      ORDER BY l.created_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const { rows } = await pool.query(query, [user_id, limit, offset]);
+    res.json({
+      page,
+      limit,
+      total,
+      videos: rows.map(v => mapVideoToResponse(v, apiBaseUrl))
+    });
+  } catch (err) {
+    console.error("Liked videos error:", err);
+    res.status(500).json({ error: "Failed to fetch liked videos" });
+  }
+});
+
+app.post("/api/interactions/like", authenticateToken, async (req, res) => {
   try {
     const { message_id } = req.body;
     const user_id = req.user.id; 
@@ -963,7 +985,7 @@ app.post("/api/interactions/like", authenticateAppUser, async (req, res) => {
   }
 });
 
-app.post("/api/interactions/save", authenticateAppUser, async (req, res) => {
+app.post("/api/interactions/save", authenticateToken, async (req, res) => {
   try {
     const { message_id } = req.body;
     const user_id = req.user.id; 
@@ -993,7 +1015,7 @@ app.post("/api/interactions/share", async (req, res) => {
   }
 });
 
-app.post("/api/comments", authenticateAppUser, async (req, res) => {
+app.post("/api/comments", authenticateToken, async (req, res) => {
   try {
     const { message_id, content } = req.body;
     const user_id = req.user.id;

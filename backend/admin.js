@@ -3,15 +3,13 @@
    File: backend/admin.js
 ===================== */
 import express from "express";
-import pkg from "pg";
 import { authenticateToken } from "./auth.js"; 
+import pool from "./db.js";
 
-const { Pool } = pkg;
 const router = express.Router();
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // 🟢 1. THE BOUNCER: Admin-Only Middleware
-const isAdmin = async (req, res, next) => {
+export const isAdmin = async (req, res, next) => {
   try {
     const userQuery = await pool.query("SELECT role FROM app_users WHERE id = $1", [req.user.id]);
     if (userQuery.rows.length === 0 || userQuery.rows[0].role !== 'admin') {
@@ -148,60 +146,112 @@ router.put("/video/:identifier", authenticateToken, isAdmin, async (req, res) =>
   }
 });
 
-// 🟢 7. DELETE VIDEO
+// 🟢 7. DELETE VIDEO (With Transaction)
 router.delete("/video/:identifier", authenticateToken, isAdmin, async (req, res) => {
+  const client = await pool.connect();
   try {
     const { identifier } = req.params;
+    await client.query('BEGIN');
 
     // Find the exact message_id first to cleanly wipe dependencies
-    const videoQuery = await pool.query(
+    const videoQuery = await client.query(
       "SELECT message_id FROM videos WHERE message_id = $1 OR id::text = $1",
       [identifier]
     );
 
     if (videoQuery.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: "Video not found" });
     }
 
     const targetMessageId = videoQuery.rows[0].message_id;
 
     // Delete interactions tied to this video to prevent foreign key constraint errors
-    await pool.query("DELETE FROM likes WHERE message_id = $1", [targetMessageId]);
-    await pool.query("DELETE FROM saves WHERE message_id = $1", [targetMessageId]);
-    await pool.query("DELETE FROM comments WHERE message_id = $1", [targetMessageId]);
+    await client.query("DELETE FROM likes WHERE message_id = $1", [targetMessageId]);
+    await client.query("DELETE FROM saves WHERE message_id = $1", [targetMessageId]);
+    await client.query("DELETE FROM comments WHERE message_id = $1", [targetMessageId]);
 
     // Now delete the actual video
-    await pool.query("DELETE FROM videos WHERE message_id = $1", [targetMessageId]);
+    await client.query("DELETE FROM videos WHERE message_id = $1", [targetMessageId]);
 
+    await client.query('COMMIT');
     res.json({ success: true });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error("Delete failed", err);
     res.status(500).json({ error: "Delete failed" });
+  } finally {
+    client.release();
   }
 });
 
-// 🟢 8. DELETE USER (With Cascade Cleanup)
+// 🟢 8. UPDATE USER (Role / Premium Status)
+router.put("/user/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { role, is_premium } = req.body;
+
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    if (role !== undefined) {
+      if (!['user', 'admin'].includes(role)) {
+        return res.status(400).json({ error: "Invalid role specified" });
+      }
+      updates.push(`role = $${idx++}`);
+      values.push(role);
+    }
+
+    if (is_premium !== undefined) {
+      updates.push(`is_premium = $${idx++}`);
+      values.push(Boolean(is_premium));
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    values.push(userId);
+    const query = `UPDATE app_users SET ${updates.join(", ")} WHERE id = $${idx} RETURNING id, username, email, role, is_premium`;
+    const result = await pool.query(query, values);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ success: true, user: result.rows[0] });
+  } catch (err) {
+    console.error("[UPDATE USER ERROR]", err);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+// 🟢 9. DELETE USER (With Cascade Cleanup & Transaction)
 router.delete("/user/:id", authenticateToken, isAdmin, async (req, res) => {
   const userId = req.params.id;
+  const client = await pool.connect();
 
   try {
+    await client.query('BEGIN');
+
     // 1. Fetch the user first to get their Telegram user_id if linked
-    const userQuery = await pool.query("SELECT * FROM app_users WHERE id = $1", [userId]);
+    const userQuery = await client.query("SELECT * FROM app_users WHERE id = $1", [userId]);
     if (userQuery.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: "User not found" });
     }
     const user = userQuery.rows[0];
 
     // 2. Clean up user interactions to prevent foreign key violations
-    await pool.query("DELETE FROM likes WHERE user_id = $1", [userId]);
-    await pool.query("DELETE FROM saves WHERE user_id = $1", [userId]);
-    await pool.query("DELETE FROM comments WHERE user_id = $1", [userId]);
-    await pool.query("DELETE FROM transactions WHERE app_user_id = $1", [userId]);
+    await client.query("DELETE FROM likes WHERE user_id = $1", [userId]);
+    await client.query("DELETE FROM saves WHERE user_id = $1", [userId]);
+    await client.query("DELETE FROM comments WHERE user_id = $1", [userId]);
+    await client.query("DELETE FROM transactions WHERE app_user_id = $1", [userId]);
 
     // 3. Unlink or reassign videos uploaded by this user (Sets uploader_id to NULL so videos aren't deleted)
     if (user.username) {
-      // Find matching telegram user_id if applicable
-      await pool.query(`
+      await client.query(`
         UPDATE videos 
         SET uploader_id = NULL 
         WHERE uploader_id IN (SELECT user_id FROM users WHERE username = $1)
@@ -209,12 +259,16 @@ router.delete("/user/:id", authenticateToken, isAdmin, async (req, res) => {
     }
 
     // 4. Finally, delete the user from app_users
-    await pool.query("DELETE FROM app_users WHERE id = $1", [userId]);
+    await client.query("DELETE FROM app_users WHERE id = $1", [userId]);
 
+    await client.query('COMMIT');
     res.json({ success: true, message: "User and associated records cleaned up successfully." });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error("[DELETE USER ERROR]", err);
     res.status(500).json({ error: "Failed to delete user due to database constraints." });
+  } finally {
+    client.release();
   }
 });
 

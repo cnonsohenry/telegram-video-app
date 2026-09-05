@@ -54,7 +54,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
     if (isPlaying && !videoUrl) {
       timer = setTimeout(async () => {
         try {
-          const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+          const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}&noview=1`);
           if (res.ok) {
             const data = await res.json();
             if (data.video_url) setVideoUrl(data.video_url);
@@ -68,14 +68,21 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   useEffect(() => {
     if (!videoUrl || !videoRef.current) return;
     if (videoUrl.includes('.m3u8') && window.Hls && window.Hls.isSupported()) {
-      if (!hlsRef.current) {
-        hlsRef.current = new window.Hls({ startLevel: 1 }); 
-        hlsRef.current.loadSource(videoUrl);
-        hlsRef.current.attachMedia(videoRef.current);
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
       }
+      hlsRef.current = new window.Hls({ startLevel: 1 }); 
+      hlsRef.current.loadSource(videoUrl);
+      hlsRef.current.attachMedia(videoRef.current);
     } else {
       if (videoRef.current.src !== videoUrl) videoRef.current.src = videoUrl;
     }
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
   }, [videoUrl]);
 
   useEffect(() => {

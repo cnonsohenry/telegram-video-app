@@ -25,16 +25,44 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
     return () => { if (el) observer.unobserve(el); };
   }, []);
 
+  const hlsRef = useRef(null);
+
   useEffect(() => {
     const el = videoRef.current;
-    if (!el) return;
+    if (!el || !video.video_url) return;
+
     if (isVisible && isHovered) {
-      el.play().catch(() => {});
+      if (video.video_url.includes('.m3u8') && window.Hls && window.Hls.isSupported()) {
+        if (!hlsRef.current) {
+          hlsRef.current = new window.Hls({ startLevel: 0 });
+          hlsRef.current.loadSource(video.video_url);
+          hlsRef.current.attachMedia(el);
+          hlsRef.current.on(window.Hls.Events.MANIFEST_PARSED, () => {
+            el.play().catch(() => {});
+          });
+        } else {
+          el.play().catch(() => {});
+        }
+      } else {
+        if (el.src !== video.video_url) el.src = video.video_url;
+        el.play().catch(() => {});
+      }
     } else {
       el.pause();
       setIsVideoReady(false);
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
     }
-  }, [isVisible, isHovered]);
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [isVisible, isHovered, video.video_url]);
 
   return (
     <a
@@ -103,7 +131,6 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
 
         <video
           ref={videoRef}
-          src={video.video_url}
           preload="none" 
           muted loop playsInline
           onPlaying={() => setIsVideoReady(true)}

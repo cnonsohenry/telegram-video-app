@@ -1,13 +1,6 @@
 import "dotenv/config";
-import pkg from "pg";
 import axios from "axios";
-
-const { Pool } = pkg;
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
+import pool from "./db.js";
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://127.0.0.1:8000";
 const BATCH_SIZE = 10;
@@ -49,18 +42,26 @@ async function runBatch() {
   let processed = 0;
   let succeeded = 0;
   let failed = 0;
-  let offset = 0;
+  const failedIds = new Set();
 
   while (true) {
-    // Fetch next batch
-    const batchRes = await pool.query(`
+    // Fetch next batch excluding items that already failed in this run
+    const failedArray = Array.from(failedIds);
+    let query = `
       SELECT message_id, caption, category 
       FROM videos 
       WHERE seo_description IS NULL
-      ORDER BY created_at DESC
-      LIMIT $1 OFFSET $2
-    `, [BATCH_SIZE, offset]);
+    `;
+    const params = [BATCH_SIZE];
 
+    if (failedArray.length > 0) {
+      query += ` AND message_id != ALL($2::text[])`;
+      params.push(failedArray);
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT $1`;
+
+    const batchRes = await pool.query(query, params);
     if (batchRes.rows.length === 0) break;
 
     console.log(`\n⚙️  Processing batch of ${batchRes.rows.length} videos...`);
@@ -78,13 +79,12 @@ async function runBatch() {
         console.log(`✅ [${succeeded}/${total}] ${video.message_id} — ${description.substring(0, 60)}...`);
       } else {
         failed++;
+        failedIds.add(video.message_id);
         console.log(`⚠️  [${failed} failed] Skipped ${video.message_id} — API returned nothing.`);
       }
 
       processed++;
     }));
-
-    offset += BATCH_SIZE;
 
     // Progress report
     const percent = Math.round((processed / total) * 100);
