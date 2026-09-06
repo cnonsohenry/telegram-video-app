@@ -32,6 +32,62 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const currentViewRef = useRef(currentView);
+  useEffect(() => {
+    currentViewRef.current = currentView;
+  }, [currentView]);
+
+  const activeGroupRef = useRef(activeGroup);
+  useEffect(() => {
+    activeGroupRef.current = activeGroup;
+  }, [activeGroup]);
+
+  const handleOpenSettings = () => {
+    setCurrentView("settings");
+    currentViewRef.current = "settings";
+    if (!window.history.state?.settingsOpen) {
+      window.history.pushState(
+        { ...(window.history.state || {}), settingsOpen: true },
+        document.title,
+        window.location.href
+      );
+    }
+  };
+
+  const handleCloseSettings = () => {
+    currentViewRef.current = "profile";
+    setCurrentView("profile");
+    if (window.history.state?.settingsOpen) {
+      window.history.back();
+    }
+  };
+
+  const handleCloseGroup = useCallback(() => {
+    activeGroupRef.current = null;
+    setActiveGroup(null);
+    if (window.history.state?.albumOpen) {
+      window.history.back();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleProfilePopState = (event) => {
+      const state = event.state || {};
+      if (currentViewRef.current === "settings" && !state.settingsOpen) {
+        currentViewRef.current = "profile";
+        setCurrentView("profile");
+        return;
+      }
+      if (activeGroupRef.current && !state.albumOpen) {
+        activeGroupRef.current = null;
+        setActiveGroup(null);
+        return;
+      }
+    };
+    window.addEventListener("popstate", handleProfilePopState);
+    return () => window.removeEventListener("popstate", handleProfilePopState);
+  }, []);
+
   // 🟢 THE FIX: Footer broadcast logic updated to respect the scroll state
   useEffect(() => {
     if (currentView === "settings") {
@@ -148,10 +204,18 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
         
-        setActiveGroup({
+        const groupData = {
           title: video.caption || "Collection",
           videos: groupVideos
-        });
+        };
+        setActiveGroup(groupData);
+        activeGroupRef.current = groupData;
+
+        window.history.pushState(
+          { ...(window.history.state || {}), albumOpen: true },
+          document.title,
+          window.location.href
+        );
         
         if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollTop = 0;
@@ -192,7 +256,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
   }, [activeGroup]);
 
   if (currentView === "settings") {
-    return <SettingsView onBack={() => setCurrentView("profile")} onLogout={onLogout} />;
+    return <SettingsView onBack={handleCloseSettings} onLogout={onLogout} />;
   }
 
   return (
@@ -228,7 +292,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
               <CheckCircle size={14} color="#20D5EC" fill="black" style={{ marginLeft: "4px" }} />
             </div>
             <div style={{ display: "flex", gap: "16px", justifyContent: "flex-end", flex: 1 }}>
-              <Settings size={24} color="#fff" onClick={() => setCurrentView("settings")} style={{ cursor: "pointer" }} />
+              <Settings size={24} color="#fff" onClick={handleOpenSettings} style={{ cursor: "pointer" }} />
             </div>
           </div>
         )}
@@ -253,8 +317,8 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
                 </h1>
                 {isDesktop && (
                   <div style={{ display: "flex", gap: "10px", marginLeft: "14px" }}>
-                     <button style={desktopEditBtnStyle} onClick={() => setCurrentView("settings")}>Edit Profile</button>
-                     <Settings size={24} color="#fff" onClick={() => setCurrentView("settings")} style={{ cursor: "pointer" }} />
+                     <button style={desktopEditBtnStyle} onClick={handleOpenSettings}>Edit Profile</button>
+                     <Settings size={24} color="#fff" onClick={handleOpenSettings} style={{ cursor: "pointer" }} />
                   </div>
                 )}
               </div>
@@ -329,7 +393,7 @@ export default function Profile({ user, onLogout, setHideFooter, setActiveVideo,
           
           {activeGroup && (
             <div style={groupHeaderStyle}>
-              <button onClick={() => setActiveGroup(null)} style={backButtonStyle}>
+              <button onClick={handleCloseGroup} style={backButtonStyle}>
                 <ArrowLeft size={20} />
                 <span>Back</span>
               </button>

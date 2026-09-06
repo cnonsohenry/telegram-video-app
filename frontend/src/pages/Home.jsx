@@ -16,7 +16,16 @@ const AD_FREQUENCY = 3;
 const TREND_TIMEFRAMES = ["all_time", "monthly", "weekly"];
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
-  const [activeTab, setActiveTab] = useState(() => Math.floor(Math.random() * APP_CONFIG.categories.length)); 
+  // 🟢 Initialize category tab from URL search params (?cat=baddies, ?cat=knacks, etc.) or random default
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const catParam = params.get("cat");
+    if (catParam) {
+      const foundIdx = APP_CONFIG.categories.findIndex(c => c.toLowerCase() === catParam.toLowerCase());
+      if (foundIdx !== -1) return foundIdx;
+    }
+    return Math.floor(Math.random() * APP_CONFIG.categories.length);
+  }); 
   const [trendsTimeframe, setTrendsTimeframe] = useState(() => TREND_TIMEFRAMES[Math.floor(Math.random() * TREND_TIMEFRAMES.length)]);
 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -28,6 +37,17 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [isChangingTab, setIsChangingTab] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [activeGroup, setActiveGroup] = useState(null);
+
+  // 🟢 Refs to keep track of current category & open album for history popstate events
+  const activeCategoryRef = useRef(activeTab);
+  useEffect(() => {
+    activeCategoryRef.current = activeTab;
+  }, [activeTab]);
+
+  const activeGroupRef = useRef(activeGroup);
+  useEffect(() => {
+    activeGroupRef.current = activeGroup;
+  }, [activeGroup]);
 
   const [isUIHidden, setIsUIHidden] = useState(false);
   const [premiumPool, setPremiumPool] = useState([]);
@@ -152,28 +172,142 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
   }, [videos, currentCategory, loading, updateCache, isVideosFresh]);
 
-  const handleTabClick = (index) => {
-    setActiveGroup(null); 
-    if (activeTab === index) {
-      scrollToTop();
-    } else {
-      window.scrollTo(0, 0);
-      setIsChangingTab(true); 
-      setActiveTab(index);
-      
-      if (index === 3) {
-        const newTimeframe = TREND_TIMEFRAMES[Math.floor(Math.random() * TREND_TIMEFRAMES.length)];
-        setTrendsTimeframe(newTimeframe);
-        
-        // 🟢 Always clear the cache for Trends so it pulls fresh data/timeframes on each visit
-        setVideoCache(prev => {
-          const newCache = { ...prev };
-          delete newCache[APP_CONFIG.categories[3]];
-          return newCache;
-        });
-      }
+  const scrollToTop = useCallback(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
-  };
+  }, []);
+
+  const handleCloseGroup = useCallback(() => {
+    activeGroupRef.current = null;
+    setActiveGroup(null);
+    if (window.history.state?.albumOpen) {
+      window.history.back();
+    }
+  }, []);
+
+  // 🟢 Synchronize category tabs with browser history
+  const handleTabClick = useCallback((index, fromHistory = false) => {
+    setActiveGroup(null); 
+    activeGroupRef.current = null;
+
+    if (activeCategoryRef.current === index && !fromHistory) {
+      scrollToTop();
+      return;
+    }
+
+    window.scrollTo(0, 0);
+    setIsChangingTab(true); 
+    setActiveTab(index);
+    activeCategoryRef.current = index;
+    
+    if (index === 3) {
+      const newTimeframe = TREND_TIMEFRAMES[Math.floor(Math.random() * TREND_TIMEFRAMES.length)];
+      setTrendsTimeframe(newTimeframe);
+      
+      // 🟢 Always clear the cache for Trends so it pulls fresh data/timeframes on each visit
+      setVideoCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[APP_CONFIG.categories[3]];
+        return newCache;
+      });
+    }
+
+    if (!fromHistory) {
+      const catName = APP_CONFIG.categories[index];
+      const currentState = window.history.state || {};
+      const newState = {
+        ...currentState,
+        tab: "home",
+        cat: catName,
+        catIndex: index
+      };
+      // Clean up overlay modal states
+      delete newState.videoPlayer;
+      delete newState.messageId;
+      delete newState.commentModal;
+      delete newState.paywall;
+      delete newState.searchOpen;
+      delete newState.albumOpen;
+
+      window.history.pushState(newState, document.title, `/?cat=${encodeURIComponent(catName)}`);
+    }
+  }, [scrollToTop]);
+
+  // 🟢 Normalize initial history state for Home category
+  useEffect(() => {
+    const currentCat = APP_CONFIG.categories[activeTab];
+    const currentState = window.history.state || {};
+    if (!currentState.cat) {
+      const isHomeTab = !currentState.tab || currentState.tab === "home";
+      const targetUrl = window.location.search.includes("cat=")
+        ? window.location.href
+        : (isHomeTab && window.location.pathname === "/"
+            ? `/?cat=${encodeURIComponent(currentCat)}`
+            : window.location.href);
+
+      window.history.replaceState({
+        ...currentState,
+        tab: currentState.tab || "home",
+        cat: currentCat,
+        catIndex: activeTab
+      }, document.title, targetUrl);
+    }
+  }, [activeTab]);
+
+  // 🟢 Handle browser Back button (popstate) for Category switching and Album closing
+  useEffect(() => {
+    const handleHomePopState = (event) => {
+      const state = event.state || {};
+
+      // 1. If viewing an album and state no longer has albumOpen, close album
+      if (activeGroupRef.current && !state.albumOpen) {
+        activeGroupRef.current = null;
+        setActiveGroup(null);
+        return;
+      }
+
+      // 2. If any overlay modal is open/active, do not process category changes
+      if (state.videoPlayer || state.commentModal || state.paywall || state.searchOpen) {
+        return;
+      }
+
+      // 3. Only handle category change if current tab is home
+      const currentTab = state.tab || new URLSearchParams(window.location.search).get("tab") || "home";
+      if (currentTab !== "home") {
+        return;
+      }
+
+      // 4. Check category index
+      let targetIndex = -1;
+      if (typeof state.catIndex === "number" && state.catIndex >= 0 && state.catIndex < APP_CONFIG.categories.length) {
+        targetIndex = state.catIndex;
+      } else {
+        const catParam = state.cat || new URLSearchParams(window.location.search).get("cat");
+        if (catParam) {
+          targetIndex = APP_CONFIG.categories.findIndex(c => c.toLowerCase() === catParam.toLowerCase());
+        }
+      }
+
+      if (targetIndex !== -1 && targetIndex !== activeCategoryRef.current) {
+        handleTabClick(targetIndex, true);
+      }
+    };
+
+    window.addEventListener("popstate", handleHomePopState);
+    return () => window.removeEventListener("popstate", handleHomePopState);
+  }, [handleTabClick]);
+
+  // 🟢 Listen for Home footer tab reselection to scroll to top
+  useEffect(() => {
+    const handleTabReselect = (e) => {
+      if (e.detail === "home") {
+        scrollToTop();
+      }
+    };
+    window.addEventListener("tabReselected", handleTabReselect);
+    return () => window.removeEventListener("tabReselected", handleTabReselect);
+  }, [scrollToTop]);
 
   const playVideo = async (video) => {
     try {
@@ -206,10 +340,19 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
         
-        setActiveGroup({
+        const groupData = {
           title: video.caption || "Collection",
           videos: groupVideos
-        });
+        };
+        setActiveGroup(groupData);
+        activeGroupRef.current = groupData;
+
+        // Push history entry for the album
+        window.history.pushState(
+          { ...(window.history.state || {}), albumOpen: true },
+          document.title,
+          window.location.href
+        );
         
         if (scrollContainerRef.current) {
             scrollContainerRef.current.scrollTop = 0;
@@ -359,12 +502,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     window.addEventListener('videoDeleted', handleVideoDeleted);
     return () => window.removeEventListener('videoDeleted', handleVideoDeleted);
   }, []);
-
-  const scrollToTop = () => {
-    if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
   
   const handleRefresh = async () => {
     premiumInjectionMap.current.clear(); 
@@ -480,7 +617,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                  
                  {activeGroup && (
                    <div style={groupHeaderStyle}>
-                     <button onClick={() => setActiveGroup(null)} style={backButtonStyle}>
+                     <button onClick={handleCloseGroup} style={backButtonStyle}>
                        <ArrowLeft size={20} />
                        <span>Back to {currentCategory.toUpperCase()}</span>
                      </button>

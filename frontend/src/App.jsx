@@ -17,7 +17,19 @@ import { APP_CONFIG } from "./config";
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState("home");
+  
+  // 🟢 Initialize activeTab from URL search params if present (?tab=explore, ?tab=profile, etc.)
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get("tab");
+    if (tabParam && ["home", "explore", "profile", "admin"].includes(tabParam.toLowerCase())) {
+      return tabParam.toLowerCase();
+    }
+    if (params.get("admin") === "true") return "admin";
+    if (window.location.pathname === "/login") return "profile";
+    return "home";
+  });
+
   const [isFooterVisible, setIsFooterVisible] = useState(true);
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); 
@@ -40,6 +52,64 @@ export default function App() {
     setIsFooterVisible(true);
   }, [activeTab]);
 
+  // 🟢 Switch footer tabs with browser history integration
+  const handleTabSwitch = useCallback((tabName, fromHistory = false) => {
+    if (activeTabRef.current === tabName && !fromHistory) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.dispatchEvent(new CustomEvent("tabReselected", { detail: tabName }));
+      return;
+    }
+
+    activeTabRef.current = tabName;
+    setActiveTab(tabName);
+
+    if (!fromHistory) {
+      let targetUrl = "/";
+      const currentState = window.history.state || {};
+      const stateData = { ...currentState, tab: tabName };
+
+      // Clean up overlay modal flags from new tab state
+      delete stateData.videoPlayer;
+      delete stateData.messageId;
+      delete stateData.commentModal;
+      delete stateData.paywall;
+      delete stateData.searchOpen;
+      delete stateData.albumOpen;
+
+      if (tabName === "home") {
+        const cat = stateData.cat || new URLSearchParams(window.location.search).get("cat");
+        if (cat) {
+          targetUrl = `/?cat=${encodeURIComponent(cat)}`;
+        } else {
+          targetUrl = "/";
+        }
+      } else {
+        targetUrl = `/?tab=${encodeURIComponent(tabName)}`;
+      }
+
+      window.history.pushState(stateData, document.title, targetUrl);
+    }
+  }, []);
+
+  // 🟢 Normalize initial history state on mount
+  useEffect(() => {
+    const currentState = window.history.state || {};
+    if (!currentState.tab) {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      const currentTab = tabParam && ["home", "explore", "profile", "admin"].includes(tabParam.toLowerCase())
+        ? tabParam.toLowerCase()
+        : (params.get("admin") === "true" ? "admin" : (window.location.pathname === "/login" ? "profile" : "home"));
+      
+      const catParam = params.get("cat");
+      window.history.replaceState({
+        ...currentState,
+        tab: currentTab,
+        ...(catParam ? { cat: catParam } : {})
+      }, document.title, window.location.href);
+    }
+  }, []);
+
   // 🟢 2. Create exclusive, stable callbacks for each specific tab
   const handleHomeHideFooter = useCallback((hide) => {
     if (activeTabRef.current === "home") setIsFooterVisible(!hide);
@@ -49,7 +119,6 @@ export default function App() {
     if (activeTabRef.current === "profile") setIsFooterVisible(!hide);
   }, []);
 
-  // 🟢 Add this right under handleProfileHideFooter
   const handleExploreHideFooter = useCallback((hide) => {
     if (activeTabRef.current === "explore") setIsFooterVisible(!hide);
   }, []);
@@ -85,7 +154,7 @@ export default function App() {
       // Only push a new history entry if this video is not already the active entry
       if (!currentState?.videoPlayer || currentState?.messageId !== String(activeVideo.message_id)) {
         window.history.pushState(
-          { videoPlayer: true, messageId: String(activeVideo.message_id) },
+          { ...(currentState || {}), videoPlayer: true, messageId: String(activeVideo.message_id) },
           document.title,
           targetPath
         );
@@ -98,7 +167,7 @@ export default function App() {
     if (activeCommentVideo && activeCommentVideo.message_id) {
       if (!window.history.state?.commentModal) {
         window.history.pushState(
-          { commentModal: true, videoPlayer: true, messageId: String(activeCommentVideo.message_id) },
+          { ...(window.history.state || {}), commentModal: true, videoPlayer: true, messageId: String(activeCommentVideo.message_id) },
           document.title
         );
       }
@@ -117,7 +186,7 @@ export default function App() {
     }
   }, [showPaywall]);
 
-  // 🟢 Handle browser Back button (popstate) to close overlays instead of navigating away
+  // 🟢 Handle browser Back button (popstate) to close overlays and switch tabs
   useEffect(() => {
     const handlePopState = (event) => {
       const state = event.state || {};
@@ -149,6 +218,20 @@ export default function App() {
         activeLegalPageRef.current = null;
         setActiveLegalPage(null);
         return;
+      }
+
+      // 5. If search overlay was open, AppHeader's popstate listener closes it
+      if (state.searchOpen) {
+        return;
+      }
+
+      // 6. Global Footer Tabs navigation
+      const params = new URLSearchParams(window.location.search);
+      const targetTab = state.tab || params.get("tab") || (params.get("admin") === "true" ? "admin" : "home");
+
+      if (targetTab !== activeTabRef.current) {
+        activeTabRef.current = targetTab;
+        setActiveTab(targetTab);
       }
     };
 
@@ -343,17 +426,17 @@ export default function App() {
     setToken(userToken);
     setUser(userData);
     if (userData.settings?.theme) applyTheme(userData.settings.theme);
-    setActiveTab("profile"); 
+    handleTabSwitch("profile"); 
   };
 
   const onLogout = useCallback(() => {
     localStorage.removeItem("token");
     setToken(null);
     setUser(null);
-    setActiveTab("home");
+    handleTabSwitch("home", true);
     if (window.google?.accounts?.id) window.google.accounts.id.disableAutoSelect();
     window.location.href = "/"; 
-  }, []);
+  }, [handleTabSwitch]);
 
   useEffect(() => {
     if (token && !user) {
@@ -372,7 +455,7 @@ export default function App() {
     }
     
     const params = new URLSearchParams(window.location.search);
-    if (params.get("admin") === "true") setActiveTab("admin");
+    if (params.get("admin") === "true") handleTabSwitch("admin", true);
     
     const legalParam = params.get("legal");
     if (legalParam) {
@@ -380,11 +463,11 @@ export default function App() {
     }
 
     if (window.location.pathname === "/login") {
-      setActiveTab("profile"); 
+      handleTabSwitch("profile", true); 
       setHasSeenPitch(true);   
-      window.history.replaceState({}, document.title, "/"); 
+      window.history.replaceState({ tab: "profile" }, document.title, "/"); 
     }
-  }, [token, user, applyTheme]);
+  }, [token, user, applyTheme, handleTabSwitch]);
 
   // 🟢 FIX: Only hide the footer when logged out if we are currently on the profile tab (showing AuthForm)
   const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo && (activeTab !== "profile" || isLoggedIn);
@@ -455,7 +538,7 @@ export default function App() {
         }}>
           <Home 
             user={user} 
-            onProfileClick={() => setActiveTab("profile")}
+            onProfileClick={() => handleTabSwitch("profile")}
             setHideFooter={handleHomeHideFooter} // 🟢 UPDATED
             setActiveVideo={setActiveVideo}
             setShowPaywall={setShowPaywall} 
@@ -470,7 +553,7 @@ export default function App() {
         }}>
           <Explore 
             user={user} 
-            onProfileClick={() => setActiveTab("profile")}
+            onProfileClick={() => handleTabSwitch("profile")}
             setHideFooter={handleExploreHideFooter} // Make sure this matches whatever your callback is named in App.jsx!
             onVideoClick={handleOpenVideo}
             onCommentClick={setActiveCommentVideo}
@@ -495,7 +578,7 @@ export default function App() {
           ) : (
             <AuthForm 
               onLoginSuccess={onLoginSuccess} 
-              onClose={() => setActiveTab("home")} 
+              onClose={() => handleTabSwitch("home")} 
             />
           )}
         </div>
@@ -506,7 +589,7 @@ export default function App() {
           user={user}
           onLogout={() => {
             window.history.replaceState({}, document.title, "/"); 
-            setActiveTab("home"); 
+            handleTabSwitch("home", true); 
           }} 
         />
       )}
@@ -514,7 +597,7 @@ export default function App() {
       {shouldShowFooter && (
         <nav style={navStyle}>
           <button 
-            onClick={() => setActiveTab("home")} 
+            onClick={() => handleTabSwitch("home")} 
             style={{...btnStyle, color: activeTab === 'home' ? 'var(--primary-color)' : '#8e8e8e'}}
           >
             <HomeIcon size={24} strokeWidth={activeTab === 'home' ? 2.5 : 2} fill={activeTab === 'home' ? 'currentColor' : 'none'} />
@@ -522,7 +605,7 @@ export default function App() {
           </button>
 
           <button 
-            onClick={() => setActiveTab("explore")} 
+            onClick={() => handleTabSwitch("explore")} 
             style={{...btnStyle, color: activeTab === 'explore' ? 'var(--primary-color)' : '#8e8e8e'}}
           >
             <Compass size={24} strokeWidth={activeTab === 'explore' ? 2.5 : 2} fill={activeTab === 'explore' ? 'currentColor' : 'none'} />
@@ -530,7 +613,7 @@ export default function App() {
           </button>
 
           <button 
-            onClick={() => setActiveTab("profile")} 
+            onClick={() => handleTabSwitch("profile")} 
             style={{...btnStyle, color: activeTab === 'profile' ? 'var(--primary-color)' : '#8e8e8e'}}
           >
             <User size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} fill={activeTab === 'profile' ? 'currentColor' : 'none'} />
@@ -539,7 +622,7 @@ export default function App() {
 
           {user?.role === 'admin' && (
             <button 
-              onClick={() => setActiveTab("admin")} 
+              onClick={() => handleTabSwitch("admin")} 
               style={{...btnStyle, color: activeTab === 'admin' ? 'var(--primary-color)' : '#8e8e8e'}}
             >
               <ShieldCheck size={24} strokeWidth={activeTab === 'admin' ? 2.5 : 2} fill={activeTab === 'admin' ? 'currentColor' : 'none'} />

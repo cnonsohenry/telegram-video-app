@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock } from "lucide-react";
 
@@ -28,6 +28,43 @@ export default function AppHeader({
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
+
+  const isSearchOpenRef = useRef(false);
+  useEffect(() => {
+    isSearchOpenRef.current = isSearchOpen;
+  }, [isSearchOpen]);
+
+  const handleOpenSearch = () => {
+    setIsSearchOpen(true);
+    isSearchOpenRef.current = true;
+    if (!window.history.state?.searchOpen) {
+      window.history.pushState(
+        { ...(window.history.state || {}), searchOpen: true },
+        document.title
+      );
+    }
+  };
+
+  const handleCloseSearch = () => {
+    isSearchOpenRef.current = false;
+    setIsSearchOpen(false);
+    if (window.history.state?.searchOpen) {
+      window.history.back();
+    }
+  };
+
+  useEffect(() => {
+    const handleSearchPopState = (event) => {
+      const state = event.state || {};
+      if (isSearchOpenRef.current && !state.searchOpen) {
+        isSearchOpenRef.current = false;
+        setIsSearchOpen(false);
+      }
+    };
+
+    window.addEventListener("popstate", handleSearchPopState);
+    return () => window.removeEventListener("popstate", handleSearchPopState);
+  }, []);
 
   useEffect(() => {
     if (isSearchOpen) document.body.style.overflow = "hidden";
@@ -112,13 +149,20 @@ export default function AppHeader({
       setHasSubmittedSearch(true);
       saveSearchHistory(searchTerm);
     } else {
-      setIsSearchOpen(false);
+      handleCloseSearch();
     }
   };
 
   const handleExecuteSearch = (video, e) => {
     saveSearchHistory(searchTerm);
+    isSearchOpenRef.current = false;
     setIsSearchOpen(false);
+    if (window.history.state?.searchOpen) {
+      window.history.replaceState(
+        { ...(window.history.state || {}), searchOpen: false },
+        document.title
+      );
+    }
     onVideoClick(video, e);
   };
 
@@ -134,7 +178,7 @@ export default function AppHeader({
       {isSearchOpen && createPortal(
         <div style={searchOverlayStyle}>
           <div style={overlayHeaderStyle}>
-            <button onClick={() => setIsSearchOpen(false)} style={iconBtnStyle}>
+            <button onClick={handleCloseSearch} style={iconBtnStyle}>
               <ArrowLeft size={24} color="#fff" />
             </button>
             <div style={activeSearchBarStyle}>
@@ -316,7 +360,7 @@ export default function AppHeader({
           </div>
           
           <div style={{ display: "flex", alignItems: "center", gap: "25px" }}>
-            <div style={searchBarStyle} onClick={() => setIsSearchOpen(true)}>
+            <div style={searchBarStyle} onClick={handleOpenSearch}>
               <Search size={18} color="#8e8e8e" />
               <div style={{ ...inputStyle, color: searchTerm ? "#fff" : "#8e8e8e", cursor: "text" }}>
                 {searchTerm || APP_CONFIG.searchPlaceholder}
@@ -343,7 +387,7 @@ export default function AppHeader({
             <span style={{ color: "var(--primary-color)", textShadow: "0 0 15px" }}>{APP_CONFIG.appNameSuffix}</span>
           </h1>
           <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-            <Search size={22} color="#fff" onClick={() => setIsSearchOpen(true)} />
+            <Search size={22} color="#fff" onClick={handleOpenSearch} />
             <button onClick={onProfileClick} style={profileBtnStyle}>
               {isLoggedIn ? (
                 <img src={user.avatar_url || "/assets/default-avatar.png"} alt="P" style={avatarStyle(false)} />
