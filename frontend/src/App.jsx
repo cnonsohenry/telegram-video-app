@@ -54,6 +54,135 @@ export default function App() {
     if (activeTabRef.current === "explore") setIsFooterVisible(!hide);
   }, []);
 
+  // 🟢 Browser History & Back Button Management for Video/Modals
+  const activeVideoRef = useRef(null);
+  const activeCommentVideoRef = useRef(null);
+  const showPaywallRef = useRef(false);
+  const activeLegalPageRef = useRef(null);
+
+  useEffect(() => {
+    activeVideoRef.current = activeVideo;
+  }, [activeVideo]);
+
+  useEffect(() => {
+    activeCommentVideoRef.current = activeCommentVideo;
+  }, [activeCommentVideo]);
+
+  useEffect(() => {
+    showPaywallRef.current = showPaywall;
+  }, [showPaywall]);
+
+  useEffect(() => {
+    activeLegalPageRef.current = activeLegalPage;
+  }, [activeLegalPage]);
+
+  // 🟢 Synchronize browser history when opening a video
+  useEffect(() => {
+    if (activeVideo && activeVideo.message_id) {
+      const currentState = window.history.state;
+      const targetPath = `/v/${activeVideo.message_id}`;
+
+      // Only push a new history entry if this video is not already the active entry
+      if (!currentState?.videoPlayer || currentState?.messageId !== String(activeVideo.message_id)) {
+        window.history.pushState(
+          { videoPlayer: true, messageId: String(activeVideo.message_id) },
+          document.title,
+          targetPath
+        );
+      }
+    }
+  }, [activeVideo?.message_id]);
+
+  // 🟢 Synchronize browser history when opening comment modal
+  useEffect(() => {
+    if (activeCommentVideo && activeCommentVideo.message_id) {
+      if (!window.history.state?.commentModal) {
+        window.history.pushState(
+          { commentModal: true, videoPlayer: true, messageId: String(activeCommentVideo.message_id) },
+          document.title
+        );
+      }
+    }
+  }, [activeCommentVideo]);
+
+  // 🟢 Synchronize browser history when opening paywall modal
+  useEffect(() => {
+    if (showPaywall) {
+      if (!window.history.state?.paywall) {
+        window.history.pushState(
+          { ...(window.history.state || {}), paywall: true },
+          document.title
+        );
+      }
+    }
+  }, [showPaywall]);
+
+  // 🟢 Handle browser Back button (popstate) to close overlays instead of navigating away
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const state = event.state || {};
+
+      // 1. If comments modal was open and state no longer has commentModal, close comments
+      if (activeCommentVideoRef.current && !state.commentModal) {
+        activeCommentVideoRef.current = null;
+        setActiveCommentVideo(null);
+        return;
+      }
+
+      // 2. If video player was open and state no longer has videoPlayer, close video
+      if (activeVideoRef.current && !state.videoPlayer) {
+        activeVideoRef.current = null;
+        setActiveVideo(null);
+        setIsSharedVideoView(false);
+        return;
+      }
+
+      // 3. If paywall was open and state no longer has paywall, close paywall
+      if (showPaywallRef.current && !state.paywall) {
+        showPaywallRef.current = false;
+        setShowPaywall(false);
+        return;
+      }
+
+      // 4. If legal page was open and state no longer has legal, close legal page
+      if (activeLegalPageRef.current && !state.legal) {
+        activeLegalPageRef.current = null;
+        setActiveLegalPage(null);
+        return;
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const handleCloseVideo = useCallback(() => {
+    activeVideoRef.current = null;
+    setActiveVideo(null);
+    setIsSharedVideoView(false);
+    if (window.history.state?.videoPlayer) {
+      window.history.back();
+    } else if (window.location.pathname.startsWith('/v/') || window.location.search.includes('v=')) {
+      window.history.replaceState({}, document.title, "/");
+    }
+  }, []);
+
+  const handleCloseComments = useCallback(() => {
+    activeCommentVideoRef.current = null;
+    setActiveCommentVideo(null);
+    if (window.history.state?.commentModal) {
+      window.history.back();
+    }
+  }, []);
+
+  const handleClosePaywall = useCallback(() => {
+    showPaywallRef.current = false;
+    setShowPaywall(false);
+    if (window.history.state?.paywall) {
+      window.history.back();
+    }
+  }, []);
+
   useEffect(() => {
     // 🟢 Let React mount and render the UI, then tell Prerender to take the snapshot instantly
     // We use a small 1.5-second timeout to ensure your feed videos have fetched from the DB
@@ -177,6 +306,13 @@ export default function App() {
 
     if (sharedVideoId) {
       setIsSharedVideoView(true);
+      // Replace direct URL with '/' so browser back button returns to the home feed instead of leaving the site
+      window.history.replaceState({ page: 'home' }, document.title, "/");
+      window.history.pushState(
+        { videoPlayer: true, messageId: String(sharedVideoId) },
+        document.title,
+        `/v/${sharedVideoId}`
+      );
       const fetchSharedVideo = async () => {
         try {
           const res = await fetch(`${APP_CONFIG.apiUrl}/api/video/details?message_id=${sharedVideoId}`);
@@ -414,7 +550,7 @@ export default function App() {
       )}
 
       {showPaywall && (
-        <PaywallModal user={user} onClose={() => setShowPaywall(false)} />
+        <PaywallModal user={user} onClose={handleClosePaywall} />
       )}
 
       {activeLegalPage && (
@@ -432,14 +568,7 @@ export default function App() {
           <FullscreenPlayer 
             video={activeVideo}
             currentUser={user} 
-            onClose={() => {
-              setActiveVideo(null);
-              setIsSharedVideoView(false); 
-              // 🟢 Revert URL back to homepage only when user closes player
-              if (window.location.pathname.startsWith('/v/') || window.location.search.includes('v=')) {
-                window.history.replaceState({}, document.title, "/");
-              }
-            }} 
+            onClose={handleCloseVideo} 
             isDesktop={window.innerWidth > 1024} 
             onCommentClick={setActiveCommentVideo}
           />
@@ -450,7 +579,7 @@ export default function App() {
       {activeCommentVideo && (
         <CommentSectionModal 
           video={activeCommentVideo} 
-          onClose={() => setActiveCommentVideo(null)} 
+          onClose={handleCloseComments} 
         />
       )}
       
