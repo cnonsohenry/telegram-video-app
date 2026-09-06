@@ -167,7 +167,7 @@ export default function AdminUpload({ onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           url: twitterUrl,
-          admin_id: adminId, 
+          admin_id: adminId || APP_CONFIG.adminUsers[0]?.id || "1881815190", 
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
@@ -216,7 +216,7 @@ export default function AdminUpload({ onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           url: telegramUrl,
-          admin_id: adminId, 
+          admin_id: adminId || APP_CONFIG.adminUsers[0]?.id || "1881815190", 
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
@@ -267,7 +267,7 @@ export default function AdminUpload({ onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           url: instagramUrl,
-          admin_id: adminId, 
+          admin_id: adminId || APP_CONFIG.adminUsers[0]?.id || "1881815190", 
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,

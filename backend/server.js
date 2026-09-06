@@ -23,8 +23,8 @@ import { fileURLToPath } from "url";
 import prerender from "prerender-node";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; 
-import adminRoutes, { isAdmin } from "./admin.js";
-import authRoutes, { authenticateToken } from "./auth.js";
+import adminRoutes from "./admin.js";
+import authRoutes, { authenticateToken, JWT_SECRET } from "./auth.js";
 import pool from "./db.js";
 import multer from "multer";
 import { uploadDirectToStream } from "./controllers/upload_premium.js";
@@ -353,17 +353,58 @@ app.post("/webhook", async (req, res) => {
 ===================== */
 const upload = multer({ dest: "uploads/" }); 
 
-app.post("/api/admin/upload-premium", authenticateToken, isAdmin, upload.single("video"), async (req, res) => {
+app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) => {
   try {
     const { caption, category, uploader_id, media_group_id, upload_target } = req.body; 
     const videoFile = req.file;
 
-    const uploaderId = uploader_id || req.user?.id;
-    if (!ALLOWED_USERS.includes(Number(uploaderId)) && req.user?.role !== 'admin') {
-      return res.status(403).json({ error: "Unauthorized" });
+    // Verify authorization:
+    // 1. JWT Bearer token with admin role
+    let isAuthorized = false;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded) {
+          if (decoded.role === 'admin') {
+            isAuthorized = true;
+          } else if (decoded.id) {
+            const adminCheck = await pool.query("SELECT role FROM app_users WHERE id = $1", [decoded.id]);
+            if (adminCheck.rows.length > 0 && adminCheck.rows[0].role === 'admin') {
+              isAuthorized = true;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. OR uploader_id is in ALLOWED_USERS (for FastAPI worker callback or Telegram admin)
+    const numericUploaderId = Number(uploader_id);
+    if (!isAuthorized && numericUploaderId && ALLOWED_USERS.includes(numericUploaderId)) {
+      isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
+      if (videoFile && fs.existsSync(videoFile.path)) {
+        fs.unlinkSync(videoFile.path);
+      }
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     if (!videoFile) return res.status(400).json({ error: "No video file provided" });
+
+    const finalUploaderId = (numericUploaderId && ALLOWED_USERS.includes(numericUploaderId))
+      ? numericUploaderId 
+      : ALLOWED_USERS[0];
+
+    // Ensure uploader exists in users table to satisfy foreign key constraint
+    await pool.query(
+      `INSERT INTO users (user_id, username, full_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [finalUploaderId, 'Admin', 'Admin']
+    );
 
     let savedCloudflareId = "none";
     
@@ -415,7 +456,7 @@ app.post("/api/admin/upload-premium", authenticateToken, isAdmin, upload.single(
         "internal", 
         internalId, 
         "none", 
-        uploaderId, 
+        finalUploaderId, 
         safeCategory, 
         caption, 
         savedCloudflareId,
