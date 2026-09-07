@@ -34,7 +34,11 @@ export default function App() {
   const [hasSeenPitch, setHasSeenPitch] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); 
   const [showPaywall, setShowPaywall] = useState(false);
-  const [activeLegalPage, setActiveLegalPage] = useState(null); 
+  // 🟢 Initialize activeLegalPage from URL query param (?legal=about, ?legal=terms, etc.)
+  const [activeLegalPage, setActiveLegalPage] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("legal") || null;
+  }); 
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
   
   const [activeCommentVideo, setActiveCommentVideo] = useState(null);
@@ -102,10 +106,12 @@ export default function App() {
         : (params.get("admin") === "true" ? "admin" : (window.location.pathname === "/login" ? "profile" : "home"));
       
       const catParam = params.get("cat");
+      const legalParam = params.get("legal");
       window.history.replaceState({
         ...currentState,
         tab: currentTab,
-        ...(catParam ? { cat: catParam } : {})
+        ...(catParam ? { cat: catParam } : {}),
+        ...(legalParam ? { legal: legalParam } : {})
       }, document.title, window.location.href);
     }
   }, []);
@@ -219,6 +225,11 @@ export default function App() {
         setActiveLegalPage(null);
         return;
       }
+      if (state.legal && state.legal !== activeLegalPageRef.current) {
+        activeLegalPageRef.current = state.legal;
+        setActiveLegalPage(state.legal);
+        return;
+      }
 
       // 5. If search overlay was open, AppHeader's popstate listener closes it
       if (state.searchOpen) {
@@ -238,6 +249,43 @@ export default function App() {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  // 🟢 Seamless in-app legal page navigation
+  const handleOpenLegal = useCallback((pageId) => {
+    setActiveLegalPage(pageId);
+    activeLegalPageRef.current = pageId;
+    const currentState = window.history.state || {};
+    window.history.pushState(
+      { ...currentState, legal: pageId },
+      document.title,
+      `/?legal=${encodeURIComponent(pageId)}`
+    );
+  }, []);
+
+  const handleCloseLegal = useCallback(() => {
+    activeLegalPageRef.current = null;
+    setActiveLegalPage(null);
+    if (window.history.state?.legal) {
+      window.history.back();
+    } else {
+      const currentState = window.history.state || {};
+      const currentTab = currentState.tab || "home";
+      const targetUrl = currentTab === "home"
+        ? (currentState.cat ? `/?cat=${encodeURIComponent(currentState.cat)}` : "/")
+        : `/?tab=${encodeURIComponent(currentTab)}`;
+      window.history.replaceState({ ...currentState, legal: null }, document.title, targetUrl);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleOpenLegalEvent = (e) => {
+      if (e.detail) {
+        handleOpenLegal(e.detail);
+      }
+    };
+    window.addEventListener("openLegalPage", handleOpenLegalEvent);
+    return () => window.removeEventListener("openLegalPage", handleOpenLegalEvent);
+  }, [handleOpenLegal]);
 
   const handleCloseVideo = useCallback(() => {
     activeVideoRef.current = null;
@@ -639,10 +687,7 @@ export default function App() {
       {activeLegalPage && (
         <LegalPages 
           initialPage={activeLegalPage} 
-          onBack={() => {
-            setActiveLegalPage(null);
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }} 
+          onBack={handleCloseLegal} 
         />
       )}
 

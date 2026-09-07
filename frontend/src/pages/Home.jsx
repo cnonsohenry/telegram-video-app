@@ -240,9 +240,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     const currentState = window.history.state || {};
     if (!currentState.cat) {
       const isHomeTab = !currentState.tab || currentState.tab === "home";
-      const targetUrl = window.location.search.includes("cat=")
+      const hasOtherParams = window.location.search.includes("cat=") || window.location.search.includes("legal=") || window.location.search.includes("v=");
+      const targetUrl = hasOtherParams
         ? window.location.href
-        : (isHomeTab && window.location.pathname === "/"
+        : (isHomeTab && window.location.pathname === "/" && !window.location.search
             ? `/?cat=${encodeURIComponent(currentCat)}`
             : window.location.href);
 

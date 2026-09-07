@@ -24,6 +24,12 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 768);
 
   useEffect(() => {
+    if (initialPage && initialPage !== activePage) {
+      setActivePage(initialPage);
+    }
+  }, [initialPage]);
+
+  useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth > 768);
     window.addEventListener("resize", handleResize);
     window.scrollTo(0, 0);
@@ -65,7 +71,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
               key={tab.id}
               onClick={() => {
                 setActivePage(tab.id);
-                window.history.replaceState({}, document.title, `/?legal=${tab.id}`);
+                window.history.replaceState({ ...(window.history.state || {}), legal: tab.id }, document.title, `/?legal=${tab.id}`);
               }}
               style={{
                 ...mobileTabStyle,
@@ -96,7 +102,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
                   key={tab.id}
                   onClick={() => {
                     setActivePage(tab.id);
-                    window.history.replaceState({}, document.title, `/?legal=${tab.id}`);
+                    window.history.replaceState({ ...(window.history.state || {}), legal: tab.id }, document.title, `/?legal=${tab.id}`);
                   }}
                   style={{
                     ...desktopTabBtnStyle,

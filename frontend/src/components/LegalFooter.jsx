@@ -3,7 +3,16 @@ import { FaTelegram, FaXTwitter, FaInstagram, FaTiktok, FaSnapchat } from "react
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
 
-export default function LegalFooter() {
+export default function LegalFooter({ onOpenLegal }) {
+  const handleLegalClick = (e, pageId) => {
+    e.preventDefault();
+    if (onOpenLegal) {
+      onOpenLegal(pageId);
+    } else {
+      window.dispatchEvent(new CustomEvent("openLegalPage", { detail: pageId }));
+    }
+  };
+
   return (
     <footer style={footerStyle}>
       {/* 🟢 NEW: Social Media Icons (Single Line) */}
@@ -27,12 +36,12 @@ export default function LegalFooter() {
 
       {/* Legal Links with the border moved to the top of this container */}
       <div style={linkRowStyle}>
-        <a href="/?legal=about" style={linkStyle}>About</a>
-        <a href="/?legal=terms" style={linkStyle}>Terms</a>
-        <a href="/?legal=privacy" style={linkStyle}>Privacy</a>
-        <a href="/?legal=cookies" style={linkStyle}>Cookies</a>
-        <a href="/?legal=dmca" style={linkStyle}>DMCA</a>
-        <a href="/?legal=2257" style={linkStyle}>2257</a>
+        <a href="/?legal=about" onClick={(e) => handleLegalClick(e, "about")} style={linkStyle}>About</a>
+        <a href="/?legal=terms" onClick={(e) => handleLegalClick(e, "terms")} style={linkStyle}>Terms</a>
+        <a href="/?legal=privacy" onClick={(e) => handleLegalClick(e, "privacy")} style={linkStyle}>Privacy</a>
+        <a href="/?legal=cookies" onClick={(e) => handleLegalClick(e, "cookies")} style={linkStyle}>Cookies</a>
+        <a href="/?legal=dmca" onClick={(e) => handleLegalClick(e, "dmca")} style={linkStyle}>DMCA</a>
+        <a href="/?legal=2257" onClick={(e) => handleLegalClick(e, "2257")} style={linkStyle}>2257</a>
       </div>
       
       {/* 🟢 THE FIX: Dynamic Brand Name for the copyright */}
