@@ -544,12 +544,15 @@ export default function Explore({
           transition: "padding-bottom 0.3s ease"
         }}
       >
-        <PullToRefresh onRefresh={() => {
-          setSearchPage(1);
-          setHasMoreSearch(true);
-          if (searchQuery.trim()) loadSearchFeed(1, false);
-          else loadRandomFeed(false);
-        }}>
+        <PullToRefresh 
+          scrollRef={scrollContainerRef}
+          onRefresh={async () => {
+            setSearchPage(1);
+            setHasMoreSearch(true);
+            if (searchQuery.trim()) await loadSearchFeed(1, false);
+            else await loadRandomFeed(false);
+          }}
+        >
           <div style={feedWrapper}>
             {loading ? (
               [...Array(5)].map((_, i) => (

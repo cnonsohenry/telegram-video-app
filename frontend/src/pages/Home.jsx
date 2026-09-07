@@ -598,7 +598,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <PullToRefresh onRefresh={handleRefresh}>
+          <PullToRefresh scrollRef={scrollContainerRef} onRefresh={handleRefresh}>
             <div 
             ref={scrollContainerRef}
             style={{ 
