@@ -25,6 +25,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; 
 import adminRoutes from "./admin.js";
 import authRoutes, { authenticateToken, JWT_SECRET } from "./auth.js";
+import creatorRoutes from "./creator.js";
 import pool from "./db.js";
 import multer from "multer";
 import { uploadDirectToStream } from "./controllers/upload_premium.js";
@@ -137,6 +138,37 @@ async function initDatabase() {
 
       await pool.query(`
         ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_creator BOOLEAN DEFAULT FALSE;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS display_name TEXT;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS creator_bio TEXT;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS banner_url TEXT DEFAULT 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80';
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS creator_category TEXT DEFAULT 'Creator';
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS subscription_price NUMERIC DEFAULT 0;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{}'::jsonb;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS location TEXT DEFAULT '';
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS website TEXT DEFAULT '';
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS creator_subscriptions (
+          id SERIAL PRIMARY KEY,
+          subscriber_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          creator_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(subscriber_id, creator_id)
+        );
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS creator_tips (
+          id SERIAL PRIMARY KEY,
+          sender_id INTEGER REFERENCES app_users(id) ON DELETE SET NULL,
+          creator_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          amount NUMERIC NOT NULL,
+          message TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        );
       `);
 
       await pool.query(`
@@ -229,6 +261,8 @@ function signWorkerUrl(filePath) {
 ===================== */
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/creator", creatorRoutes);
+app.use("/api/creators", creatorRoutes);
 
 app.post("/api/verify-payment", authenticateToken, (req, res) => verifyPayment(req, res, pool));
 app.post("/api/crypto/create", authenticateToken, (req, res) => createCryptoPayment(req, res, pool));

@@ -5,7 +5,7 @@ import PullToRefresh from "../components/PullToRefresh";
 import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
 
 // 🟢 INDIVIDUAL POST COMPONENT
-const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen }) => {
+const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen, onCreatorClick }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
   
@@ -234,7 +234,15 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 
   return (
     <div ref={isLast ? lastElementRef : null} style={postStyle}>
-      <div style={avatarColumnStyle}>
+      <div 
+        style={{ ...avatarColumnStyle, cursor: onCreatorClick && video.uploader_name ? "pointer" : "default" }}
+        onClick={(e) => {
+          if (onCreatorClick && video.uploader_name) {
+            e.stopPropagation();
+            onCreatorClick(video.uploader_name);
+          }
+        }}
+      >
         <img 
           src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
           alt="avatar"
@@ -245,7 +253,17 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 
       <div style={contentColumnStyle}>
         <div style={postHeaderStyle}>
-          <span style={usernameStyle}>@{video.uploader_name || "Member"}</span>
+          <span 
+            style={{ ...usernameStyle, cursor: onCreatorClick && video.uploader_name ? "pointer" : "default" }}
+            onClick={(e) => {
+              if (onCreatorClick && video.uploader_name) {
+                e.stopPropagation();
+                onCreatorClick(video.uploader_name);
+              }
+            }}
+          >
+            @{video.uploader_name || "Member"}
+          </span>
           <span style={timeStyle}>&middot; {new Date(video.created_at).toLocaleDateString()} &middot; {video.category}</span>
         </div>
 
@@ -323,7 +341,8 @@ export default function Explore({
   setHideFooter, // 🟢 ADDED
   onVideoClick, 
   onCommentClick, 
-  isAnyModalOpen 
+  isAnyModalOpen,
+  onCreatorClick
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [feed, setFeed] = useState([]);
@@ -581,6 +600,7 @@ export default function Explore({
                     onVideoClick={onVideoClick}
                     onCommentClick={onCommentClick} 
                     isAnyModalOpen={isAnyModalOpen} 
+                    onCreatorClick={onCreatorClick}
                   />
                 );
               })

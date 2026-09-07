@@ -8,7 +8,7 @@ import {
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
 
-export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick }) {
+export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick, onCreatorClick }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null); 
   const hlsRef = useRef(null);
@@ -478,10 +478,26 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                   src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
                   alt="avatar"
                   onError={(e) => { e.target.src = '/assets/default-avatar.png'; }}
-                  style={avatarStyle}
+                  style={{ ...avatarStyle, cursor: onCreatorClick && video.uploader_name ? "pointer" : "default" }}
+                  onClick={(e) => {
+                    if (onCreatorClick && video.uploader_name) {
+                      e.stopPropagation();
+                      onCreatorClick(video.uploader_name);
+                    }
+                  }}
                 />
                <div style={textDetailsStyle}>
-                  <div style={usernameStyle}>@{video.uploader_name || "Member"}</div>
+                  <div 
+                    style={{ ...usernameStyle, cursor: onCreatorClick && video.uploader_name ? "pointer" : "default" }}
+                    onClick={(e) => {
+                      if (onCreatorClick && video.uploader_name) {
+                        e.stopPropagation();
+                        onCreatorClick(video.uploader_name);
+                      }
+                    }}
+                  >
+                    @{video.uploader_name || "Member"}
+                  </div>
                   <div style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</div>
                </div>
             </div>

@@ -9,6 +9,7 @@ import FullscreenPlayer from "./components/FullscreenPlayer";
 import PaywallModal from "./components/PaywallModal"; 
 import LegalPages from "./pages/LegalPages"; 
 import CommentSectionModal from "./components/CommentSectionModal"; 
+import CreatorProfileModal from "./components/CreatorProfileModal";
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
@@ -42,6 +43,10 @@ export default function App() {
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
   
   const [activeCommentVideo, setActiveCommentVideo] = useState(null);
+  const [viewingCreator, setViewingCreator] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("creator") || null;
+  });
 
   // 🟢 THE FIX: App Height Lock Architecture
   const windowWidth = useRef(window.innerWidth);
@@ -107,11 +112,13 @@ export default function App() {
       
       const catParam = params.get("cat");
       const legalParam = params.get("legal");
+      const creatorParam = params.get("creator");
       window.history.replaceState({
         ...currentState,
         tab: currentTab,
         ...(catParam ? { cat: catParam } : {}),
-        ...(legalParam ? { legal: legalParam } : {})
+        ...(legalParam ? { legal: legalParam } : {}),
+        ...(creatorParam ? { creatorProfile: creatorParam } : {})
       }, document.title, window.location.href);
     }
   }, []);
@@ -134,6 +141,7 @@ export default function App() {
   const activeCommentVideoRef = useRef(null);
   const showPaywallRef = useRef(false);
   const activeLegalPageRef = useRef(null);
+  const viewingCreatorRef = useRef(null);
 
   useEffect(() => {
     activeVideoRef.current = activeVideo;
@@ -150,6 +158,10 @@ export default function App() {
   useEffect(() => {
     activeLegalPageRef.current = activeLegalPage;
   }, [activeLegalPage]);
+
+  useEffect(() => {
+    viewingCreatorRef.current = viewingCreator;
+  }, [viewingCreator]);
 
   // 🟢 Synchronize browser history when opening a video
   useEffect(() => {
@@ -231,12 +243,24 @@ export default function App() {
         return;
       }
 
-      // 5. If search overlay was open, AppHeader's popstate listener closes it
+      // 5. If creator profile was open and state no longer has creatorProfile, close creator modal
+      if (viewingCreatorRef.current && !state.creatorProfile) {
+        viewingCreatorRef.current = null;
+        setViewingCreator(null);
+        return;
+      }
+      if (state.creatorProfile && state.creatorProfile !== viewingCreatorRef.current) {
+        viewingCreatorRef.current = state.creatorProfile;
+        setViewingCreator(state.creatorProfile);
+        return;
+      }
+
+      // 6. If search overlay was open, AppHeader's popstate listener closes it
       if (state.searchOpen) {
         return;
       }
 
-      // 6. Global Footer Tabs navigation
+      // 7. Global Footer Tabs navigation
       const params = new URLSearchParams(window.location.search);
       const targetTab = state.tab || params.get("tab") || (params.get("admin") === "true" ? "admin" : "home");
 
@@ -286,6 +310,43 @@ export default function App() {
     window.addEventListener("openLegalPage", handleOpenLegalEvent);
     return () => window.removeEventListener("openLegalPage", handleOpenLegalEvent);
   }, [handleOpenLegal]);
+
+  // 🟢 Seamless Creator Profile navigation
+  const handleOpenCreator = useCallback((username) => {
+    if (!username) return;
+    setViewingCreator(username);
+    viewingCreatorRef.current = username;
+    const currentState = window.history.state || {};
+    window.history.pushState(
+      { ...currentState, creatorProfile: username },
+      document.title,
+      `/?creator=${encodeURIComponent(username)}`
+    );
+  }, []);
+
+  const handleCloseCreator = useCallback(() => {
+    viewingCreatorRef.current = null;
+    setViewingCreator(null);
+    if (window.history.state?.creatorProfile) {
+      window.history.back();
+    } else {
+      const currentState = window.history.state || {};
+      delete currentState.creatorProfile;
+      const targetTab = currentState.tab || "home";
+      const targetUrl = targetTab === "home" ? "/" : `/?tab=${encodeURIComponent(targetTab)}`;
+      window.history.replaceState(currentState, document.title, targetUrl);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleOpenCreatorEvent = (e) => {
+      if (e.detail) {
+        handleOpenCreator(e.detail);
+      }
+    };
+    window.addEventListener("openCreatorProfile", handleOpenCreatorEvent);
+    return () => window.removeEventListener("openCreatorProfile", handleOpenCreatorEvent);
+  }, [handleOpenCreator]);
 
   const handleCloseVideo = useCallback(() => {
     activeVideoRef.current = null;
@@ -346,7 +407,7 @@ export default function App() {
     document.title = `${APP_CONFIG.appNamePrefix}${APP_CONFIG.appNameSuffix}`;
   }, []);
 
-  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo;
+  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || !!viewingCreator || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo;
   
   useAdZapper(isAdFreeZone);
 
@@ -602,10 +663,11 @@ export default function App() {
           <Explore 
             user={user} 
             onProfileClick={() => handleTabSwitch("profile")}
-            setHideFooter={handleExploreHideFooter} // Make sure this matches whatever your callback is named in App.jsx!
+            setHideFooter={handleExploreHideFooter} 
             onVideoClick={handleOpenVideo}
             onCommentClick={setActiveCommentVideo}
-            isAnyModalOpen={!!activeVideo || !!activeCommentVideo || showPaywall || !!activeLegalPage || activeTab !== "explore"} 
+            onCreatorClick={handleOpenCreator}
+            isAnyModalOpen={!!activeVideo || !!activeCommentVideo || showPaywall || !!activeLegalPage || !!viewingCreator || activeTab !== "explore"} 
           />
         </div>
         
@@ -622,6 +684,7 @@ export default function App() {
               setActiveVideo={setActiveVideo} 
               setHideFooter={handleProfileHideFooter} 
               setShowPaywall={setShowPaywall} 
+              onUpdateUser={(updated) => setUser(prev => ({ ...prev, ...updated }))}
             />
           ) : (
             <AuthForm 
@@ -699,6 +762,7 @@ export default function App() {
             onClose={handleCloseVideo} 
             isDesktop={window.innerWidth > 1024} 
             onCommentClick={setActiveCommentVideo}
+            onCreatorClick={handleOpenCreator}
           />
         </div>
       )}
@@ -708,6 +772,17 @@ export default function App() {
         <CommentSectionModal 
           video={activeCommentVideo} 
           onClose={handleCloseComments} 
+        />
+      )}
+
+      {/* 🟢 ONLYFANS STYLE CREATOR PROFILE MODAL */}
+      {viewingCreator && (
+        <CreatorProfileModal 
+          creatorUsername={viewingCreator} 
+          currentUser={user} 
+          onClose={handleCloseCreator} 
+          onVideoClick={handleOpenVideo} 
+          setShowPaywall={setShowPaywall} 
         />
       )}
       

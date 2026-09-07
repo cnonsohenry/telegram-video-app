@@ -64,6 +64,11 @@ const registerSchema = z.object({
     .max(30, { message: "Username must be under 30 characters" })
     .regex(/^[a-zA-Z0-9_-]+$/, { message: "Username can only contain letters, numbers, underscores, and hyphens." })
     .optional(),
+  is_creator: z.boolean().optional(),
+  display_name: z.string().max(100).optional(),
+  creator_category: z.string().max(50).optional(),
+  creator_bio: z.string().max(500).optional(),
+  subscription_price: z.number().min(0).optional(),
 });
 
 const loginSchema = z.object({
@@ -124,7 +129,9 @@ router.post("/google", async (req, res) => {
        ON CONFLICT (email) DO UPDATE 
        SET avatar_url = COALESCE(EXCLUDED.avatar_url, app_users.avatar_url), 
            google_id = COALESCE(app_users.google_id, EXCLUDED.google_id)
-       RETURNING id, email, username, avatar_url, role, settings, is_premium`,
+       RETURNING id, email, username, avatar_url, role, settings, is_premium,
+                 is_creator, display_name, creator_bio, banner_url, creator_category, 
+                 subscription_price, social_links, is_verified, location, website`,
       [email, finalUsername, picture, googleId]
     );
 
@@ -138,14 +145,14 @@ router.post("/google", async (req, res) => {
   }
 });
 
-// 🟢 4. REGISTER (Email/Password)
+// 🟢 4. REGISTER (Email/Password & Optional Creator)
 router.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid input" });
   }
 
-  const { email, password, username } = parsed.data;
+  const { email, password, username, is_creator, display_name, creator_category, creator_bio, subscription_price } = parsed.data;
 
   try {
     const userCheck = await pool.query("SELECT id FROM app_users WHERE email = $1", [email]);
@@ -158,15 +165,32 @@ router.post("/register", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
+    const isCreator = Boolean(is_creator);
+    const displayName = display_name?.trim() || desiredUsername;
+    const category = creator_category?.trim() || "Model & Creator";
+    const bio = creator_bio?.trim() || "";
+    const price = Number(subscription_price) || 0;
+
     const newUser = await pool.query(
-      "INSERT INTO app_users (email, password_hash, username, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id, email, username, avatar_url, role, settings, is_premium",
-      [email, hash, desiredUsername, "https://videos.naijahomemade.com/assets/default-avatar.png"]
+      `INSERT INTO app_users (
+        email, password_hash, username, avatar_url, role,
+        is_creator, display_name, creator_category, creator_bio, subscription_price, is_verified
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+      RETURNING id, email, username, avatar_url, role, settings, is_premium,
+                is_creator, display_name, creator_bio, banner_url, creator_category, 
+                subscription_price, social_links, is_verified, location, website`,
+      [
+        email, hash, desiredUsername, 
+        "https://videos.naijahomemade.com/assets/default-avatar.png",
+        isCreator ? 'creator' : 'user',
+        isCreator, displayName, category, bio, price, isCreator
+      ]
     );
 
     // Inside your register logic, after the user is saved:
     sendReactEmail(
       email,
-      "Welcome to the Community! 🚀",
+      isCreator ? "Welcome to the Creator Community! 🌟" : "Welcome to the Community! 🚀",
       React.createElement(WelcomeEmail, { username: desiredUsername })
     ).catch(e => console.error("[WELCOME EMAIL ERROR]", e.message));
 
@@ -212,7 +236,10 @@ router.post("/login", async (req, res) => {
 router.get("/me", authenticateToken, async (req, res) => {
   try {
     const userResult = await pool.query(
-      "SELECT id, email, username, avatar_url, role, settings, is_premium FROM app_users WHERE id = $1", // 🟢 ADDED THIS 
+      `SELECT id, email, username, avatar_url, role, settings, is_premium,
+              is_creator, display_name, creator_bio, banner_url, creator_category, 
+              subscription_price, social_links, is_verified, location, website
+       FROM app_users WHERE id = $1`,
       [req.user.id]
     );
 
