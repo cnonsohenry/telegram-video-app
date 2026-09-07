@@ -605,7 +605,7 @@ export default function App() {
             setHideFooter={handleExploreHideFooter} // Make sure this matches whatever your callback is named in App.jsx!
             onVideoClick={handleOpenVideo}
             onCommentClick={setActiveCommentVideo}
-            isAnyModalOpen={!!activeVideo || !!activeCommentVideo || showPaywall} 
+            isAnyModalOpen={!!activeVideo || !!activeCommentVideo || showPaywall || !!activeLegalPage || activeTab !== "explore"} 
           />
         </div>
         

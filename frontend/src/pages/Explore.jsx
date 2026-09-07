@@ -24,6 +24,13 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   const containerRef = useRef(null);
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+  const isPlayingRef = useRef(isPlaying);
+  const isAnyModalOpenRef = useRef(isAnyModalOpen);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+    isAnyModalOpenRef.current = isAnyModalOpen;
+  }, [isPlaying, isAnyModalOpen]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -43,10 +50,13 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => setIsPlaying(entry.isIntersecting),
-      { threshold: 0.6 }
+      { threshold: 0.4 }
     );
     if (containerRef.current) observer.observe(containerRef.current);
-    return () => { if (containerRef.current) observer.unobserve(containerRef.current); };
+    return () => { 
+      if (containerRef.current) observer.unobserve(containerRef.current);
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -65,18 +75,62 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
     return () => clearTimeout(timer);
   }, [isPlaying, videoUrl, video.chat_id, video.message_id]);
 
+  // Attach HLS or video src whenever videoUrl is available
   useEffect(() => {
-    if (!videoUrl || !videoRef.current) return;
+    const el = videoRef.current;
+    if (!videoUrl || !el) return;
+
     if (videoUrl.includes('.m3u8') && window.Hls && window.Hls.isSupported()) {
       if (hlsRef.current) {
         hlsRef.current.destroy();
+        hlsRef.current = null;
       }
-      hlsRef.current = new window.Hls({ startLevel: 1 }); 
-      hlsRef.current.loadSource(videoUrl);
-      hlsRef.current.attachMedia(videoRef.current);
+      const hls = new window.Hls({ 
+        startLevel: 1,
+        capLevelToPlayerSize: true 
+      }); 
+      hlsRef.current = hls;
+      hls.loadSource(videoUrl);
+      hls.attachMedia(el);
+      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        if (isPlayingRef.current && !isAnyModalOpenRef.current && videoRef.current) {
+          videoRef.current.muted = true;
+          videoRef.current.play().catch(() => {});
+        }
+      });
+      hls.on(window.Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case window.Hls.ErrorTypes.NETWORK_ERROR:
+              hls.startLoad();
+              break;
+            case window.Hls.ErrorTypes.MEDIA_ERROR:
+              hls.recoverMediaError();
+              break;
+            default:
+              hls.destroy();
+              hlsRef.current = null;
+              break;
+          }
+        }
+      });
     } else {
-      if (videoRef.current.src !== videoUrl) videoRef.current.src = videoUrl;
+      if (el.src !== videoUrl) {
+        el.src = videoUrl;
+      }
+      const handleCanPlay = () => {
+        if (isPlayingRef.current && !isAnyModalOpenRef.current && videoRef.current) {
+          videoRef.current.muted = true;
+          videoRef.current.play().catch(() => {});
+        }
+      };
+      el.addEventListener('canplay', handleCanPlay, { once: true });
+      if (isPlayingRef.current && !isAnyModalOpenRef.current) {
+        el.muted = true;
+        el.play().catch(() => {});
+      }
     }
+
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
@@ -85,15 +139,27 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
     };
   }, [videoUrl]);
 
+  // Control playback: pause when offscreen or modal open; play when onscreen & no modal
   useEffect(() => {
-    if (videoRef.current) {
-      if (isPlaying && !isAnyModalOpen) {
-        videoRef.current.play().catch(() => {});
-      } else {
-        videoRef.current.pause();
+    const el = videoRef.current;
+    if (!el || !videoUrl) return;
+
+    if (isPlaying && !isAnyModalOpen) {
+      el.muted = true;
+      const playPromise = el.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {});
+      }
+    } else {
+      el.pause();
+      if (!isPlaying) {
+        // Reset playback position when scrolled offscreen so autoplay restarts from start when scrolled back
+        try {
+          el.currentTime = 0;
+        } catch (e) {}
       }
     }
-  }, [isPlaying, videoUrl, isAnyModalOpen]);
+  }, [isPlaying, isAnyModalOpen, videoUrl]);
 
   const handleLike = async (e) => {
     e.stopPropagation();
@@ -191,7 +257,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
           style={{ ...videoContainerStyle, width: isPortrait ? "75%" : "100%" }} 
           onClick={() => onVideoClick({ ...video, video_url: videoUrl })}
         >
-          {videoUrl && isPlaying && !isAnyModalOpen ? (
+          {videoUrl ? (
             <video 
               ref={videoRef} 
               style={thumbnailImgStyle} 
@@ -199,7 +265,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
               loop 
               playsInline 
               poster={video.thumbnail_url} 
-              preload="none" 
+              preload="metadata" 
               onLoadedMetadata={handleMediaLoad} 
             />
           ) : (
@@ -211,7 +277,11 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
               onLoad={handleMediaLoad} 
             />
           )}
-          {!isPlaying && <div style={playOverlayStyle}><Play size={24} fill="#fff" strokeWidth={0} /></div>}
+          {(!isPlaying || isAnyModalOpen) && (
+            <div style={playOverlayStyle}>
+              <Play size={24} fill="#fff" strokeWidth={0} />
+            </div>
+          )}
           {video.is_group && <div style={groupBadgeStyle}>Album</div>}
         </div>
 
