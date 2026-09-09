@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Settings, Grid3X3, Heart, Lock, CheckCircle, Share2, ArrowLeft, 
-  Camera, Sparkles, Edit3, MapPin, Globe, Award, ExternalLink, ShieldCheck, Eye 
+  Camera, Sparkles, Edit3, MapPin, Globe, Award, ExternalLink, ShieldCheck, Eye,
+  Film, Play, Plus, ChevronRight, TrendingUp, Link2, ChevronDown, Bookmark, Copy, MessageCircle
 } from "lucide-react"; 
 import VideoCard from "../components/VideoCard"; 
+import InstagramMediaCard from "../components/InstagramMediaCard";
 import SettingsView from "../components/SettingsView"; 
 import CreatorSetupModal from "../components/CreatorSetupModal";
 import EditProfileModal from "../components/EditProfileModal";
@@ -216,6 +218,10 @@ export default function Profile({
     rawVideosToDisplay = liked || [];
     loading = likedLoading;
     loadMore = loadMoreLiked;
+  } else if (activeTab === "reels") {
+    rawVideosToDisplay = shots || [];
+    loading = shotsLoading;
+    loadMore = loadMoreShots;
   }
 
   useEffect(() => {
@@ -369,7 +375,21 @@ export default function Profile({
     return <SettingsView onBack={handleCloseSettings} onLogout={onLogout} />;
   }
 
-  const coverBanner = user?.banner_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80";
+  const formatStat = (num) => {
+    const n = Number(num) || 0;
+    return Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  };
+
+  const postsCount = creatorStats.posts || (user?.is_creator ? creatorPosts.length : rawVideosToDisplay.length) || 0;
+  const followersCount = creatorStats.subscribers || 0;
+  const followingCount = creatorStats.views || creatorStats.likes || 0;
+
+  const highlights = [
+    { id: "vip", title: "VIP Drops", icon: Sparkles, color: "#FFD700", tab: "premium" },
+    { id: "reels", title: "Reels", icon: Film, color: "#0095f6", tab: "reels" },
+    { id: "top", title: "Popular", icon: Heart, color: "#f91880", tab: "likes" },
+    { id: "posts", title: "All Posts", icon: Grid3X3, color: "#fff", tab: "videos" }
+  ];
 
   return (
     <div
@@ -396,356 +416,426 @@ export default function Profile({
             opacity: shouldHideUI ? 0 : 1,
             pointerEvents: shouldHideUI ? "none" : "auto"
           }}>
-            <div style={{ width: "40px" }} />
-            <div style={centerTitleContainer}>
-              <h2 style={usernameStyle}>{user?.display_name || user?.username || APP_CONFIG.defaultUploader}</h2>
-              {(user?.is_creator || user?.is_verified) && (
-                <CheckCircle size={15} color="#00aff0" fill="#00aff0" style={{ marginLeft: "4px" }} />
+            <div style={{ width: "36px" }}>
+              {activeGroup && (
+                <button onClick={handleCloseGroup} style={headerIconButton}>
+                  <ArrowLeft size={22} color="#fff" />
+                </button>
               )}
             </div>
-            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", flex: 1, alignItems: "center" }}>
-              <button onClick={handleShareProfile} style={headerIconButton}>
-                <Share2 size={18} color="#fff" />
+            <div style={centerTitleContainer}>
+              <h2 style={usernameStyle}>{user?.username || APP_CONFIG.defaultUploader}</h2>
+              {(user?.is_creator || user?.is_verified) && (
+                <CheckCircle size={15} color="#0095f6" fill="#0095f6" style={{ marginLeft: "4px" }} />
+              )}
+              <ChevronDown size={14} color="#a8a8a8" style={{ marginLeft: "2px" }} />
+            </div>
+            <div style={{ display: "flex", gap: "14px", justifyContent: "flex-end", flex: 1, alignItems: "center" }}>
+              <button onClick={handleShareProfile} style={headerIconButton} title="Share Profile">
+                <Share2 size={20} color="#fff" />
               </button>
-              <button onClick={handleOpenSettings} style={headerIconButton}>
-                <Settings size={20} color="#fff" />
+              <button onClick={handleOpenSettings} style={headerIconButton} title="Settings">
+                <Settings size={21} color="#fff" />
               </button>
             </div>
           </div>
         )}
 
-        {/* 🌟 ONLYFANS HERO COVER BANNER */}
-        <div style={{
-          position: "relative",
-          width: "100%",
-          height: isDesktop ? "260px" : "165px",
-          backgroundColor: "#16181c",
-          backgroundImage: `url(${coverBanner})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          borderBottom: "1px solid rgba(255,255,255,0.06)"
-        }}>
-          <div style={{
-            position: "absolute",
-            inset: 0,
-            background: "linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.65) 100%)"
-          }} />
-
-          {/* Edit Cover Overlay Button */}
-          <button 
-            onClick={() => setShowEditModal(true)}
-            style={coverEditButtonStyle}
-            title="Edit Banner & Profile"
-          >
-            <Camera size={14} />
-            <span>Change Cover</span>
-          </button>
-        </div>
-
-        {/* 🌟 AVATAR + IDENTITY + ACTIONS SECTION */}
-        <div style={{ padding: isDesktop ? "0 30px" : "0 16px", position: "relative" }}>
+        {/* 🌟 MATURED INSTAGRAM PROFILE HEADER */}
+        <div style={{ padding: isDesktop ? "36px 20px 10px 20px" : "14px 16px 8px 16px" }}>
           
-          {/* Row 1: Avatar overlapping banner + Action Buttons */}
-          <div style={{
-            display: "flex", 
-            justifyContent: "space-between", 
-            alignItems: "flex-end", 
-            marginTop: isDesktop ? "-65px" : "-45px", 
-            marginBottom: "16px"
-          }}>
-            {/* Avatar Container with Online Dot */}
-            <div style={{ position: "relative", zIndex: 10 }}>
-              <div style={{
-                width: isDesktop ? "130px" : "90px",
-                height: isDesktop ? "130px" : "90px",
-                borderRadius: "50%",
-                border: "4px solid var(--bg-color)",
-                overflow: "hidden",
-                backgroundColor: "#202020",
-                boxShadow: "0 6px 20px rgba(0,0,0,0.6)"
-              }}>
-                <img
-                  src={user?.avatar_url || "/assets/default-avatar.png"}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  alt="Avatar"
-                  onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                />
+          {/* MOBILE HEADER LAYOUT */}
+          {!isDesktop ? (
+            <div>
+              {/* Row 1: Avatar + 3 Stat Columns */}
+              <div style={{ display: "flex", alignItems: "center", marginBottom: "14px" }}>
+                
+                {/* Instagram Story Gradient Ring Avatar */}
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <div style={storyGradientRingMobile}>
+                    <div style={avatarInnerCircleMobile}>
+                      <img
+                        src={user?.avatar_url || "/assets/default-avatar.png"}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        alt="Avatar"
+                        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Camera / Edit shortcut badge */}
+                  <button 
+                    onClick={() => setShowEditModal(true)} 
+                    style={mobileAvatarEditBadge}
+                    title="Change Profile Photo"
+                  >
+                    <Plus size={13} color="#fff" strokeWidth={3} />
+                  </button>
+                </div>
+
+                {/* 3 Stats: Posts, Followers, Following */}
+                <div style={{ display: "flex", flex: 1, justifyContent: "space-around", alignItems: "center", marginLeft: "12px" }}>
+                  <div style={statColStyle}>
+                    <span style={statNumberStyle}>{formatStat(postsCount)}</span>
+                    <span style={statLabelStyle}>posts</span>
+                  </div>
+                  <div style={statColStyle}>
+                    <span style={statNumberStyle}>{formatStat(followersCount)}</span>
+                    <span style={statLabelStyle}>followers</span>
+                  </div>
+                  <div style={statColStyle}>
+                    <span style={statNumberStyle}>{formatStat(followingCount)}</span>
+                    <span style={statLabelStyle}>following</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Green online badge */}
-              <span style={{
-                position: "absolute",
-                bottom: "6px",
-                right: "6px",
-                width: "14px",
-                height: "14px",
-                borderRadius: "50%",
-                backgroundColor: "#00ba7c",
-                border: "2px solid var(--bg-color)"
-              }} />
-            </div>
+              {/* Row 2: Display Name, Category, Bio, Link */}
+              <div style={{ marginBottom: "14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "14.5px", fontWeight: "700", color: "#fff" }}>
+                    {user?.display_name || user?.username || "Member"}
+                  </span>
+                  {(user?.is_creator || user?.is_verified) && (
+                    <CheckCircle size={15} color="#0095f6" fill="#0095f6" />
+                  )}
+                  {user?.is_creator && (
+                    <span style={creatorBadgeTagStyle}>CREATOR</span>
+                  )}
+                </div>
 
-            {/* Top Action Buttons (Edit, Preview, Creator Setup, Settings) */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {/* Creator Category in subtle Instagram gray */}
+                <div style={{ fontSize: "12.5px", color: "#8e8e93", marginTop: "2px", fontWeight: "500" }}>
+                  {user?.creator_category || (user?.is_creator ? "Digital Creator" : "Video Enthusiast")}
+                </div>
+
+                {/* Bio text */}
+                <p style={{
+                  fontSize: "13.5px",
+                  color: "#f5f5f5",
+                  lineHeight: "1.42",
+                  margin: "8px 0 6px 0",
+                  whiteSpace: "pre-wrap"
+                }}>
+                  {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
+                </p>
+
+                {/* Website Link with link icon */}
+                {user?.website && (
+                  <div style={{ marginTop: "4px" }}>
+                    <a 
+                      href={user.website.startsWith("http") ? user.website : `https://${user.website}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      style={websiteLinkStyle}
+                    >
+                      <Link2 size={13} color="#0095f6" />
+                      <span>{user.website.replace(/^https?:\/\//, "")}</span>
+                    </a>
+                  </div>
+                )}
+
+                {/* Location */}
+                {user?.location && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12.5px", color: "#8e8e93", marginTop: "4px" }}>
+                    <MapPin size={13} color="#8e8e93" />
+                    <span>{user.location}</span>
+                  </div>
+                )}
+
+                {/* VIP Pricing Badge if creator */}
+                {user?.is_creator && (
+                  <div style={{ marginTop: "8px" }}>
+                    <span style={vipPricingBadgeStyle}>
+                      <Sparkles size={12} color="#FFD700" />
+                      <span>VIP Channel: {Number(user.subscription_price) > 0 ? `₦${Number(user.subscription_price).toLocaleString()} / mo` : "Free Access"}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* DESKTOP HEADER LAYOUT */
+            <div style={{ display: "flex", gap: "60px", alignItems: "flex-start", marginBottom: "28px" }}>
+              
+              {/* Desktop Avatar (Left column 150px) */}
+              <div style={{ flexShrink: 0, position: "relative", paddingLeft: "15px" }}>
+                <div style={storyGradientRingDesktop}>
+                  <div style={avatarInnerCircleDesktop}>
+                    <img
+                      src={user?.avatar_url || "/assets/default-avatar.png"}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      alt="Avatar"
+                      onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                    />
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowEditModal(true)} 
+                  style={desktopAvatarEditBadge}
+                  title="Change Profile Photo"
+                >
+                  <Camera size={14} color="#fff" />
+                </button>
+              </div>
+
+              {/* Desktop Details (Right column) */}
+              <div style={{ flex: 1 }}>
+                
+                {/* Row 1: Username + Actions + Settings */}
+                <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", marginBottom: "18px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <h2 style={{ fontSize: "20px", fontWeight: "400", color: "#fff", margin: 0 }}>
+                      {user?.username || APP_CONFIG.defaultUploader}
+                    </h2>
+                    {(user?.is_creator || user?.is_verified) && (
+                      <CheckCircle size={18} color="#0095f6" fill="#0095f6" />
+                    )}
+                    {user?.is_creator && (
+                      <span style={creatorBadgeTagStyle}>CREATOR</span>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <button onClick={() => setShowEditModal(true)} style={desktopActionButton}>
+                      Edit profile
+                    </button>
+                    <button onClick={handleShareProfile} style={desktopActionButton}>
+                      Share profile
+                    </button>
+                    {user?.is_creator ? (
+                      <>
+                        <button 
+                          onClick={() => setShowStudioModal(true)} 
+                          style={{ ...desktopActionButton, background: "rgba(255, 215, 0, 0.15)", border: "1px solid rgba(255, 215, 0, 0.4)", color: "#FFD700", fontWeight: "700" }}
+                        >
+                          <Sparkles size={14} color="#FFD700" />
+                          <span>Creator Studio</span>
+                        </button>
+                        <button 
+                          onClick={() => setShowPreviewModal(true)} 
+                          style={{ ...desktopActionButton, color: "#00aff0" }}
+                        >
+                          <Eye size={14} />
+                          <span>Fan View</span>
+                        </button>
+                      </>
+                    ) : (
+                      <button 
+                        onClick={() => setShowSetupModal(true)} 
+                        style={{ ...desktopActionButton, background: "#0095f6", color: "#fff", border: "none" }}
+                      >
+                        <Sparkles size={14} color="#fff" />
+                        <span>Become Creator</span>
+                      </button>
+                    )}
+                    <button onClick={handleOpenSettings} style={desktopIconBtnStyle} title="Settings">
+                      <Settings size={18} color="#fff" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Row 2: Stats (Posts, Followers, Following) */}
+                <div style={{ display: "flex", gap: "40px", marginBottom: "18px", fontSize: "15px" }}>
+                  <div>
+                    <strong style={{ color: "#fff" }}>{formatStat(postsCount)}</strong>{" "}
+                    <span style={{ color: "#8e8e93" }}>posts</span>
+                  </div>
+                  <div>
+                    <strong style={{ color: "#fff" }}>{formatStat(followersCount)}</strong>{" "}
+                    <span style={{ color: "#8e8e93" }}>followers</span>
+                  </div>
+                  <div>
+                    <strong style={{ color: "#fff" }}>{formatStat(followingCount)}</strong>{" "}
+                    <span style={{ color: "#8e8e93" }}>following</span>
+                  </div>
+                </div>
+
+                {/* Row 3: Name, Category, Bio, Links */}
+                <div>
+                  <div style={{ fontSize: "15px", fontWeight: "700", color: "#fff" }}>
+                    {user?.display_name || user?.username || "Member"}
+                  </div>
+
+                  <div style={{ fontSize: "13px", color: "#8e8e93", marginTop: "2px" }}>
+                    {user?.creator_category || (user?.is_creator ? "Digital Creator" : "Video Enthusiast")}
+                  </div>
+
+                  <p style={{
+                    fontSize: "14px",
+                    color: "#f5f5f5",
+                    lineHeight: "1.45",
+                    margin: "8px 0 8px 0",
+                    whiteSpace: "pre-wrap",
+                    maxWidth: "540px"
+                  }}>
+                    {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
+                  </p>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", fontSize: "13.5px" }}>
+                    {user?.website && (
+                      <a 
+                        href={user.website.startsWith("http") ? user.website : `https://${user.website}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={websiteLinkStyle}
+                      >
+                        <Link2 size={14} color="#0095f6" />
+                        <span>{user.website.replace(/^https?:\/\//, "")}</span>
+                      </a>
+                    )}
+                    {user?.location && (
+                      <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#8e8e93" }}>
+                        <MapPin size={14} color="#8e8e93" />
+                        <span>{user.location}</span>
+                      </span>
+                    )}
+                    {user?.is_creator && (
+                      <span style={vipPricingBadgeStyle}>
+                        <Sparkles size={12} color="#FFD700" />
+                        <span>VIP: {Number(user.subscription_price) > 0 ? `₦${Number(user.subscription_price).toLocaleString()}/mo` : "Free"}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🌟 INSTAGRAM PROFESSIONAL DASHBOARD CARD */}
+          {user?.is_creator ? (
+            <div 
+              onClick={() => setShowStudioModal(true)} 
+              style={professionalCardStyle}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={professionalIconStyle}>
+                  <TrendingUp size={18} color="#0095f6" />
+                </div>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: "13.5px", fontWeight: "700", color: "#fff" }}>
+                    Professional dashboard
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
+                    {creatorStats.subscribers > 0 
+                      ? `${creatorStats.subscribers} VIP fans · ₦${(creatorStats.subscribers * (Number(user.subscription_price) || 0)).toLocaleString()} projected MRR` 
+                      : "Insights, fan subscriptions & creator monetization tools"}
+                  </div>
+                </div>
+              </div>
+              <ChevronRight size={18} color="#737373" />
+            </div>
+          ) : (
+            <div 
+              onClick={() => setShowSetupModal(true)} 
+              style={professionalCardStyle}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ ...professionalIconStyle, background: "rgba(255, 215, 0, 0.12)" }}>
+                  <Sparkles size={18} color="#FFD700" />
+                </div>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ fontSize: "13.5px", fontWeight: "700", color: "#fff" }}>
+                    Professional tools
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
+                    Turn on creator mode to monetize with VIP subscriptions and fan tips
+                  </div>
+                </div>
+              </div>
+              <ChevronRight size={18} color="#737373" />
+            </div>
+          )}
+
+          {/* 🌟 MOBILE ACTION BUTTONS ROW */}
+          {!isDesktop && (
+            <div style={mobileActionButtonsRow}>
+              <button onClick={() => setShowEditModal(true)} style={mobileActionButton}>
+                Edit profile
+              </button>
+              <button onClick={handleShareProfile} style={mobileActionButton}>
+                Share profile
+              </button>
               {user?.is_creator ? (
                 <>
                   <button 
-                    onClick={() => setShowStudioModal(true)}
-                    style={{ 
-                      ...actionPillBtnStyle, 
-                      background: "linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(249, 24, 128, 0.2))", 
-                      border: "1px solid rgba(255, 215, 0, 0.4)",
-                      color: "#FFD700",
-                      fontWeight: "700"
-                    }}
+                    onClick={() => setShowStudioModal(true)} 
+                    style={{ ...mobileActionButton, flex: "0 0 auto", padding: "0 12px", color: "#FFD700", background: "rgba(255, 215, 0, 0.12)", border: "1px solid rgba(255, 215, 0, 0.3)" }}
+                    title="Studio"
                   >
                     <Sparkles size={14} color="#FFD700" />
-                    <span>Studio</span>
                   </button>
                   <button 
-                    onClick={() => setShowEditModal(true)}
-                    style={actionPillBtnStyle}
+                    onClick={() => setShowPreviewModal(true)} 
+                    style={{ ...mobileActionButton, flex: "0 0 auto", padding: "0 12px" }}
+                    title="Fan View"
                   >
-                    <Edit3 size={14} />
-                    <span>Edit Profile</span>
-                  </button>
-                  <button 
-                    onClick={() => setShowPreviewModal(true)}
-                    style={{ ...actionPillBtnStyle, background: "rgba(0, 175, 240, 0.12)", color: "#00aff0", border: "1px solid rgba(0, 175, 240, 0.3)" }}
-                  >
-                    <Eye size={14} />
-                    <span>Fan View</span>
+                    <Eye size={15} color="#fff" />
                   </button>
                 </>
               ) : (
-                <>
-                  <button 
-                    onClick={() => setShowSetupModal(true)}
-                    style={becomeCreatorHighlightBtnStyle}
-                  >
-                    <Sparkles size={14} />
-                    <span>Become Creator</span>
-                  </button>
-                  <button 
-                    onClick={() => setShowEditModal(true)}
-                    style={actionPillBtnStyle}
-                  >
-                    <Edit3 size={14} />
-                    <span>Edit</span>
-                  </button>
-                </>
-              )}
-
-              {isDesktop && (
-                <>
-                  <button onClick={handleShareProfile} style={desktopIconBtnStyle} title="Share Profile">
-                    <Share2 size={16} color="#fff" />
-                  </button>
-                  <button onClick={handleOpenSettings} style={desktopIconBtnStyle} title="Settings">
-                    <Settings size={16} color="#fff" />
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Row 2: Display Name, Username, Badges, Bio */}
-          <div style={{ marginBottom: "18px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-              <h1 style={{ fontSize: isDesktop ? "24px" : "19px", fontWeight: "800", color: "#fff", margin: 0 }}>
-                {user?.display_name || user?.username || "Member"}
-              </h1>
-              {(user?.is_creator || user?.is_verified) && (
-                <CheckCircle size={18} color="#00aff0" fill="#00aff0" />
-              )}
-              {user?.is_creator && (
-                <span style={creatorBadgeStyle}>
-                  CREATOR
-                </span>
-              )}
-              {user?.is_premium && (
-                <span style={vipBadgeStyle}>
-                  VIP
-                </span>
-              )}
-            </div>
-
-            <div style={{ fontSize: "14px", color: "#8e8e93", marginTop: "2px", fontWeight: "500" }}>
-              @{user?.username || "user"}
-            </div>
-
-            {/* Category Tag if Creator */}
-            {user?.is_creator && user?.creator_category && (
-              <div style={{ marginTop: "6px" }}>
-                <span style={categoryPillStyle}>
-                  {user.creator_category}
-                </span>
-              </div>
-            )}
-
-            {/* Bio Text */}
-            <p style={{
-              fontSize: "14px",
-              color: "#e1e1e1",
-              lineHeight: "1.5",
-              margin: "12px 0 8px 0",
-              whiteSpace: "pre-wrap"
-            }}>
-              {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
-            </p>
-
-            {/* Location & Website */}
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "16px", fontSize: "13px", color: "#8e8e93", marginTop: "8px" }}>
-              {user?.location && (
-                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <MapPin size={14} color="#71767b" />
-                  <span>{user.location}</span>
-                </span>
-              )}
-              {user?.website && (
-                <a 
-                  href={user.website.startsWith("http") ? user.website : `https://${user.website}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  style={{ display: "flex", alignItems: "center", gap: "4px", color: "#00aff0", textDecoration: "none" }}
+                <button 
+                  onClick={() => setShowSetupModal(true)} 
+                  style={{ ...mobileActionButton, background: "#0095f6", color: "#fff", border: "none", flex: "0 0 auto", padding: "0 14px" }}
                 >
-                  <Globe size={14} />
-                  <span>{user.website.replace(/^https?:\/\//, "")}</span>
-                </a>
+                  <Sparkles size={13} color="#fff" />
+                  <span>Upgrade</span>
+                </button>
               )}
             </div>
-
-            {/* Social Handles Chips */}
-            {(user?.social_links?.twitter || user?.social_links?.instagram || user?.social_links?.telegram) && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px" }}>
-                {user.social_links.twitter && (
-                  <a href={`https://twitter.com/${user.social_links.twitter.replace("@", "")}`} target="_blank" rel="noreferrer" style={socialChipStyle}>
-                    𝕏 @{user.social_links.twitter.replace("@", "")}
-                  </a>
-                )}
-                {user.social_links.instagram && (
-                  <a href={`https://instagram.com/${user.social_links.instagram.replace("@", "")}`} target="_blank" rel="noreferrer" style={socialChipStyle}>
-                    📸 @{user.social_links.instagram.replace("@", "")}
-                  </a>
-                )}
-                {user.social_links.telegram && (
-                  <a href={`https://t.me/${user.social_links.telegram.replace("@", "")}`} target="_blank" rel="noreferrer" style={socialChipStyle}>
-                    ✈️ @{user.social_links.telegram.replace("@", "")}
-                  </a>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* 🌟 ONLYFANS STATS BAR */}
-          <div style={statsContainerStyle}>
-            <div style={statItemStyle}>
-              <span style={statNumberStyle}>{creatorStats.posts || rawVideosToDisplay.length || 0}</span>
-              <span style={statLabelStyle}>POSTS</span>
-            </div>
-            <div style={statDividerStyle} />
-            <div style={statItemStyle}>
-              <span style={statNumberStyle}>{creatorStats.subscribers || 0}</span>
-              <span style={statLabelStyle}>FANS</span>
-            </div>
-            <div style={statDividerStyle} />
-            <div style={statItemStyle}>
-              <span style={statNumberStyle}>{creatorStats.likes || 0}</span>
-              <span style={statLabelStyle}>LIKES</span>
-            </div>
-            <div style={statDividerStyle} />
-            <div style={statItemStyle}>
-              <span style={statNumberStyle}>{creatorStats.views || 0}</span>
-              <span style={statLabelStyle}>VIEWS</span>
-            </div>
-          </div>
-
-          {/* 🌟 BECOME CREATOR CARD (If user has not upgraded yet) */}
-          {!user?.is_creator && (
-            <div style={becomeCreatorBannerStyle}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-                <div style={sparkleIconBoxStyle}>
-                  <Sparkles size={24} color="#FFD700" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: "0 0 4px 0", fontSize: "15px", fontWeight: "700", color: "#fff" }}>
-                    Join as an Official Creator
-                  </h3>
-                  <p style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#a0a0a0", lineHeight: "1.4" }}>
-                    Start earning like OnlyFans. Set your monthly subscription price, receive fan tips, and build your VIP community.
-                  </p>
-                  <button 
-                    onClick={() => setShowSetupModal(true)} 
-                    style={becomeCreatorBtnStyle}
-                  >
-                    🚀 Set Up Creator Profile
-                  </button>
-                </div>
-              </div>
-            </div>
           )}
 
-          {/* 🌟 CREATOR VIP PRICING BADGE (If user is already a creator) */}
-          {user?.is_creator && (
-            <div style={pricingCardStyle}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px", color: "#8e8e93", fontWeight: "700" }}>
-                    Monthly Fan Subscription
-                  </span>
-                  <div style={{ fontSize: "17px", fontWeight: "800", color: "#fff", marginTop: "2px" }}>
-                    {Number(user?.subscription_price) > 0 
-                      ? `₦${Number(user.subscription_price).toLocaleString()} / month` 
-                      : "Free Subscription"}
+          {/* 🌟 INSTAGRAM STORY HIGHLIGHTS BAR */}
+          <div style={highlightsContainerStyle}>
+            {/* + New Highlight (Owner) */}
+            <div 
+              onClick={() => setShowEditModal(true)} 
+              style={highlightItemStyle}
+              title="Add New Highlight"
+            >
+              <div style={newHighlightCircleStyle}>
+                <Plus size={20} color="#fff" strokeWidth={2.5} />
+              </div>
+              <span style={highlightLabelStyle}>New</span>
+            </div>
+
+            {highlights.map((h) => {
+              const Icon = h.icon;
+              const isActive = activeTab === h.tab;
+              return (
+                <div 
+                  key={h.id} 
+                  onClick={() => setActiveTab(h.tab)} 
+                  style={highlightItemStyle}
+                >
+                  <div style={{
+                    ...highlightCircleOuterStyle,
+                    borderColor: isActive ? "#0095f6" : "rgba(255, 255, 255, 0.16)"
+                  }}>
+                    <div style={highlightCircleInnerStyle}>
+                      <Icon size={18} color={h.color} />
+                    </div>
                   </div>
+                  <span style={{
+                    ...highlightLabelStyle,
+                    color: isActive ? "#fff" : "#8e8e93",
+                    fontWeight: isActive ? "700" : "500"
+                  }}>
+                    {h.title}
+                  </span>
                 </div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button 
-                    onClick={() => setShowStudioModal(true)}
-                    style={{ 
-                      background: "linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(249, 24, 128, 0.2))", 
-                      border: "1px solid rgba(255, 215, 0, 0.4)", 
-                      borderRadius: "16px", 
-                      padding: "6px 14px", 
-                      color: "#FFD700", 
-                      fontSize: "12px", 
-                      fontWeight: "700",
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px"
-                    }}
-                  >
-                    <Sparkles size={14} color="#FFD700" />
-                    <span>Creator Studio</span>
-                  </button>
-                  <button 
-                    onClick={() => setShowEditModal(true)}
-                    style={{ 
-                      background: "rgba(255,255,255,0.06)", 
-                      border: "1px solid rgba(255,255,255,0.15)", 
-                      borderRadius: "16px", 
-                      padding: "6px 14px", 
-                      color: "#fff", 
-                      fontSize: "12px", 
-                      fontWeight: "600",
-                      cursor: "pointer" 
-                    }}
-                  >
-                    Edit Profile
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+              );
+            })}
+          </div>
+
         </div>
 
-        {/* 🌟 PROFILE TABS */}
+        {/* 🌟 INSTAGRAM PROFILE TABS NAVIGATION */}
         <div style={{ 
           ...tabsContainerStyle, 
           justifyContent: isDesktop ? "center" : "space-around",
-          gap: isDesktop ? "60px" : "0",
-          borderTop: "1px solid rgba(255,255,255,0.08)",
+          gap: isDesktop ? "50px" : "0",
+          borderTop: "1px solid #262626",
           top: isDesktop ? "0" : (shouldHideUI ? "0px" : "48px"),
           transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
         }}>
@@ -753,62 +843,86 @@ export default function Profile({
             isDesktop={isDesktop} 
             active={activeTab === "videos"} 
             onClick={() => setActiveTab("videos")} 
-            icon={<Grid3X3 size={isDesktop ? 18 : 22} />} 
-            label={APP_CONFIG.profileTabs.posts} 
+            icon={<Grid3X3 size={isDesktop ? 16 : 22} />} 
+            label="POSTS" 
+          />
+          <TabButton 
+            isDesktop={isDesktop} 
+            active={activeTab === "reels"} 
+            onClick={() => setActiveTab("reels")} 
+            icon={<Film size={isDesktop ? 16 : 22} />} 
+            label="REELS" 
           />
           <TabButton 
             isDesktop={isDesktop} 
             active={activeTab === "premium"} 
             onClick={() => setActiveTab("premium")} 
-            icon={<Lock size={isDesktop ? 18 : 22} />} 
-            label={APP_CONFIG.profileTabs.premium} 
+            icon={<Lock size={isDesktop ? 16 : 22} />} 
+            label="VIP EXCLUSIVE" 
           />
           <TabButton 
             isDesktop={isDesktop} 
             active={activeTab === "likes"} 
             onClick={() => setActiveTab("likes")} 
-            icon={<Heart size={isDesktop ? 18 : 22} />} 
-            label={APP_CONFIG.profileTabs.liked} 
+            icon={<Heart size={isDesktop ? 16 : 22} />} 
+            label="LIKED" 
           />
         </div>
 
-        {/* 🌟 VIDEO GRID */}
-        <div style={{ padding: isDesktop ? "30px 25px" : "15px" }}>
+        {/* 🌟 3-COLUMN INSTAGRAM SQUARE MEDIA GRID */}
+        <div style={{ padding: isDesktop ? "20px 0" : "0" }}>
           
           {activeGroup && (
             <div style={groupHeaderStyle}>
               <button onClick={handleCloseGroup} style={backButtonStyle}>
                 <ArrowLeft size={20} />
-                <span>Back</span>
+                <span>Back to profile</span>
               </button>
-              <span style={groupTitleStyle}>{activeGroup.videos.length} clips in collection</span>
+              <span style={groupTitleStyle}>{activeGroup.title || "Collection"} ({activeGroup.videos.length} clips)</span>
             </div>
           )}
 
           <div style={{ 
-            ...gridStyle, 
-            gridTemplateColumns: isDesktop ? "repeat(5, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
-            gap: isDesktop ? "20px" : "10px"
+            display: "grid", 
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: isDesktop ? "4px" : "2px",
+            width: "100%"
           }}>
-            {videosToDisplay.map(v => (
-              <VideoCard 
+            {videosToDisplay.map((v) => (
+              <InstagramMediaCard 
                 key={`${v.chat_id}:${v.message_id}`} 
                 video={v} 
-                onOpen={(vData, e) => handleOpenVideo(vData, e)} 
-                showDetails={true} 
+                onClick={(vData, e) => handleOpenVideo(vData, e)} 
+                isDesktop={isDesktop}
               />
             ))}
           </div>
           
-          {loading && !activeGroup && <div style={loaderStyle}>Refreshing shots...</div>}
+          {loading && !activeGroup && (
+            <div style={loaderStyle}>Loading posts...</div>
+          )}
           
           {!loading && !activeGroup && filteredRawVideos.length === 0 && (
-            <div style={{ padding: "60px 20px", textAlign: "center", color: "#888" }}>
-              {activeTab === "likes" 
-                ? "No liked videos yet." 
-                : (user?.is_creator 
-                    ? "You haven't uploaded any posts yet. Start sharing exclusive content to grow your subscriber base!" 
-                    : "No videos found.")}
+            <div style={{ padding: "80px 20px", textAlign: "center", color: "#8e8e93" }}>
+              <div style={{ width: "60px", height: "60px", borderRadius: "50%", border: "2px solid #333", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px auto" }}>
+                {activeTab === "likes" ? <Heart size={28} color="#555" /> : activeTab === "premium" ? <Lock size={28} color="#555" /> : <Grid3X3 size={28} color="#555" />}
+              </div>
+              <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#fff", margin: "0 0 6px 0" }}>
+                {activeTab === "likes" 
+                  ? "No Liked Videos Yet" 
+                  : activeTab === "premium"
+                  ? "No VIP Exclusive Posts"
+                  : "No Posts Yet"}
+              </h3>
+              <p style={{ fontSize: "13px", color: "#8e8e93", maxWidth: "300px", margin: "0 auto", lineHeight: "1.4" }}>
+                {activeTab === "likes" 
+                  ? "Videos you like will appear here." 
+                  : activeTab === "premium"
+                  ? "Exclusive paywalled content for your subscribers will be displayed here."
+                  : (user?.is_creator 
+                      ? "Share high quality videos and reels to engage your audience." 
+                      : "When you share photos and videos, they will appear on your profile.")}
+              </p>
             </div>
           )}
 
@@ -875,71 +989,225 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
     display: "flex", 
     flexDirection: isDesktop ? "row" : "column", 
     alignItems: "center", 
+    justifyContent: "center",
     gap: isDesktop ? "8px" : "6px",
-    background: "none", border: "none", 
-    padding: isDesktop ? "15px 0" : "12px 0",
-    borderTop: (isDesktop && active) ? "2px solid #00aff0" : "none",
-    borderBottom: (!isDesktop && active) ? "2px solid #00aff0" : (!isDesktop ? "1px solid rgba(255,255,255,0.05)" : "none"),
-    opacity: active ? 1 : 0.45, 
-    color: active ? "#fff" : "#8e8e93", 
+    background: "none", 
+    border: "none", 
+    padding: isDesktop ? "16px 0" : "12px 0",
+    borderTop: (isDesktop && active) ? "1px solid #ffffff" : "none",
+    borderBottom: (!isDesktop && active) ? "2px solid #ffffff" : "none",
+    opacity: active ? 1 : 0.4, 
+    color: active ? "#ffffff" : "#a8a8a8", 
     cursor: "pointer",
     marginTop: isDesktop ? "-1px" : "0",
-    flex: 1
+    flex: 1,
+    transition: "all 0.15s ease"
   }}>
     {icon}
-    <span style={{ fontSize: isDesktop ? "13px" : "11px", fontWeight: "700", letterSpacing: isDesktop ? "0.5px" : "0" }}>{label}</span>
+    {isDesktop && (
+      <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: "1px" }}>{label}</span>
+    )}
   </button>
 );
 
-// 🖌 STYLES
+// 🖌 STYLES (Clean AMOLED Instagram Dark Theme)
 const containerStyle = { 
   minHeight: "100%", 
-  background: "var(--bg-color)", 
-  color: "#fff", 
+  background: "#000000", 
+  color: "#f5f5f5", 
   position: "relative", 
   overflowX: "hidden" 
 };
 
 const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%" };
-const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, background: "var(--bg-color)", zIndex: 100, backdropFilter: "blur(15px)" };
-const centerTitleContainer = { display: "flex", alignItems: "center" };
-const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0 };
-const tabsContainerStyle = { display: "flex", position: "sticky", background: "var(--bg-color)", zIndex: 90 };
-const gridStyle = { display: "grid" };
-const loaderStyle = { padding: "40px", textAlign: "center", color: "#666", fontSize: "14px" };
+const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid #1c1c1e", position: "sticky", top: 0, background: "#000000", zIndex: 100, backdropFilter: "blur(20px)" };
+const centerTitleContainer = { display: "flex", alignItems: "center", cursor: "pointer" };
+const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0, color: "#fff" };
+const tabsContainerStyle = { display: "flex", position: "sticky", background: "#000000", zIndex: 90 };
+const loaderStyle = { padding: "40px", textAlign: "center", color: "#737373", fontSize: "14px" };
 
-const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px", background: "var(--bg-color)", borderBottom: "1px solid rgba(255,255,255,0.05)" };
-const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
+const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", background: "#121214", borderBottom: "1px solid #262626" };
+const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "14px", fontWeight: "600", cursor: "pointer", padding: "0" };
 const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
 
 const headerIconButton = { background: "none", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: "4px" };
-const desktopIconBtnStyle = { background: "#1f1f23", border: "1px solid #333", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
+const desktopIconBtnStyle = { background: "#262626", border: "1px solid #363636", borderRadius: "8px", width: "36px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
 
-const coverEditButtonStyle = { 
-  position: "absolute", 
-  right: "16px", 
-  bottom: "16px", 
-  background: "rgba(0,0,0,0.65)", 
-  backdropFilter: "blur(10px)", 
-  border: "1px solid rgba(255,255,255,0.2)", 
-  borderRadius: "20px", 
-  padding: "6px 14px", 
-  color: "#fff", 
-  fontSize: "12px", 
-  fontWeight: "600", 
-  display: "flex", 
-  alignItems: "center", 
-  gap: "6px", 
-  cursor: "pointer", 
-  zIndex: 2 
+// Instagram Story Gradient Rings
+const storyGradientRingMobile = {
+  padding: "2.5px",
+  borderRadius: "50%",
+  background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+  display: "inline-block"
 };
 
-const actionPillBtnStyle = {
-  background: "#1f1f23",
-  color: "#fff",
-  border: "1px solid #3a3a40",
-  borderRadius: "20px",
-  padding: "7px 16px",
+const avatarInnerCircleMobile = {
+  width: "78px",
+  height: "78px",
+  borderRadius: "50%",
+  border: "2.5px solid #000000",
+  overflow: "hidden",
+  backgroundColor: "#1c1c1e"
+};
+
+const storyGradientRingDesktop = {
+  padding: "3.5px",
+  borderRadius: "50%",
+  background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+  display: "inline-block"
+};
+
+const avatarInnerCircleDesktop = {
+  width: "142px",
+  height: "142px",
+  borderRadius: "50%",
+  border: "3.5px solid #000000",
+  overflow: "hidden",
+  backgroundColor: "#1c1c1e"
+};
+
+const mobileAvatarEditBadge = {
+  position: "absolute",
+  bottom: "2px",
+  right: "2px",
+  width: "24px",
+  height: "24px",
+  borderRadius: "50%",
+  backgroundColor: "#0095f6",
+  border: "2px solid #000000",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  boxShadow: "0 2px 6px rgba(0,0,0,0.5)"
+};
+
+const desktopAvatarEditBadge = {
+  position: "absolute",
+  bottom: "8px",
+  right: "8px",
+  width: "32px",
+  height: "32px",
+  borderRadius: "50%",
+  backgroundColor: "#262626",
+  border: "2px solid #000000",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer"
+};
+
+// 3 Stat Columns
+const statColStyle = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  textAlign: "center"
+};
+
+const statNumberStyle = {
+  fontSize: "17px",
+  fontWeight: "700",
+  color: "#ffffff"
+};
+
+const statLabelStyle = {
+  fontSize: "13px",
+  color: "#a8a8a8",
+  marginTop: "1px",
+  fontWeight: "400"
+};
+
+// Badges and Links
+const creatorBadgeTagStyle = {
+  fontSize: "9px",
+  fontWeight: "800",
+  color: "#FFD700",
+  backgroundColor: "rgba(255, 215, 0, 0.12)",
+  border: "1px solid rgba(255, 215, 0, 0.3)",
+  borderRadius: "4px",
+  padding: "2px 6px",
+  letterSpacing: "0.5px"
+};
+
+const websiteLinkStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "5px",
+  color: "#0095f6",
+  textDecoration: "none",
+  fontSize: "13.5px",
+  fontWeight: "600"
+};
+
+const vipPricingBadgeStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "5px",
+  backgroundColor: "rgba(255, 215, 0, 0.08)",
+  border: "1px solid rgba(255, 215, 0, 0.25)",
+  borderRadius: "6px",
+  padding: "3px 8px",
+  fontSize: "12px",
+  fontWeight: "700",
+  color: "#FFD700"
+};
+
+// Professional Dashboard Box
+const professionalCardStyle = {
+  backgroundColor: "#16181c",
+  border: "1px solid #262626",
+  borderRadius: "10px",
+  padding: "12px 14px",
+  margin: "12px 0 14px 0",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  cursor: "pointer",
+  transition: "background-color 0.15s ease"
+};
+
+const professionalIconStyle = {
+  width: "36px",
+  height: "36px",
+  borderRadius: "8px",
+  backgroundColor: "rgba(0, 149, 246, 0.12)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0
+};
+
+// Action Buttons
+const mobileActionButtonsRow = {
+  display: "flex",
+  gap: "8px",
+  marginBottom: "16px"
+};
+
+const mobileActionButton = {
+  flex: 1,
+  height: "34px",
+  backgroundColor: "#262626",
+  color: "#ffffff",
+  border: "1px solid #363636",
+  borderRadius: "8px",
+  fontSize: "13px",
+  fontWeight: "600",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  cursor: "pointer"
+};
+
+const desktopActionButton = {
+  height: "34px",
+  padding: "0 16px",
+  backgroundColor: "#262626",
+  color: "#ffffff",
+  border: "1px solid #363636",
+  borderRadius: "8px",
   fontSize: "13px",
   fontWeight: "600",
   display: "flex",
@@ -948,139 +1216,66 @@ const actionPillBtnStyle = {
   cursor: "pointer"
 };
 
-const becomeCreatorHighlightBtnStyle = {
-  background: "linear-gradient(135deg, #FF6B00 0%, #FF007A 100%)",
-  color: "#fff",
-  border: "none",
-  borderRadius: "20px",
-  padding: "7px 16px",
-  fontSize: "13px",
-  fontWeight: "700",
+// Story Highlights
+const highlightsContainerStyle = {
   display: "flex",
   alignItems: "center",
-  gap: "6px",
-  cursor: "pointer",
-  boxShadow: "0 4px 14px rgba(255, 107, 0, 0.35)"
+  gap: "16px",
+  overflowX: "auto",
+  paddingBottom: "8px",
+  scrollbarWidth: "none",
+  msOverflowStyle: "none"
 };
 
-const creatorBadgeStyle = {
-  fontSize: "10px",
-  fontWeight: "800",
-  color: "#FFD700",
-  backgroundColor: "rgba(255, 215, 0, 0.12)",
-  border: "1px solid rgba(255, 215, 0, 0.3)",
-  borderRadius: "10px",
-  padding: "2px 8px",
-  letterSpacing: "0.5px"
-};
-
-const vipBadgeStyle = {
-  fontSize: "10px",
-  fontWeight: "800",
-  color: "var(--primary-color)",
-  backgroundColor: "rgba(229, 9, 20, 0.12)",
-  border: "1px solid rgba(229, 9, 20, 0.3)",
-  borderRadius: "10px",
-  padding: "2px 8px",
-  letterSpacing: "0.5px"
-};
-
-const categoryPillStyle = {
-  fontSize: "12px",
-  color: "#00aff0",
-  backgroundColor: "rgba(0, 175, 240, 0.1)",
-  padding: "3px 10px",
-  borderRadius: "12px",
-  fontWeight: "600",
-  display: "inline-block"
-};
-
-const socialChipStyle = {
-  fontSize: "12px",
-  color: "#e1e1e1",
-  backgroundColor: "#16181c",
-  border: "1px solid rgba(255,255,255,0.1)",
-  padding: "4px 10px",
-  borderRadius: "14px",
-  textDecoration: "none",
-  display: "inline-flex",
-  alignItems: "center"
-};
-
-const statsContainerStyle = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-around",
-  backgroundColor: "#121417",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: "14px",
-  padding: "14px 10px",
-  margin: "18px 0 16px 0"
-};
-
-const statItemStyle = {
+const highlightItemStyle = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  flex: 1
-};
-
-const statNumberStyle = {
-  fontSize: "16px",
-  fontWeight: "800",
-  color: "#fff"
-};
-
-const statLabelStyle = {
-  fontSize: "11px",
-  color: "#8e8e93",
-  fontWeight: "600",
-  marginTop: "2px",
-  letterSpacing: "0.5px"
-};
-
-const statDividerStyle = {
-  width: "1px",
-  height: "26px",
-  backgroundColor: "rgba(255,255,255,0.08)"
-};
-
-const becomeCreatorBannerStyle = {
-  background: "linear-gradient(135deg, rgba(255, 107, 0, 0.12) 0%, rgba(255, 0, 122, 0.12) 100%)",
-  border: "1px solid rgba(255, 107, 0, 0.3)",
-  borderRadius: "16px",
-  padding: "16px",
-  margin: "16px 0",
-  boxShadow: "0 4px 20px rgba(0,0,0,0.3)"
-};
-
-const sparkleIconBoxStyle = {
-  width: "44px",
-  height: "44px",
-  borderRadius: "12px",
-  backgroundColor: "rgba(255, 215, 0, 0.15)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+  gap: "6px",
+  cursor: "pointer",
   flexShrink: 0
 };
 
-const becomeCreatorBtnStyle = {
-  background: "linear-gradient(135deg, #FF6B00 0%, #FF007A 100%)",
-  color: "#fff",
-  border: "none",
-  borderRadius: "20px",
-  padding: "9px 20px",
-  fontSize: "13px",
-  fontWeight: "700",
-  cursor: "pointer",
-  boxShadow: "0 4px 14px rgba(255, 107, 0, 0.35)"
+const highlightCircleOuterStyle = {
+  width: "64px",
+  height: "64px",
+  borderRadius: "50%",
+  border: "1.5px solid rgba(255, 255, 255, 0.16)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "3px",
+  transition: "border-color 0.2s ease"
 };
 
-const pricingCardStyle = {
-  background: "#16181c",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: "14px",
-  padding: "14px 18px",
-  margin: "16px 0"
+const highlightCircleInnerStyle = {
+  width: "100%",
+  height: "100%",
+  borderRadius: "50%",
+  backgroundColor: "#16181c",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center"
 };
+
+const newHighlightCircleStyle = {
+  width: "64px",
+  height: "64px",
+  borderRadius: "50%",
+  border: "1.5px solid rgba(255, 255, 255, 0.25)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "#121214"
+};
+
+const highlightLabelStyle = {
+  fontSize: "11px",
+  color: "#a8a8a8",
+  textAlign: "center",
+  maxWidth: "68px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap"
+};
+

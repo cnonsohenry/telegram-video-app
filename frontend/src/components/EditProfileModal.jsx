@@ -96,54 +96,36 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess }) {
 
         <form onSubmit={handleSubmit} style={formStyle}>
           
-          {/* Banner Selector */}
-          <div style={fieldGroupStyle}>
-            <label style={labelStyle}>Cover Banner Image</label>
-            <div style={{ ...bannerPreviewStyle, backgroundImage: `url(${customBanner.trim() || bannerUrl})` }}>
-              <div style={bannerOverlayStyle}>Cover Preview</div>
-            </div>
-            <div style={presetRowStyle}>
-              {BANNER_PRESETS.map((preset) => (
-                <button
-                  type="button"
-                  key={preset.label}
-                  onClick={() => { setBannerUrl(preset.url); setCustomBanner(""); }}
-                  style={{
-                    ...presetBtnStyle,
-                    borderColor: (bannerUrl === preset.url && !customBanner) ? "var(--primary-color)" : "#333"
-                  }}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <input 
-              type="url" 
-              placeholder="Custom image URL..." 
-              value={customBanner} 
-              onChange={(e) => setCustomBanner(e.target.value)} 
-              style={{ ...inputStyle, marginTop: "8px", fontSize: "12px", padding: "10px 14px" }}
-            />
-          </div>
-
-          {/* Avatar URL */}
-          <div style={fieldGroupStyle}>
-            <label style={labelStyle}>Profile Picture URL</label>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {/* Profile Picture Avatar (Instagram Style at Top) */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "20px" }}>
+            <div style={{
+              padding: "3px",
+              borderRadius: "50%",
+              background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+              display: "inline-block",
+              marginBottom: "8px"
+            }}>
               <img 
                 src={avatarUrl || user?.avatar_url || "/assets/default-avatar.png"} 
                 alt="Avatar preview" 
-                style={avatarPreviewStyle}
+                style={{
+                  width: "80px",
+                  height: "80px",
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  border: "2px solid #16181c",
+                  display: "block"
+                }}
                 onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
               />
-              <input
-                type="url"
-                placeholder="https://... image link"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                style={{ ...inputStyle, flex: 1 }}
-              />
             </div>
+            <input
+              type="url"
+              placeholder="Paste new photo URL (https://...)"
+              value={avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
+              style={{ ...inputStyle, width: "100%", maxWidth: "340px", fontSize: "12px", textAlign: "center" }}
+            />
           </div>
 
           {/* Display Name */}
