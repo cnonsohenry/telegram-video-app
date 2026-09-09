@@ -211,7 +211,12 @@ async function initDatabase() {
           expected_amount NUMERIC NOT NULL,
           status TEXT DEFAULT 'PENDING',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
+        );
+        ALTER TABLE transactions ADD COLUMN IF NOT EXISTS transaction_type TEXT DEFAULT 'premium';
+        ALTER TABLE transactions ADD COLUMN IF NOT EXISTS creator_id BIGINT;
+        ALTER TABLE transactions ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+        CREATE INDEX IF NOT EXISTS idx_transactions_creator_id ON transactions(creator_id);
+        CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(transaction_type);
       `);
 
       // Interaction Tables & Counters

@@ -263,7 +263,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
     let subCount = 0;
     try {
       const subRes = await pool.query(
-        "SELECT COUNT(*) FROM creator_subscriptions WHERE creator_id = $1",
+        "SELECT COUNT(*) FROM creator_subscriptions WHERE creator_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
         [creator.id]
       );
       subCount = Number(subRes.rows[0].count);
@@ -299,7 +299,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       } else {
         try {
           const checkSub = await pool.query(
-            "SELECT id FROM creator_subscriptions WHERE subscriber_id = $1 AND creator_id = $2",
+            "SELECT id FROM creator_subscriptions WHERE subscriber_id = $1 AND creator_id = $2 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
             [req.user.id, creator.id]
           );
           isSubscribed = checkSub.rows.length > 0;
@@ -464,31 +464,41 @@ router.post("/:username/subscribe", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "You cannot subscribe to yourself" });
     }
 
-    // Check existing
+    // Check existing active subscription
     const existing = await pool.query(
-      "SELECT id FROM creator_subscriptions WHERE subscriber_id = $1 AND creator_id = $2",
+      "SELECT id, status, expires_at FROM creator_subscriptions WHERE subscriber_id = $1 AND creator_id = $2 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
       [subscriberId, creatorId]
     );
 
     let isSubscribed = false;
     if (existing.rows.length > 0) {
-      // Unsubscribe
+      // Unsubscribe / Cancel
       await pool.query(
         "DELETE FROM creator_subscriptions WHERE subscriber_id = $1 AND creator_id = $2",
         [subscriberId, creatorId]
       );
       isSubscribed = false;
     } else {
-      // Subscribe
+      if (subscriptionPrice > 0) {
+        return res.status(402).json({ 
+          error: "Paid VIP subscription requires crypto checkout.",
+          requires_payment: true,
+          price: subscriptionPrice
+        });
+      }
+      // Free subscribe
       await pool.query(
-        "INSERT INTO creator_subscriptions (subscriber_id, creator_id, amount_paid, status) VALUES ($1, $2, $3, 'active')",
-        [subscriberId, creatorId, subscriptionPrice]
+        `INSERT INTO creator_subscriptions (subscriber_id, creator_id, amount_paid, status, expires_at) 
+         VALUES ($1, $2, 0, 'active', NULL)
+         ON CONFLICT (subscriber_id, creator_id)
+         DO UPDATE SET status = 'active', amount_paid = 0, expires_at = NULL`,
+        [subscriberId, creatorId]
       );
       isSubscribed = true;
     }
 
     const totalRes = await pool.query(
-      "SELECT COUNT(*) FROM creator_subscriptions WHERE creator_id = $1",
+      "SELECT COUNT(*) FROM creator_subscriptions WHERE creator_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
       [creatorId]
     );
 

@@ -1,23 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { 
-  X, Heart, CheckCircle, CheckCircle2, Copy, QrCode, 
-  Loader2, Sparkles, ArrowLeft, ShieldCheck, DollarSign
+  X, CheckCircle, CheckCircle2, ShieldCheck, Copy, QrCode, 
+  Loader2, Sparkles, ArrowLeft, Lock, Star, MessageCircle, AlertCircle
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 
-const TIP_PRESETS = [
-  { amountNgn: 3000, amountUsd: 3, label: "₦3,000 ($3)" },
-  { amountNgn: 5000, amountUsd: 6, label: "₦5,000 ($6)" },
-  { amountNgn: 10000, amountUsd: 12, label: "₦10,000 ($12)" },
-  { amountNgn: 25000, amountUsd: 30, label: "₦25,000 ($30)" },
-  { amountNgn: 50000, amountUsd: 60, label: "₦50,000 ($60)" }
-];
-
-export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
-  const [selectedPreset, setSelectedPreset] = useState(TIP_PRESETS[1]); // Default ₦5,000 ($6)
-  const [customAmount, setCustomAmount] = useState("");
-  const [message, setMessage] = useState("");
-  
+export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuccess }) {
+  const [selectedCoin, setSelectedCoin] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [cryptoDetails, setCryptoDetails] = useState(null);
   const [copiedField, setCopiedField] = useState(null);
@@ -25,21 +14,17 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
   const [pollingStatus, setPollingStatus] = useState("pending");
   const [error, setError] = useState("");
 
-  const effectiveAmountNgn = customAmount 
-    ? Number(customAmount) 
-    : (selectedPreset?.amountNgn || 5000);
+  const priceNgn = Number(creator?.subscription_price || 0);
+  // Convert NGN to USD (minimum $3 USD to satisfy NOWPayments network limits)
+  const priceUsd = Math.max(3, Math.round(priceNgn / 800) || 19);
 
-  const effectiveAmountUsd = customAmount 
-    ? Math.max(3, Math.round(Number(customAmount) / 850)) 
-    : (selectedPreset?.amountUsd || 6);
-
-  // Prevent background scroll while modal is active
+  // Prevent background scroll while modal is open
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  // Polling for confirmation
+  // Polling for blockchain confirmation
   useEffect(() => {
     let pollInterval;
     if (cryptoDetails?.order_id && pollingStatus !== "success") {
@@ -50,36 +35,33 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
           if (data.success && data.status === "APPROVED") {
             setPollingStatus("success");
             clearInterval(pollInterval);
-            if (onTipSuccess) {
-              onTipSuccess(effectiveAmountNgn);
+            if (onSubscribeSuccess) {
+              onSubscribeSuccess();
             }
           }
         } catch (err) {
-          console.error("Tip crypto poll error:", err);
+          console.error("Subscription crypto poll error:", err);
         }
       };
 
+      // Poll every 8 seconds
       pollInterval = setInterval(checkStatus, 8000);
       if (hasSentPayment) {
         checkStatus();
       }
     }
     return () => clearInterval(pollInterval);
-  }, [cryptoDetails, hasSentPayment, pollingStatus, effectiveAmountNgn, onTipSuccess]);
+  }, [cryptoDetails, hasSentPayment, pollingStatus, onSubscribeSuccess]);
 
   const handleSelectCoin = async (coinId) => {
-    if (!effectiveAmountUsd || effectiveAmountUsd < 2) {
-      setError("Minimum tip amount via crypto is $2 USD (~₦2,000).");
-      return;
-    }
-
+    setSelectedCoin(coinId);
     setGenerating(true);
     setError("");
 
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error("Please log in to send a tip.");
+        throw new Error("Please log in to subscribe to this creator.");
       }
 
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/crypto/create`, {
@@ -89,22 +71,22 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          amount_usd: effectiveAmountUsd,
+          amount_usd: priceUsd,
           crypto_currency: coinId,
-          payment_type: "creator_tip",
-          creator_username: creator.username,
-          message: message.trim()
+          payment_type: "creator_sub",
+          creator_username: creator.username
         })
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to initialize crypto tip");
+        throw new Error(data.error || "Failed to initialize crypto payment");
       }
 
       setCryptoDetails(data);
     } catch (err) {
-      setError(err.message || "Failed to create crypto tip address");
+      setError(err.message || "Failed to create payment session");
+      setSelectedCoin(null);
     } finally {
       setGenerating(false);
     }
@@ -120,25 +102,23 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalBoxStyle} onClick={(e) => e.stopPropagation()}>
         
-        {/* Header */}
+        {/* Header Bar */}
         <div style={headerStyle}>
           {cryptoDetails && pollingStatus !== "success" ? (
             <button 
-              onClick={() => { setCryptoDetails(null); setError(""); setHasSentPayment(false); }} 
+              onClick={() => { setCryptoDetails(null); setSelectedCoin(null); setError(""); }} 
               style={iconBtnStyle}
-              title="Change amount or coin"
+              title="Back to coin selection"
             >
               <ArrowLeft size={20} color="#fff" />
             </button>
           ) : (
-            <div style={heartIconStyle}>
-              <Heart size={18} fill="#fff" color="#fff" />
-            </div>
+            <div style={{ width: "32px" }} />
           )}
 
-          <div style={{ flex: 1, paddingLeft: "10px" }}>
-            <h2 style={titleStyle}>Tip Creator</h2>
-            <p style={subtitleStyle}>Direct Crypto Tip to @{creator?.username || "creator"}</p>
+          <div style={{ textAlign: "center", flex: 1 }}>
+            <h2 style={titleStyle}>Creator VIP Pass</h2>
+            <span style={subtitleStyle}>30 Days Unlimited Access</span>
           </div>
 
           <button onClick={onClose} style={iconBtnStyle}>
@@ -146,6 +126,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
           </button>
         </div>
 
+        {/* Content Body */}
         <div style={contentBodyStyle}>
           
           {/* STATE 1: SUCCESS */}
@@ -154,15 +135,15 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
               <div style={successIconStyle}>
                 <Sparkles size={40} color="#00d084" />
               </div>
-              <h3 style={successTitleStyle}>Tip Sent Successfully!</h3>
+              <h3 style={successTitleStyle}>VIP Access Activated!</h3>
               <p style={successSubStyle}>
-                You sent a tip of <b>₦{effectiveAmountNgn.toLocaleString()} (${effectiveAmountUsd} USD)</b> to <b>{creator?.display_name || creator?.username}</b>. Thank you for supporting creators!
+                You now have 30 days of VIP access to <b>@{creator?.username}</b>'s exclusive drops, full videos, and direct messages.
               </p>
               <div style={successCreatorCardStyle}>
                 <img 
                   src={creator?.avatar_url || "/assets/default-avatar.png"} 
                   alt={creator?.display_name} 
-                  style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover" }}
+                  style={{ width: "48px", height: "48px", borderRadius: "50%", objectFit: "cover" }}
                   onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                 />
                 <div>
@@ -170,12 +151,12 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                     {creator?.display_name || creator?.username}
                   </div>
                   <div style={{ fontSize: "12px", color: "#00d084", fontWeight: "700" }}>
-                    Tip Confirmed on Blockchain ✓
+                    Active VIP Subscriber ✓
                   </div>
                 </div>
               </div>
               <button onClick={onClose} style={doneBtnStyle}>
-                Done
+                Start Watching VIP Content
               </button>
             </div>
           ) : cryptoDetails ? (
@@ -192,25 +173,25 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                     onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                   />
                   <div>
-                    <div style={{ fontSize: "12px", color: "#8e8e93" }}>Tipping</div>
+                    <div style={{ fontSize: "12px", color: "#8e8e93" }}>Subscribing to</div>
                     <div style={{ fontSize: "14px", fontWeight: "800", color: "#fff" }}>
                       @{creator?.username}
                     </div>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <span style={{ fontSize: "11px", color: "#8e8e93" }}>TIP AMOUNT</span>
-                  <div style={{ fontSize: "15px", fontWeight: "900", color: "#f91880" }}>
-                    ₦{effectiveAmountNgn.toLocaleString()} (${effectiveAmountUsd})
+                  <span style={{ fontSize: "11px", color: "#8e8e93" }}>30 DAYS PASS</span>
+                  <div style={{ fontSize: "15px", fontWeight: "900", color: "#00aff0" }}>
+                    ₦{priceNgn.toLocaleString()} (${priceUsd})
                   </div>
                 </div>
               </div>
 
-              {/* Amount Box */}
+              {/* Amount to Send Box */}
               <div style={transferDetailsBox}>
                 <div style={transferRowStyle}>
                   <div>
-                    <span style={transferLabelStyle}>EXACT CRYPTO TO SEND</span>
+                    <span style={transferLabelStyle}>EXACT AMOUNT TO SEND</span>
                     <div style={transferAmountStyle}>
                       {cryptoDetails.pay_amount}{" "}
                       <span style={{ color: "#f7931a", fontSize: "14px" }}>
@@ -252,16 +233,16 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                   alt="Deposit QR Code"
                   style={qrImageStyle}
                 />
-                <span style={qrCaptionStyle}>Scan with your crypto wallet to send tip</span>
+                <span style={qrCaptionStyle}>Scan with your crypto wallet to pay</span>
               </div>
 
-              {/* Status button */}
+              {/* Status & Confirmation Trigger */}
               {!hasSentPayment ? (
                 <button 
                   onClick={() => setHasSentPayment(true)} 
                   style={iHavePaidBtnStyle}
                 >
-                  I Have Sent Tip
+                  I Have Sent Payment
                 </button>
               ) : (
                 <div style={statusWaitingBox}>
@@ -273,104 +254,62 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
               )}
 
               <p style={securityNoticeStyle}>
-                🔒 100% of your tip goes directly to @{creator?.username} upon blockchain confirmation.
+                🔒 Payments are processed securely via NOWPayments. Once confirmed on the blockchain, your VIP pass activates automatically.
               </p>
             </div>
           ) : (
-            /* STATE 3: TIP SELECTION & COIN SELECTION */
+            /* STATE 3: CREATOR OVERVIEW & COIN SELECTION */
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {error && <div style={errorBannerStyle}>{error}</div>}
+
               {/* Creator Card */}
-              <div style={creatorCardStyle}>
+              <div style={creatorBannerCardStyle}>
                 <img 
                   src={creator?.avatar_url || "/assets/default-avatar.png"} 
                   alt={creator?.display_name} 
-                  style={creatorAvatarStyle}
+                  style={creatorProfileAvatarStyle}
                   onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                 />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <span style={creatorNameStyle}>{creator?.display_name || creator?.username}</span>
-                    <CheckCircle size={14} color="#00aff0" fill="#00aff0" />
+                    <CheckCircle size={15} color="#00aff0" fill="#00aff0" />
                   </div>
-                  <span style={creatorCategoryStyle}>{creator?.creator_category || "Creator"}</span>
+                  <span style={creatorMetaStyle}>@{creator?.username} • {creator?.creator_category || "Creator"}</span>
+                  <div style={priceTagStyle}>
+                    ₦{priceNgn.toLocaleString()}/mo <span style={{ color: "#8e8e93", fontSize: "12px", fontWeight: "500" }}>(~${priceUsd} USD)</span>
+                  </div>
                 </div>
               </div>
 
-              {error && <div style={errorBannerStyle}>{error}</div>}
-
-              {/* Preset Chips */}
-              <div style={fieldGroupStyle}>
-                <label style={labelStyle}>Select Tip Amount</label>
-                <div style={presetGridStyle}>
-                  {TIP_PRESETS.map((p) => {
-                    const isSelected = selectedPreset?.amountNgn === p.amountNgn && !customAmount;
-                    return (
-                      <button
-                        type="button"
-                        key={p.amountNgn}
-                        onClick={() => { setSelectedPreset(p); setCustomAmount(""); }}
-                        style={{
-                          ...presetBtnStyle,
-                          borderColor: isSelected ? "#f91880" : "#333",
-                          background: isSelected ? "rgba(249, 24, 128, 0.15)" : "#1c1c1e",
-                          color: isSelected ? "#fff" : "#ccc"
-                        }}
-                      >
-                        {p.label}
-                      </button>
-                    );
-                  })}
+              {/* Perks List */}
+              <div style={perksContainerStyle}>
+                <div style={perkItemStyle}>
+                  <Lock size={16} color="#00aff0" />
+                  <span>Full access to private photos, drops, and uncensored full videos</span>
+                </div>
+                <div style={perkItemStyle}>
+                  <MessageCircle size={16} color="#00aff0" />
+                  <span>Priority DM chat access with @{creator?.username}</span>
+                </div>
+                <div style={perkItemStyle}>
+                  <Star size={16} color="#00aff0" />
+                  <span>VIP badge on all comments and live updates for 30 days</span>
                 </div>
               </div>
 
-              {/* Custom Amount Input */}
-              <div style={fieldGroupStyle}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <label style={labelStyle}>Or Custom Amount (₦)</label>
-                  {customAmount && (
-                    <span style={{ fontSize: "11px", color: "#00d084", fontWeight: "700" }}>
-                      ≈ ${effectiveAmountUsd} USD
-                    </span>
-                  )}
-                </div>
-                <div style={{ position: "relative" }}>
-                  <span style={currencySymbolStyle}>₦</span>
-                  <input
-                    type="number"
-                    min={2000}
-                    step={500}
-                    placeholder="e.g. 15000"
-                    value={customAmount}
-                    onChange={(e) => { setCustomAmount(e.target.value); setSelectedPreset(null); }}
-                    style={{ ...inputStyle, paddingLeft: "36px" }}
-                  />
-                </div>
-              </div>
-
-              {/* Note / Message */}
-              <div style={fieldGroupStyle}>
-                <label style={labelStyle}>Note to Creator (Optional)</label>
-                <textarea
-                  rows={2}
-                  maxLength={200}
-                  placeholder="Add a compliment or private note with your tip..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  style={textareaStyle}
-                />
-              </div>
-
-              {/* Crypto Coin Grid */}
-              <div style={fieldGroupStyle}>
-                <label style={labelStyle}>
-                  Select Crypto to Send ₦{effectiveAmountNgn.toLocaleString()} (~${effectiveAmountUsd} USD)
-                </label>
+              {/* Cryptocurrency Grid */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <span style={selectCoinLabelStyle}>Choose Cryptocurrency to Pay</span>
 
                 {generating ? (
                   <div style={loaderBoxStyle}>
-                    <Loader2 size={30} color="#f7931a" className="animate-spin" />
+                    <Loader2 size={32} color="#f7931a" className="animate-spin" />
                     <span style={{ fontSize: "13px", color: "#fff", fontWeight: "700", marginTop: "10px" }}>
-                      Generating Secure Tip Wallet...
+                      Generating Secure Deposit Wallet...
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#8e8e93", marginTop: "4px" }}>
+                      Fetching real-time exchange rates
                     </span>
                   </div>
                 ) : (
@@ -394,10 +333,10 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                 )}
               </div>
 
-              {/* Footer */}
+              {/* Guarantee Footer */}
               <div style={guaranteeRowStyle}>
-                <ShieldCheck size={15} color="#00d084" />
-                <span>Powered by NOWPayments • Zero chargebacks • Instant payout</span>
+                <ShieldCheck size={16} color="#00d084" />
+                <span>Instant blockchain activation • 256-bit secure checkout</span>
               </div>
             </div>
           )}
@@ -412,9 +351,9 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
 const overlayStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 100001,
+  zIndex: 100002,
   backgroundColor: "rgba(0, 0, 0, 0.85)",
-  backdropFilter: "blur(8px)",
+  backdropFilter: "blur(10px)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -422,14 +361,14 @@ const overlayStyle = {
 };
 
 const modalBoxStyle = {
-  backgroundColor: "#121214",
+  backgroundColor: "#131316",
   border: "1px solid rgba(255, 255, 255, 0.12)",
   borderRadius: "24px",
   width: "100%",
   maxWidth: "460px",
   maxHeight: "92vh",
   overflowY: "auto",
-  boxShadow: "0 20px 50px rgba(0, 0, 0, 0.9)",
+  boxShadow: "0 25px 60px rgba(0, 0, 0, 0.9)",
   display: "flex",
   flexDirection: "column"
 };
@@ -442,62 +381,70 @@ const headerStyle = {
   justifyContent: "space-between"
 };
 
-const heartIconStyle = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "10px",
-  background: "linear-gradient(135deg, #f91880, var(--primary-color))",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center"
-};
-
 const titleStyle = { margin: 0, fontSize: "16px", fontWeight: "800", color: "#fff" };
-const subtitleStyle = { margin: "2px 0 0 0", fontSize: "12px", color: "#8e8e93" };
+const subtitleStyle = { fontSize: "11px", color: "#00aff0", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" };
 const iconBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center" };
 const contentBodyStyle = { padding: "20px" };
 
-const creatorCardStyle = {
+const creatorBannerCardStyle = {
   display: "flex",
   alignItems: "center",
-  gap: "12px",
-  padding: "12px 16px",
-  background: "#1c1c1e",
-  borderRadius: "14px",
-  border: "1px solid #2a2a2c"
+  gap: "14px",
+  padding: "14px 16px",
+  background: "#1c1c1f",
+  borderRadius: "16px",
+  border: "1px solid rgba(255, 255, 255, 0.08)"
 };
 
-const creatorAvatarStyle = {
-  width: "44px",
-  height: "44px",
+const creatorProfileAvatarStyle = {
+  width: "56px",
+  height: "56px",
   borderRadius: "50%",
   objectFit: "cover",
-  border: "2px solid #fff"
+  border: "2px solid #00aff0"
 };
 
-const creatorNameStyle = { fontWeight: "700", fontSize: "14px", color: "#fff" };
-const creatorCategoryStyle = { fontSize: "11px", color: "#8e8e93" };
-const fieldGroupStyle = { display: "flex", flexDirection: "column", gap: "6px" };
-const labelStyle = { fontSize: "13px", fontWeight: "700", color: "#e5e5ea" };
+const creatorNameStyle = { fontWeight: "800", fontSize: "15px", color: "#fff" };
+const creatorMetaStyle = { fontSize: "12px", color: "#8e8e93", display: "block", marginTop: "2px" };
+const priceTagStyle = { fontSize: "15px", fontWeight: "900", color: "#00d084", marginTop: "4px" };
 
-const presetGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" };
-const presetBtnStyle = { border: "1px solid", borderRadius: "10px", padding: "10px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" };
+const perksContainerStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+  background: "rgba(0, 175, 240, 0.06)",
+  border: "1px solid rgba(0, 175, 240, 0.15)",
+  borderRadius: "14px",
+  padding: "12px 14px"
+};
 
-const currencySymbolStyle = { position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#888", fontWeight: "700" };
-const inputStyle = { width: "100%", background: "#1c1c1e", border: "1px solid #333", borderRadius: "12px", padding: "12px 14px", color: "#fff", fontSize: "14px", outline: "none", boxSizing: "border-box" };
-const textareaStyle = { width: "100%", background: "#1c1c1e", border: "1px solid #333", borderRadius: "12px", padding: "10px 14px", color: "#fff", fontSize: "13px", outline: "none", boxSizing: "border-box", resize: "none" };
+const perkItemStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  fontSize: "12px",
+  color: "#d1d1d6",
+  lineHeight: "1.4"
+};
+
+const selectCoinLabelStyle = {
+  fontSize: "13px",
+  fontWeight: "800",
+  color: "#fff",
+  marginBottom: "4px"
+};
 
 const cryptoGridStyle = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
-  gap: "8px"
+  gap: "10px"
 };
 
 const cryptoBtnStyle = {
-  padding: "12px 10px",
+  padding: "13px 12px",
   borderRadius: "12px",
   fontWeight: "800",
-  fontSize: "12px",
+  fontSize: "13px",
   cursor: "pointer",
   border: "none",
   transition: "transform 0.15s ease, opacity 0.2s ease",
@@ -508,13 +455,13 @@ const cryptoBtnStyle = {
 };
 
 const loaderBoxStyle = {
-  padding: "24px 16px",
+  padding: "36px 16px",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
   background: "#1a1a1c",
-  borderRadius: "14px",
+  borderRadius: "16px",
   border: "1px solid #28282b"
 };
 
@@ -522,10 +469,10 @@ const guaranteeRowStyle = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: "6px",
+  gap: "8px",
   fontSize: "11px",
   color: "#8e8e93",
-  paddingTop: "4px"
+  paddingTop: "6px"
 };
 
 const invoiceHeaderCard = {
@@ -543,7 +490,7 @@ const creatorSmallAvatarStyle = {
   height: "36px",
   borderRadius: "50%",
   objectFit: "cover",
-  border: "1.5px solid #f91880"
+  border: "1.5px solid #00aff0"
 };
 
 const transferDetailsBox = {
@@ -616,7 +563,7 @@ const qrCaptionStyle = {
 };
 
 const iHavePaidBtnStyle = {
-  background: "linear-gradient(135deg, #f91880, var(--primary-color))",
+  background: "linear-gradient(135deg, #00aff0, #0088cc)",
   color: "#fff",
   border: "none",
   borderRadius: "14px",
@@ -624,7 +571,7 @@ const iHavePaidBtnStyle = {
   fontWeight: "800",
   fontSize: "14px",
   cursor: "pointer",
-  boxShadow: "0 6px 18px rgba(249, 24, 128, 0.35)"
+  boxShadow: "0 6px 18px rgba(0, 175, 240, 0.35)"
 };
 
 const statusWaitingBox = {

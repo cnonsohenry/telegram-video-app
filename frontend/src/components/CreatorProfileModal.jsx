@@ -6,6 +6,7 @@ import {
 import { APP_CONFIG } from "../config";
 import VideoCard from "./VideoCard";
 import CreatorTipModal from "./CreatorTipModal";
+import CreatorSubscribeModal from "./CreatorSubscribeModal";
 
 export default function CreatorProfileModal({ 
   creatorUsername, 
@@ -23,6 +24,7 @@ export default function CreatorProfileModal({
   const [subscribersCount, setSubscribersCount] = useState(0);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [videoPage, setVideoPage] = useState(1);
   const [hasMoreVideos, setHasMoreVideos] = useState(false);
   const [loadingMoreVideos, setLoadingMoreVideos] = useState(false);
@@ -111,17 +113,43 @@ export default function CreatorProfileModal({
     }
 
     const price = Number(creatorData?.subscription_price || 0);
-    if (price > 0 && !isSubscribed) {
-      const confirmed = window.confirm(`Subscribing to ${creatorData?.display_name || creatorUsername} is ₦${price.toLocaleString()}/mo. Do you want to proceed?`);
+
+    // If currently subscribed, confirm cancellation
+    if (isSubscribed) {
+      const confirmed = window.confirm(`Are you sure you want to cancel your subscription to @${creatorData?.username || creatorUsername}?`);
       if (!confirmed) return;
+
+      setIsSubscribing(true);
+      try {
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${creatorUsername}/subscribe`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Failed to cancel subscription");
+        }
+        setIsSubscribed(false);
+        setSubscribersCount(data.subscribers_count);
+      } catch (e) {
+        alert(e.message || "Failed to cancel subscription");
+      } finally {
+        setIsSubscribing(false);
+      }
+      return;
     }
 
-    setIsSubscribing(true);
-    // Optimistic toggle
-    const nextSub = !isSubscribed;
-    setIsSubscribed(nextSub);
-    setSubscribersCount(prev => nextSub ? prev + 1 : Math.max(0, prev - 1));
+    // If paid subscription, launch NOWPayments crypto checkout!
+    if (price > 0) {
+      setShowSubscribeModal(true);
+      return;
+    }
 
+    // Free subscription (price === 0)
+    setIsSubscribing(true);
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${creatorUsername}/subscribe`, {
         method: "POST",
@@ -137,9 +165,6 @@ export default function CreatorProfileModal({
       setIsSubscribed(data.subscribed);
       setSubscribersCount(data.subscribers_count);
     } catch (e) {
-      // Revert on error
-      setIsSubscribed(!nextSub);
-      setSubscribersCount(prev => !nextSub ? prev + 1 : Math.max(0, prev - 1));
       alert(e.message || "Failed to update subscription");
     } finally {
       setIsSubscribing(false);
@@ -400,7 +425,19 @@ export default function CreatorProfileModal({
           creator={creatorData}
           onClose={() => setShowTipModal(false)}
           onTipSuccess={(amt) => {
-            alert(`🎉 Successfully sent ₦${amt.toLocaleString()} tip!`);
+            alert(`🎉 Successfully sent ₦${amt.toLocaleString()} tip to @${creatorData?.username}!`);
+          }}
+        />
+      )}
+
+      {/* Subscribe Modal (NOWPayments Crypto Flow) */}
+      {showSubscribeModal && (
+        <CreatorSubscribeModal 
+          creator={creatorData}
+          onClose={() => setShowSubscribeModal(false)}
+          onSubscribeSuccess={() => {
+            setIsSubscribed(true);
+            setSubscribersCount(prev => prev + 1);
           }}
         />
       )}
