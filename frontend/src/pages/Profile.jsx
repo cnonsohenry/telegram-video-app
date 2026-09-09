@@ -878,7 +878,12 @@ export default function Profile({
                 <ArrowLeft size={20} />
                 <span>Back to profile</span>
               </button>
-              <span style={groupTitleStyle}>{activeGroup.title || "Collection"} ({activeGroup.videos.length} clips)</span>
+              <span 
+                style={groupTitleStyle} 
+                title={activeGroup.title || "Collection"}
+              >
+                {(activeGroup.title || "Collection").slice(0, 32)} ({activeGroup.videos.length} clips)
+              </span>
             </div>
           )}
 
@@ -1028,7 +1033,15 @@ const loaderStyle = { padding: "40px", textAlign: "center", color: "#737373", fo
 
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", background: "#121214", borderBottom: "1px solid #262626" };
 const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#fff", fontSize: "14px", fontWeight: "600", cursor: "pointer", padding: "0" };
-const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
+const groupTitleStyle = { 
+  fontSize: "13px", 
+  color: "#8e8e8e", 
+  fontWeight: "500",
+  maxWidth: "50%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap"
+};
 
 const headerIconButton = { background: "none", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: "4px" };
 const desktopIconBtnStyle = { background: "#262626", border: "1px solid #363636", borderRadius: "8px", width: "36px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };

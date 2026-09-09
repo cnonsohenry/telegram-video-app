@@ -1149,10 +1149,21 @@ app.get("/api/comments/:message_id", async (req, res) => {
 /* =======================================================
    🟢 BULLETPROOF THUMBNAIL ROUTE 
 ======================================================= */
+const FALLBACK_THUMB_SVG = Buffer.from(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+    <rect width="400" height="400" fill="#121214"/>
+    <circle cx="200" cy="200" r="36" fill="rgba(255,255,255,0.06)"/>
+    <polygon points="192,184 218,200 192,216" fill="rgba(255,255,255,0.3)"/>
+  </svg>`
+);
+
 app.get("/api/thumbnail", async (req, res) => {
   const { chat_id, message_id } = req.query;
-  // If invalid request, redirect to fallback silently
-  if (!chat_id || !message_id) return res.redirect('/assets/default-avatar.png');
+  // If invalid request, return clean dark SVG fallback
+  if (!chat_id || !message_id) {
+    res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*" });
+    return res.send(FALLBACK_THUMB_SVG);
+  }
   
   const fileName = `thumbs/${chat_id}_${message_id}.jpg`;
 
@@ -1176,10 +1187,17 @@ app.get("/api/thumbnail", async (req, res) => {
     }
 
     // 2. Fetch from Telegram DB
-    const dbRes = await pool.query("SELECT thumb_file_id FROM videos WHERE chat_id=$1 AND message_id=$2", [chat_id, message_id]);
+    const dbRes = await pool.query("SELECT thumb_file_id, cloudflare_id FROM videos WHERE chat_id=$1 AND message_id=$2", [chat_id, message_id]);
     
+    // If video is hosted on Cloudflare, redirect to high-res Cloudflare thumbnail
+    if (dbRes.rows[0]?.cloudflare_id && dbRes.rows[0].cloudflare_id !== "none" && !dbRes.rows[0].cloudflare_id.startsWith("r2:")) {
+      const cleanId = dbRes.rows[0].cloudflare_id.split('?')[0];
+      return res.redirect(`https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`);
+    }
+
     if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) {
-        return res.redirect('/assets/default-avatar.png');
+      res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*" });
+      return res.send(FALLBACK_THUMB_SVG);
     }
 
     const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: dbRes.rows[0].thumb_file_id } });
@@ -1202,9 +1220,20 @@ app.get("/api/thumbnail", async (req, res) => {
     return res.send(buffer);
 
   } catch (err) {
-    // Ultimate Failsafe: Never show a broken image icon
-    return res.redirect('/assets/default-avatar.png');
+    // Failsafe: return clean SVG placeholder so image never breaks or displays broken alt text
+    res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*" });
+    return res.send(FALLBACK_THUMB_SVG);
   }
+});
+
+// Alias for /api/thumb to /api/thumbnail
+app.get("/api/thumb", (req, res) => {
+  const { chat_id, message_id } = req.query;
+  if (!chat_id || !message_id) {
+    res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*" });
+    return res.send(FALLBACK_THUMB_SVG);
+  }
+  return res.redirect(301, `/api/thumbnail?chat_id=${encodeURIComponent(chat_id)}&message_id=${encodeURIComponent(message_id)}`);
 });
 
 /* =======================================================

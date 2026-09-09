@@ -22,6 +22,14 @@ const optionalAuth = (req, res, next) => {
   next();
 };
 
+const formatThumbnailUrl = (v, apiBaseUrl) => {
+  if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
+    const cleanId = v.cloudflare_id.split("?")[0];
+    return `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
+  }
+  return `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`;
+};
+
 /* =======================================================
    1. UPGRADE USER TO CREATOR
    POST /api/creator/upgrade
@@ -240,7 +248,7 @@ router.get("/studio/insights", authenticateToken, async (req, res) => {
 
     // 4. Video Stats
     const videosRes = await pool.query(
-      `SELECT v.id, v.chat_id, v.message_id, v.caption, v.category, v.views, v.likes_count, v.comments_count, v.created_at
+      `SELECT v.id, v.chat_id, v.message_id, v.caption, v.category, v.views, v.likes_count, v.comments_count, v.created_at, v.cloudflare_id
        FROM videos v
        WHERE v.uploader_id = $1 OR LOWER(COALESCE(v.uploader_name, '')) = LOWER($2)
        ORDER BY v.views DESC
@@ -259,6 +267,12 @@ router.get("/studio/insights", authenticateToken, async (req, res) => {
     const totalViews = Number(videoSummaryRes.rows[0]?.total_views || 0);
     const totalLikes = Number(videoSummaryRes.rows[0]?.total_likes || 0);
 
+    const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const mappedTopVideos = videosRes.rows.map(v => ({
+      ...v,
+      thumbnail_url: formatThumbnailUrl(v, apiBaseUrl)
+    }));
+
     res.json({
       creator,
       stats: {
@@ -273,7 +287,7 @@ router.get("/studio/insights", authenticateToken, async (req, res) => {
       },
       subscribers: subscribersRes.rows,
       tips: tipsRes.rows,
-      top_videos: videosRes.rows
+      top_videos: mappedTopVideos
     });
   } catch (err) {
     console.error("[CREATOR STUDIO INSIGHTS ERROR]", err);
@@ -389,8 +403,9 @@ router.get("/:username", optionalAuth, async (req, res) => {
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1) 
-          OR v.uploader_id = $2`,
-      [creator.username, Number(creator.id) || 0]
+          OR CAST(v.uploader_id AS TEXT) = CAST($2 AS TEXT)
+          OR (v.uploader_name IS NOT NULL AND LOWER(v.uploader_name) = LOWER($1))`,
+      [creator.username, String(creator.id || '0')]
     );
 
     const postsCount = Number(statsRes.rows[0]?.posts_count || 0);
@@ -420,14 +435,15 @@ router.get("/:username", optionalAuth, async (req, res) => {
 
     // 4. Fetch First 12 Videos
     const videosRes = await pool.query(
-      `SELECT v.*, COALESCE(u.username, 'Member') as uploader_name
+      `SELECT v.*, COALESCE(u.username, v.uploader_name, 'Member') as uploader_name
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1) 
-          OR v.uploader_id = $2
+          OR CAST(v.uploader_id AS TEXT) = CAST($2 AS TEXT)
+          OR (v.uploader_name IS NOT NULL AND LOWER(v.uploader_name) = LOWER($1))
        ORDER BY v.created_at DESC
        LIMIT 12`,
-      [creator.username, Number(creator.id) || 0]
+      [creator.username, String(creator.id || '0')]
     );
 
     const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
@@ -444,7 +460,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       comments_count: Number(v.comments_count || 0),
       shares_count: Number(v.shares_count || 0),
       saves_count: Number(v.saves_count || 0),
-      thumbnail_url: `${apiBaseUrl}/api/thumb?chat_id=${v.chat_id}&message_id=${v.message_id}`,
+      thumbnail_url: formatThumbnailUrl(v, apiBaseUrl),
       video_url: null,
       is_group: Boolean(v.media_group_id && v.media_group_id !== 'none'),
       created_at: v.created_at
@@ -489,14 +505,15 @@ router.get("/:username/videos", async (req, res) => {
     }
 
     const videosRes = await pool.query(
-      `SELECT v.*, COALESCE(u.username, $1) as uploader_name
+      `SELECT v.*, COALESCE(u.username, v.uploader_name, $1) as uploader_name
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
-          OR v.uploader_id = $2
+          OR CAST(v.uploader_id AS TEXT) = CAST($2 AS TEXT)
+          OR (v.uploader_name IS NOT NULL AND LOWER(v.uploader_name) = LOWER($1))
        ORDER BY v.created_at DESC
        LIMIT $3 OFFSET $4`,
-      [username, Number(creatorId) || 0, limit, offset]
+      [username, String(creatorId || '0'), limit, offset]
     );
 
     const countRes = await pool.query(
@@ -504,8 +521,9 @@ router.get("/:username/videos", async (req, res) => {
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
-          OR v.uploader_id = $2`,
-      [username, Number(creatorId) || 0]
+          OR CAST(v.uploader_id AS TEXT) = CAST($2 AS TEXT)
+          OR (v.uploader_name IS NOT NULL AND LOWER(v.uploader_name) = LOWER($1))`,
+      [username, String(creatorId || '0')]
     );
 
     const totalVideos = Number(countRes.rows[0]?.count || 0);
@@ -521,7 +539,10 @@ router.get("/:username/videos", async (req, res) => {
       caption: v.caption,
       views: Number(v.views || 0),
       likes_count: Number(v.likes_count || 0),
-      thumbnail_url: `${apiBaseUrl}/api/thumb?chat_id=${v.chat_id}&message_id=${v.message_id}`,
+      comments_count: Number(v.comments_count || 0),
+      shares_count: Number(v.shares_count || 0),
+      saves_count: Number(v.saves_count || 0),
+      thumbnail_url: formatThumbnailUrl(v, apiBaseUrl),
       video_url: null,
       is_group: Boolean(v.media_group_id && v.media_group_id !== 'none'),
       created_at: v.created_at

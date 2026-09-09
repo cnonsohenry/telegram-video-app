@@ -9,15 +9,27 @@ export default function InstagramMediaCard({
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isImgLoaded, setIsImgLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const cardRef = useRef(null);
 
-  const thumbSrc = video.thumbnail_url
-    ? (video.thumbnail_url.includes("?") ? `${video.thumbnail_url}&w=500` : `${video.thumbnail_url}?w=500`)
-    : "";
+  const thumbSrc = React.useMemo(() => {
+    let url = video.thumbnail_url;
+    if (!url && video.chat_id && video.message_id) {
+      url = `/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}`;
+    }
+    if (!url) return "";
+    if (url.includes("/api/thumb?")) {
+      url = url.replace("/api/thumb?", "/api/thumbnail?");
+    }
+    if (url.startsWith("/")) {
+      url = `${APP_CONFIG.apiUrl}${url}`;
+    }
+    return url.includes("?") ? `${url}&w=500` : `${url}?w=500`;
+  }, [video.thumbnail_url, video.chat_id, video.message_id]);
 
   useEffect(() => {
     const el = cardRef.current;
@@ -102,7 +114,7 @@ export default function InstagramMediaCard({
       }}
     >
       {/* Skeleton loader */}
-      {!isImgLoaded && (
+      {!isImgLoaded && !hasError && (
         <div
           style={{
             position: "absolute",
@@ -113,16 +125,34 @@ export default function InstagramMediaCard({
         />
       )}
 
+      {/* Fallback placeholder if thumbnail is missing or fails to load */}
+      {(!thumbSrc || hasError) && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 2,
+            backgroundColor: "#16161a",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          <Play size={26} color="rgba(255,255,255,0.2)" fill="rgba(255,255,255,0.08)" />
+        </div>
+      )}
+
       {/* Thumbnail */}
-      {thumbSrc && (
+      {thumbSrc && !hasError && (
         <img
           src={thumbSrc}
-          alt={video.caption || "Post thumbnail"}
+          alt=""
+          aria-label="Post thumbnail"
           loading="lazy"
           onLoad={() => setIsImgLoaded(true)}
-          onError={(e) => {
+          onError={() => {
             setIsImgLoaded(true);
-            e.target.style.display = "none";
+            setHasError(true);
           }}
           style={{
             width: "100%",

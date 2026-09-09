@@ -8,11 +8,23 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isImgLoaded, setIsImgLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
 
-  const thumbSrc = video.thumbnail_url 
-    ? (video.thumbnail_url.includes('?') ? `${video.thumbnail_url}&w=400` : `${video.thumbnail_url}?w=400`)
-    : '';
+  const thumbSrc = React.useMemo(() => {
+    let url = video.thumbnail_url;
+    if (!url && video.chat_id && video.message_id) {
+      url = `/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}`;
+    }
+    if (!url) return '';
+    if (url.includes('/api/thumb?')) {
+      url = url.replace('/api/thumb?', '/api/thumbnail?');
+    }
+    if (url.startsWith('/')) {
+      url = `${APP_CONFIG.apiUrl}${url}`;
+    }
+    return url.includes('?') ? `${url}&w=400` : `${url}?w=400`;
+  }, [video.thumbnail_url, video.chat_id, video.message_id]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -108,15 +120,16 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           }} />
         )}
 
-        {thumbSrc && (
+        {thumbSrc && !hasError && (
           <img 
             src={thumbSrc} 
-            alt={video.caption || "Thumbnail"}
+            alt=""
+            aria-label="Thumbnail"
             loading="eager"
             onLoad={() => setIsImgLoaded(true)}
-            onError={(e) => { 
+            onError={() => { 
               setIsImgLoaded(true); 
-              e.target.style.display = 'none'; 
+              setHasError(true);
             }}
             style={{
               width: "100%", height: "100%", 
