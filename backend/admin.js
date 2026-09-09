@@ -272,21 +272,190 @@ router.delete("/user/:id", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
+// 🟢 10. GET ALL CREATORS (Admin Creator Management)
+router.get("/creators", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const creatorsRes = await pool.query(`
+      SELECT 
+        u.id, 
+        u.username, 
+        u.email, 
+        COALESCE(u.display_name, u.username) as display_name, 
+        u.avatar_url, 
+        u.banner_url, 
+        u.creator_bio, 
+        COALESCE(u.creator_category, 'Creator') as creator_category, 
+        COALESCE(u.subscription_price, 0) as subscription_price, 
+        COALESCE(u.is_verified, false) as is_verified, 
+        COALESCE(u.is_creator, false) as is_creator, 
+        u.created_at,
+        (
+          SELECT COUNT(*) 
+          FROM creator_subscriptions cs 
+          WHERE cs.creator_id = u.id 
+            AND cs.status = 'active' 
+            AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
+        ) as subscribers_count,
+        (
+          SELECT COALESCE(SUM(expected_amount), 0)
+          FROM transactions t
+          WHERE t.creator_id = u.id 
+            AND t.transaction_type = 'creator_sub' 
+            AND t.status = 'APPROVED'
+        ) as subscription_revenue_usd,
+        (
+          SELECT COUNT(*) 
+          FROM creator_tips ct 
+          WHERE ct.creator_id = u.id
+        ) as tips_count,
+        (
+          SELECT COALESCE(SUM(amount), 0) 
+          FROM creator_tips ct 
+          WHERE ct.creator_id = u.id
+        ) as tips_total,
+        (
+          SELECT COUNT(*) 
+          FROM videos v 
+          LEFT JOIN users tg ON v.uploader_id = tg.user_id
+          WHERE v.uploader_id = u.id 
+             OR LOWER(COALESCE(tg.username, '')) = LOWER(u.username)
+        ) as posts_count,
+        (
+          SELECT COALESCE(SUM(views), 0) 
+          FROM videos v 
+          LEFT JOIN users tg ON v.uploader_id = tg.user_id
+          WHERE v.uploader_id = u.id 
+             OR LOWER(COALESCE(tg.username, '')) = LOWER(u.username)
+        ) as total_views
+      FROM app_users u
+      WHERE u.is_creator = true OR u.subscription_price > 0
+      ORDER BY u.created_at DESC
+    `);
+
+    // Overview aggregate metrics
+    const statsRes = await pool.query(`
+      SELECT 
+        (SELECT COUNT(*) FROM app_users WHERE is_creator = true) as total_creators,
+        (SELECT COUNT(*) FROM app_users WHERE is_creator = true AND is_verified = true) as verified_creators,
+        (SELECT COUNT(*) FROM creator_subscriptions WHERE status = 'active' AND (expires_at IS NULL OR expires_at > NOW())) as total_active_subscriptions,
+        (SELECT COALESCE(SUM(expected_amount), 0) FROM transactions WHERE transaction_type = 'creator_sub' AND status = 'APPROVED') as total_sub_revenue_usd,
+        (SELECT COALESCE(SUM(amount), 0) FROM creator_tips) as total_tips_ngn
+    `);
+
+    res.json({
+      creators: creatorsRes.rows.map(c => ({
+        ...c,
+        subscribers_count: Number(c.subscribers_count || 0),
+        subscription_revenue_usd: Number(c.subscription_revenue_usd || 0),
+        tips_count: Number(c.tips_count || 0),
+        tips_total: Number(c.tips_total || 0),
+        posts_count: Number(c.posts_count || 0),
+        total_views: Number(c.total_views || 0)
+      })),
+      stats: {
+        total_creators: Number(statsRes.rows[0]?.total_creators || 0),
+        verified_creators: Number(statsRes.rows[0]?.verified_creators || 0),
+        total_active_subscriptions: Number(statsRes.rows[0]?.total_active_subscriptions || 0),
+        total_sub_revenue_usd: Number(statsRes.rows[0]?.total_sub_revenue_usd || 0),
+        total_tips_ngn: Number(statsRes.rows[0]?.total_tips_ngn || 0)
+      }
+    });
+  } catch (err) {
+    console.error("[ADMIN GET CREATORS ERROR]", err);
+    res.status(500).json({ error: "Failed to fetch creators" });
+  }
+});
+
+// 🟢 11. UPDATE CREATOR (Verification Badge, Category, Price, Creator Status)
+router.put("/creator/:id", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const creatorId = req.params.id;
+    const { 
+      is_verified, 
+      is_creator, 
+      subscription_price, 
+      creator_category, 
+      display_name, 
+      creator_bio 
+    } = req.body;
+
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    if (is_verified !== undefined) {
+      updates.push(`is_verified = $${idx++}`);
+      values.push(Boolean(is_verified));
+    }
+
+    if (is_creator !== undefined) {
+      updates.push(`is_creator = $${idx++}`);
+      values.push(Boolean(is_creator));
+    }
+
+    if (subscription_price !== undefined) {
+      const price = Number(subscription_price);
+      if (!Number.isFinite(price) || price < 0) {
+        return res.status(400).json({ error: "Invalid subscription price" });
+      }
+      updates.push(`subscription_price = $${idx++}`);
+      values.push(price);
+    }
+
+    if (creator_category !== undefined) {
+      updates.push(`creator_category = $${idx++}`);
+      values.push(String(creator_category).trim().slice(0, 50));
+    }
+
+    if (display_name !== undefined) {
+      updates.push(`display_name = $${idx++}`);
+      values.push(String(display_name).trim().slice(0, 100));
+    }
+
+    if (creator_bio !== undefined) {
+      updates.push(`creator_bio = $${idx++}`);
+      values.push(String(creator_bio).trim().slice(0, 500));
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No fields provided to update" });
+    }
+
+    values.push(creatorId);
+    const query = `
+      UPDATE app_users 
+      SET ${updates.join(", ")} 
+      WHERE id = $${idx} 
+      RETURNING id, username, email, display_name, avatar_url, banner_url, 
+                creator_bio, creator_category, subscription_price, is_verified, is_creator
+    `;
+
+    const result = await pool.query(query, values);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Creator not found" });
+    }
+
+    res.json({ success: true, creator: result.rows[0] });
+  } catch (err) {
+    console.error("[ADMIN UPDATE CREATOR ERROR]", err);
+    res.status(500).json({ error: "Failed to update creator" });
+  }
+});
+
 // 🟢 GLOBAL DATABASE SEARCH
 router.get("/search", authenticateToken, isAdmin, async (req, res) => {
   try {
     const { q } = req.query;
-    if (!q) return res.json({ users: [], videos: [], transactions: [] });
+    if (!q) return res.json({ users: [], videos: [], transactions: [], creators: [] });
 
     const searchParam = `%${q}%`;
 
-    // Query all three core tables simultaneously
-    const [usersRes, videosRes, txRes] = await Promise.all([
+    // Query all core tables simultaneously including creators
+    const [usersRes, videosRes, txRes, creatorsRes] = await Promise.all([
       pool.query(`SELECT * FROM app_users WHERE username ILIKE $1 OR email ILIKE $1 LIMIT 20`, [searchParam]),
       
       pool.query(`SELECT * FROM videos WHERE caption ILIKE $1 OR category ILIKE $1 LIMIT 20`, [searchParam]),
       
-      // 🟢 THE FIX: Query actual DB columns (status/sender_name) but return the aliases (amount/payment_method) the frontend expects
       pool.query(`
         SELECT 
           t.*, 
@@ -297,6 +466,14 @@ router.get("/search", authenticateToken, isAdmin, async (req, res) => {
         FROM transactions t 
         LEFT JOIN app_users u ON t.app_user_id = u.id 
         WHERE u.username ILIKE $1 OR u.email ILIKE $1 OR t.status ILIKE $1 OR t.sender_name ILIKE $1
+        LIMIT 20
+      `, [searchParam]),
+
+      pool.query(`
+        SELECT id, username, email, display_name, avatar_url, creator_category, subscription_price, is_verified, is_creator
+        FROM app_users
+        WHERE (is_creator = true OR subscription_price > 0)
+          AND (username ILIKE $1 OR display_name ILIKE $1 OR creator_category ILIKE $1)
         LIMIT 20
       `, [searchParam])
     ]);
@@ -316,7 +493,8 @@ router.get("/search", authenticateToken, isAdmin, async (req, res) => {
     res.json({
       users: usersRes.rows,
       videos: formattedVideos,
-      transactions: txRes.rows
+      transactions: txRes.rows,
+      creators: creatorsRes.rows
     });
   } catch (err) {
     console.error("Global search failed:", err);

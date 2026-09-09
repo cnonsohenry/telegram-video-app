@@ -171,6 +171,117 @@ router.patch("/profile", authenticateToken, async (req, res) => {
 });
 
 /* =======================================================
+   2B. CREATOR STUDIO INSIGHTS & ANALYTICS
+   GET /api/creator/studio/insights
+======================================================= */
+router.get("/studio/insights", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const userRes = await pool.query(
+      `SELECT id, username, email, display_name, avatar_url, banner_url,
+              creator_bio, creator_category, subscription_price, is_verified, is_creator, created_at
+       FROM app_users WHERE id = $1`,
+      [userId]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const creator = userRes.rows[0];
+
+    // 1. Active subscribers count & list
+    const subscribersRes = await pool.query(
+      `SELECT cs.id, cs.subscriber_id, cs.amount_paid, cs.status, cs.expires_at, cs.created_at,
+              u.username as subscriber_username, u.display_name as subscriber_display_name, u.avatar_url as subscriber_avatar
+       FROM creator_subscriptions cs
+       JOIN app_users u ON cs.subscriber_id = u.id
+       WHERE cs.creator_id = $1 AND cs.status = 'active' AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
+       ORDER BY cs.created_at DESC
+       LIMIT 50`,
+      [userId]
+    );
+
+    const subCountRes = await pool.query(
+      `SELECT COUNT(*) FROM creator_subscriptions 
+       WHERE creator_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())`,
+      [userId]
+    );
+    const activeSubscribers = Number(subCountRes.rows[0]?.count || 0);
+
+    // 2. Subscription Revenue USD
+    const subRevRes = await pool.query(
+      `SELECT COALESCE(SUM(expected_amount), 0) as total_usd, COUNT(*) as tx_count
+       FROM transactions
+       WHERE creator_id = $1 AND transaction_type = 'creator_sub' AND status = 'APPROVED'`,
+      [userId]
+    );
+    const subscriptionRevenueUsd = Number(subRevRes.rows[0]?.total_usd || 0);
+
+    // 3. Tips received (list + sum)
+    const tipsRes = await pool.query(
+      `SELECT ct.id, ct.amount, ct.message, ct.created_at,
+              u.username as sender_username, u.display_name as sender_display_name, u.avatar_url as sender_avatar
+       FROM creator_tips ct
+       LEFT JOIN app_users u ON ct.sender_id = u.id
+       WHERE ct.creator_id = $1
+       ORDER BY ct.created_at DESC
+       LIMIT 50`,
+      [userId]
+    );
+
+    const tipsTotalRes = await pool.query(
+      `SELECT COALESCE(SUM(amount), 0) as total_ngn, COUNT(*) as count 
+       FROM creator_tips WHERE creator_id = $1`,
+      [userId]
+    );
+    const tipsTotalNgn = Number(tipsTotalRes.rows[0]?.total_ngn || 0);
+    const tipsCount = Number(tipsTotalRes.rows[0]?.count || 0);
+
+    // 4. Video Stats
+    const videosRes = await pool.query(
+      `SELECT v.id, v.chat_id, v.message_id, v.caption, v.category, v.views, v.likes_count, v.comments_count, v.created_at
+       FROM videos v
+       WHERE v.uploader_id = $1 OR LOWER(COALESCE(v.uploader_name, '')) = LOWER($2)
+       ORDER BY v.views DESC
+       LIMIT 30`,
+      [userId, creator.username]
+    );
+
+    const videoSummaryRes = await pool.query(
+      `SELECT COUNT(*) as posts_count, COALESCE(SUM(views), 0) as total_views, COALESCE(SUM(likes_count), 0) as total_likes
+       FROM videos
+       WHERE uploader_id = $1 OR LOWER(COALESCE(uploader_name, '')) = LOWER($2)`,
+      [userId, creator.username]
+    );
+
+    const postsCount = Number(videoSummaryRes.rows[0]?.posts_count || 0);
+    const totalViews = Number(videoSummaryRes.rows[0]?.total_views || 0);
+    const totalLikes = Number(videoSummaryRes.rows[0]?.total_likes || 0);
+
+    res.json({
+      creator,
+      stats: {
+        active_subscribers: activeSubscribers,
+        subscription_revenue_usd: subscriptionRevenueUsd,
+        tips_total_ngn: tipsTotalNgn,
+        tips_count: tipsCount,
+        posts_count: postsCount,
+        total_views: totalViews,
+        total_likes: totalLikes,
+        estimated_mrr_ngn: activeSubscribers * Number(creator.subscription_price || 0)
+      },
+      subscribers: subscribersRes.rows,
+      tips: tipsRes.rows,
+      top_videos: videosRes.rows
+    });
+  } catch (err) {
+    console.error("[CREATOR STUDIO INSIGHTS ERROR]", err);
+    res.status(500).json({ error: "Failed to fetch studio insights" });
+  }
+});
+
+/* =======================================================
    3. GET PUBLIC CREATOR PROFILE
    GET /api/creator/:username
 ======================================================= */

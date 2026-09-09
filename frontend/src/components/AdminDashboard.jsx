@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   LayoutDashboard, Users, CreditCard, LogOut, TrendingUp, ShieldCheck, 
   Clock, RefreshCw, UploadCloud, Video, Search, Edit3, Trash2, ChevronUp, ChevronDown, X, AlertTriangle, Menu,
-  PlayCircle, Eye, PieChart, Activity, Star, Percent 
+  PlayCircle, Eye, PieChart, Activity, Star, Percent, Sparkles, CheckCircle, CheckCircle2, Heart, ExternalLink, DollarSign
 } from "lucide-react";
 import AdminUpload from "./AdminUpload"; 
 
@@ -24,10 +24,16 @@ export default function AdminDashboard({ user, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null); 
+  const [editingCreator, setEditingCreator] = useState(null);
+  const [updatingCreatorId, setUpdatingCreatorId] = useState(null);
   const [deleteWarning, setDeleteWarning] = useState(null); 
 
   const [stats, setStats] = useState({ total_users: 0, premium_users: 0, total_revenue_usd: 0, pending_crypto_orders: 0 });
   const [usersList, setUsersList] = useState([]);
+  const [creatorsList, setCreatorsList] = useState([]);
+  const [creatorStats, setCreatorStats] = useState(null);
+  const [creatorFilter, setCreatorFilter] = useState("all");
+  const [creatorCategoryFilter, setCreatorCategoryFilter] = useState("all");
   const [transactions, setTransactions] = useState([]);
   const [videosList, setVideosList] = useState([]);
 
@@ -79,6 +85,13 @@ export default function AdminDashboard({ user, onLogout }) {
       } else if (activeTab === "videos") {
         const res = await fetch(`${baseUrl}/api/admin/all-videos`, { headers });
         setVideosList(await res.json());
+      } else if (activeTab === "creators") {
+        const res = await fetch(`${baseUrl}/api/admin/creators`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setCreatorsList(data.creators || []);
+          setCreatorStats(data.stats || null);
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -121,6 +134,107 @@ export default function AdminDashboard({ user, onLogout }) {
   const processedUsers = useMemo(() => sortData(usersList), [usersList, sortConfig]);
   const processedVideos = useMemo(() => sortData(videosList), [videosList, sortConfig]);
   const processedTx = useMemo(() => sortData(transactions), [transactions, sortConfig]);
+
+  const filteredCreators = useMemo(() => {
+    return creatorsList.filter(c => {
+      if (creatorFilter === "verified" && !c.is_verified) return false;
+      if (creatorFilter === "unverified" && c.is_verified) return false;
+      if (creatorFilter === "paid" && Number(c.subscription_price || 0) === 0) return false;
+      if (creatorFilter === "free" && Number(c.subscription_price || 0) > 0) return false;
+      if (creatorCategoryFilter !== "all" && c.creator_category !== creatorCategoryFilter) return false;
+      return true;
+    });
+  }, [creatorsList, creatorFilter, creatorCategoryFilter]);
+
+  const processedCreators = useMemo(() => sortData(filteredCreators), [filteredCreators, sortConfig]);
+  const paginatedCreators = processedCreators.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalCreatorPages = Math.ceil(processedCreators.length / ITEMS_PER_PAGE);
+
+  const creatorAnalytics = useMemo(() => {
+    const total = creatorStats?.total_creators || creatorsList.length;
+    const verified = creatorStats?.verified_creators || creatorsList.filter(c => c.is_verified).length;
+    const totalSubs = creatorStats?.total_active_subscriptions || creatorsList.reduce((sum, c) => sum + (Number(c.subscribers_count) || 0), 0);
+    const totalSubRev = (creatorStats?.total_sub_revenue_usd || creatorsList.reduce((sum, c) => sum + (Number(c.subscription_revenue_usd) || 0), 0)).toFixed(2);
+    const totalTips = creatorStats?.total_tips_ngn || creatorsList.reduce((sum, c) => sum + (Number(c.tips_total) || 0), 0);
+    return { total, verified, totalSubs, totalSubRev, totalTips };
+  }, [creatorsList, creatorStats]);
+
+  const handleToggleVerify = async (creator) => {
+    const nextState = !creator.is_verified;
+    setUpdatingCreatorId(creator.id);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creator/${creator.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({ is_verified: nextState })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCreatorsList(prev => prev.map(c => c.id === creator.id ? { ...c, is_verified: nextState } : c));
+      }
+    } catch (err) {
+      console.error("Failed to toggle verify:", err);
+    } finally {
+      setUpdatingCreatorId(null);
+    }
+  };
+
+  const handleToggleCreatorStatus = async (creator) => {
+    const nextState = !creator.is_creator;
+    setUpdatingCreatorId(creator.id);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creator/${creator.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({ is_creator: nextState })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCreatorsList(prev => prev.map(c => c.id === creator.id ? { ...c, is_creator: nextState } : c));
+      }
+    } catch (err) {
+      console.error("Failed to toggle creator status:", err);
+    } finally {
+      setUpdatingCreatorId(null);
+    }
+  };
+
+  const handleSaveCreatorEdit = async (e) => {
+    e.preventDefault();
+    if (!editingCreator) return;
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creator/${editingCreator.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({
+          display_name: editingCreator.display_name,
+          creator_category: editingCreator.creator_category,
+          subscription_price: Number(editingCreator.subscription_price),
+          creator_bio: editingCreator.creator_bio,
+          is_verified: editingCreator.is_verified,
+          is_creator: editingCreator.is_creator
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCreatorsList(prev => prev.map(c => c.id === editingCreator.id ? { ...c, ...data.creator } : c));
+        setEditingCreator(null);
+      } else {
+        alert(data.error || "Failed to update creator");
+      }
+    } catch (err) {
+      alert("Failed to update creator: " + err.message);
+    }
+  };
 
   const videoAnalytics = useMemo(() => {
     const total = videosList.length;
@@ -264,6 +378,7 @@ export default function AdminDashboard({ user, onLogout }) {
           
           <div style={{ marginTop: "40px", display: "flex", flexDirection: "column", gap: "10px" }}>
             <SidebarBtn active={activeTab === "overview" && !searchQuery} onClick={() => handleTabSwitch("overview")} icon={<LayoutDashboard size={20} />} label="Overview" />
+            <SidebarBtn active={activeTab === "creators" && !searchQuery} onClick={() => handleTabSwitch("creators")} icon={<Sparkles size={20} />} label="Creators" />
             <SidebarBtn active={activeTab === "videos" && !searchQuery} onClick={() => handleTabSwitch("videos")} icon={<Video size={20} />} label="Videos" />
             <SidebarBtn active={activeTab === "users" && !searchQuery} onClick={() => handleTabSwitch("users")} icon={<Users size={20} />} label="Users" />
             <SidebarBtn active={activeTab === "transactions" && !searchQuery} onClick={() => handleTabSwitch("transactions")} icon={<CreditCard size={20} />} label="Transactions" />
@@ -373,6 +488,54 @@ export default function AdminDashboard({ user, onLogout }) {
                       </div>
                     </div>
                   )}
+
+                  {globalSearchResults.creators && globalSearchResults.creators.length > 0 && (
+                    <>
+                      <h3 style={{ color: "#8e8e93", marginBottom: "20px" }}>Found {globalSearchResults.creators.length} Creators</h3>
+                      <div style={{ ...tableContainerStyle, marginBottom: "40px" }}>
+                        <div style={{ overflowX: "auto" }}>
+                          <table style={tableStyle}>
+                            <thead>
+                              <tr>
+                                <th style={thStyle}>Creator</th>
+                                <th style={thStyle}>Category</th>
+                                <th style={thStyle}>Monthly Rate</th>
+                                <th style={thStyle}>Verified</th>
+                                <th style={thStyle}>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {globalSearchResults.creators.map(c => (
+                                <tr key={c.id} style={trStyle}>
+                                  <td style={tdStyle}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                      <img src={c.avatar_url || '/assets/default-avatar.png'} alt="" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} />
+                                      <div>
+                                        <div style={{ fontWeight: "700", color: "#fff", fontSize: "13px" }}>{c.display_name || c.username}</div>
+                                        <div style={{ fontSize: "11px", color: "#8e8e93" }}>@{c.username}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td style={tdStyle}>{c.creator_category || "Creator"}</td>
+                                  <td style={{ ...tdStyle, color: "#00d084", fontWeight: "700" }}>
+                                    {Number(c.subscription_price) > 0 ? `₦${Number(c.subscription_price).toLocaleString()}/mo` : "Free"}
+                                  </td>
+                                  <td style={tdStyle}>
+                                    {c.is_verified ? <CheckCircle size={15} color="#00aff0" fill="#00aff0" /> : <span style={{ color: "#8e8e93", fontSize: "12px" }}>No</span>}
+                                  </td>
+                                  <td style={tdStyle}>
+                                    <button onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: c.username }))} style={{ ...iconBtnStyle, color: "#00aff0" }}>
+                                      <ExternalLink size={16} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </>
+                  )}
                </div>
             ) : <div style={centerFlex}><p>No results found.</p></div>
           ) : loading ? (
@@ -387,6 +550,258 @@ export default function AdminDashboard({ user, onLogout }) {
                   <StatCard title="Premium Members" value={stats.premium_users} icon={<ShieldCheck size={24} color="var(--primary-color)" />} bg="rgba(247, 147, 26, 0.1)" />
                   <StatCard title="Pending Crypto" value={stats.pending_crypto_orders} icon={<Clock size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
                 </div>
+              )}
+
+              {/* 🟢 CREATOR MANAGEMENT TAB */}
+              {activeTab === "creators" && (
+                <>
+                  <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
+                    <StatCard 
+                      title="Total Creators" 
+                      value={creatorAnalytics.total} 
+                      icon={<Sparkles size={24} color="#00aff0" />} 
+                      bg="rgba(0, 175, 240, 0.1)" 
+                    />
+                    <StatCard 
+                      title="Verified Badges" 
+                      value={creatorAnalytics.verified} 
+                      icon={<CheckCircle size={24} color="#00d084" />} 
+                      bg="rgba(0, 208, 132, 0.1)" 
+                    />
+                    <StatCard 
+                      title="Active VIP Subscribers" 
+                      value={creatorAnalytics.totalSubs} 
+                      icon={<Users size={24} color="#F3BA2F" />} 
+                      bg="rgba(243, 186, 47, 0.1)" 
+                    />
+                    <StatCard 
+                      title="Total Tips Volume" 
+                      value={`₦${Number(creatorAnalytics.totalTips).toLocaleString()}`} 
+                      icon={<Heart size={24} color="#f91880" />} 
+                      bg="rgba(249, 24, 128, 0.1)" 
+                    />
+                  </div>
+
+                  {/* Filter bar */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      {[
+                        { id: "all", label: "All Creators" },
+                        { id: "verified", label: "Verified Only" },
+                        { id: "unverified", label: "Unverified" },
+                        { id: "paid", label: "Paid Subscriptions" },
+                        { id: "free", label: "Free Follow" }
+                      ].map(f => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => { setCreatorFilter(f.id); setCurrentPage(1); }}
+                          style={{
+                            padding: "6px 14px",
+                            borderRadius: "20px",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                            border: "1px solid",
+                            borderColor: creatorFilter === f.id ? "var(--primary-color)" : "rgba(255,255,255,0.12)",
+                            background: creatorFilter === f.id ? "rgba(247, 147, 26, 0.15)" : "transparent",
+                            color: creatorFilter === f.id ? "#fff" : "#8e8e93"
+                          }}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "12px", color: "#8e8e93" }}>Category:</span>
+                      <select
+                        value={creatorCategoryFilter}
+                        onChange={(e) => { setCreatorCategoryFilter(e.target.value); setCurrentPage(1); }}
+                        style={{
+                          background: "#18181b",
+                          border: "1px solid rgba(255,255,255,0.15)",
+                          borderRadius: "10px",
+                          color: "#fff",
+                          padding: "6px 12px",
+                          fontSize: "12px",
+                          outline: "none"
+                        }}
+                      >
+                        <option value="all">All Categories</option>
+                        <option value="Creator">General Creator</option>
+                        <option value="Model">Model</option>
+                        <option value="Influencer">Influencer</option>
+                        <option value="Dancer">Dancer</option>
+                        <option value="Fitness">Fitness</option>
+                        <option value="Blogger">Blogger</option>
+                        <option value="Musician">Musician</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={tableContainerStyle}>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={tableStyle}>
+                        <thead>
+                          <tr>
+                            <th onClick={() => handleSort('display_name')} style={{ ...thStyle, cursor: "pointer" }}>
+                              Creator <SortIcon columnKey="display_name" />
+                            </th>
+                            <th onClick={() => handleSort('creator_category')} style={{ ...thStyle, cursor: "pointer" }}>
+                              Category <SortIcon columnKey="creator_category" />
+                            </th>
+                            <th onClick={() => handleSort('subscription_price')} style={{ ...thStyle, cursor: "pointer" }}>
+                              Monthly Rate <SortIcon columnKey="subscription_price" />
+                            </th>
+                            <th onClick={() => handleSort('subscribers_count')} style={{ ...thStyle, cursor: "pointer" }}>
+                              VIP Fans <SortIcon columnKey="subscribers_count" />
+                            </th>
+                            <th onClick={() => handleSort('tips_total')} style={{ ...thStyle, cursor: "pointer" }}>
+                              Tips Received <SortIcon columnKey="tips_total" />
+                            </th>
+                            <th onClick={() => handleSort('posts_count')} style={{ ...thStyle, cursor: "pointer" }}>
+                              Posts / Views <SortIcon columnKey="posts_count" />
+                            </th>
+                            <th style={thStyle}>Verify Badge</th>
+                            <th style={thStyle}>Status</th>
+                            <th style={thStyle}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedCreators.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} style={{ ...tdStyle, textAlign: "center", padding: "40px 16px", color: "#8e8e93" }}>
+                                No creators matching this filter.
+                              </td>
+                            </tr>
+                          ) : (
+                            paginatedCreators.map(c => (
+                              <tr key={c.id} style={trStyle}>
+                                <td style={tdStyle}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                    <img 
+                                      src={c.avatar_url || '/assets/default-avatar.png'} 
+                                      alt="" 
+                                      style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: c.is_verified ? "1.5px solid #00aff0" : "1px solid #333" }}
+                                      onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                    />
+                                    <div>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                        <span style={{ fontWeight: "700", color: "#fff", fontSize: "13px" }}>{c.display_name || c.username}</span>
+                                        {c.is_verified && <CheckCircle size={13} color="#00aff0" fill="#00aff0" />}
+                                      </div>
+                                      <span style={{ fontSize: "11px", color: "#8e8e93" }}>@{c.username}</span>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td style={tdStyle}>
+                                  <span style={{
+                                    background: "rgba(0, 175, 240, 0.12)",
+                                    color: "#00aff0",
+                                    borderRadius: "8px",
+                                    padding: "3px 8px",
+                                    fontSize: "11px",
+                                    fontWeight: "700"
+                                  }}>
+                                    {c.creator_category || "Creator"}
+                                  </span>
+                                </td>
+                                <td style={{ ...tdStyle, fontWeight: "700" }}>
+                                  {Number(c.subscription_price) > 0 ? (
+                                    <span style={{ color: "#00d084" }}>₦{Number(c.subscription_price).toLocaleString()}/mo</span>
+                                  ) : (
+                                    <span style={{ color: "#8e8e93" }}>Free</span>
+                                  )}
+                                </td>
+                                <td style={{ ...tdStyle, fontWeight: "700", color: "#fff" }}>
+                                  {c.subscribers_count}
+                                </td>
+                                <td style={tdStyle}>
+                                  <span style={{ fontWeight: "700", color: "#f91880" }}>₦{(c.tips_total || 0).toLocaleString()}</span>
+                                  <span style={{ display: "block", fontSize: "10px", color: "#8e8e93" }}>{c.tips_count || 0} tips</span>
+                                </td>
+                                <td style={tdStyle}>
+                                  <span style={{ fontWeight: "700", color: "#fff" }}>{c.posts_count} posts</span>
+                                  <span style={{ display: "block", fontSize: "10px", color: "#8e8e93" }}>{(c.total_views || 0).toLocaleString()} views</span>
+                                </td>
+                                <td style={tdStyle}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleVerify(c)}
+                                    disabled={updatingCreatorId === c.id}
+                                    style={{
+                                      background: c.is_verified ? "rgba(0, 175, 240, 0.15)" : "rgba(255,255,255,0.06)",
+                                      border: `1px solid ${c.is_verified ? "#00aff0" : "rgba(255,255,255,0.15)"}`,
+                                      borderRadius: "14px",
+                                      padding: "4px 10px",
+                                      color: c.is_verified ? "#00aff0" : "#8e8e93",
+                                      fontSize: "11px",
+                                      fontWeight: "700",
+                                      cursor: "pointer",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "4px"
+                                    }}
+                                  >
+                                    <CheckCircle size={12} color={c.is_verified ? "#00aff0" : "#666"} />
+                                    <span>{c.is_verified ? "Verified" : "Unverified"}</span>
+                                  </button>
+                                </td>
+                                <td style={tdStyle}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleCreatorStatus(c)}
+                                    disabled={updatingCreatorId === c.id}
+                                    style={{
+                                      background: c.is_creator ? "rgba(0, 208, 132, 0.12)" : "rgba(255, 59, 48, 0.12)",
+                                      border: `1px solid ${c.is_creator ? "rgba(0, 208, 132, 0.3)" : "rgba(255, 59, 48, 0.3)"}`,
+                                      borderRadius: "14px",
+                                      padding: "4px 10px",
+                                      color: c.is_creator ? "#00d084" : "#ff3b30",
+                                      fontSize: "11px",
+                                      fontWeight: "700",
+                                      cursor: "pointer"
+                                    }}
+                                  >
+                                    {c.is_creator ? "Active" : "Disabled"}
+                                  </button>
+                                </td>
+                                <td style={tdStyle}>
+                                  <div style={{ display: "flex", gap: "6px" }}>
+                                    <button 
+                                      type="button"
+                                      onClick={() => setEditingCreator(c)} 
+                                      style={iconBtnStyle} 
+                                      title="Edit Creator"
+                                    >
+                                      <Edit3 size={16} />
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: c.username }))} 
+                                      style={{ ...iconBtnStyle, color: "#00aff0" }} 
+                                      title="Preview Public Profile"
+                                    >
+                                      <ExternalLink size={16} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {totalCreatorPages > 1 && (
+                      <div style={paginationStyle}>
+                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
+                        <span style={pageTextStyle}>Page {currentPage} of {totalCreatorPages}</span>
+                        <button disabled={currentPage === totalCreatorPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalCreatorPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
               {activeTab === "videos" && (
@@ -589,6 +1004,97 @@ export default function AdminDashboard({ user, onLogout }) {
               </>
             )}
             <button type="submit" style={saveBtnStyle}>Save Changes</button>
+          </form>
+        </div>
+      )}
+
+      {editingCreator && (
+        <div style={modalOverlayStyle}>
+          <form onSubmit={handleSaveCreatorEdit} style={modalBoxStyle}>
+            <div style={modalHeaderStyle}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Sparkles size={18} color="#FFD700" />
+                <h2 style={{ margin: 0, fontSize: "17px", color: "#fff" }}>
+                  Edit Creator @{editingCreator.username}
+                </h2>
+              </div>
+              <X size={20} cursor="pointer" onClick={() => setEditingCreator(null)} color="#8e8e93"/>
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Display Name</label>
+              <input 
+                type="text" 
+                value={editingCreator.display_name || ""} 
+                onChange={e => setEditingCreator({ ...editingCreator, display_name: e.target.value })} 
+                style={formInputStyle} 
+              />
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Category</label>
+              <select 
+                value={editingCreator.creator_category || "Creator"} 
+                onChange={e => setEditingCreator({ ...editingCreator, creator_category: e.target.value })} 
+                style={formInputStyle}
+              >
+                <option value="Creator">General Creator</option>
+                <option value="Model">Model</option>
+                <option value="Influencer">Influencer</option>
+                <option value="Dancer">Dancer</option>
+                <option value="Fitness">Fitness</option>
+                <option value="Blogger">Blogger</option>
+                <option value="Musician">Musician</option>
+              </select>
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Monthly Subscription Price (₦ NGN)</label>
+              <input 
+                type="number" 
+                min={0}
+                step={500}
+                value={editingCreator.subscription_price || 0} 
+                onChange={e => setEditingCreator({ ...editingCreator, subscription_price: e.target.value })} 
+                style={formInputStyle} 
+              />
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Verified Badge</label>
+              <select 
+                value={editingCreator.is_verified ? "true" : "false"} 
+                onChange={e => setEditingCreator({ ...editingCreator, is_verified: e.target.value === "true" })} 
+                style={formInputStyle}
+              >
+                <option value="true">Verified ✓ (Official Blue Checkmark)</option>
+                <option value="false">Unverified</option>
+              </select>
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Creator Channel Status</label>
+              <select 
+                value={editingCreator.is_creator ? "true" : "false"} 
+                onChange={e => setEditingCreator({ ...editingCreator, is_creator: e.target.value === "true" })} 
+                style={formInputStyle}
+              >
+                <option value="true">Active Creator</option>
+                <option value="false">Disabled / Revoked</option>
+              </select>
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Bio / Summary</label>
+              <textarea 
+                rows={3} 
+                value={editingCreator.creator_bio || ""} 
+                onChange={e => setEditingCreator({ ...editingCreator, creator_bio: e.target.value })} 
+                style={{ ...formInputStyle, resize: "none" }} 
+              />
+            </div>
+
+            <button type="submit" style={saveBtnStyle}>Save Creator Profile</button>
           </form>
         </div>
       )}

@@ -8,6 +8,7 @@ import SettingsView from "../components/SettingsView";
 import CreatorSetupModal from "../components/CreatorSetupModal";
 import EditProfileModal from "../components/EditProfileModal";
 import CreatorProfileModal from "../components/CreatorProfileModal";
+import CreatorStudioModal from "../components/CreatorStudioModal";
 import { useVideos } from "../hooks/useVideos";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
@@ -27,6 +28,7 @@ export default function Profile({
   
   const [activeGroup, setActiveGroup] = useState(null);
   const [deletedVideoIds, setDeletedVideoIds] = useState(new Set());
+  const [showStudioModal, setShowStudioModal] = useState(false);
   
   // Creator Modals
   const [showSetupModal, setShowSetupModal] = useState(false);
@@ -55,6 +57,12 @@ export default function Profile({
     const handleResize = () => setIsDesktop(window.innerWidth > 1024);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    const handleOpenStudio = () => setShowStudioModal(true);
+    window.addEventListener("openCreatorStudio", handleOpenStudio);
+    return () => window.removeEventListener("openCreatorStudio", handleOpenStudio);
   }, []);
 
   // Fetch live stats for creator profile from DB
@@ -482,6 +490,19 @@ export default function Profile({
               {user?.is_creator ? (
                 <>
                   <button 
+                    onClick={() => setShowStudioModal(true)}
+                    style={{ 
+                      ...actionPillBtnStyle, 
+                      background: "linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(249, 24, 128, 0.2))", 
+                      border: "1px solid rgba(255, 215, 0, 0.4)",
+                      color: "#FFD700",
+                      fontWeight: "700"
+                    }}
+                  >
+                    <Sparkles size={14} color="#FFD700" />
+                    <span>Studio</span>
+                  </button>
+                  <button 
                     onClick={() => setShowEditModal(true)}
                     style={actionPillBtnStyle}
                   >
@@ -678,21 +699,42 @@ export default function Profile({
                       : "Free Subscription"}
                   </div>
                 </div>
-                <button 
-                  onClick={() => setShowEditModal(true)}
-                  style={{ 
-                    background: "rgba(255,255,255,0.06)", 
-                    border: "1px solid rgba(255,255,255,0.15)", 
-                    borderRadius: "16px", 
-                    padding: "6px 14px", 
-                    color: "#fff", 
-                    fontSize: "12px", 
-                    fontWeight: "600",
-                    cursor: "pointer" 
-                  }}
-                >
-                  Edit Rates
-                </button>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button 
+                    onClick={() => setShowStudioModal(true)}
+                    style={{ 
+                      background: "linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(249, 24, 128, 0.2))", 
+                      border: "1px solid rgba(255, 215, 0, 0.4)", 
+                      borderRadius: "16px", 
+                      padding: "6px 14px", 
+                      color: "#FFD700", 
+                      fontSize: "12px", 
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px"
+                    }}
+                  >
+                    <Sparkles size={14} color="#FFD700" />
+                    <span>Creator Studio</span>
+                  </button>
+                  <button 
+                    onClick={() => setShowEditModal(true)}
+                    style={{ 
+                      background: "rgba(255,255,255,0.06)", 
+                      border: "1px solid rgba(255,255,255,0.15)", 
+                      borderRadius: "16px", 
+                      padding: "6px 14px", 
+                      color: "#fff", 
+                      fontSize: "12px", 
+                      fontWeight: "600",
+                      cursor: "pointer" 
+                    }}
+                  >
+                    Edit Profile
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -809,6 +851,18 @@ export default function Profile({
           onClose={() => setShowPreviewModal(false)}
           onVideoClick={handleOpenVideo}
           setShowPaywall={setShowPaywall}
+        />
+      )}
+
+      {/* 🌟 CREATOR STUDIO MODAL */}
+      {showStudioModal && (
+        <CreatorStudioModal 
+          isOpen={showStudioModal}
+          onClose={() => setShowStudioModal(false)}
+          user={user}
+          onUpdateUser={(updated) => {
+            handleUpdateSuccess(updated);
+          }}
         />
       )}
     </div>
