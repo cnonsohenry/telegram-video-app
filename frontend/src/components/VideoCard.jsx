@@ -197,7 +197,17 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
             {video.caption || APP_CONFIG.defaultCaption}
           </p>
           
-          <div style={userInfoRowStyle}>
+          <div 
+            style={{ ...userInfoRowStyle, cursor: video.uploader_name ? "pointer" : "default" }}
+            onClick={(e) => {
+              if (video.uploader_name) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: video.uploader_name }));
+              }
+            }}
+            title={video.uploader_name ? `View @${video.uploader_name}'s profile` : ""}
+          >
             <div style={avatarWrapperStyle}>
                <img 
                  src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}

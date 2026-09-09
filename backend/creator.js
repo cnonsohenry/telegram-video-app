@@ -48,20 +48,23 @@ router.post("/upgrade", authenticateToken, async (req, res) => {
     }
 
     const existing = userCheck.rows[0];
-    const finalDisplayName = display_name?.trim() || existing.display_name || existing.username;
-    const finalCategory = creator_category?.trim() || existing.creator_category || "Model & Creator";
-    const finalBio = creator_bio !== undefined ? creator_bio.trim() : (existing.creator_bio || "");
-    const finalPrice = subscription_price !== undefined ? Number(subscription_price) : (Number(existing.subscription_price) || 0);
-    const finalBanner = banner_url || existing.banner_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80";
-    const finalSocials = social_links || existing.social_links || {};
-    const finalLocation = location !== undefined ? location.trim() : (existing.location || "");
-    const finalWebsite = website !== undefined ? website.trim() : (existing.website || "");
+    const finalDisplayName = (display_name ? String(display_name).trim().slice(0, 100) : null) || existing.display_name || existing.username;
+    const finalCategory = (creator_category ? String(creator_category).trim().slice(0, 50) : null) || existing.creator_category || "Model & Creator";
+    const finalBio = creator_bio !== undefined ? String(creator_bio).trim().slice(0, 500) : (existing.creator_bio || "");
+    const finalPrice = subscription_price !== undefined ? Math.max(0, Math.min(10000000, Number(subscription_price) || 0)) : (Number(existing.subscription_price) || 0);
+    const finalBanner = banner_url && typeof banner_url === "string" && (banner_url.startsWith("http://") || banner_url.startsWith("https://") || banner_url.startsWith("/"))
+      ? banner_url.slice(0, 500)
+      : (existing.banner_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80");
+    const finalSocials = social_links && typeof social_links === "object" ? social_links : (existing.social_links || {});
+    const finalLocation = location !== undefined ? String(location).trim().slice(0, 100) : (existing.location || "");
+    let cleanWebsite = website !== undefined ? String(website).trim().slice(0, 200) : (existing.website || "");
+    if (cleanWebsite.toLowerCase().startsWith("javascript:")) cleanWebsite = "";
 
     const updateQuery = `
       UPDATE app_users 
       SET is_creator = TRUE,
-          role = 'creator',
-          is_verified = TRUE,
+          role = CASE WHEN role = 'admin' THEN 'admin' ELSE 'creator' END,
+          is_verified = COALESCE(is_verified, FALSE),
           display_name = $1,
           creator_category = $2,
           creator_bio = $3,
@@ -84,7 +87,7 @@ router.post("/upgrade", authenticateToken, async (req, res) => {
       finalBanner,
       JSON.stringify(finalSocials),
       finalLocation,
-      finalWebsite,
+      cleanWebsite,
       userId
     ]);
 
@@ -119,6 +122,17 @@ router.patch("/profile", authenticateToken, async (req, res) => {
     const userCheck = await pool.query("SELECT * FROM app_users WHERE id = $1", [userId]);
     if (userCheck.rows.length === 0) return res.status(404).json({ error: "User not found" });
 
+    const cleanDisplayName = display_name !== undefined ? String(display_name).trim().slice(0, 100) : null;
+    const cleanBio = creator_bio !== undefined ? String(creator_bio).trim().slice(0, 500) : null;
+    const cleanCategory = creator_category !== undefined ? String(creator_category).trim().slice(0, 50) : null;
+    const cleanPrice = subscription_price !== undefined ? Math.max(0, Math.min(10000000, Number(subscription_price) || 0)) : null;
+    const cleanAvatar = avatar_url && typeof avatar_url === "string" && (avatar_url.startsWith("http://") || avatar_url.startsWith("https://") || avatar_url.startsWith("/")) ? avatar_url.slice(0, 500) : null;
+    const cleanBanner = banner_url && typeof banner_url === "string" && (banner_url.startsWith("http://") || banner_url.startsWith("https://") || banner_url.startsWith("/")) ? banner_url.slice(0, 500) : null;
+    const cleanSocials = social_links && typeof social_links === "object" ? JSON.stringify(social_links) : null;
+    const cleanLocation = location !== undefined ? String(location).trim().slice(0, 100) : null;
+    let cleanWebsite = website !== undefined ? String(website).trim().slice(0, 200) : null;
+    if (cleanWebsite && cleanWebsite.toLowerCase().startsWith("javascript:")) cleanWebsite = "";
+
     const updateQuery = `
       UPDATE app_users
       SET display_name = COALESCE($1, display_name),
@@ -137,15 +151,15 @@ router.patch("/profile", authenticateToken, async (req, res) => {
     `;
 
     const result = await pool.query(updateQuery, [
-      display_name !== undefined ? display_name.trim() : null,
-      creator_bio !== undefined ? creator_bio.trim() : null,
-      creator_category !== undefined ? creator_category.trim() : null,
-      subscription_price !== undefined ? Number(subscription_price) : null,
-      avatar_url || null,
-      banner_url || null,
-      social_links ? JSON.stringify(social_links) : null,
-      location !== undefined ? location.trim() : null,
-      website !== undefined ? website.trim() : null,
+      cleanDisplayName,
+      cleanBio,
+      cleanCategory,
+      cleanPrice,
+      cleanAvatar,
+      cleanBanner,
+      cleanSocials,
+      cleanLocation,
+      cleanWebsite,
       userId
     ]);
 
@@ -167,7 +181,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
   try {
     // 1. Search in app_users
     let creatorQuery = await pool.query(
-      `SELECT id, username, email, avatar_url, role, is_premium,
+      `SELECT id, username, avatar_url, role, is_premium,
               is_creator, display_name, creator_bio, banner_url, creator_category, 
               subscription_price, social_links, is_verified, location, website, created_at
        FROM app_users 
@@ -352,19 +366,38 @@ router.get("/:username", optionalAuth, async (req, res) => {
 router.get("/:username/videos", async (req, res) => {
   const { username } = req.params;
   const page = Math.max(1, Number(req.query.page || 1));
-  const limit = Math.max(1, Number(req.query.limit || 12));
+  const limit = Math.max(1, Math.min(50, Number(req.query.limit || 12)));
   const offset = (page - 1) * limit;
 
   try {
+    const appUserRes = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [username]);
+    let creatorId = appUserRes.rows[0]?.id;
+    if (!creatorId) {
+      const tgRes = await pool.query("SELECT user_id FROM users WHERE LOWER(username) = LOWER($1)", [username]);
+      creatorId = tgRes.rows[0]?.user_id;
+    }
+
     const videosRes = await pool.query(
-      `SELECT v.*, COALESCE(u.username, 'Member') as uploader_name
+      `SELECT v.*, COALESCE(u.username, $1) as uploader_name
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
+          OR v.uploader_id = $2
        ORDER BY v.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [username, limit, offset]
+       LIMIT $3 OFFSET $4`,
+      [username, Number(creatorId) || 0, limit, offset]
     );
+
+    const countRes = await pool.query(
+      `SELECT COUNT(*)
+       FROM videos v
+       LEFT JOIN users u ON v.uploader_id = u.user_id
+       WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
+          OR v.uploader_id = $2`,
+      [username, Number(creatorId) || 0]
+    );
+
+    const totalVideos = Number(countRes.rows[0]?.count || 0);
 
     const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
     const mappedVideos = videosRes.rows.map(v => ({
@@ -386,8 +419,9 @@ router.get("/:username/videos", async (req, res) => {
     res.json({
       page,
       limit,
+      total: totalVideos,
       videos: mappedVideos,
-      hasMore: mappedVideos.length === limit
+      hasMore: offset + mappedVideos.length < totalVideos
     });
   } catch (err) {
     console.error("[CREATOR VIDEOS ERROR]", err);
@@ -406,11 +440,12 @@ router.post("/:username/subscribe", authenticateToken, async (req, res) => {
   try {
     // Find creator ID
     let creatorRes = await pool.query(
-      "SELECT id, username FROM app_users WHERE LOWER(username) = LOWER($1)",
+      "SELECT id, username, subscription_price FROM app_users WHERE LOWER(username) = LOWER($1)",
       [username]
     );
 
     let creatorId = creatorRes.rows[0]?.id;
+    let subscriptionPrice = Number(creatorRes.rows[0]?.subscription_price || 0);
 
     if (!creatorId) {
       // Check telegram users
@@ -425,7 +460,7 @@ router.post("/:username/subscribe", authenticateToken, async (req, res) => {
       return res.status(404).json({ error: "Creator not found" });
     }
 
-    if (Number(subscriberId) === Number(creatorId)) {
+    if (String(subscriberId) === String(creatorId)) {
       return res.status(400).json({ error: "You cannot subscribe to yourself" });
     }
 
@@ -446,8 +481,8 @@ router.post("/:username/subscribe", authenticateToken, async (req, res) => {
     } else {
       // Subscribe
       await pool.query(
-        "INSERT INTO creator_subscriptions (subscriber_id, creator_id) VALUES ($1, $2)",
-        [subscriberId, creatorId]
+        "INSERT INTO creator_subscriptions (subscriber_id, creator_id, amount_paid, status) VALUES ($1, $2, $3, 'active')",
+        [subscriberId, creatorId, subscriptionPrice]
       );
       isSubscribed = true;
     }
@@ -460,7 +495,7 @@ router.post("/:username/subscribe", authenticateToken, async (req, res) => {
     res.json({
       success: true,
       subscribed: isSubscribed,
-      subscribers_count: Number(totalRes.rows[0].count)
+      subscribers_count: Number(totalRes.rows[0]?.count || 0)
     });
   } catch (err) {
     console.error("[CREATOR SUBSCRIBE ERROR]", err);
@@ -478,8 +513,8 @@ router.post("/:username/tip", authenticateToken, async (req, res) => {
   const senderId = req.user.id;
 
   const numericAmount = Number(amount);
-  if (!numericAmount || numericAmount <= 0) {
-    return res.status(400).json({ error: "Invalid tip amount" });
+  if (!Number.isFinite(numericAmount) || numericAmount < 100 || numericAmount > 5000000) {
+    return res.status(400).json({ error: "Invalid tip amount. Tips must be between ₦100 and ₦5,000,000." });
   }
 
   try {
@@ -496,9 +531,13 @@ router.post("/:username/tip", authenticateToken, async (req, res) => {
 
     if (!creator) return res.status(404).json({ error: "Creator not found" });
 
+    if (String(senderId) === String(creator.id)) {
+      return res.status(400).json({ error: "You cannot tip yourself" });
+    }
+
     await pool.query(
       "INSERT INTO creator_tips (sender_id, creator_id, amount, message) VALUES ($1, $2, $3, $4)",
-      [senderId, creator.id, numericAmount, message ? message.slice(0, 300) : ""]
+      [senderId, creator.id, numericAmount, message ? String(message).trim().slice(0, 300) : ""]
     );
 
     res.json({

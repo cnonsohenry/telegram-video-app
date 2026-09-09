@@ -154,21 +154,35 @@ async function initDatabase() {
         CREATE TABLE IF NOT EXISTS creator_subscriptions (
           id SERIAL PRIMARY KEY,
           subscriber_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
-          creator_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          creator_id BIGINT NOT NULL,
           created_at TIMESTAMP DEFAULT NOW(),
           UNIQUE(subscriber_id, creator_id)
         );
+        ALTER TABLE creator_subscriptions DROP CONSTRAINT IF EXISTS creator_subscriptions_creator_id_fkey;
+        ALTER TABLE creator_subscriptions ALTER COLUMN creator_id TYPE BIGINT;
+        ALTER TABLE creator_subscriptions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
+        ALTER TABLE creator_subscriptions ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+        ALTER TABLE creator_subscriptions ADD COLUMN IF NOT EXISTS amount_paid NUMERIC DEFAULT 0;
       `);
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS creator_tips (
           id SERIAL PRIMARY KEY,
           sender_id INTEGER REFERENCES app_users(id) ON DELETE SET NULL,
-          creator_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          creator_id BIGINT NOT NULL,
           amount NUMERIC NOT NULL,
           message TEXT,
           created_at TIMESTAMP DEFAULT NOW()
         );
+        ALTER TABLE creator_tips DROP CONSTRAINT IF EXISTS creator_tips_creator_id_fkey;
+        ALTER TABLE creator_tips ALTER COLUMN creator_id TYPE BIGINT;
+      `);
+
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_subscriptions_creator ON creator_subscriptions(creator_id);
+        CREATE INDEX IF NOT EXISTS idx_subscriptions_subscriber ON creator_subscriptions(subscriber_id);
+        CREATE INDEX IF NOT EXISTS idx_tips_creator ON creator_tips(creator_id);
+        CREATE INDEX IF NOT EXISTS idx_app_users_lower_username ON app_users(LOWER(username));
       `);
 
       await pool.query(`

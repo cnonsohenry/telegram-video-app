@@ -152,11 +152,55 @@ export default function Profile({
   const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium", fetchLimit);
   const { videos: liked, loading: likedLoading, loadMore: loadMoreLiked } = useVideos("likes", fetchLimit);
 
+  // Creator's own posts state
+  const [creatorPosts, setCreatorPosts] = useState([]);
+  const [creatorPostsLoading, setCreatorPostsLoading] = useState(false);
+  const [creatorPostsPage, setCreatorPostsPage] = useState(1);
+  const [hasMoreCreatorPosts, setHasMoreCreatorPosts] = useState(true);
+
+  const fetchCreatorPosts = useCallback(async (targetPage, isNew) => {
+    if (!user?.username || !user?.is_creator) return;
+    setCreatorPostsLoading(true);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(user.username)}/videos?page=${targetPage}&limit=${fetchLimit}`);
+      const data = await res.json();
+      if (data?.videos) {
+        setCreatorPosts(prev => {
+          const combined = isNew ? data.videos : [...prev, ...data.videos];
+          const map = new Map();
+          combined.forEach(v => map.set(`${v.chat_id}:${v.message_id}`, v));
+          return Array.from(map.values());
+        });
+        setHasMoreCreatorPosts(Boolean(data.hasMore));
+        setCreatorPostsPage(targetPage + 1);
+      }
+    } catch (e) {
+      console.error("Failed to load creator profile posts", e);
+    } finally {
+      setCreatorPostsLoading(false);
+    }
+  }, [user?.username, user?.is_creator, fetchLimit]);
+
+  useEffect(() => {
+    if (user?.is_creator && user?.username) {
+      setCreatorPostsPage(1);
+      fetchCreatorPosts(1, true);
+    }
+  }, [user?.is_creator, user?.username, fetchCreatorPosts]);
+
   let rawVideosToDisplay = shots || [];
   let loading = shotsLoading;
   let loadMore = loadMoreShots;
 
-  if (activeTab === "premium") {
+  if (user?.is_creator && activeTab === "videos") {
+    rawVideosToDisplay = creatorPosts;
+    loading = creatorPostsLoading;
+    loadMore = () => {
+      if (!creatorPostsLoading && hasMoreCreatorPosts) {
+        fetchCreatorPosts(creatorPostsPage, false);
+      }
+    };
+  } else if (activeTab === "premium") {
     rawVideosToDisplay = premium || [];
     loading = premiumLoading;
     loadMore = loadMorePremium;
@@ -718,7 +762,11 @@ export default function Profile({
           
           {!loading && !activeGroup && filteredRawVideos.length === 0 && (
             <div style={{ padding: "60px 20px", textAlign: "center", color: "#888" }}>
-              {activeTab === "likes" ? "No liked videos yet." : "No videos found."}
+              {activeTab === "likes" 
+                ? "No liked videos yet." 
+                : (user?.is_creator 
+                    ? "You haven't uploaded any posts yet. Start sharing exclusive content to grow your subscriber base!" 
+                    : "No videos found.")}
             </div>
           )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark } from "lucide-react";
+import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, Sparkles } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
 import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
@@ -350,6 +350,20 @@ export default function Explore({
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchPage, setSearchPage] = useState(1);
   const [hasMoreSearch, setHasMoreSearch] = useState(true);
+  const [featuredCreators, setFeaturedCreators] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch(`${APP_CONFIG.apiUrl}/api/creator/featured/list`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (isMounted && data?.creators) {
+          setFeaturedCreators(data.creators);
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
 
   // 🟢 SCROLL UI STATES
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
@@ -573,6 +587,48 @@ export default function Explore({
           }}
         >
           <div style={feedWrapper}>
+            {/* 🌟 FEATURED CREATORS DISCOVERY BAR */}
+            {featuredCreators.length > 0 && !searchQuery.trim() && (
+              <div style={featuredCreatorsWrapper}>
+                <div style={featuredCreatorsHeader}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Sparkles size={14} color="#00aff0" />
+                    <span style={featuredTitleStyle}>Featured Creators</span>
+                  </div>
+                  <span style={{ fontSize: "11px", color: "#8e8e93" }}>Swipe to explore</span>
+                </div>
+                <div style={featuredRowStyle}>
+                  {featuredCreators.map((creator) => (
+                    <div
+                      key={creator.username}
+                      onClick={() => onCreatorClick && onCreatorClick(creator.username)}
+                      style={featuredCardStyle}
+                    >
+                      <div style={featuredAvatarRing}>
+                        <img
+                          src={creator.avatar_url || "/assets/default-avatar.png"}
+                          alt={creator.display_name || creator.username}
+                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                          style={featuredAvatarImg}
+                        />
+                        {creator.is_verified && (
+                          <div style={verifiedBadgeIcon}>
+                            <CheckCircle size={13} color="#00aff0" fill="#00aff0" />
+                          </div>
+                        )}
+                      </div>
+                      <span style={featuredCreatorName}>
+                        {creator.display_name || creator.username}
+                      </span>
+                      <span style={featuredCategoryBadge}>
+                        {creator.creator_category || "Creator"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {loading ? (
               [...Array(5)].map((_, i) => (
                 <div key={i} style={postStyle}>
@@ -647,3 +703,99 @@ const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", col
 const skeletonAvatar = { width: "40px", height: "40px", borderRadius: "50%", animation: "skeleton-loading 1.5s infinite" };
 const skeletonTextBase = { width: "150px", height: "20px", borderRadius: "4px", marginTop: "4px", animation: "skeleton-loading 1.5s infinite" };
 const skeletonVideo = { width: "100%", height: "300px", borderRadius: "16px", animation: "skeleton-loading 1.5s infinite" };
+
+// 🌟 Featured Creators Carousel Styles
+const featuredCreatorsWrapper = {
+  width: "100%",
+  padding: "16px 16px 12px 16px",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+  marginBottom: "8px",
+  boxSizing: "border-box",
+  background: "linear-gradient(180deg, rgba(0, 175, 240, 0.03) 0%, transparent 100%)"
+};
+
+const featuredCreatorsHeader = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "12px"
+};
+
+const featuredTitleStyle = {
+  fontSize: "13px",
+  fontWeight: "800",
+  letterSpacing: "0.5px",
+  color: "#fff",
+  textTransform: "uppercase"
+};
+
+const featuredRowStyle = {
+  display: "flex",
+  gap: "14px",
+  overflowX: "auto",
+  paddingBottom: "8px",
+  scrollbarWidth: "none",
+  msOverflowStyle: "none"
+};
+
+const featuredCardStyle = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "6px",
+  minWidth: "76px",
+  maxWidth: "84px",
+  cursor: "pointer",
+  flexShrink: 0
+};
+
+const featuredAvatarRing = {
+  position: "relative",
+  width: "58px",
+  height: "58px",
+  borderRadius: "50%",
+  padding: "2px",
+  background: "linear-gradient(135deg, #00aff0, #0077b5)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center"
+};
+
+const featuredAvatarImg = {
+  width: "54px",
+  height: "54px",
+  borderRadius: "50%",
+  objectFit: "cover",
+  backgroundColor: "#111",
+  border: "2px solid #000"
+};
+
+const verifiedBadgeIcon = {
+  position: "absolute",
+  bottom: "0",
+  right: "0",
+  background: "#000",
+  borderRadius: "50%",
+  display: "flex"
+};
+
+const featuredCreatorName = {
+  fontSize: "12px",
+  fontWeight: "700",
+  color: "#fff",
+  textAlign: "center",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  width: "100%"
+};
+
+const featuredCategoryBadge = {
+  fontSize: "10px",
+  color: "#8e8e93",
+  textAlign: "center",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  width: "100%"
+};

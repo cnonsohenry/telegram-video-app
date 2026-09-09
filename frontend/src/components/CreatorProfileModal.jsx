@@ -23,6 +23,9 @@ export default function CreatorProfileModal({
   const [subscribersCount, setSubscribersCount] = useState(0);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
+  const [videoPage, setVideoPage] = useState(1);
+  const [hasMoreVideos, setHasMoreVideos] = useState(false);
+  const [loadingMoreVideos, setLoadingMoreVideos] = useState(false);
 
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
 
@@ -52,6 +55,8 @@ export default function CreatorProfileModal({
           setVideos(data.videos || []);
           setIsSubscribed(Boolean(data.creator.is_subscribed));
           setSubscribersCount(Number(data.creator.stats?.subscribers || 0));
+          setHasMoreVideos(Boolean(data.videos && data.videos.length >= 12));
+          setVideoPage(1);
         }
       } catch (err) {
         if (isMounted) setError(err.message);
@@ -67,6 +72,32 @@ export default function CreatorProfileModal({
     };
   }, [creatorUsername]);
 
+  const handleLoadMoreVideos = async () => {
+    if (loadingMoreVideos || !hasMoreVideos) return;
+    setLoadingMoreVideos(true);
+    const nextPage = videoPage + 1;
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorUsername)}/videos?page=${nextPage}&limit=12`);
+      const data = await res.json();
+      if (data?.videos && data.videos.length > 0) {
+        setVideos(prev => {
+          const map = new Map();
+          prev.forEach(v => map.set(`${v.chat_id}:${v.message_id}`, v));
+          data.videos.forEach(v => map.set(`${v.chat_id}:${v.message_id}`, v));
+          return Array.from(map.values());
+        });
+        setVideoPage(nextPage);
+        setHasMoreVideos(Boolean(data.hasMore));
+      } else {
+        setHasMoreVideos(false);
+      }
+    } catch (err) {
+      console.error("Failed to load more videos", err);
+    } finally {
+      setLoadingMoreVideos(false);
+    }
+  };
+
   const handleSubscribeToggle = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -77,6 +108,12 @@ export default function CreatorProfileModal({
     if (creatorData?.is_owner) {
       alert("This is your own profile!");
       return;
+    }
+
+    const price = Number(creatorData?.subscription_price || 0);
+    if (price > 0 && !isSubscribed) {
+      const confirmed = window.confirm(`Subscribing to ${creatorData?.display_name || creatorUsername} is ₦${price.toLocaleString()}/mo. Do you want to proceed?`);
+      if (!confirmed) return;
     }
 
     setIsSubscribing(true);
@@ -94,14 +131,16 @@ export default function CreatorProfileModal({
         }
       });
       const data = await res.json();
-      if (res.ok && data.success) {
-        setIsSubscribed(data.subscribed);
-        setSubscribersCount(data.subscribers_count);
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to update subscription");
       }
+      setIsSubscribed(data.subscribed);
+      setSubscribersCount(data.subscribers_count);
     } catch (e) {
       // Revert on error
       setIsSubscribed(!nextSub);
       setSubscribersCount(prev => !nextSub ? prev + 1 : Math.max(0, prev - 1));
+      alert(e.message || "Failed to update subscription");
     } finally {
       setIsSubscribing(false);
     }
@@ -225,7 +264,12 @@ export default function CreatorProfileModal({
                   </div>
                 )}
                 {creatorData?.website && (
-                  <a href={creatorData.website} target="_blank" rel="noreferrer" style={metaItemStyle}>
+                  <a 
+                    href={creatorData.website.startsWith("http://") || creatorData.website.startsWith("https://") ? creatorData.website : `https://${creatorData.website}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    style={metaItemStyle}
+                  >
                     <Globe size={14} color="#00aff0" />
                     <span style={{ color: "#00aff0" }}>{creatorData.website.replace(/^https?:\/\//, '')}</span>
                   </a>
@@ -283,19 +327,46 @@ export default function CreatorProfileModal({
                   <span style={{ marginTop: "10px", color: "#888", fontSize: "14px" }}>No public posts uploaded yet.</span>
                 </div>
               ) : (
-                <div style={{
-                  ...gridStyle,
-                  gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : "repeat(2, 1fr)"
-                }}>
-                  {videos.map((v) => (
-                    <VideoCard 
-                      key={`${v.chat_id}:${v.message_id}`}
-                      video={v}
-                      onOpen={(vData, e) => onVideoClick(vData, e)}
-                      showDetails={true}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div style={{
+                    ...gridStyle,
+                    gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : "repeat(2, 1fr)"
+                  }}>
+                    {videos.map((v) => (
+                      <VideoCard 
+                        key={`${v.chat_id}:${v.message_id}`}
+                        video={v}
+                        onOpen={(vData, e) => onVideoClick(vData, e)}
+                        showDetails={true}
+                      />
+                    ))}
+                  </div>
+                  {hasMoreVideos && (
+                    <div style={{ display: "flex", justifyContent: "center", marginTop: "24px", marginBottom: "20px" }}>
+                      <button
+                        onClick={handleLoadMoreVideos}
+                        disabled={loadingMoreVideos}
+                        style={{
+                          background: "rgba(255, 255, 255, 0.08)",
+                          border: "1px solid rgba(255, 255, 255, 0.15)",
+                          borderRadius: "25px",
+                          padding: "10px 24px",
+                          color: "#fff",
+                          fontSize: "13px",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        {loadingMoreVideos && <Loader2 size={16} className="animate-spin" />}
+                        <span>{loadingMoreVideos ? "Loading more..." : "Load More Posts"}</span>
+                      </button>
+                    </div>
+                  )}
+                </>
               )
             )}
 
