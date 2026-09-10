@@ -250,16 +250,20 @@ router.get("/studio/insights", authenticateToken, async (req, res) => {
     const videosRes = await pool.query(
       `SELECT v.id, v.chat_id, v.message_id, v.caption, v.category, v.views, v.likes_count, v.comments_count, v.created_at, v.cloudflare_id
        FROM videos v
-       WHERE v.uploader_id = $1 OR LOWER(COALESCE(v.uploader_name, '')) = LOWER($2)
+       LEFT JOIN users u ON v.uploader_id = u.user_id
+       WHERE CAST(v.uploader_id AS TEXT) = CAST($1 AS TEXT) 
+          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
        ORDER BY v.views DESC
        LIMIT 30`,
       [userId, creator.username]
     );
 
     const videoSummaryRes = await pool.query(
-      `SELECT COUNT(*) as posts_count, COALESCE(SUM(views), 0) as total_views, COALESCE(SUM(likes_count), 0) as total_likes
-       FROM videos
-       WHERE uploader_id = $1 OR LOWER(COALESCE(uploader_name, '')) = LOWER($2)`,
+      `SELECT COUNT(*) as posts_count, COALESCE(SUM(v.views), 0) as total_views, COALESCE(SUM(v.likes_count), 0) as total_likes
+       FROM videos v
+       LEFT JOIN users u ON v.uploader_id = u.user_id
+       WHERE CAST(v.uploader_id AS TEXT) = CAST($1 AS TEXT) 
+          OR LOWER(COALESCE(u.username, '')) = LOWER($2)`,
       [userId, creator.username]
     );
 
@@ -310,7 +314,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
               is_creator, display_name, creator_bio, banner_url, creator_category, 
               subscription_price, social_links, is_verified, location, website, created_at
        FROM app_users 
-       WHERE LOWER(username) = LOWER($1)`,
+       WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)`,
       [username]
     );
 
@@ -319,11 +323,11 @@ router.get("/:username", optionalAuth, async (req, res) => {
     if (creatorQuery.rows.length > 0) {
       creator = creatorQuery.rows[0];
     } else {
-      // 2. Check if username matches an uploader from telegram users table
+      // 2. Check if username or full_name matches an uploader from telegram users table
       const tgUserQuery = await pool.query(
         `SELECT user_id, username, full_name, created_at 
          FROM users 
-         WHERE LOWER(username) = LOWER($1)`,
+         WHERE LOWER(COALESCE(username, '')) = LOWER($1) OR LOWER(COALESCE(full_name, '')) = LOWER($1)`,
         [username]
       );
 
@@ -331,14 +335,14 @@ router.get("/:username", optionalAuth, async (req, res) => {
         const tgUser = tgUserQuery.rows[0];
         creator = {
           id: tgUser.user_id,
-          username: tgUser.username,
-          display_name: tgUser.full_name || tgUser.username,
+          username: tgUser.username || tgUser.full_name || username,
+          display_name: tgUser.full_name || tgUser.username || username,
           avatar_url: `/api/avatar?user_id=${tgUser.user_id}`,
           banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
           creator_bio: "Official creator channel. Catch all exclusive drops and daily previews here.",
           creator_category: "Featured Creator",
           subscription_price: 15000,
-          social_links: { telegram: `https://t.me/${tgUser.username}` },
+          social_links: tgUser.username ? { telegram: `https://t.me/${tgUser.username}` } : {},
           is_creator: true,
           is_verified: true,
           location: "Lagos, Nigeria",
@@ -348,10 +352,11 @@ router.get("/:username", optionalAuth, async (req, res) => {
       } else {
         // Synthesize profile from videos if author exists in videos table
         const videoCheck = await pool.query(
-          `SELECT uploader_id, uploader_name FROM (
-             SELECT v.uploader_id, COALESCE(u.username, 'Member') as uploader_name 
-             FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id
-           ) sub WHERE LOWER(uploader_name) = LOWER($1) LIMIT 1`,
+          `SELECT v.uploader_id, COALESCE(u.username, u.full_name, 'Member') as uploader_name 
+           FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id
+           WHERE LOWER(COALESCE(u.username, '')) = LOWER($1) 
+              OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+           LIMIT 1`,
           [username]
         );
 
@@ -360,7 +365,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
           creator = {
             id: row.uploader_id || 0,
             username: username,
-            display_name: username,
+            display_name: row.uploader_name || username,
             avatar_url: row.uploader_id ? `/api/avatar?user_id=${row.uploader_id}` : "/assets/default-avatar.png",
             banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
             creator_bio: "Welcome to my official creator hub. Follow for exclusive content and daily drops.",
@@ -387,25 +392,29 @@ router.get("/:username", optionalAuth, async (req, res) => {
     // 2. Fetch Creator Stats
     let subCount = 0;
     try {
-      const subRes = await pool.query(
-        "SELECT COUNT(*) FROM creator_subscriptions WHERE creator_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
-        [creator.id]
-      );
-      subCount = Number(subRes.rows[0].count);
+      if (creator.id && Number(creator.id) !== 0) {
+        const subRes = await pool.query(
+          "SELECT COUNT(*) FROM creator_subscriptions WHERE creator_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
+          [creator.id]
+        );
+        subCount = Number(subRes.rows[0]?.count || 0);
+      }
     } catch (e) {}
 
     // Video & views stats
     const statsRes = await pool.query(
       `SELECT 
          COUNT(*) as posts_count,
-         COALESCE(SUM(views), 0) as views_count,
-         COALESCE(SUM(likes_count), 0) as likes_count
+         COALESCE(SUM(v.views), 0) as views_count,
+         COALESCE(SUM(v.likes_count), 0) as likes_count
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1) 
-          OR CAST(v.uploader_id AS TEXT) = CAST($2 AS TEXT)
-          OR (v.uploader_name IS NOT NULL AND LOWER(v.uploader_name) = LOWER($1))`,
-      [creator.username, String(creator.id || '0')]
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
+          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)`,
+      [creator.username, username, String(creator.id || '0')]
     );
 
     const postsCount = Number(statsRes.rows[0]?.posts_count || 0);
@@ -419,7 +428,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
     let isSubscribed = false;
     let isOwner = false;
 
-    if (req.user) {
+    if (req.user && creator.id && Number(creator.id) !== 0) {
       if (Number(req.user.id) === Number(creator.id)) {
         isOwner = true;
       } else {
@@ -435,15 +444,17 @@ router.get("/:username", optionalAuth, async (req, res) => {
 
     // 4. Fetch First 12 Videos
     const videosRes = await pool.query(
-      `SELECT v.*, COALESCE(u.username, v.uploader_name, 'Member') as uploader_name
+      `SELECT v.*, COALESCE(u.username, u.full_name, 'Member') as uploader_name
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1) 
-          OR CAST(v.uploader_id AS TEXT) = CAST($2 AS TEXT)
-          OR (v.uploader_name IS NOT NULL AND LOWER(v.uploader_name) = LOWER($1))
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
+          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
        ORDER BY v.created_at DESC
        LIMIT 12`,
-      [creator.username, String(creator.id || '0')]
+      [creator.username, username, String(creator.id || '0')]
     );
 
     const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
@@ -497,23 +508,34 @@ router.get("/:username/videos", async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    const appUserRes = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [username]);
+    const appUserRes = await pool.query(
+      "SELECT id, username FROM app_users WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)",
+      [username]
+    );
     let creatorId = appUserRes.rows[0]?.id;
+    let creatorUsername = appUserRes.rows[0]?.username || username;
+
     if (!creatorId) {
-      const tgRes = await pool.query("SELECT user_id FROM users WHERE LOWER(username) = LOWER($1)", [username]);
+      const tgRes = await pool.query(
+        "SELECT user_id, username, full_name FROM users WHERE LOWER(COALESCE(username, '')) = LOWER($1) OR LOWER(COALESCE(full_name, '')) = LOWER($1)",
+        [username]
+      );
       creatorId = tgRes.rows[0]?.user_id;
+      if (tgRes.rows[0]?.username) creatorUsername = tgRes.rows[0].username;
     }
 
     const videosRes = await pool.query(
-      `SELECT v.*, COALESCE(u.username, v.uploader_name, $1) as uploader_name
+      `SELECT v.*, COALESCE(u.username, u.full_name, $1) as uploader_name
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
-          OR CAST(v.uploader_id AS TEXT) = CAST($2 AS TEXT)
-          OR (v.uploader_name IS NOT NULL AND LOWER(v.uploader_name) = LOWER($1))
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
+          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
        ORDER BY v.created_at DESC
-       LIMIT $3 OFFSET $4`,
-      [username, String(creatorId || '0'), limit, offset]
+       LIMIT $4 OFFSET $5`,
+      [username, creatorUsername, String(creatorId || '0'), limit, offset]
     );
 
     const countRes = await pool.query(
@@ -521,9 +543,11 @@ router.get("/:username/videos", async (req, res) => {
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
-          OR CAST(v.uploader_id AS TEXT) = CAST($2 AS TEXT)
-          OR (v.uploader_name IS NOT NULL AND LOWER(v.uploader_name) = LOWER($1))`,
-      [username, String(creatorId || '0')]
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
+          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)`,
+      [username, creatorUsername, String(creatorId || '0')]
     );
 
     const totalVideos = Number(countRes.rows[0]?.count || 0);
@@ -572,7 +596,7 @@ router.post("/:username/subscribe", authenticateToken, async (req, res) => {
   try {
     // Find creator ID
     let creatorRes = await pool.query(
-      "SELECT id, username, subscription_price FROM app_users WHERE LOWER(username) = LOWER($1)",
+      "SELECT id, username, subscription_price FROM app_users WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)",
       [username]
     );
 
@@ -582,7 +606,7 @@ router.post("/:username/subscribe", authenticateToken, async (req, res) => {
     if (!creatorId) {
       // Check telegram users
       const tgRes = await pool.query(
-        "SELECT user_id FROM users WHERE LOWER(username) = LOWER($1)",
+        "SELECT user_id FROM users WHERE LOWER(COALESCE(username, '')) = LOWER($1) OR LOWER(COALESCE(full_name, '')) = LOWER($1)",
         [username]
       );
       creatorId = tgRes.rows[0]?.user_id;
@@ -661,13 +685,16 @@ router.post("/:username/tip", authenticateToken, async (req, res) => {
 
   try {
     let creatorRes = await pool.query(
-      "SELECT id, username, display_name FROM app_users WHERE LOWER(username) = LOWER($1)",
+      "SELECT id, username, display_name FROM app_users WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)",
       [username]
     );
 
     let creator = creatorRes.rows[0];
     if (!creator) {
-      const tgRes = await pool.query("SELECT user_id as id, username, full_name as display_name FROM users WHERE LOWER(username) = LOWER($1)", [username]);
+      const tgRes = await pool.query(
+        "SELECT user_id as id, username, full_name as display_name FROM users WHERE LOWER(COALESCE(username, '')) = LOWER($1) OR LOWER(COALESCE(full_name, '')) = LOWER($1)",
+        [username]
+      );
       creator = tgRes.rows[0];
     }
 
