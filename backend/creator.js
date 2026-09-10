@@ -519,10 +519,12 @@ router.get("/:username", optionalAuth, async (req, res) => {
     // 1. Search in app_users
     let creatorQuery = await pool.query(
       `SELECT id, username, avatar_url, role, is_premium,
-              is_creator, display_name, creator_bio, banner_url, creator_category, 
+              is_creator, is_managed, telegram_user_id, display_name, creator_bio, banner_url, creator_category, 
               subscription_price, social_links, is_verified, location, website, created_at
        FROM app_users 
-       WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)`,
+       WHERE LOWER(username) = LOWER($1) 
+          OR LOWER(COALESCE(display_name, '')) = LOWER($1)
+          OR (telegram_user_id IS NOT NULL AND CAST(telegram_user_id AS TEXT) = $1)`,
       [username]
     );
 
@@ -541,22 +543,47 @@ router.get("/:username", optionalAuth, async (req, res) => {
 
       if (tgUserQuery.rows.length > 0) {
         const tgUser = tgUserQuery.rows[0];
-        creator = {
-          id: tgUser.user_id,
-          username: tgUser.username || tgUser.full_name || username,
-          display_name: tgUser.full_name || tgUser.username || username,
-          avatar_url: `/api/avatar?user_id=${tgUser.user_id}`,
-          banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
-          creator_bio: "Official creator channel. Catch all exclusive drops and daily previews here.",
-          creator_category: "Featured Creator",
-          subscription_price: 15000,
-          social_links: tgUser.username ? { telegram: `https://t.me/${tgUser.username}` } : {},
-          is_creator: true,
-          is_verified: true,
-          location: "Lagos, Nigeria",
-          website: "",
-          created_at: tgUser.created_at
-        };
+        const tgUsername = tgUser.username ? tgUser.username.toLowerCase().replace(/[^a-z0-9_]/g, '') : `tg_${tgUser.user_id}`;
+        const uCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [tgUsername]);
+        const safeUname = uCheck.rows.length > 0 ? `${tgUsername}_${tgUser.user_id.toString().slice(-4)}` : tgUsername;
+        const displayName = tgUser.full_name || tgUser.username || username;
+
+        try {
+          const insertRes = await pool.query(
+            `INSERT INTO app_users (
+               username, display_name, email, is_creator, is_managed, 
+               telegram_user_id, creator_category, subscription_price, is_verified, 
+               banner_url, creator_bio, avatar_url
+             ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15000, TRUE, 
+               'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
+               'Official creator channel. Catch all exclusive drops and daily previews here.',
+               $5
+             )
+             ON CONFLICT (telegram_user_id) DO UPDATE 
+             SET is_creator = TRUE, is_managed = TRUE
+             RETURNING id, username, avatar_url, role, is_premium, is_creator, is_managed, telegram_user_id, display_name, creator_bio, banner_url, creator_category, subscription_price, social_links, is_verified, location, website, created_at`,
+            [safeUname, displayName, `tg_${tgUser.user_id}@internal.naijahomemade.com`, tgUser.user_id, `/api/avatar?user_id=${tgUser.user_id}`]
+          );
+          creator = insertRes.rows[0];
+        } catch (uErr) {
+          creator = {
+            id: tgUser.user_id,
+            username: safeUname,
+            display_name: displayName,
+            avatar_url: `/api/avatar?user_id=${tgUser.user_id}`,
+            banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
+            creator_bio: "Official creator channel. Catch all exclusive drops and daily previews here.",
+            creator_category: "Featured Creator",
+            subscription_price: 15000,
+            social_links: tgUser.username ? { telegram: `https://t.me/${tgUser.username}` } : {},
+            is_creator: true,
+            is_managed: true,
+            is_verified: true,
+            location: "Lagos, Nigeria",
+            website: "",
+            created_at: tgUser.created_at
+          };
+        }
       } else {
         // Synthesize profile from videos if author exists in videos table
         const videoCheck = await pool.query(
@@ -570,22 +597,47 @@ router.get("/:username", optionalAuth, async (req, res) => {
 
         if (videoCheck.rows.length > 0) {
           const row = videoCheck.rows[0];
-          creator = {
-            id: row.uploader_id || 0,
-            username: username,
-            display_name: row.uploader_name || username,
-            avatar_url: row.uploader_id ? `/api/avatar?user_id=${row.uploader_id}` : "/assets/default-avatar.png",
-            banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
-            creator_bio: "Welcome to my official creator hub. Follow for exclusive content and daily drops.",
-            creator_category: "Creator",
-            subscription_price: 15000,
-            social_links: {},
-            is_creator: true,
-            is_verified: true,
-            location: "",
-            website: "",
-            created_at: new Date()
-          };
+          const rawId = row.uploader_id || Date.now();
+          const cleanUname = username.toLowerCase().replace(/[^a-z0-9_]/g, '') || `creator_${rawId}`;
+          const uCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [cleanUname]);
+          const safeUname = uCheck.rows.length > 0 ? `${cleanUname}_${String(rawId).slice(-4)}` : cleanUname;
+
+          try {
+            const insertRes = await pool.query(
+              `INSERT INTO app_users (
+                 username, display_name, email, is_creator, is_managed, 
+                 telegram_user_id, creator_category, subscription_price, is_verified, 
+                 banner_url, creator_bio, avatar_url
+               ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15000, TRUE, 
+                 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
+                 'Official creator channel. Follow for exclusive content and daily drops.',
+                 $5
+               )
+               ON CONFLICT (telegram_user_id) DO UPDATE 
+               SET is_creator = TRUE, is_managed = TRUE
+               RETURNING id, username, avatar_url, role, is_premium, is_creator, is_managed, telegram_user_id, display_name, creator_bio, banner_url, creator_category, subscription_price, social_links, is_verified, location, website, created_at`,
+              [safeUname, row.uploader_name || username, `tg_${rawId}@internal.naijahomemade.com`, rawId, row.uploader_id ? `/api/avatar?user_id=${row.uploader_id}` : "/assets/default-avatar.png"]
+            );
+            creator = insertRes.rows[0];
+          } catch (vErr) {
+            creator = {
+              id: row.uploader_id || 0,
+              username: username,
+              display_name: row.uploader_name || username,
+              avatar_url: row.uploader_id ? `/api/avatar?user_id=${row.uploader_id}` : "/assets/default-avatar.png",
+              banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
+              creator_bio: "Welcome to my official creator hub. Follow for exclusive content and daily drops.",
+              creator_category: "Creator",
+              subscription_price: 15000,
+              social_links: {},
+              is_creator: true,
+              is_managed: true,
+              is_verified: true,
+              location: "",
+              website: "",
+              created_at: new Date()
+            };
+          }
         } else {
           return res.status(404).json({ error: "Creator not found" });
         }
@@ -602,8 +654,8 @@ router.get("/:username", optionalAuth, async (req, res) => {
     try {
       if (creator.id && Number(creator.id) !== 0) {
         const subRes = await pool.query(
-          "SELECT COUNT(*) FROM creator_subscriptions WHERE creator_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
-          [creator.id]
+          "SELECT COUNT(*) FROM creator_subscriptions WHERE (creator_id = $1 OR ($2::BIGINT IS NOT NULL AND creator_id = $2::BIGINT)) AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
+          [creator.id, creator.telegram_user_id || null]
         );
         subCount = Number(subRes.rows[0]?.count || 0);
       }
@@ -621,8 +673,9 @@ router.get("/:username", optionalAuth, async (req, res) => {
           OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
           OR LOWER(COALESCE(u.username, '')) = LOWER($2)
           OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
-          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)`,
-      [creator.username, username, String(creator.id || '0')]
+          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
+          OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)`,
+      [creator.username, username, String(creator.id || '0'), creator.telegram_user_id || null]
     );
 
     const postsCount = Number(statsRes.rows[0]?.posts_count || 0);
@@ -642,8 +695,8 @@ router.get("/:username", optionalAuth, async (req, res) => {
       } else {
         try {
           const checkSub = await pool.query(
-            "SELECT id FROM creator_subscriptions WHERE subscriber_id = $1 AND creator_id = $2 AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
-            [req.user.id, creator.id]
+            "SELECT id FROM creator_subscriptions WHERE subscriber_id = $1 AND (creator_id = $2 OR ($3::BIGINT IS NOT NULL AND creator_id = $3::BIGINT)) AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
+            [req.user.id, creator.id, creator.telegram_user_id || null]
           );
           isSubscribed = checkSub.rows.length > 0;
         } catch (e) {}
@@ -660,9 +713,10 @@ router.get("/:username", optionalAuth, async (req, res) => {
           OR LOWER(COALESCE(u.username, '')) = LOWER($2)
           OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
           OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
+          OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)
        ORDER BY v.created_at DESC
        LIMIT 12`,
-      [creator.username, username, String(creator.id || '0')]
+      [creator.username, username, String(creator.id || '0'), creator.telegram_user_id || null]
     );
 
     const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
@@ -717,10 +771,15 @@ router.get("/:username/videos", async (req, res) => {
 
   try {
     const appUserRes = await pool.query(
-      "SELECT id, username FROM app_users WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)",
+      `SELECT id, username, telegram_user_id 
+       FROM app_users 
+       WHERE LOWER(username) = LOWER($1) 
+          OR LOWER(COALESCE(display_name, '')) = LOWER($1)
+          OR (telegram_user_id IS NOT NULL AND CAST(telegram_user_id AS TEXT) = $1)`,
       [username]
     );
     let creatorId = appUserRes.rows[0]?.id;
+    let creatorTgId = appUserRes.rows[0]?.telegram_user_id || null;
     let creatorUsername = appUserRes.rows[0]?.username || username;
 
     if (!creatorId) {
@@ -729,6 +788,7 @@ router.get("/:username/videos", async (req, res) => {
         [username]
       );
       creatorId = tgRes.rows[0]?.user_id;
+      creatorTgId = tgRes.rows[0]?.user_id;
       if (tgRes.rows[0]?.username) creatorUsername = tgRes.rows[0].username;
     }
 
@@ -741,9 +801,10 @@ router.get("/:username/videos", async (req, res) => {
           OR LOWER(COALESCE(u.username, '')) = LOWER($2)
           OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
           OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
+          OR ($6::BIGINT IS NOT NULL AND v.uploader_id = $6::BIGINT)
        ORDER BY v.created_at DESC
        LIMIT $4 OFFSET $5`,
-      [username, creatorUsername, String(creatorId || '0'), limit, offset]
+      [username, creatorUsername, String(creatorId || '0'), limit, offset, creatorTgId]
     );
 
     const countRes = await pool.query(
@@ -754,8 +815,9 @@ router.get("/:username/videos", async (req, res) => {
           OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
           OR LOWER(COALESCE(u.username, '')) = LOWER($2)
           OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
-          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)`,
-      [username, creatorUsername, String(creatorId || '0')]
+          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
+          OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)`,
+      [username, creatorUsername, String(creatorId || '0'), creatorTgId]
     );
 
     const totalVideos = Number(countRes.rows[0]?.count || 0);

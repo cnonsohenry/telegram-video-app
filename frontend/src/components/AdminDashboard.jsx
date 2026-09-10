@@ -34,6 +34,7 @@ export default function AdminDashboard({ user, onLogout }) {
   const [creatorStats, setCreatorStats] = useState(null);
   const [creatorFilter, setCreatorFilter] = useState("all");
   const [creatorCategoryFilter, setCreatorCategoryFilter] = useState("all");
+  const [syncingTelegram, setSyncingTelegram] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [videosList, setVideosList] = useState([]);
 
@@ -141,6 +142,8 @@ export default function AdminDashboard({ user, onLogout }) {
       if (creatorFilter === "unverified" && c.is_verified) return false;
       if (creatorFilter === "paid" && Number(c.subscription_price || 0) === 0) return false;
       if (creatorFilter === "free" && Number(c.subscription_price || 0) > 0) return false;
+      if (creatorFilter === "telegram" && !c.is_managed) return false;
+      if (creatorFilter === "web" && c.is_managed) return false;
       if (creatorCategoryFilter !== "all" && c.creator_category !== creatorCategoryFilter) return false;
       return true;
     });
@@ -153,10 +156,11 @@ export default function AdminDashboard({ user, onLogout }) {
   const creatorAnalytics = useMemo(() => {
     const total = creatorStats?.total_creators || creatorsList.length;
     const verified = creatorStats?.verified_creators || creatorsList.filter(c => c.is_verified).length;
+    const managed = creatorStats?.managed_creators ?? creatorsList.filter(c => c.is_managed).length;
     const totalSubs = creatorStats?.total_active_subscriptions || creatorsList.reduce((sum, c) => sum + (Number(c.subscribers_count) || 0), 0);
     const totalSubRev = (creatorStats?.total_sub_revenue_usd || creatorsList.reduce((sum, c) => sum + (Number(c.subscription_revenue_usd) || 0), 0)).toFixed(2);
     const totalTips = creatorStats?.total_tips_ngn || creatorsList.reduce((sum, c) => sum + (Number(c.tips_total) || 0), 0);
-    return { total, verified, totalSubs, totalSubRev, totalTips };
+    return { total, verified, managed, totalSubs, totalSubRev, totalTips };
   }, [creatorsList, creatorStats]);
 
   const handleToggleVerify = async (creator) => {
@@ -217,11 +221,15 @@ export default function AdminDashboard({ user, onLogout }) {
         },
         body: JSON.stringify({
           display_name: editingCreator.display_name,
+          username: editingCreator.username,
           creator_category: editingCreator.creator_category,
           subscription_price: Number(editingCreator.subscription_price),
           creator_bio: editingCreator.creator_bio,
           is_verified: editingCreator.is_verified,
-          is_creator: editingCreator.is_creator
+          is_creator: editingCreator.is_creator,
+          is_managed: editingCreator.is_managed,
+          avatar_url: editingCreator.avatar_url,
+          banner_url: editingCreator.banner_url
         })
       });
       const data = await res.json();
@@ -233,6 +241,37 @@ export default function AdminDashboard({ user, onLogout }) {
       }
     } catch (err) {
       alert("Failed to update creator: " + err.message);
+    }
+  };
+
+  const handleSyncTelegramCreators = async () => {
+    setSyncingTelegram(true);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators/sync-telegram`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Successfully synced ${data.count} Telegram creator(s)!`);
+        // Refresh creators list
+        const refreshRes = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        });
+        const refreshData = await refreshRes.json();
+        if (refreshData.creators) {
+          setCreatorsList(refreshData.creators);
+          setCreatorStats(refreshData.stats);
+        }
+      } else {
+        alert(data.error || "Failed to sync Telegram creators");
+      }
+    } catch (err) {
+      alert("Failed to sync Telegram creators: " + err.message);
+    } finally {
+      setSyncingTelegram(false);
     }
   };
 
@@ -563,6 +602,12 @@ export default function AdminDashboard({ user, onLogout }) {
                       bg="rgba(0, 175, 240, 0.1)" 
                     />
                     <StatCard 
+                      title="Telegram Funnels" 
+                      value={creatorAnalytics.managed} 
+                      icon={<RefreshCw size={24} color="#29b6f6" />} 
+                      bg="rgba(41, 182, 246, 0.1)" 
+                    />
+                    <StatCard 
                       title="Verified Badges" 
                       value={creatorAnalytics.verified} 
                       icon={<CheckCircle size={24} color="#00d084" />} 
@@ -587,6 +632,8 @@ export default function AdminDashboard({ user, onLogout }) {
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                       {[
                         { id: "all", label: "All Creators" },
+                        { id: "telegram", label: "🤖 Telegram Funnels" },
+                        { id: "web", label: "🌐 Web Creators" },
                         { id: "verified", label: "Verified Only" },
                         { id: "unverified", label: "Unverified" },
                         { id: "paid", label: "Paid Subscriptions" },
@@ -613,30 +660,55 @@ export default function AdminDashboard({ user, onLogout }) {
                       ))}
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "12px", color: "#8e8e93" }}>Category:</span>
-                      <select
-                        value={creatorCategoryFilter}
-                        onChange={(e) => { setCreatorCategoryFilter(e.target.value); setCurrentPage(1); }}
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={handleSyncTelegramCreators}
+                        disabled={syncingTelegram}
                         style={{
-                          background: "#18181b",
-                          border: "1px solid rgba(255,255,255,0.15)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "6px 14px",
                           borderRadius: "10px",
-                          color: "#fff",
-                          padding: "6px 12px",
                           fontSize: "12px",
-                          outline: "none"
+                          fontWeight: "700",
+                          background: "rgba(0, 136, 204, 0.15)",
+                          color: "#29b6f6",
+                          border: "1px solid rgba(41, 182, 246, 0.35)",
+                          cursor: syncingTelegram ? "not-allowed" : "pointer"
                         }}
+                        title="Scan Telegram uploaders and sync into managed creators"
                       >
-                        <option value="all">All Categories</option>
-                        <option value="Creator">General Creator</option>
-                        <option value="Model">Model</option>
-                        <option value="Influencer">Influencer</option>
-                        <option value="Dancer">Dancer</option>
-                        <option value="Fitness">Fitness</option>
-                        <option value="Blogger">Blogger</option>
-                        <option value="Musician">Musician</option>
-                      </select>
+                        <RefreshCw size={13} style={{ animation: syncingTelegram ? "spin 1s linear infinite" : "none" }} />
+                        {syncingTelegram ? "Syncing..." : "Sync Telegram"}
+                      </button>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "12px", color: "#8e8e93" }}>Category:</span>
+                        <select
+                          value={creatorCategoryFilter}
+                          onChange={(e) => { setCreatorCategoryFilter(e.target.value); setCurrentPage(1); }}
+                          style={{
+                            background: "#18181b",
+                            border: "1px solid rgba(255,255,255,0.15)",
+                            borderRadius: "10px",
+                            color: "#fff",
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            outline: "none"
+                          }}
+                        >
+                          <option value="all">All Categories</option>
+                          <option value="Creator">General Creator</option>
+                          <option value="Model">Model</option>
+                          <option value="Influencer">Influencer</option>
+                          <option value="Dancer">Dancer</option>
+                          <option value="Fitness">Fitness</option>
+                          <option value="Blogger">Blogger</option>
+                          <option value="Musician">Musician</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -683,15 +755,44 @@ export default function AdminDashboard({ user, onLogout }) {
                                     <img 
                                       src={c.avatar_url || '/assets/default-avatar.png'} 
                                       alt="" 
-                                      style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: c.is_verified ? "1.5px solid #00aff0" : "1px solid #333" }}
+                                      style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", border: c.is_verified ? "1.5px solid #00aff0" : "1px solid #333" }}
                                       onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                                     />
                                     <div>
-                                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                         <span style={{ fontWeight: "700", color: "#fff", fontSize: "13px" }}>{c.display_name || c.username}</span>
                                         {c.is_verified && <CheckCircle size={13} color="#00aff0" fill="#00aff0" />}
                                       </div>
-                                      <span style={{ fontSize: "11px", color: "#8e8e93" }}>@{c.username}</span>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                                        <span style={{ fontSize: "11px", color: "#8e8e93" }}>@{c.username}</span>
+                                        {c.is_managed ? (
+                                          <span style={{
+                                            background: "rgba(0, 136, 204, 0.18)",
+                                            color: "#29b6f6",
+                                            border: "1px solid rgba(41, 182, 246, 0.35)",
+                                            borderRadius: "6px",
+                                            padding: "1px 5px",
+                                            fontSize: "9px",
+                                            fontWeight: "800",
+                                            letterSpacing: "0.5px"
+                                          }}>
+                                            🤖 TELEGRAM
+                                          </span>
+                                        ) : (
+                                          <span style={{
+                                            background: "rgba(0, 208, 132, 0.12)",
+                                            color: "#00d084",
+                                            border: "1px solid rgba(0, 208, 132, 0.3)",
+                                            borderRadius: "6px",
+                                            padding: "1px 5px",
+                                            fontSize: "9px",
+                                            fontWeight: "800",
+                                            letterSpacing: "0.5px"
+                                          }}>
+                                            🌐 WEB
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 </td>
@@ -1032,6 +1133,28 @@ export default function AdminDashboard({ user, onLogout }) {
             </div>
 
             <div style={inputGroupStyle}>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Username (@handle)</label>
+              <input 
+                type="text" 
+                value={editingCreator.username || ""} 
+                onChange={e => setEditingCreator({ ...editingCreator, username: e.target.value })} 
+                style={formInputStyle} 
+              />
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Creator Type / Origin</label>
+              <select 
+                value={editingCreator.is_managed ? "true" : "false"} 
+                onChange={e => setEditingCreator({ ...editingCreator, is_managed: e.target.value === "true" })} 
+                style={formInputStyle}
+              >
+                <option value="true">🤖 Telegram Funnel / Managed Creator</option>
+                <option value="false">🌐 Registered Web Creator</option>
+              </select>
+            </div>
+
+            <div style={inputGroupStyle}>
               <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Category</label>
               <select 
                 value={editingCreator.creator_category || "Creator"} 
@@ -1082,6 +1205,28 @@ export default function AdminDashboard({ user, onLogout }) {
                 <option value="true">Active Creator</option>
                 <option value="false">Disabled / Revoked</option>
               </select>
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Avatar Image URL</label>
+              <input 
+                type="text" 
+                value={editingCreator.avatar_url || ""} 
+                onChange={e => setEditingCreator({ ...editingCreator, avatar_url: e.target.value })} 
+                placeholder="https://... or /api/avatar?user_id=..."
+                style={formInputStyle} 
+              />
+            </div>
+
+            <div style={inputGroupStyle}>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Banner Image URL</label>
+              <input 
+                type="text" 
+                value={editingCreator.banner_url || ""} 
+                onChange={e => setEditingCreator({ ...editingCreator, banner_url: e.target.value })} 
+                placeholder="https://images.unsplash.com/..."
+                style={formInputStyle} 
+              />
             </div>
 
             <div style={inputGroupStyle}>

@@ -23,7 +23,7 @@ import { fileURLToPath } from "url";
 import prerender from "prerender-node";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; 
-import adminRoutes from "./admin.js";
+import adminRoutes, { syncTelegramCreators } from "./admin.js";
 import authRoutes, { authenticateToken, JWT_SECRET } from "./auth.js";
 import creatorRoutes from "./creator.js";
 import pool from "./db.js";
@@ -139,6 +139,10 @@ async function initDatabase() {
       await pool.query(`
         ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE;
         ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_creator BOOLEAN DEFAULT FALSE;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_managed BOOLEAN DEFAULT FALSE;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS telegram_user_id BIGINT UNIQUE;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS source_channel TEXT;
+        ALTER TABLE app_users ALTER COLUMN email DROP NOT NULL;
         ALTER TABLE app_users ADD COLUMN IF NOT EXISTS display_name TEXT;
         ALTER TABLE app_users ADD COLUMN IF NOT EXISTS creator_bio TEXT;
         ALTER TABLE app_users ADD COLUMN IF NOT EXISTS banner_url TEXT DEFAULT 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80';
@@ -183,6 +187,8 @@ async function initDatabase() {
         CREATE INDEX IF NOT EXISTS idx_subscriptions_subscriber ON creator_subscriptions(subscriber_id);
         CREATE INDEX IF NOT EXISTS idx_tips_creator ON creator_tips(creator_id);
         CREATE INDEX IF NOT EXISTS idx_app_users_lower_username ON app_users(LOWER(username));
+        CREATE INDEX IF NOT EXISTS idx_app_users_telegram_user_id ON app_users(telegram_user_id);
+        CREATE INDEX IF NOT EXISTS idx_app_users_is_managed ON app_users(is_managed);
       `);
 
       await pool.query(`
@@ -260,6 +266,13 @@ async function initDatabase() {
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS media_group_id TEXT`);
       
       console.log("✅ Database initialized (Admins, App_Users, Videos, Transactions & Interactions)");
+
+      // Auto-sync Telegram uploaders as managed creators in app_users
+      try {
+        await syncTelegramCreators(pool);
+      } catch (sErr) {
+        console.warn("⚠️ [STARTUP] Telegram creators sync notice:", sErr.message);
+      }
       break;
     } catch (err) {
       retries--;
@@ -342,6 +355,40 @@ app.post("/webhook", async (req, res) => {
       [userId, username, fullName]
     );
 
+    // Sync uploader into app_users as managed creator
+    try {
+      const tgUsername = username ? username.toLowerCase().replace(/[^a-z0-9_]/g, '') : `tg_${userId}`;
+      const existingTg = await pool.query(
+        "SELECT id FROM app_users WHERE telegram_user_id = $1 OR (username IS NOT NULL AND LOWER(username) = LOWER($2))",
+        [userId, tgUsername]
+      );
+      if (existingTg.rows.length === 0) {
+        const uCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [tgUsername]);
+        const safeUname = uCheck.rows.length > 0 ? `${tgUsername}_${userId.toString().slice(-4)}` : tgUsername;
+        await pool.query(
+          `INSERT INTO app_users (
+             username, display_name, email, is_creator, is_managed, 
+             telegram_user_id, creator_category, subscription_price, is_verified, 
+             banner_url, creator_bio, avatar_url
+           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15000, TRUE, 
+             'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
+             'Official creator channel. Catch all exclusive drops and daily previews here.',
+             $5
+           )
+           ON CONFLICT (telegram_user_id) DO UPDATE 
+           SET is_creator = TRUE, is_managed = TRUE`,
+          [safeUname, fullName, `tg_${userId}@internal.naijahomemade.com`, userId, `/api/avatar?user_id=${userId}`]
+        );
+      } else {
+        await pool.query(
+          "UPDATE app_users SET is_creator = TRUE, is_managed = TRUE, telegram_user_id = COALESCE(telegram_user_id, $1) WHERE id = $2",
+          [userId, existingTg.rows[0].id]
+        );
+      }
+    } catch (auErr) {
+      console.warn("[TELEGRAM WEBHOOK] Managed creator sync notice:", auErr.message);
+    }
+
     const media = message.video || 
                   (message.document && message.document.mime_type?.startsWith("video/")) || 
                   message.video_note || 
@@ -410,7 +457,16 @@ const upload = multer({ dest: "uploads/" });
 
 app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) => {
   try {
-    const { caption, category, uploader_id, media_group_id, upload_target } = req.body; 
+    const { 
+      caption, 
+      category, 
+      uploader_id, 
+      media_group_id, 
+      upload_target,
+      creator_username,
+      creator_display_name,
+      creator_name 
+    } = req.body; 
     const videoFile = req.file;
 
     // Verify authorization:
@@ -451,19 +507,58 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     const finalUploaderId = (numericUploaderId && ALLOWED_USERS.includes(numericUploaderId))
       ? numericUploaderId 
-      : ALLOWED_USERS[0];
+      : (numericUploaderId || ALLOWED_USERS[0]);
 
-    // Ensure uploader exists in users table to satisfy foreign key constraint
+    const targetUsername = creator_username 
+      ? String(creator_username).trim().toLowerCase().replace(/[^a-z0-9_]/g, '')
+      : `tg_${finalUploaderId}`;
+    const targetDisplayName = creator_display_name || creator_name || targetUsername;
+    const safeCategory = category ? category.toLowerCase().trim() : "premium";
+
+    // Ensure uploader exists in users table to satisfy foreign key constraint or legacy queries
     await pool.query(
       `INSERT INTO users (user_id, username, full_name)
        VALUES ($1, $2, $3)
-       ON CONFLICT (user_id) DO NOTHING`,
-      [finalUploaderId, 'Admin', 'Admin']
+       ON CONFLICT (user_id) DO UPDATE 
+       SET username = COALESCE(users.username, EXCLUDED.username),
+           full_name = COALESCE(users.full_name, EXCLUDED.full_name)`,
+      [finalUploaderId, targetUsername, targetDisplayName]
     );
 
+    // Auto-upsert into app_users as managed creator
+    try {
+      const existingTg = await pool.query(
+        "SELECT id, username FROM app_users WHERE telegram_user_id = $1 OR (username IS NOT NULL AND LOWER(username) = LOWER($2))",
+        [finalUploaderId, targetUsername]
+      );
+      if (existingTg.rows.length === 0) {
+        const uCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [targetUsername]);
+        const safeUname = uCheck.rows.length > 0 ? `${targetUsername}_${finalUploaderId.toString().slice(-4)}` : targetUsername;
+        await pool.query(
+          `INSERT INTO app_users (
+             username, display_name, email, is_creator, is_managed, 
+             telegram_user_id, creator_category, subscription_price, is_verified, 
+             banner_url, creator_bio, avatar_url
+           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, $5, 15000, TRUE, 
+             'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
+             'Official creator channel. Catch all exclusive drops and daily previews here.',
+             $6
+           )
+           ON CONFLICT (telegram_user_id) DO UPDATE 
+           SET is_creator = TRUE, is_managed = TRUE`,
+          [safeUname, targetDisplayName, `tg_${finalUploaderId}@internal.naijahomemade.com`, finalUploaderId, safeCategory, `/api/avatar?user_id=${finalUploaderId}`]
+        );
+      } else {
+        await pool.query(
+          "UPDATE app_users SET is_creator = TRUE, is_managed = TRUE, telegram_user_id = COALESCE(telegram_user_id, $1) WHERE id = $2",
+          [finalUploaderId, existingTg.rows[0].id]
+        );
+      }
+    } catch (mErr) {
+      console.warn("[UPLOAD-PREMIUM] Managed creator upsert notice:", mErr.message);
+    }
+
     let savedCloudflareId = "none";
-    
-    const safeCategory = category ? category.toLowerCase().trim() : "premium";
     const internalId = `${safeCategory}_${Date.now()}`;
 
     try {
@@ -776,6 +871,7 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     category: v.category,
     uploader_id: v.uploader_id,
     uploader_name: v.uploader_name || "Member",
+    uploader_handle: v.uploader_handle || v.uploader_name || "creator",
     created_at: v.created_at,
     thumbnail_url: thumbnailUrl,
     media_group_id: v.media_group_id || null,
@@ -818,10 +914,14 @@ app.get("/api/videos", async (req, res) => {
 
       query = `
         WITH GroupedVideos AS (
-          SELECT v.*, u.username as uploader_name,
+          SELECT v.*, 
+            COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+            COALESCE(au.username, u.username, 'creator') as uploader_handle,
             ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.views DESC) as rn,
             COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
-          FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id
+          FROM videos v 
+          LEFT JOIN users u ON v.uploader_id = u.user_id
+          LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
           ${timeFilter}
         )
         SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY views DESC LIMIT $1 OFFSET $2
@@ -830,10 +930,14 @@ app.get("/api/videos", async (req, res) => {
     } else {
       query = `
         WITH GroupedVideos AS (
-          SELECT v.*, u.username as uploader_name,
+          SELECT v.*, 
+            COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+            COALESCE(au.username, u.username, 'creator') as uploader_handle,
             ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
             COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
-          FROM videos v LEFT JOIN users u ON v.uploader_id = u.user_id
+          FROM videos v 
+          LEFT JOIN users u ON v.uploader_id = u.user_id
+          LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
           WHERE category = $1
         )
         SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
@@ -846,9 +950,12 @@ app.get("/api/videos", async (req, res) => {
     let suggestions = [];
     if (page === 1) {
       const suggestQuery = `
-        SELECT v.*, u.username as uploader_name 
+        SELECT v.*, 
+          COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+          COALESCE(au.username, u.username, 'creator') as uploader_handle 
         FROM videos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id 
+        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
         ORDER BY RANDOM() LIMIT 10
       `;
       const suggestRes = await pool.query(suggestQuery);
@@ -891,9 +998,12 @@ app.get("/api/group", async (req, res) => {
     if (!media_group_id || media_group_id === 'none') return res.status(400).json({error: "Invalid group"});
     
     const query = `
-      SELECT v.*, u.username as uploader_name 
+      SELECT v.*, 
+        COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+        COALESCE(au.username, u.username, 'creator') as uploader_handle 
       FROM videos v 
       LEFT JOIN users u ON v.uploader_id = u.user_id 
+      LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
       WHERE v.media_group_id = $1 
       ORDER BY v.created_at ASC
     `;

@@ -282,6 +282,127 @@ router.delete("/user/:id", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
+// 🟢 HELPER: Sync Telegram Uploaders into app_users as Managed Creators
+export async function syncTelegramCreators(poolInstance) {
+  const db = poolInstance || pool;
+  let count = 0;
+  try {
+    // 1. Fetch all distinct uploaders from videos & users table
+    const uploadersRes = await db.query(`
+      SELECT DISTINCT 
+        v.uploader_id, 
+        u.username, 
+        u.full_name,
+        (
+          SELECT category 
+          FROM videos v2 
+          WHERE v2.uploader_id = v.uploader_id AND v2.category IS NOT NULL 
+          GROUP BY category 
+          ORDER BY COUNT(*) DESC 
+          LIMIT 1
+        ) as top_category
+      FROM videos v
+      LEFT JOIN users u ON v.uploader_id = u.user_id
+      WHERE v.uploader_id IS NOT NULL
+    `);
+
+    // Also include any users in users table that might not have videos yet
+    const rawUsersRes = await db.query(`
+      SELECT user_id as uploader_id, username, full_name, 'Creator' as top_category 
+      FROM users
+    `);
+
+    const combinedMap = new Map();
+    for (const r of uploadersRes.rows) {
+      if (r.uploader_id) combinedMap.set(String(r.uploader_id), r);
+    }
+    for (const r of rawUsersRes.rows) {
+      if (r.uploader_id && !combinedMap.has(String(r.uploader_id))) {
+        combinedMap.set(String(r.uploader_id), r);
+      }
+    }
+
+    for (const [uploaderIdStr, info] of combinedMap.entries()) {
+      const uploaderIdNum = Number(uploaderIdStr);
+      if (!uploaderIdNum || isNaN(uploaderIdNum)) continue;
+
+      // Check if already in app_users
+      const existing = await db.query(
+        `SELECT id, username, telegram_user_id, is_managed 
+         FROM app_users 
+         WHERE telegram_user_id = $1 
+            OR (username IS NOT NULL AND LOWER(username) = LOWER($2))`,
+        [uploaderIdNum, info.username || '']
+      );
+
+      const defaultCategory = info.top_category && info.top_category !== 'none' 
+        ? (info.top_category.charAt(0).toUpperCase() + info.top_category.slice(1)) 
+        : 'Creator';
+      const displayName = info.full_name || info.username || `Creator ${uploaderIdNum}`;
+
+      if (existing.rows.length > 0) {
+        // Update existing record to ensure it is marked as a managed creator
+        await db.query(
+          `UPDATE app_users 
+           SET is_creator = TRUE, 
+               is_managed = TRUE, 
+               telegram_user_id = COALESCE(telegram_user_id, $1),
+               display_name = COALESCE(display_name, $2),
+               creator_category = COALESCE(creator_category, $3)
+           WHERE id = $4`,
+          [uploaderIdNum, displayName, defaultCategory, existing.rows[0].id]
+        );
+        count++;
+      } else {
+        // Pick safe username
+        let baseUsername = info.username 
+          ? info.username.toLowerCase().replace(/[^a-z0-9_]/g, '')
+          : `tg_${uploaderIdNum}`;
+        if (!baseUsername) baseUsername = `tg_${uploaderIdNum}`;
+
+        // Check if baseUsername is already taken
+        const checkUname = await db.query(
+          "SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)",
+          [baseUsername]
+        );
+        if (checkUname.rows.length > 0) {
+          baseUsername = `${baseUsername}_${uploaderIdStr.slice(-4)}`;
+        }
+
+        const syntheticEmail = `tg_${uploaderIdNum}@internal.naijahomemade.com`;
+
+        await db.query(
+          `INSERT INTO app_users (
+             username, display_name, email, is_creator, is_managed, 
+             telegram_user_id, creator_category, subscription_price, is_verified, 
+             banner_url, creator_bio, avatar_url
+           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, $5, 15000, TRUE, 
+             'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
+             'Official Telegram channel. Catch all exclusive drops and daily previews here.',
+             $6
+           )
+           ON CONFLICT (telegram_user_id) DO UPDATE 
+           SET is_creator = TRUE, is_managed = TRUE`,
+          [
+            baseUsername, 
+            displayName, 
+            syntheticEmail, 
+            uploaderIdNum, 
+            defaultCategory,
+            `/api/avatar?user_id=${uploaderIdNum}`
+          ]
+        );
+        count++;
+      }
+    }
+    console.log(`[SYNC TELEGRAM CREATORS] Successfully synced/verified ${count} Telegram creator(s).`);
+    return { success: true, count };
+  } catch (err) {
+    console.error("[SYNC TELEGRAM CREATORS ERROR]", err);
+    return { success: false, error: err.message };
+  }
+}
+
 // 🟢 10. GET ALL CREATORS (Admin Creator Management)
 router.get("/creators", authenticateToken, isAdmin, async (req, res) => {
   try {
@@ -298,36 +419,39 @@ router.get("/creators", authenticateToken, isAdmin, async (req, res) => {
         COALESCE(u.subscription_price, 0) as subscription_price, 
         COALESCE(u.is_verified, false) as is_verified, 
         COALESCE(u.is_creator, false) as is_creator, 
+        COALESCE(u.is_managed, false) as is_managed,
+        u.telegram_user_id,
         u.created_at,
         (
           SELECT COUNT(*) 
           FROM creator_subscriptions cs 
-          WHERE cs.creator_id = u.id 
+          WHERE (cs.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cs.creator_id = u.telegram_user_id))
             AND cs.status = 'active' 
             AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
         ) as subscribers_count,
         (
           SELECT COALESCE(SUM(expected_amount), 0)
           FROM transactions t
-          WHERE t.creator_id = u.id 
+          WHERE (t.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND t.creator_id = u.telegram_user_id))
             AND t.transaction_type = 'creator_sub' 
             AND t.status = 'APPROVED'
         ) as subscription_revenue_usd,
         (
           SELECT COUNT(*) 
           FROM creator_tips ct 
-          WHERE ct.creator_id = u.id
+          WHERE (ct.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND ct.creator_id = u.telegram_user_id))
         ) as tips_count,
         (
           SELECT COALESCE(SUM(amount), 0) 
           FROM creator_tips ct 
-          WHERE ct.creator_id = u.id
+          WHERE (ct.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND ct.creator_id = u.telegram_user_id))
         ) as tips_total,
         (
           SELECT COUNT(*) 
           FROM videos v 
           LEFT JOIN users tg ON v.uploader_id = tg.user_id
           WHERE v.uploader_id = u.id 
+             OR (u.telegram_user_id IS NOT NULL AND v.uploader_id = u.telegram_user_id)
              OR LOWER(COALESCE(tg.username, '')) = LOWER(u.username)
         ) as posts_count,
         (
@@ -335,18 +459,20 @@ router.get("/creators", authenticateToken, isAdmin, async (req, res) => {
           FROM videos v 
           LEFT JOIN users tg ON v.uploader_id = tg.user_id
           WHERE v.uploader_id = u.id 
+             OR (u.telegram_user_id IS NOT NULL AND v.uploader_id = u.telegram_user_id)
              OR LOWER(COALESCE(tg.username, '')) = LOWER(u.username)
         ) as total_views
       FROM app_users u
-      WHERE u.is_creator = true OR u.subscription_price > 0
+      WHERE u.is_creator = true OR u.subscription_price > 0 OR u.is_managed = true
       ORDER BY u.created_at DESC
     `);
 
     // Overview aggregate metrics
     const statsRes = await pool.query(`
       SELECT 
-        (SELECT COUNT(*) FROM app_users WHERE is_creator = true) as total_creators,
-        (SELECT COUNT(*) FROM app_users WHERE is_creator = true AND is_verified = true) as verified_creators,
+        (SELECT COUNT(*) FROM app_users WHERE is_creator = true OR is_managed = true) as total_creators,
+        (SELECT COUNT(*) FROM app_users WHERE is_managed = true) as managed_creators,
+        (SELECT COUNT(*) FROM app_users WHERE (is_creator = true OR is_managed = true) AND is_verified = true) as verified_creators,
         (SELECT COUNT(*) FROM creator_subscriptions WHERE status = 'active' AND (expires_at IS NULL OR expires_at > NOW())) as total_active_subscriptions,
         (SELECT COALESCE(SUM(expected_amount), 0) FROM transactions WHERE transaction_type = 'creator_sub' AND status = 'APPROVED') as total_sub_revenue_usd,
         (SELECT COALESCE(SUM(amount), 0) FROM creator_tips) as total_tips_ngn
@@ -364,6 +490,7 @@ router.get("/creators", authenticateToken, isAdmin, async (req, res) => {
       })),
       stats: {
         total_creators: Number(statsRes.rows[0]?.total_creators || 0),
+        managed_creators: Number(statsRes.rows[0]?.managed_creators || 0),
         verified_creators: Number(statsRes.rows[0]?.verified_creators || 0),
         total_active_subscriptions: Number(statsRes.rows[0]?.total_active_subscriptions || 0),
         total_sub_revenue_usd: Number(statsRes.rows[0]?.total_sub_revenue_usd || 0),
@@ -376,17 +503,32 @@ router.get("/creators", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// 🟢 11. UPDATE CREATOR (Verification Badge, Category, Price, Creator Status)
+// 🟢 10B. SYNC TELEGRAM CREATORS ON DEMAND
+router.post("/creators/sync-telegram", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const result = await syncTelegramCreators(pool);
+    res.json(result);
+  } catch (err) {
+    console.error("[ADMIN SYNC TELEGRAM CREATORS ROUTE ERROR]", err);
+    res.status(500).json({ error: "Failed to sync Telegram creators" });
+  }
+});
+
+// 🟢 11. UPDATE CREATOR (Verification Badge, Category, Price, Creator Status, Avatar, Banner)
 router.put("/creator/:id", authenticateToken, isAdmin, async (req, res) => {
   try {
     const creatorId = req.params.id;
     const { 
       is_verified, 
       is_creator, 
+      is_managed,
       subscription_price, 
       creator_category, 
       display_name, 
-      creator_bio 
+      creator_bio,
+      avatar_url,
+      banner_url,
+      username
     } = req.body;
 
     const updates = [];
@@ -401,6 +543,11 @@ router.put("/creator/:id", authenticateToken, isAdmin, async (req, res) => {
     if (is_creator !== undefined) {
       updates.push(`is_creator = $${idx++}`);
       values.push(Boolean(is_creator));
+    }
+
+    if (is_managed !== undefined) {
+      updates.push(`is_managed = $${idx++}`);
+      values.push(Boolean(is_managed));
     }
 
     if (subscription_price !== undefined) {
@@ -427,6 +574,28 @@ router.put("/creator/:id", authenticateToken, isAdmin, async (req, res) => {
       values.push(String(creator_bio).trim().slice(0, 500));
     }
 
+    if (avatar_url !== undefined && typeof avatar_url === 'string') {
+      updates.push(`avatar_url = $${idx++}`);
+      values.push(avatar_url.trim().slice(0, 500));
+    }
+
+    if (banner_url !== undefined && typeof banner_url === 'string') {
+      updates.push(`banner_url = $${idx++}`);
+      values.push(banner_url.trim().slice(0, 500));
+    }
+
+    if (username !== undefined) {
+      const cleanUsername = String(username).trim().toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 50);
+      if (cleanUsername) {
+        const uCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1) AND id != $2", [cleanUsername, creatorId]);
+        if (uCheck.rows.length > 0) {
+          return res.status(400).json({ error: "Username is already taken by another account" });
+        }
+        updates.push(`username = $${idx++}`);
+        values.push(cleanUsername);
+      }
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: "No fields provided to update" });
     }
@@ -437,7 +606,7 @@ router.put("/creator/:id", authenticateToken, isAdmin, async (req, res) => {
       SET ${updates.join(", ")} 
       WHERE id = $${idx} 
       RETURNING id, username, email, display_name, avatar_url, banner_url, 
-                creator_bio, creator_category, subscription_price, is_verified, is_creator
+                creator_bio, creator_category, subscription_price, is_verified, is_creator, is_managed, telegram_user_id
     `;
 
     const result = await pool.query(query, values);
@@ -480,9 +649,9 @@ router.get("/search", authenticateToken, isAdmin, async (req, res) => {
       `, [searchParam]),
 
       pool.query(`
-        SELECT id, username, email, display_name, avatar_url, creator_category, subscription_price, is_verified, is_creator
+        SELECT id, username, email, display_name, avatar_url, creator_category, subscription_price, is_verified, is_creator, COALESCE(is_managed, false) as is_managed
         FROM app_users
-        WHERE (is_creator = true OR subscription_price > 0)
+        WHERE (is_creator = true OR subscription_price > 0 OR is_managed = true)
           AND (username ILIKE $1 OR display_name ILIKE $1 OR creator_category ILIKE $1)
         LIMIT 20
       `, [searchParam])
