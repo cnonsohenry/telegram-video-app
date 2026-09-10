@@ -10,6 +10,7 @@ import CreatorSetupModal from "../components/CreatorSetupModal";
 import EditProfileModal from "../components/EditProfileModal";
 import CreatorProfileModal from "../components/CreatorProfileModal";
 import CreatorStudioModal from "../components/CreatorStudioModal";
+import CreatorUploadModal from "../components/CreatorUploadModal";
 import { useVideos } from "../hooks/useVideos";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
@@ -30,6 +31,8 @@ export default function Profile({
   const [activeGroup, setActiveGroup] = useState(null);
   const [deletedVideoIds, setDeletedVideoIds] = useState(new Set());
   const [showStudioModal, setShowStudioModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadDefaultCategory, setUploadDefaultCategory] = useState("hotties");
   
   // Creator Modals
   const [showSetupModal, setShowSetupModal] = useState(false);
@@ -197,12 +200,33 @@ export default function Profile({
     }
   }, [user?.is_creator, user?.username, fetchCreatorPosts]);
 
+  const handleUploadSuccess = (newVideo) => {
+    if (!newVideo) return;
+    setCreatorPosts(prev => [newVideo, ...prev]);
+    setCreatorStats(prev => ({
+      ...prev,
+      posts: (prev.posts || 0) + 1
+    }));
+    if (!user?.is_creator && onUpdateUser) {
+      onUpdateUser({ ...user, is_creator: true, role: "creator" });
+    }
+  };
+
   let rawVideosToDisplay = shots || [];
   let loading = shotsLoading;
   let loadMore = loadMoreShots;
 
   if (user?.is_creator && activeTab === "videos") {
     rawVideosToDisplay = creatorPosts;
+    loading = creatorPostsLoading;
+    loadMore = () => {
+      if (!creatorPostsLoading && hasMoreCreatorPosts) {
+        fetchCreatorPosts(creatorPostsPage, false);
+      }
+    };
+  } else if (user?.is_creator && activeTab === "premium") {
+    // Creator sees their own VIP Exclusive / Premium uploaded content
+    rawVideosToDisplay = creatorPosts.filter(v => v.category === "premium");
     loading = creatorPostsLoading;
     loadMore = () => {
       if (!creatorPostsLoading && hasMoreCreatorPosts) {
@@ -598,6 +622,23 @@ export default function Profile({
                     {user?.is_creator ? (
                       <>
                         <button 
+                          onClick={() => {
+                            setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                            setShowUploadModal(true);
+                          }}
+                          style={{ 
+                            ...desktopActionButton, 
+                            background: "linear-gradient(135deg, #00aff0, #0088cc)", 
+                            color: "#fff", 
+                            border: "none", 
+                            fontWeight: "700",
+                            boxShadow: "0 2px 10px rgba(0, 175, 240, 0.3)"
+                          }}
+                        >
+                          <Plus size={15} color="#fff" />
+                          <span>Upload Video</span>
+                        </button>
+                        <button 
                           onClick={() => setShowStudioModal(true)} 
                           style={{ ...desktopActionButton, background: "rgba(255, 215, 0, 0.15)", border: "1px solid rgba(255, 215, 0, 0.4)", color: "#FFD700", fontWeight: "700" }}
                         >
@@ -751,6 +792,28 @@ export default function Profile({
               {user?.is_creator ? (
                 <>
                   <button 
+                    onClick={() => {
+                      setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                      setShowUploadModal(true);
+                    }}
+                    style={{ 
+                      ...mobileActionButton, 
+                      background: "linear-gradient(135deg, #00aff0, #0088cc)", 
+                      color: "#fff", 
+                      border: "none", 
+                      fontWeight: "700",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "4px",
+                      padding: "0 12px",
+                      flex: "0 0 auto"
+                    }}
+                  >
+                    <Plus size={15} color="#fff" />
+                    <span>Upload</span>
+                  </button>
+                  <button 
                     onClick={() => setShowStudioModal(true)} 
                     style={{ ...mobileActionButton, flex: "0 0 auto", padding: "0 12px", color: "#FFD700", background: "rgba(255, 215, 0, 0.12)", border: "1px solid rgba(255, 215, 0, 0.3)" }}
                     title="Studio"
@@ -883,6 +946,32 @@ export default function Profile({
                       ? "Share high quality videos and reels to engage your audience." 
                       : "When you share photos and videos, they will appear on your profile.")}
               </p>
+              {user?.is_creator && activeTab !== "likes" && (
+                <button
+                  onClick={() => {
+                    setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                    setShowUploadModal(true);
+                  }}
+                  style={{
+                    marginTop: "16px",
+                    padding: "10px 20px",
+                    borderRadius: "10px",
+                    background: activeTab === "premium" ? "linear-gradient(135deg, #FFD700, #ffae00)" : "linear-gradient(135deg, #00aff0, #0088cc)",
+                    color: activeTab === "premium" ? "#000" : "#fff",
+                    border: "none",
+                    fontSize: "13.5px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.4)"
+                  }}
+                >
+                  <Plus size={16} />
+                  <span>Upload {activeTab === "premium" ? "VIP Exclusive Post" : "First Video"}</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -937,6 +1026,17 @@ export default function Profile({
           onUpdateUser={(updated) => {
             handleUpdateSuccess(updated);
           }}
+        />
+      )}
+
+      {/* 🌟 CREATOR CONTENT UPLOAD MODAL */}
+      {showUploadModal && (
+        <CreatorUploadModal 
+          isOpen={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={handleUploadSuccess}
+          defaultCategory={uploadDefaultCategory}
+          user={user}
         />
       )}
     </div>

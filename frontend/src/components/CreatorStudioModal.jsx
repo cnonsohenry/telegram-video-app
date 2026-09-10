@@ -1,17 +1,23 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { 
   X, Sparkles, Users, DollarSign, Heart, Eye, ThumbsUp, 
   MessageCircle, Settings, Calendar, Lock, CheckCircle, 
   CheckCircle2, Clock, TrendingUp, Edit3, Save, ExternalLink, 
-  Loader2, AlertCircle, ShieldCheck
+  Loader2, AlertCircle, ShieldCheck, Plus, UploadCloud, Trash2
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
+import CreatorUploadModal from "./CreatorUploadModal";
 
 export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
+
+  // Upload modal state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadDefaultCategory, setUploadDefaultCategory] = useState("hotties");
+  const [deletingMessageId, setDeletingMessageId] = useState(null);
 
   // Settings form state
   const [editPrice, setEditPrice] = useState(0);
@@ -21,48 +27,79 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
 
+  const fetchStudioInsights = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Authentication required");
+
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/studio/insights`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to load studio data");
+      }
+
+      const json = await res.json();
+      setData(json);
+
+      if (json.creator) {
+        setEditPrice(json.creator.subscription_price || 0);
+        setEditDisplayName(json.creator.display_name || "");
+        setEditCategory(json.creator.creator_category || "Creator");
+        setEditBio(json.creator.creator_bio || "");
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
     document.body.style.overflow = "hidden";
-
-    const fetchStudioInsights = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) throw new Error("Authentication required");
-
-        const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/studio/insights`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || "Failed to load studio data");
-        }
-
-        const json = await res.json();
-        setData(json);
-
-        if (json.creator) {
-          setEditPrice(json.creator.subscription_price || 0);
-          setEditDisplayName(json.creator.display_name || "");
-          setEditCategory(json.creator.creator_category || "Creator");
-          setEditBio(json.creator.creator_bio || "");
-        }
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchStudioInsights();
 
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isOpen]);
+  }, [isOpen, fetchStudioInsights]);
+
+  const handleDeleteVideo = async (messageId) => {
+    if (!window.confirm("Are you sure you want to delete this video? This cannot be undone.")) return;
+    setDeletingMessageId(messageId);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/videos/${encodeURIComponent(messageId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to delete video");
+      }
+      setData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          top_videos: prev.top_videos.filter(v => v.message_id !== messageId),
+          stats: {
+            ...prev.stats,
+            posts_count: Math.max(0, (prev.stats?.posts_count || 1) - 1)
+          }
+        };
+      });
+      window.dispatchEvent(new CustomEvent("videoDeleted", { detail: messageId }));
+    } catch (err) {
+      alert(err.message || "Failed to delete video");
+    } finally {
+      setDeletingMessageId(null);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -128,6 +165,23 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button 
+              onClick={() => {
+                setUploadDefaultCategory("hotties");
+                setShowUploadModal(true);
+              }} 
+              style={{
+                ...previewBtnStyle,
+                background: "linear-gradient(135deg, #00aff0, #0088cc)",
+                borderColor: "transparent",
+                color: "#fff",
+                fontWeight: "700"
+              }}
+              title="Upload video"
+            >
+              <Plus size={15} />
+              <span>Upload Video</span>
+            </button>
             <button 
               onClick={() => {
                 onClose();
@@ -501,22 +555,68 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
               {/* TAB 4: VIDEOS PERFORMANCE */}
               {activeTab === "videos" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#fff" }}>
-                      Video Performance Analytics
-                    </h3>
-                    <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#8e8e93" }}>
-                      Posts ordered by engagement & view count
-                    </p>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#fff" }}>
+                        Video Performance Analytics
+                      </h3>
+                      <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#8e8e93" }}>
+                        Posts ordered by engagement & view count
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setUploadDefaultCategory("hotties");
+                        setShowUploadModal(true);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        background: "linear-gradient(135deg, #00aff0, #0088cc)",
+                        color: "#fff",
+                        border: "none",
+                        padding: "8px 14px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: "700",
+                        cursor: "pointer"
+                      }}
+                    >
+                      <Plus size={15} />
+                      <span>Upload New Video</span>
+                    </button>
                   </div>
 
                   {(data?.top_videos || []).length === 0 ? (
                     <div style={emptyBoxStyle}>
                       <Eye size={36} color="#555" />
-                      <h4 style={{ margin: "10px 0 4px 0", color: "#fff" }}>No Uploaded Content</h4>
-                      <p style={{ margin: 0, fontSize: "12px", color: "#8e8e93" }}>
-                        Upload videos via the Telegram Bot or Admin Uploader to see engagement here.
+                      <h4 style={{ margin: "10px 0 4px 0", color: "#fff" }}>No Uploaded Content Yet</h4>
+                      <p style={{ margin: "0 0 14px 0", fontSize: "12px", color: "#8e8e93", maxWidth: "340px", textAlign: "center" }}>
+                        Upload videos directly from your browser to your public feed or VIP exclusive channel.
                       </p>
+                      <button
+                        onClick={() => {
+                          setUploadDefaultCategory("hotties");
+                          setShowUploadModal(true);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          background: "linear-gradient(135deg, #00aff0, #0088cc)",
+                          color: "#fff",
+                          border: "none",
+                          padding: "10px 20px",
+                          borderRadius: "10px",
+                          fontSize: "13.5px",
+                          fontWeight: "700",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <Plus size={15} />
+                        <span>Upload First Video</span>
+                      </button>
                     </div>
                   ) : (
                     <div style={tableContainerStyle}>
@@ -528,6 +628,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                             <th style={thStyle}>Views</th>
                             <th style={thStyle}>Likes</th>
                             <th style={thStyle}>Uploaded</th>
+                            <th style={{ ...thStyle, textAlign: "right" }}>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -539,7 +640,14 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                                 </div>
                               </td>
                               <td style={tdStyle}>
-                                <span style={categoryBadgeStyle}>{vid.category || "General"}</span>
+                                <span style={{
+                                  ...categoryBadgeStyle,
+                                  backgroundColor: vid.category === "premium" ? "rgba(255, 215, 0, 0.15)" : categoryBadgeStyle.backgroundColor,
+                                  color: vid.category === "premium" ? "#FFD700" : categoryBadgeStyle.color,
+                                  borderColor: vid.category === "premium" ? "rgba(255, 215, 0, 0.4)" : "transparent"
+                                }}>
+                                  {vid.category === "premium" ? "VIP Exclusive" : (vid.category || "General")}
+                                </span>
                               </td>
                               <td style={{ ...tdStyle, fontWeight: "700", color: "#00aff0" }}>
                                 {(vid.views || 0).toLocaleString()}
@@ -549,6 +657,28 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                               </td>
                               <td style={{ ...tdStyle, color: "#8e8e93", fontSize: "12px" }}>
                                 {new Date(vid.created_at).toLocaleDateString()}
+                              </td>
+                              <td style={{ ...tdStyle, textAlign: "right" }}>
+                                <button
+                                  onClick={() => handleDeleteVideo(vid.message_id)}
+                                  disabled={deletingMessageId === vid.message_id}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    color: "#ff3b30",
+                                    cursor: "pointer",
+                                    padding: "4px 8px",
+                                    borderRadius: "6px",
+                                    opacity: deletingMessageId === vid.message_id ? 0.5 : 1
+                                  }}
+                                  title="Delete video"
+                                >
+                                  {deletingMessageId === vid.message_id ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                    <Trash2 size={14} />
+                                  )}
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -664,6 +794,22 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
         </div>
 
       </div>
+
+      {/* Creator Video Upload Modal */}
+      {showUploadModal && (
+        <CreatorUploadModal 
+          isOpen={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={(newVideo) => {
+            fetchStudioInsights();
+            if (newVideo) {
+              window.dispatchEvent(new CustomEvent("creatorVideoUploaded", { detail: newVideo }));
+            }
+          }}
+          defaultCategory={uploadDefaultCategory}
+          user={user}
+        />
+      )}
     </div>
   );
 }

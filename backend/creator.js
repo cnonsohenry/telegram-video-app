@@ -3,11 +3,21 @@
    File: backend/creator.js
 ======================================================= */
 import express from "express";
+import fs from "fs";
+import multer from "multer";
 import jwt from "jsonwebtoken";
 import pool from "./db.js";
 import { authenticateToken, JWT_SECRET } from "./auth.js";
+import { uploadVideoToR2, deleteMediaFromR2, R2_PUBLIC_DOMAIN } from "./r2.js";
 
 const router = express.Router();
+
+const upload = multer({ 
+  dest: "uploads/",
+  limits: {
+    fileSize: 500 * 1024 * 1024 // 500MB
+  }
+});
 
 // Optional authentication middleware (doesn't reject if not logged in, but sets req.user if token is valid)
 const optionalAuth = (req, res, next) => {
@@ -296,6 +306,204 @@ router.get("/studio/insights", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error("[CREATOR STUDIO INSIGHTS ERROR]", err);
     res.status(500).json({ error: "Failed to fetch studio insights" });
+  }
+});
+
+/* =======================================================
+   2C. CREATOR CONTENT UPLOAD (Public & VIP / Premium)
+   POST /api/creator/upload
+======================================================= */
+router.post("/upload", authenticateToken, upload.single("video"), async (req, res) => {
+  const userId = req.user.id;
+  const videoFile = req.file;
+  const { caption, category, is_premium } = req.body;
+
+  if (!videoFile) {
+    return res.status(400).json({ error: "Please select a video file to upload." });
+  }
+
+  try {
+    // 1. Fetch user & ensure creator access
+    const userRes = await pool.query(
+      `SELECT id, username, display_name, is_creator, role, is_verified 
+       FROM app_users WHERE id = $1`,
+      [userId]
+    );
+
+    if (userRes.rows.length === 0) {
+      if (fs.existsSync(videoFile.path)) fs.unlinkSync(videoFile.path);
+      return res.status(404).json({ error: "User account not found." });
+    }
+
+    const creator = userRes.rows[0];
+
+    // If user is not yet marked as creator, automatically activate creator status
+    if (!creator.is_creator) {
+      await pool.query(
+        `UPDATE app_users 
+         SET is_creator = TRUE, 
+             role = CASE WHEN role = 'admin' THEN 'admin' ELSE 'creator' END 
+         WHERE id = $1`,
+        [userId]
+      );
+    }
+
+    // 2. Ensure creator exists in users table to satisfy any joins or legacy references
+    try {
+      await pool.query(
+        `INSERT INTO users (user_id, username, full_name)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id) DO UPDATE 
+         SET username = EXCLUDED.username, full_name = EXCLUDED.full_name`,
+        [creator.id, creator.username, creator.display_name || creator.username]
+      );
+    } catch (uErr) {
+      console.warn("[CREATOR UPLOAD] Could not sync to users table:", uErr.message);
+    }
+
+    // 3. Determine category (VIP / Premium vs Public Category)
+    const isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
+    const allowedPublicCategories = ["hotties", "amateur", "college", "trends", "shots", "general"];
+    let safeCategory = "hotties";
+    if (isVip) {
+      safeCategory = "premium";
+    } else if (category && allowedPublicCategories.includes(String(category).toLowerCase().trim())) {
+      safeCategory = String(category).toLowerCase().trim();
+    }
+
+    const sanitizedCaption = caption ? String(caption).trim().slice(0, 1000) : "";
+    const internalId = `${safeCategory}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+
+    // 4. Upload file and generate thumbnail directly to Cloudflare R2 Bucket
+    console.log(`[CREATOR UPLOAD] Uploading media to Cloudflare R2 for @${creator.username} (Category: ${safeCategory})...`);
+    const r2Result = await uploadVideoToR2(
+      videoFile.path,
+      safeCategory,
+      internalId,
+      videoFile.originalname
+    );
+
+    const savedCloudflareId = r2Result.cloudflareId; // 'r2:category/internalId.ext'
+
+    // 5. Insert video record into database
+    const insertRes = await pool.query(
+      `INSERT INTO videos (
+         chat_id, message_id, file_id, uploader_id, category, caption, cloudflare_id, status, created_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', NOW())
+       RETURNING id, chat_id, message_id, uploader_id, category, caption, cloudflare_id, created_at, views, likes_count, comments_count`,
+      [
+        "internal",
+        internalId,
+        "none",
+        creator.id,
+        safeCategory,
+        sanitizedCaption,
+        savedCloudflareId
+      ]
+    );
+
+    // 6. Clean up temporary uploaded file
+    if (fs.existsSync(videoFile.path)) {
+      fs.unlinkSync(videoFile.path);
+    }
+
+    const newVideo = insertRes.rows[0];
+    const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const thumbnailUrl = formatThumbnailUrl(newVideo, apiBaseUrl);
+    const videoUrl = r2Result.staticUrl;
+
+    return res.status(201).json({
+      success: true,
+      message: isVip ? "VIP Exclusive video published to R2!" : "Public video published to R2!",
+      video: {
+        id: newVideo.id,
+        chat_id: newVideo.chat_id,
+        message_id: newVideo.message_id,
+        uploader_id: newVideo.uploader_id,
+        uploader_name: creator.display_name || creator.username,
+        category: newVideo.category,
+        caption: newVideo.caption,
+        views: 0,
+        likes_count: 0,
+        comments_count: 0,
+        shares_count: 0,
+        saves_count: 0,
+        thumbnail_url: thumbnailUrl,
+        video_url: videoUrl,
+        is_group: false,
+        created_at: newVideo.created_at
+      }
+    });
+  } catch (err) {
+    console.error("[CREATOR UPLOAD ERROR]", err);
+    if (req.file && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+    }
+    return res.status(500).json({ error: err.message || "Failed to upload video to Cloudflare R2" });
+  }
+});
+
+/* =======================================================
+   2D. CREATOR DELETE VIDEO
+   DELETE /api/creator/videos/:message_id
+======================================================= */
+router.delete("/videos/:message_id", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { message_id } = req.params;
+
+  try {
+    const videoRes = await pool.query(
+      `SELECT id, chat_id, message_id, uploader_id, cloudflare_id 
+       FROM videos 
+       WHERE message_id = $1`,
+      [message_id]
+    );
+
+    if (videoRes.rows.length === 0) {
+      return res.status(404).json({ error: "Video not found." });
+    }
+
+    const video = videoRes.rows[0];
+
+    // Check user ownership or admin role
+    const userRes = await pool.query(`SELECT role FROM app_users WHERE id = $1`, [userId]);
+    const userRole = userRes.rows[0]?.role;
+
+    if (Number(video.uploader_id) !== Number(userId) && userRole !== "admin") {
+      return res.status(403).json({ error: "You are not authorized to delete this video." });
+    }
+
+    // Delete related rows
+    await pool.query(`DELETE FROM likes WHERE message_id = $1`, [message_id]);
+    await pool.query(`DELETE FROM comments WHERE message_id = $1`, [message_id]);
+    await pool.query(`DELETE FROM bookmarks WHERE message_id = $1`, [message_id]);
+    await pool.query(`DELETE FROM videos WHERE message_id = $1`, [message_id]);
+
+    // Attempt deletion from Cloudflare R2 bucket or Cloudflare Stream
+    if (video.cloudflare_id && video.cloudflare_id.startsWith("r2:")) {
+      await deleteMediaFromR2(video.cloudflare_id, video.message_id);
+    } else if (video.cloudflare_id && video.cloudflare_id !== "none") {
+      const cleanId = video.cloudflare_id.split("?")[0];
+      const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
+      const CF_API_TOKEN = process.env.CLOUDFLARE_STREAM_TOKEN;
+      if (CF_ACCOUNT_ID && CF_API_TOKEN) {
+        try {
+          await fetch(`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream/${cleanId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${CF_API_TOKEN}` }
+          });
+          console.log(`[CREATOR DELETE] Deleted Cloudflare Stream video: ${cleanId}`);
+        } catch (cfErr) {
+          console.warn("[CREATOR DELETE] Cloudflare delete warning:", cfErr.message);
+        }
+      }
+    }
+
+    return res.json({ success: true, message: "Video deleted successfully." });
+  } catch (err) {
+    console.error("[CREATOR DELETE ERROR]", err);
+    return res.status(500).json({ error: "Failed to delete video." });
   }
 });
 

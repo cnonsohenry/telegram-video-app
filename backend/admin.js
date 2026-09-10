@@ -5,6 +5,7 @@
 import express from "express";
 import { authenticateToken } from "./auth.js"; 
 import pool from "./db.js";
+import { deleteMediaFromR2 } from "./r2.js";
 
 const router = express.Router();
 
@@ -155,7 +156,7 @@ router.delete("/video/:identifier", authenticateToken, isAdmin, async (req, res)
 
     // Find the exact message_id first to cleanly wipe dependencies
     const videoQuery = await client.query(
-      "SELECT message_id FROM videos WHERE message_id = $1 OR id::text = $1",
+      "SELECT message_id, cloudflare_id FROM videos WHERE message_id = $1 OR id::text = $1",
       [identifier]
     );
 
@@ -165,6 +166,7 @@ router.delete("/video/:identifier", authenticateToken, isAdmin, async (req, res)
     }
 
     const targetMessageId = videoQuery.rows[0].message_id;
+    const targetCloudflareId = videoQuery.rows[0].cloudflare_id;
 
     // Delete interactions tied to this video to prevent foreign key constraint errors
     await client.query("DELETE FROM likes WHERE message_id = $1", [targetMessageId]);
@@ -175,6 +177,14 @@ router.delete("/video/:identifier", authenticateToken, isAdmin, async (req, res)
     await client.query("DELETE FROM videos WHERE message_id = $1", [targetMessageId]);
 
     await client.query('COMMIT');
+
+    // Clean up R2 objects if hosted on R2
+    if (targetCloudflareId && targetCloudflareId.startsWith("r2:")) {
+      deleteMediaFromR2(targetCloudflareId, targetMessageId).catch(e => 
+        console.warn("R2 async delete warning:", e.message)
+      );
+    }
+
     res.json({ success: true });
   } catch (err) {
     await client.query('ROLLBACK');

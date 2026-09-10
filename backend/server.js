@@ -203,6 +203,8 @@ async function initDatabase() {
         )
       `);
 
+      await pool.query(`ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_uploader_id_fkey;`);
+
       await pool.query(`
         CREATE TABLE IF NOT EXISTS transactions (
           id SERIAL PRIMARY KEY,
@@ -481,7 +483,8 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       console.error("⚠️ FFmpeg thumbnail extraction failed:", ffmpegErr.message);
     }
 
-    if (upload_target === "r2") {
+    const useR2 = !upload_target || upload_target === "r2";
+    if (useR2) {
       const fileStream = fs.createReadStream(videoFile.path);
       const extension = videoFile.originalname.split('.').pop() || "mp4";
       const r2Key = `${safeCategory}/${internalId}.${extension}`; 
