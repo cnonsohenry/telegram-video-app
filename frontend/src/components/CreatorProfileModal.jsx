@@ -6,7 +6,6 @@ import {
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import VideoCard from "./VideoCard";
-import InstagramMediaCard from "./InstagramMediaCard";
 import CreatorTipModal from "./CreatorTipModal";
 import CreatorSubscribeModal from "./CreatorSubscribeModal";
 
@@ -195,12 +194,6 @@ export default function CreatorProfileModal({
   const price = Number(creatorData?.subscription_price || 0);
   const postsCount = creatorData?.stats?.posts || videos.length || 0;
   const likesCount = creatorData?.stats?.likes || 0;
-
-  const highlights = [
-    { id: "vip", title: "VIP Drops", icon: Sparkles, color: "#FFD700", tab: "premium" },
-    { id: "reels", title: "Reels", icon: Film, color: "#0095f6", tab: "reels" },
-    { id: "posts", title: "All Posts", icon: Grid3X3, color: "#fff", tab: "posts" }
-  ];
 
   const displayedVideos = activeTab === "reels" 
     ? videos.filter(v => !v.is_group) 
@@ -493,39 +486,6 @@ export default function CreatorProfileModal({
               </div>
             )}
 
-            {/* 🌟 STORY HIGHLIGHTS */}
-            <div style={{ padding: isDesktop ? "0 20px 14px 20px" : "0 16px 14px 16px" }}>
-              <div style={highlightsContainerStyle}>
-                {highlights.map((h) => {
-                  const Icon = h.icon;
-                  const isActive = activeTab === h.tab;
-                  return (
-                    <div 
-                      key={h.id} 
-                      onClick={() => setActiveTab(h.tab)} 
-                      style={highlightItemStyle}
-                    >
-                      <div style={{
-                        ...highlightCircleOuterStyle,
-                        borderColor: isActive ? "#0095f6" : "rgba(255, 255, 255, 0.16)"
-                      }}>
-                        <div style={highlightCircleInnerStyle}>
-                          <Icon size={18} color={h.color} />
-                        </div>
-                      </div>
-                      <span style={{
-                        ...highlightLabelStyle,
-                        color: isActive ? "#fff" : "#8e8e93",
-                        fontWeight: isActive ? "700" : "500"
-                      }}>
-                        {h.title}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* 🌟 INSTAGRAM TABS */}
             <div style={{ 
               ...tabsContainerStyle, 
@@ -605,19 +565,24 @@ export default function CreatorProfileModal({
                   <span style={{ marginTop: "4px", color: "#8e8e93", fontSize: "13px" }}>When @{creatorUsername} uploads posts or reels, they will appear here.</span>
                 </div>
               ) : (
-                <div style={{ padding: isDesktop ? "16px 0" : "0" }}>
+                <div style={{ 
+                  padding: isDesktop ? "20px 20px 30px 20px" : "14px 12px 24px 12px",
+                  width: "100%",
+                  boxSizing: "border-box"
+                }}>
                   <div style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: isDesktop ? "4px" : "2px",
-                    width: "100%"
+                    gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
+                    gap: isDesktop ? "20px" : "10px",
+                    alignItems: "start",
+                    width: "100%",
+                    animation: "fadeIn 0.3s ease-out"
                   }}>
                     {displayedVideos.map((v) => (
-                      <InstagramMediaCard 
+                      <VideoCard 
                         key={`${v.chat_id}:${v.message_id}`}
                         video={v}
-                        onClick={(vData, e) => onVideoClick(vData, e)}
-                        isDesktop={isDesktop}
+                        onOpen={(vData, e) => onVideoClick(vData, e)}
                       />
                     ))}
                   </div>
@@ -886,58 +851,6 @@ const desktopIconBtnStyle = {
   alignItems: "center",
   justifyContent: "center",
   cursor: "pointer"
-};
-
-// Story Highlights
-const highlightsContainerStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "16px",
-  overflowX: "auto",
-  paddingBottom: "8px",
-  scrollbarWidth: "none",
-  msOverflowStyle: "none"
-};
-
-const highlightItemStyle = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: "6px",
-  cursor: "pointer",
-  flexShrink: 0
-};
-
-const highlightCircleOuterStyle = {
-  width: "64px",
-  height: "64px",
-  borderRadius: "50%",
-  border: "1.5px solid rgba(255, 255, 255, 0.16)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "3px",
-  transition: "border-color 0.2s ease"
-};
-
-const highlightCircleInnerStyle = {
-  width: "100%",
-  height: "100%",
-  borderRadius: "50%",
-  backgroundColor: "#16181c",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center"
-};
-
-const highlightLabelStyle = {
-  fontSize: "11px",
-  color: "#a8a8a8",
-  textAlign: "center",
-  maxWidth: "68px",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap"
 };
 
 // Tabs

@@ -5,7 +5,6 @@ import {
   Film, Play, Plus, ChevronRight, TrendingUp, Link2, ChevronDown, Bookmark, Copy, MessageCircle
 } from "lucide-react"; 
 import VideoCard from "../components/VideoCard"; 
-import InstagramMediaCard from "../components/InstagramMediaCard";
 import SettingsView from "../components/SettingsView"; 
 import CreatorSetupModal from "../components/CreatorSetupModal";
 import EditProfileModal from "../components/EditProfileModal";
@@ -383,13 +382,6 @@ export default function Profile({
   const postsCount = creatorStats.posts || (user?.is_creator ? creatorPosts.length : rawVideosToDisplay.length) || 0;
   const followersCount = creatorStats.subscribers || 0;
   const followingCount = creatorStats.views || creatorStats.likes || 0;
-
-  const highlights = [
-    { id: "vip", title: "VIP Drops", icon: Sparkles, color: "#FFD700", tab: "premium" },
-    { id: "reels", title: "Reels", icon: Film, color: "#0095f6", tab: "reels" },
-    { id: "top", title: "Popular", icon: Heart, color: "#f91880", tab: "likes" },
-    { id: "posts", title: "All Posts", icon: Grid3X3, color: "#fff", tab: "videos" }
-  ];
 
   return (
     <div
@@ -785,49 +777,6 @@ export default function Profile({
             </div>
           )}
 
-          {/* 🌟 INSTAGRAM STORY HIGHLIGHTS BAR */}
-          <div style={highlightsContainerStyle}>
-            {/* + New Highlight (Owner) */}
-            <div 
-              onClick={() => setShowEditModal(true)} 
-              style={highlightItemStyle}
-              title="Add New Highlight"
-            >
-              <div style={newHighlightCircleStyle}>
-                <Plus size={20} color="#fff" strokeWidth={2.5} />
-              </div>
-              <span style={highlightLabelStyle}>New</span>
-            </div>
-
-            {highlights.map((h) => {
-              const Icon = h.icon;
-              const isActive = activeTab === h.tab;
-              return (
-                <div 
-                  key={h.id} 
-                  onClick={() => setActiveTab(h.tab)} 
-                  style={highlightItemStyle}
-                >
-                  <div style={{
-                    ...highlightCircleOuterStyle,
-                    borderColor: isActive ? "#0095f6" : "rgba(255, 255, 255, 0.16)"
-                  }}>
-                    <div style={highlightCircleInnerStyle}>
-                      <Icon size={18} color={h.color} />
-                    </div>
-                  </div>
-                  <span style={{
-                    ...highlightLabelStyle,
-                    color: isActive ? "#fff" : "#8e8e93",
-                    fontWeight: isActive ? "700" : "500"
-                  }}>
-                    {h.title}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
         </div>
 
         {/* 🌟 INSTAGRAM PROFILE TABS NAVIGATION */}
@@ -869,8 +818,13 @@ export default function Profile({
           />
         </div>
 
-        {/* 🌟 3-COLUMN INSTAGRAM SQUARE MEDIA GRID */}
-        <div style={{ padding: isDesktop ? "20px 0" : "0" }}>
+        {/* 🌟 VIDEO FEED GRID (Same as Home.jsx) */}
+        <div style={{ 
+          paddingTop: isDesktop ? "20px" : "14px",
+          paddingBottom: "30px",
+          width: "100%",
+          boxSizing: "border-box"
+        }}>
           
           {activeGroup && (
             <div style={groupHeaderStyle}>
@@ -889,16 +843,17 @@ export default function Profile({
 
           <div style={{ 
             display: "grid", 
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: isDesktop ? "4px" : "2px",
+            gridTemplateColumns: isDesktop ? "repeat(5, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", 
+            gap: isDesktop ? "20px" : "10px",
+            alignItems: "start",
+            animation: "fadeIn 0.3s ease-out",
             width: "100%"
           }}>
             {videosToDisplay.map((v) => (
-              <InstagramMediaCard 
+              <VideoCard 
                 key={`${v.chat_id}:${v.message_id}`} 
                 video={v} 
-                onClick={(vData, e) => handleOpenVideo(vData, e)} 
-                isDesktop={isDesktop}
+                onOpen={(vData, e) => handleOpenVideo(vData, e)} 
               />
             ))}
           </div>
@@ -1227,68 +1182,5 @@ const desktopActionButton = {
   alignItems: "center",
   gap: "6px",
   cursor: "pointer"
-};
-
-// Story Highlights
-const highlightsContainerStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "16px",
-  overflowX: "auto",
-  paddingBottom: "8px",
-  scrollbarWidth: "none",
-  msOverflowStyle: "none"
-};
-
-const highlightItemStyle = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: "6px",
-  cursor: "pointer",
-  flexShrink: 0
-};
-
-const highlightCircleOuterStyle = {
-  width: "64px",
-  height: "64px",
-  borderRadius: "50%",
-  border: "1.5px solid rgba(255, 255, 255, 0.16)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "3px",
-  transition: "border-color 0.2s ease"
-};
-
-const highlightCircleInnerStyle = {
-  width: "100%",
-  height: "100%",
-  borderRadius: "50%",
-  backgroundColor: "#16181c",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center"
-};
-
-const newHighlightCircleStyle = {
-  width: "64px",
-  height: "64px",
-  borderRadius: "50%",
-  border: "1.5px solid rgba(255, 255, 255, 0.25)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  backgroundColor: "#121214"
-};
-
-const highlightLabelStyle = {
-  fontSize: "11px",
-  color: "#a8a8a8",
-  textAlign: "center",
-  maxWidth: "68px",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap"
 };
 
