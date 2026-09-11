@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, Sparkles } from "lucide-react";
+import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, Sparkles, Lock } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
 import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
+import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
 
 // 🟢 INDIVIDUAL POST COMPONENT
-const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen, onCreatorClick }) => {
+const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen, onCreatorClick, user }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
   
@@ -20,6 +21,10 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   
   const [sharesCount, setSharesCount] = useState(Number(video.shares_count || 0));
   const [commentsCount, setCommentsCount] = useState(Number(video.comments_count || 0));
+
+  const isPremium = video.category === "premium" || video.is_premium === true;
+  const isUnlocked = !isPremium || isUserSubscribedToCreator(user, video);
+  const creatorHandle = getVideoCreatorHandle(video);
   
   const containerRef = useRef(null);
   const videoRef = useRef(null);
@@ -61,7 +66,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 
   useEffect(() => {
     let timer;
-    if (isPlaying && !videoUrl) {
+    if (isPlaying && !videoUrl && isUnlocked) {
       timer = setTimeout(async () => {
         try {
           const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}&noview=1`);
@@ -73,7 +78,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
       }, 300); 
     }
     return () => clearTimeout(timer);
-  }, [isPlaying, videoUrl, video.chat_id, video.message_id]);
+  }, [isPlaying, videoUrl, video.chat_id, video.message_id, isUnlocked]);
 
   // Attach HLS or video src whenever videoUrl is available
   useEffect(() => {
@@ -235,11 +240,11 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   return (
     <div ref={isLast ? lastElementRef : null} style={postStyle}>
       <div 
-        style={{ ...avatarColumnStyle, cursor: onCreatorClick && video.uploader_name ? "pointer" : "default" }}
+        style={{ ...avatarColumnStyle, cursor: onCreatorClick ? "pointer" : "default" }}
         onClick={(e) => {
-          if (onCreatorClick && video.uploader_name) {
+          if (onCreatorClick) {
             e.stopPropagation();
-            onCreatorClick(video.uploader_name);
+            onCreatorClick(creatorHandle);
           }
         }}
       >
@@ -254,17 +259,17 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
       <div style={contentColumnStyle}>
         <div style={postHeaderStyle}>
           <span 
-            style={{ ...usernameStyle, cursor: onCreatorClick && video.uploader_name ? "pointer" : "default" }}
+            style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
             onClick={(e) => {
-              if (onCreatorClick && video.uploader_name) {
+              if (onCreatorClick) {
                 e.stopPropagation();
-                onCreatorClick(video.uploader_name);
+                onCreatorClick(creatorHandle);
               }
             }}
           >
-            @{video.uploader_name || "Member"}
+            @{creatorHandle}
           </span>
-          <span style={timeStyle}>&middot; {new Date(video.created_at).toLocaleDateString()} &middot; {video.category}</span>
+          <span style={timeStyle}>&middot; {new Date(video.created_at).toLocaleDateString()} &middot; {isPremium ? "VIP Exclusive" : video.category}</span>
         </div>
 
         <p style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</p>
@@ -273,9 +278,21 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
         <div 
           ref={containerRef} 
           style={{ ...videoContainerStyle, width: isPortrait ? "75%" : "100%" }} 
-          onClick={() => onVideoClick({ ...video, video_url: videoUrl })}
+          onClick={() => {
+            if (!isUnlocked) {
+              if (onCreatorClick) {
+                onCreatorClick(creatorHandle, { autoSubscribe: true });
+              } else {
+                window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+                  detail: { username: creatorHandle, autoSubscribe: true } 
+                }));
+              }
+              return;
+            }
+            onVideoClick({ ...video, video_url: videoUrl });
+          }}
         >
-          {videoUrl ? (
+          {videoUrl && isUnlocked ? (
             <video 
               ref={videoRef} 
               style={thumbnailImgStyle} 
@@ -295,11 +312,55 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
               onLoad={handleMediaLoad} 
             />
           )}
-          {(!isPlaying || isAnyModalOpen) && (
-            <div style={playOverlayStyle}>
-              <Play size={24} fill="#fff" strokeWidth={0} />
+
+          {!isUnlocked ? (
+            <div style={vipLockedOverlayStyle}>
+              <div style={vipBadgePillStyle}>
+                <Sparkles size={11} fill="#000" color="#000" />
+                <span>VIP EXCLUSIVE</span>
+              </div>
+              <div style={vipLockCenterStyle}>
+                <div style={vipLockCircleStyle}>
+                  <Lock size={24} color="#FFD700" />
+                </div>
+                <div style={{ color: "#fff", fontSize: "13px", fontWeight: "800", textAlign: "center" }}>
+                  Locked Premium Release
+                </div>
+                <button
+                  type="button"
+                  style={vipSubscribeButtonStyle}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onCreatorClick) {
+                      onCreatorClick(creatorHandle, { autoSubscribe: true });
+                    } else {
+                      window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+                        detail: { username: creatorHandle, autoSubscribe: true } 
+                      }));
+                    }
+                  }}
+                >
+                  <Sparkles size={13} fill="#000" color="#000" />
+                  <span>Subscribe to @{creatorHandle}</span>
+                </button>
+              </div>
             </div>
+          ) : (
+            <>
+              {(!isPlaying || isAnyModalOpen) && (
+                <div style={playOverlayStyle}>
+                  <Play size={24} fill="#fff" strokeWidth={0} />
+                </div>
+              )}
+              {isPremium && (
+                <div style={vipUnlockedBadgeStyle}>
+                  <Sparkles size={11} fill="#FFD700" color="#FFD700" />
+                  <span>VIP Unlocked</span>
+                </div>
+              )}
+            </>
           )}
+
           {video.is_group && <div style={groupBadgeStyle}>Album</div>}
         </div>
 
@@ -449,9 +510,12 @@ export default function Explore({
     else setLoading(true);
 
     try {
-      const validCategories = APP_CONFIG.categories.filter(c => c.toLowerCase() !== "premium");
+      const exploreCategories = [...APP_CONFIG.categories];
+      if (!exploreCategories.includes("premium")) {
+        exploreCategories.push("premium");
+      }
       
-      const fetches = validCategories.map(async (cat) => {
+      const fetches = exploreCategories.map(async (cat) => {
         const randomPage = Math.floor(Math.random() * 5) + 1; 
         let res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${cat}&limit=8&page=${randomPage}`);
         let data = res.ok ? await res.json() : { videos: [] };
@@ -473,7 +537,7 @@ export default function Explore({
 
       const uniqueMap = new Map();
       combined.forEach(video => {
-        if (video.category && video.category.toLowerCase() !== "premium") {
+        if (video && video.message_id) {
           uniqueMap.set(video.message_id, video);
         }
       });
@@ -504,7 +568,7 @@ export default function Explore({
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchQuery)}&limit=15&page=${pageNum}`);
       if (res.ok) {
         const data = await res.json();
-        const safeVideos = (data.videos || []).filter(v => v.category && v.category.toLowerCase() !== "premium");
+        const safeVideos = data.videos || [];
 
         if (isLoadMore) setFeed(prev => [...prev, ...safeVideos]);
         else setFeed(safeVideos);
@@ -657,6 +721,7 @@ export default function Explore({
                     onCommentClick={onCommentClick} 
                     isAnyModalOpen={isAnyModalOpen} 
                     onCreatorClick={onCreatorClick}
+                    user={user}
                   />
                 );
               })
@@ -798,4 +863,92 @@ const featuredCategoryBadge = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   width: "100%"
+};
+
+const vipLockedOverlayStyle = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 10,
+  background: "rgba(0, 0, 0, 0.78)",
+  backdropFilter: "blur(12px)",
+  WebkitBackdropFilter: "blur(12px)",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "20px",
+  textAlign: "center",
+  borderRadius: "inherit"
+};
+
+const vipBadgePillStyle = {
+  position: "absolute",
+  top: "12px",
+  left: "12px",
+  background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+  color: "#000",
+  padding: "4px 10px",
+  borderRadius: "6px",
+  fontSize: "10.5px",
+  fontWeight: "900",
+  letterSpacing: "0.5px",
+  display: "flex",
+  alignItems: "center",
+  gap: "5px",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.4)"
+};
+
+const vipLockCenterStyle = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "10px",
+  maxWidth: "240px"
+};
+
+const vipLockCircleStyle = {
+  width: "52px",
+  height: "52px",
+  borderRadius: "50%",
+  background: "rgba(255, 215, 0, 0.15)",
+  border: "1px solid rgba(255, 215, 0, 0.35)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxShadow: "0 0 24px rgba(255, 215, 0, 0.2)"
+};
+
+const vipSubscribeButtonStyle = {
+  background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+  color: "#000",
+  border: "none",
+  borderRadius: "100px",
+  padding: "10px 18px",
+  fontSize: "12.5px",
+  fontWeight: "800",
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  cursor: "pointer",
+  boxShadow: "0 4px 16px rgba(255, 215, 0, 0.3)",
+  transition: "transform 0.15s ease",
+  marginTop: "4px"
+};
+
+const vipUnlockedBadgeStyle = {
+  position: "absolute",
+  top: "12px",
+  left: "12px",
+  background: "rgba(0,0,0,0.65)",
+  backdropFilter: "blur(6px)",
+  border: "1px solid rgba(255, 215, 0, 0.4)",
+  color: "#FFD700",
+  padding: "4px 8px",
+  borderRadius: "6px",
+  fontSize: "11px",
+  fontWeight: "800",
+  display: "flex",
+  alignItems: "center",
+  gap: "4px",
+  zIndex: 10
 };

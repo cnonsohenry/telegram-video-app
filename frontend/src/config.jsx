@@ -1,4 +1,4 @@
-import { Play, Flame, Grid3X3, User as UserIcon } from "lucide-react";
+import { Play, Flame, Grid3X3, User as UserIcon, Sparkles } from "lucide-react";
 
 export const APP_CONFIG = {
   // 🟢 1. Core API & Ads
@@ -31,12 +31,13 @@ export const APP_CONFIG = {
   },
 
   // 🟢 6. Categories & Navigation Tabs
-  categories: ["knacks", "hotties", "baddies", "trends"],
+  categories: ["knacks", "hotties", "baddies", "trends", "premium"],
   tabs: [
     { icon: <Play size={22} />, label: "KNACKS" },
     { icon: <Grid3X3 size={22} />, label: "HOTTIES" },
     { icon: <UserIcon size={22} />, label: "BADDIES" },
-    { icon: <Flame size={22} />, label: "TRENDS" }
+    { icon: <Flame size={22} />, label: "TRENDS" },
+    { icon: <Sparkles size={22} />, label: "VIP" }
   ],
 
   // 🟢 NEW: Paywall & Monetization Config

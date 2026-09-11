@@ -866,6 +866,22 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
       thumbnailUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
   }
 
+  const isPremium = v.category === "premium";
+  let uploaderName = v.uploader_name;
+  let uploaderHandle = v.uploader_handle;
+
+  if (isPremium) {
+    if (!uploaderHandle || uploaderHandle === "creator" || uploaderHandle === "Member") {
+      uploaderHandle = "naijahomemade";
+    }
+    if (!uploaderName || uploaderName === "Member" || uploaderName === "creator") {
+      uploaderName = "Naija Homemade Series";
+    }
+  } else {
+    uploaderName = uploaderName || "Member";
+    uploaderHandle = uploaderHandle || uploaderName || "creator";
+  }
+
   return {
     chat_id: v.chat_id,
     message_id: v.message_id,
@@ -873,8 +889,8 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     caption: v.caption,
     category: v.category,
     uploader_id: v.uploader_id,
-    uploader_name: v.uploader_name || "Member",
-    uploader_handle: v.uploader_handle || v.uploader_name || "creator",
+    uploader_name: uploaderName,
+    uploader_handle: uploaderHandle,
     created_at: v.created_at,
     thumbnail_url: thumbnailUrl,
     media_group_id: v.media_group_id || null,

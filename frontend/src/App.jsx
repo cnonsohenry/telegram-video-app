@@ -14,6 +14,7 @@ import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
 import { APP_CONFIG } from "./config";
+import { isUserSubscribedToCreator, getVideoCreatorHandle } from "./utils/subscription";
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -47,6 +48,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get("creator") || null;
   });
+  const [creatorAutoSubscribe, setCreatorAutoSubscribe] = useState(false);
 
   // 🟢 THE FIX: App Height Lock Architecture
   const windowWidth = useRef(window.innerWidth);
@@ -312,8 +314,13 @@ export default function App() {
   }, [handleOpenLegal]);
 
   // 🟢 Seamless Creator Profile navigation
-  const handleOpenCreator = useCallback((username) => {
+  const handleOpenCreator = useCallback((target, options = {}) => {
+    if (!target) return;
+    const username = typeof target === 'string' ? target : (target.username || target.creatorUsername);
     if (!username) return;
+
+    const autoSub = Boolean(options.autoSubscribe || target.autoSubscribe);
+    setCreatorAutoSubscribe(autoSub);
     setViewingCreator(username);
     viewingCreatorRef.current = username;
     const currentState = window.history.state || {};
@@ -327,6 +334,7 @@ export default function App() {
   const handleCloseCreator = useCallback(() => {
     viewingCreatorRef.current = null;
     setViewingCreator(null);
+    setCreatorAutoSubscribe(false);
     if (window.history.state?.creatorProfile) {
       window.history.back();
     } else {
@@ -338,15 +346,41 @@ export default function App() {
     }
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const activeToken = localStorage.getItem("token");
+    if (!activeToken) return;
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${activeToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+      }
+    } catch (e) {
+      console.error("Failed to refresh user subscriptions:", e);
+    }
+  }, []);
+
   useEffect(() => {
     const handleOpenCreatorEvent = (e) => {
       if (e.detail) {
-        handleOpenCreator(e.detail);
+        if (typeof e.detail === "string") {
+          handleOpenCreator(e.detail);
+        } else if (typeof e.detail === "object") {
+          handleOpenCreator(e.detail.username || e.detail.creator, {
+            autoSubscribe: Boolean(e.detail.autoSubscribe)
+          });
+        }
       }
     };
     window.addEventListener("openCreatorProfile", handleOpenCreatorEvent);
-    return () => window.removeEventListener("openCreatorProfile", handleOpenCreatorEvent);
-  }, [handleOpenCreator]);
+    window.addEventListener("refreshUser", refreshUser);
+    return () => {
+      window.removeEventListener("openCreatorProfile", handleOpenCreatorEvent);
+      window.removeEventListener("refreshUser", refreshUser);
+    };
+  }, [handleOpenCreator, refreshUser]);
 
   const handleCloseVideo = useCallback(() => {
     activeVideoRef.current = null;
@@ -583,6 +617,15 @@ export default function App() {
 
   const handleOpenVideo = async (video) => {
     try {
+      if (video.category === "premium" || video.is_premium) {
+        const hasAccess = isUserSubscribedToCreator(user, video);
+        if (!hasAccess) {
+          const creatorHandle = getVideoCreatorHandle(video);
+          handleOpenCreator(creatorHandle, { autoSubscribe: true });
+          return;
+        }
+      }
+
       // Clear completely first
       setActiveVideo(null);
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -780,9 +823,11 @@ export default function App() {
         <CreatorProfileModal 
           creatorUsername={viewingCreator} 
           currentUser={user} 
+          autoOpenSubscribe={creatorAutoSubscribe}
           onClose={handleCloseCreator} 
           onVideoClick={handleOpenVideo} 
           setShowPaywall={setShowPaywall} 
+          onSubscriptionUpdated={refreshUser}
         />
       )}
       

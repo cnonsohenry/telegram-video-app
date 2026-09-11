@@ -10,6 +10,7 @@ import { openRewardedAd } from "../utils/rewardedAd";
 import { adReturnWatcher } from "../utils/adReturnWatcher";
 import LegalFooter from "../components/LegalFooter";
 import { APP_CONFIG } from "../config"; 
+import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription"; 
 
 const MAX_CACHE_SIZE = 4;
 const AD_FREQUENCY = 3;
@@ -121,7 +122,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     } 
     // 🟢 Prevent displaying videos until we are 100% sure they belong to the new fetch
     else if (!loading && videos.length > 0 && isVideosFresh) {
-       const isCorrectCategory = currentCategory === APP_CONFIG.categories[3] || videos[0].category === currentCategory;
+       const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
        if (isCorrectCategory) {
           baseList = videos;
        }
@@ -165,7 +166,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   useEffect(() => {
     // 🟢 Prevent the system from improperly caching the previous tab's videos as "Trends"
     if (!loading && videos?.length > 0 && isVideosFresh) {
-      const isCorrectCategory = currentCategory === APP_CONFIG.categories[3] || videos[0].category === currentCategory;
+      const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
       if (isCorrectCategory) {
         updateCache(currentCategory, videos);
       }
@@ -201,14 +202,14 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     setActiveTab(index);
     activeCategoryRef.current = index;
     
-    if (index === 3) {
+    if (APP_CONFIG.categories[index] === "trends") {
       const newTimeframe = TREND_TIMEFRAMES[Math.floor(Math.random() * TREND_TIMEFRAMES.length)];
       setTrendsTimeframe(newTimeframe);
       
       // 🟢 Always clear the cache for Trends so it pulls fresh data/timeframes on each visit
       setVideoCache(prev => {
         const newCache = { ...prev };
-        delete newCache[APP_CONFIG.categories[3]];
+        delete newCache["trends"];
         return newCache;
       });
     }
@@ -365,9 +366,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       return;
     }
 
-    if (video.category === "premium") {
-      if (!user || !user.is_premium) {
-        setShowPaywall(true);
+    if (video.category === "premium" || video.is_premium) {
+      const hasAccess = isUserSubscribedToCreator(user, video);
+      if (!hasAccess) {
+        const creatorHandle = getVideoCreatorHandle(video);
+        window.dispatchEvent(new CustomEvent("openCreatorProfile", {
+          detail: { username: creatorHandle, autoSubscribe: true }
+        }));
         return;
       }
       playVideo(video);

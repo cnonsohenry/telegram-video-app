@@ -15,6 +15,7 @@ import { useVideos } from "../hooks/useVideos";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
+import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
 
 export default function Profile({ 
   user, 
@@ -346,9 +347,13 @@ export default function Profile({
       return;
     }
 
-    if (video.category === "premium" || activeTab === "premium") {
-      if (!user || !user.is_premium) {
-        setShowPaywall(true);
+    if (video.category === "premium" || activeTab === "premium" || video.is_premium) {
+      const hasAccess = isUserSubscribedToCreator(user, video);
+      if (!hasAccess) {
+        const creatorHandle = getVideoCreatorHandle(video);
+        window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+          detail: { username: creatorHandle, autoSubscribe: true } 
+        }));
         return;
       }
     }
@@ -904,62 +909,69 @@ export default function Profile({
             </div>
           )}
 
-          {activeTab === "premium" && !user?.is_creator && (
-            <div style={{
-              margin: isDesktop ? "0 0 20px 0" : "0 0 14px 0",
-              padding: isDesktop ? "16px 20px" : "14px 16px",
-              background: "linear-gradient(135deg, rgba(255, 215, 0, 0.12), rgba(255, 140, 0, 0.06))",
-              borderRadius: "14px",
-              border: "1px solid rgba(255, 215, 0, 0.25)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: "12px"
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "50%",
-                  background: "rgba(255, 215, 0, 0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0
-                }}>
-                  <Sparkles size={20} color="#FFD700" />
-                </div>
-                <div>
-                  <div style={{ fontSize: "14px", fontWeight: "700", color: "#fff" }}>
-                    {user?.is_premium ? "VIP Pass Active" : "VIP Exclusive Channel"}
+          {activeTab === "premium" && !user?.is_creator && (() => {
+            const isSubscribedToNaija = isUserSubscribedToCreator(user, { category: 'premium', uploader_handle: 'naijahomemade' });
+            return (
+              <div style={{
+                margin: isDesktop ? "0 0 20px 0" : "0 0 14px 0",
+                padding: isDesktop ? "16px 20px" : "14px 16px",
+                background: "linear-gradient(135deg, rgba(255, 215, 0, 0.12), rgba(255, 140, 0, 0.06))",
+                borderRadius: "14px",
+                border: "1px solid rgba(255, 215, 0, 0.25)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "12px"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{
+                    width: "40px",
+                    height: "40px",
+                    borderRadius: "50%",
+                    background: "rgba(255, 215, 0, 0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0
+                  }}>
+                    <Sparkles size={20} color="#FFD700" />
                   </div>
-                  <div style={{ fontSize: "12px", color: "#b3b3b3", marginTop: "2px" }}>
-                    All private releases from Naija Homemade Series (@naijahomemade)
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: "700", color: "#fff" }}>
+                      {isSubscribedToNaija ? "VIP Pass Active (Subscribed)" : "VIP Exclusive Channel"}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#b3b3b3", marginTop: "2px" }}>
+                      {isSubscribedToNaija 
+                        ? "You have full access to all private releases from Naija Homemade Series (@naijahomemade)"
+                        : "Subscribe to Naija Homemade Series (@naijahomemade) to unlock all private releases"}
+                    </div>
                   </div>
                 </div>
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+                    detail: { username: "naijahomemade", autoSubscribe: !isSubscribedToNaija } 
+                  }))}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "100px",
+                    background: isSubscribedToNaija ? "rgba(255, 215, 0, 0.18)" : "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+                    border: isSubscribedToNaija ? "1px solid rgba(255, 215, 0, 0.4)" : "none",
+                    color: isSubscribedToNaija ? "#FFD700" : "#000",
+                    fontSize: "12.5px",
+                    fontWeight: "800",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <span>{isSubscribedToNaija ? "View Creator Channel" : "Subscribe to @naijahomemade"}</span>
+                  <ChevronRight size={14} color={isSubscribedToNaija ? "#FFD700" : "#000"} />
+                </button>
               </div>
-              <button
-                onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: "naijahomemade" }))}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "100px",
-                  background: "rgba(255, 215, 0, 0.18)",
-                  border: "1px solid rgba(255, 215, 0, 0.4)",
-                  color: "#FFD700",
-                  fontSize: "12.5px",
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px"
-                }}
-              >
-                <span>View Creator Channel</span>
-                <ChevronRight size={14} color="#FFD700" />
-              </button>
-            </div>
-          )}
+            );
+          })()}
 
           <div style={{ 
             display: "grid", 

@@ -14,7 +14,9 @@ export default function CreatorProfileModal({
   currentUser, 
   onClose, 
   onVideoClick, 
-  setShowPaywall 
+  autoOpenSubscribe = false,
+  setShowPaywall,
+  onSubscriptionUpdated
 }) {
   const [creatorData, setCreatorData] = useState(null);
   const [videos, setVideos] = useState([]);
@@ -56,10 +58,15 @@ export default function CreatorProfileModal({
         if (isMounted) {
           setCreatorData(data.creator);
           setVideos(data.videos || []);
-          setIsSubscribed(Boolean(data.creator.is_subscribed));
+          const isSub = Boolean(data.creator.is_subscribed);
+          setIsSubscribed(isSub);
           setSubscribersCount(Number(data.creator.stats?.subscribers || 0));
           setHasMoreVideos(Boolean(data.videos && data.videos.length >= 12));
           setVideoPage(1);
+
+          if (autoOpenSubscribe && !isSub && !data.creator.is_owner) {
+            setShowSubscribeModal(true);
+          }
         }
       } catch (err) {
         if (isMounted) setError(err.message);
@@ -135,6 +142,8 @@ export default function CreatorProfileModal({
         }
         setIsSubscribed(false);
         setSubscribersCount(data.subscribers_count);
+        if (onSubscriptionUpdated) onSubscriptionUpdated();
+        window.dispatchEvent(new CustomEvent("refreshUser"));
       } catch (e) {
         alert(e.message || "Failed to cancel subscription");
       } finally {
@@ -165,6 +174,8 @@ export default function CreatorProfileModal({
       }
       setIsSubscribed(data.subscribed);
       setSubscribersCount(data.subscribers_count);
+      if (onSubscriptionUpdated) onSubscriptionUpdated();
+      window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (e) {
       alert(e.message || "Failed to update subscription");
     } finally {
@@ -638,6 +649,8 @@ export default function CreatorProfileModal({
           onSubscribeSuccess={() => {
             setIsSubscribed(true);
             setSubscribersCount(prev => prev + 1);
+            if (onSubscriptionUpdated) onSubscriptionUpdated();
+            window.dispatchEvent(new CustomEvent("refreshUser"));
           }}
         />
       )}

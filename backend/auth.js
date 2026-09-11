@@ -136,6 +136,7 @@ router.post("/google", async (req, res) => {
     );
 
     const user = userQuery.rows[0];
+    user.subscriptions = await getUserSubscriptions(user.id);
     const appToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "30d" });
 
     res.json({ token: appToken, user });
@@ -144,6 +145,28 @@ router.post("/google", async (req, res) => {
     res.status(401).json({ error: "Google Authentication Failed" });
   }
 });
+
+// Helper to fetch active creator subscriptions
+export const getUserSubscriptions = async (userId) => {
+  if (!userId) return [];
+  try {
+    const subsResult = await pool.query(
+      `SELECT cs.creator_id, cs.status, cs.expires_at,
+              u.username as creator_username, u.display_name as creator_display_name,
+              u.telegram_user_id
+       FROM creator_subscriptions cs
+       LEFT JOIN app_users u ON cs.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cs.creator_id = u.telegram_user_id)
+       WHERE cs.subscriber_id = $1 
+         AND cs.status = 'active' 
+         AND (cs.expires_at IS NULL OR cs.expires_at > NOW())`,
+      [userId]
+    );
+    return subsResult.rows;
+  } catch (err) {
+    console.error("[GET USER SUBSCRIPTIONS ERROR]", err.message);
+    return [];
+  }
+};
 
 // 🟢 4. REGISTER (Email/Password & Optional Creator)
 router.post("/register", async (req, res) => {
@@ -195,7 +218,9 @@ router.post("/register", async (req, res) => {
     ).catch(e => console.error("[WELCOME EMAIL ERROR]", e.message));
 
     const token = jwt.sign({ id: newUser.rows[0].id }, JWT_SECRET, { expiresIn: "30d" });
-    res.json({ token, user: newUser.rows[0] });
+    const userData = newUser.rows[0];
+    userData.subscriptions = [];
+    res.json({ token, user: userData });
   } catch (err) {
     console.error("[REGISTER ERROR]", err);
     res.status(500).json({ error: "Registration failed" });
@@ -225,6 +250,7 @@ router.post("/login", async (req, res) => {
 
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "30d" });
     const { password_hash, ...userData } = user;
+    userData.subscriptions = await getUserSubscriptions(user.id);
     res.json({ token, user: userData });
   } catch (err) {
     console.error("[LOGIN ERROR]", err);
@@ -244,7 +270,9 @@ router.get("/me", authenticateToken, async (req, res) => {
     );
 
     if (userResult.rows.length === 0) return res.status(404).json({ error: "User not found" });
-    res.json(userResult.rows[0]);
+    const user = userResult.rows[0];
+    user.subscriptions = await getUserSubscriptions(req.user.id);
+    res.json(user);
   } catch (err) {
     res.status(401).json({ error: "Session expired" });
   }

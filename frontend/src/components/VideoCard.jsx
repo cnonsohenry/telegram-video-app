@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Play, Copy } from 'lucide-react'; 
+import { Play, Copy, Sparkles, Lock } from 'lucide-react'; 
 
 import { APP_CONFIG } from "../config";
 
@@ -184,6 +184,29 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
             zIndex: 11 
           }}>
             <Copy size={16} color="#fff" />
+          </div>
+        )}
+
+        {(video.category === "premium" || video.is_premium) && (
+          <div style={{
+            position: "absolute",
+            top: "10px",
+            left: "10px",
+            background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+            color: "#000",
+            padding: "3px 8px",
+            borderRadius: "6px",
+            fontSize: "10px",
+            fontWeight: "900",
+            letterSpacing: "0.5px",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            zIndex: 11,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.5)"
+          }}>
+            <Sparkles size={11} fill="#000" color="#000" />
+            <span>VIP</span>
           </div>
         )}
 
