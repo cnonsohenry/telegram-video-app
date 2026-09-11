@@ -211,15 +211,16 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           </p>
           
           <div 
-            style={{ ...userInfoRowStyle, cursor: video.uploader_name ? "pointer" : "default" }}
+            style={{ ...userInfoRowStyle, cursor: (video.uploader_handle || video.uploader_name) ? "pointer" : "default" }}
             onClick={(e) => {
-              if (video.uploader_name) {
+              const handle = video.uploader_handle || video.uploader_name;
+              if (handle) {
                 e.preventDefault();
                 e.stopPropagation();
-                window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: video.uploader_name }));
+                window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: handle }));
               }
             }}
-            title={video.uploader_name ? `View @${video.uploader_name}'s profile` : ""}
+            title={video.uploader_handle ? `View @${video.uploader_handle}'s profile` : (video.uploader_name ? `View ${video.uploader_name}'s profile` : "")}
           >
             <div style={avatarWrapperStyle}>
                <img 
@@ -230,7 +231,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
                />
             </div>
             <span style={uploaderNameStyle}>
-              @{video.uploader_name || APP_CONFIG.defaultUploader}
+              @{video.uploader_handle || video.uploader_name || APP_CONFIG.defaultUploader}
             </span>
           </div>
         </div>

@@ -230,6 +230,33 @@ router.put("/user/:id", authenticateToken, isAdmin, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // Keep creator_subscriptions in sync with @naijahomemade
+    if (is_premium !== undefined) {
+      try {
+        const mainCreator = await pool.query(
+          "SELECT id FROM app_users WHERE telegram_user_id = 1881815190 OR LOWER(username) = 'naijahomemade' LIMIT 1"
+        );
+        if (mainCreator.rows.length > 0) {
+          if (is_premium === true) {
+            await pool.query(
+              `INSERT INTO creator_subscriptions (subscriber_id, creator_id, amount_paid, status, expires_at)
+               VALUES ($1, $2, 15000, 'active', NOW() + INTERVAL '10 years')
+               ON CONFLICT (subscriber_id, creator_id) DO UPDATE 
+               SET status = 'active', expires_at = GREATEST(creator_subscriptions.expires_at, NOW() + INTERVAL '10 years')`,
+              [userId, mainCreator.rows[0].id]
+            );
+          } else {
+            await pool.query(
+              "UPDATE creator_subscriptions SET status = 'cancelled' WHERE subscriber_id = $1 AND creator_id = $2",
+              [userId, mainCreator.rows[0].id]
+            );
+          }
+        }
+      } catch (subSyncErr) {
+        console.warn("[ADMIN UPDATE USER] Notice syncing VIP subscription:", subSyncErr.message);
+      }
+    }
+
     res.json({ success: true, user: result.rows[0] });
   } catch (err) {
     console.error("[UPDATE USER ERROR]", err);
@@ -395,10 +422,116 @@ export async function syncTelegramCreators(poolInstance) {
         count++;
       }
     }
+
+    try {
+      await migrateLegacyVipToCreator(db);
+    } catch (mErr) {
+      console.warn("[SYNC TELEGRAM CREATORS] VIP migration notice:", mErr.message);
+    }
+
     console.log(`[SYNC TELEGRAM CREATORS] Successfully synced/verified ${count} Telegram creator(s).`);
     return { success: true, count };
   } catch (err) {
     console.error("[SYNC TELEGRAM CREATORS ERROR]", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// 🟢 9C. MIGRATE LEGACY VIP USERS & PREMIUM VIDEOS TO @NAIJAHOMEMADE
+export async function migrateLegacyVipToCreator(poolInstance) {
+  const db = poolInstance || pool;
+  try {
+    console.log("[MIGRATE VIP] Starting migration of legacy VIP users and premium videos to @naijahomemade...");
+
+    // 1. Ensure target creator @naijahomemade exists and is properly flagged as a managed creator
+    const targetCreatorRes = await db.query(
+      `SELECT id, username, telegram_user_id, subscription_price 
+       FROM app_users 
+       WHERE telegram_user_id = 1881815190 
+          OR LOWER(username) = 'naijahomemade'
+       ORDER BY id ASC
+       LIMIT 1`
+    );
+
+    let creatorAppUserId;
+    if (targetCreatorRes.rows.length === 0) {
+      const insRes = await db.query(
+        `INSERT INTO app_users (
+           username, display_name, email, is_creator, is_managed, 
+           telegram_user_id, creator_category, subscription_price, is_verified, 
+           banner_url, creator_bio, avatar_url
+         ) VALUES (
+           'naijahomemade', 'Naija Homemade Series', 'tg_1881815190@internal.naijahomemade.com',
+           TRUE, TRUE, 1881815190, 'Official VIP', 15000, TRUE,
+           'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
+           'Official Naija Homemade VIP channel. All exclusive premium drops and uncut releases.',
+           'https://videos.naijahomemade.com/assets/default-avatar.png'
+         )
+         ON CONFLICT (telegram_user_id) DO UPDATE 
+         SET is_creator = TRUE, is_managed = TRUE
+         RETURNING id`
+      );
+      creatorAppUserId = insRes.rows[0].id;
+    } else {
+      creatorAppUserId = targetCreatorRes.rows[0].id;
+      await db.query(
+        `UPDATE app_users 
+         SET is_creator = TRUE, 
+             is_managed = TRUE, 
+             telegram_user_id = 1881815190,
+             display_name = COALESCE(display_name, 'Naija Homemade Series'),
+             creator_category = COALESCE(creator_category, 'Official VIP'),
+             subscription_price = CASE WHEN subscription_price IS NULL OR subscription_price = 0 THEN 15000 ELSE subscription_price END,
+             is_verified = TRUE
+         WHERE id = $1`,
+        [creatorAppUserId]
+      );
+    }
+
+    // 2. Move all premium videos to @naijahomemade (Telegram ID 1881815190)
+    const vidsUpdateRes = await db.query(
+      `UPDATE videos 
+       SET uploader_id = '1881815190' 
+       WHERE category = 'premium' AND (uploader_id IS NULL OR uploader_id != '1881815190')`
+    );
+    const videosMoved = vidsUpdateRes.rowCount || 0;
+    console.log(`[MIGRATE VIP] Reassigned ${videosMoved} premium videos to @naijahomemade (1881815190).`);
+
+    // 3. Move all existing VIP/Premium users into creator_subscriptions for @naijahomemade
+    const subsRes = await db.query(
+      `INSERT INTO creator_subscriptions (subscriber_id, creator_id, amount_paid, status, expires_at)
+       SELECT DISTINCT u.id, $1, 15000, 'active', NOW() + INTERVAL '10 years'
+       FROM app_users u
+       LEFT JOIN transactions t ON u.id = t.app_user_id AND t.status = 'APPROVED'
+       WHERE (u.is_premium = TRUE OR t.id IS NOT NULL)
+         AND u.id != $1
+       ON CONFLICT (subscriber_id, creator_id) DO UPDATE 
+       SET status = 'active', 
+           expires_at = GREATEST(creator_subscriptions.expires_at, NOW() + INTERVAL '10 years')
+       RETURNING subscriber_id`,
+      [creatorAppUserId]
+    );
+
+    const usersMoved = subsRes.rowCount || 0;
+    console.log(`[MIGRATE VIP] Subscribed ${usersMoved} legacy VIP/premium users to @naijahomemade.`);
+
+    // 4. Double check subscriber count
+    const countCheck = await db.query(
+      "SELECT COUNT(*) FROM creator_subscriptions WHERE creator_id = $1 AND status = 'active'",
+      [creatorAppUserId]
+    );
+    const totalSubs = Number(countCheck.rows[0]?.count || 0);
+
+    return { 
+      success: true, 
+      creator_id: creatorAppUserId, 
+      creator_username: "naijahomemade",
+      videos_migrated: videosMoved, 
+      users_migrated: usersMoved,
+      total_active_subscribers: totalSubs 
+    };
+  } catch (err) {
+    console.error("[MIGRATE VIP ERROR]", err);
     return { success: false, error: err.message };
   }
 }
@@ -511,6 +644,17 @@ router.post("/creators/sync-telegram", authenticateToken, isAdmin, async (req, r
   } catch (err) {
     console.error("[ADMIN SYNC TELEGRAM CREATORS ROUTE ERROR]", err);
     res.status(500).json({ error: "Failed to sync Telegram creators" });
+  }
+});
+
+// 🟢 10C. MIGRATE LEGACY VIP & PREMIUM VIDEOS ON DEMAND
+router.post("/creators/migrate-legacy-vip", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const result = await migrateLegacyVipToCreator(pool);
+    res.json(result);
+  } catch (err) {
+    console.error("[ADMIN MIGRATE LEGACY VIP ROUTE ERROR]", err);
+    res.status(500).json({ error: "Failed to migrate legacy VIP users and premium videos" });
   }
 });
 

@@ -23,7 +23,7 @@ import { fileURLToPath } from "url";
 import prerender from "prerender-node";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; 
-import adminRoutes, { syncTelegramCreators } from "./admin.js";
+import adminRoutes, { syncTelegramCreators, migrateLegacyVipToCreator } from "./admin.js";
 import authRoutes, { authenticateToken, JWT_SECRET } from "./auth.js";
 import creatorRoutes from "./creator.js";
 import pool from "./db.js";
@@ -270,8 +270,9 @@ async function initDatabase() {
       // Auto-sync Telegram uploaders as managed creators in app_users
       try {
         await syncTelegramCreators(pool);
+        await migrateLegacyVipToCreator(pool);
       } catch (sErr) {
-        console.warn("⚠️ [STARTUP] Telegram creators sync notice:", sErr.message);
+        console.warn("⚠️ [STARTUP] Telegram creators / VIP sync notice:", sErr.message);
       }
       break;
     } catch (err) {
@@ -509,11 +510,13 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       ? numericUploaderId 
       : (numericUploaderId || ALLOWED_USERS[0]);
 
+    const safeCategory = category ? category.toLowerCase().trim() : "premium";
+    const defaultUsername = safeCategory === "premium" ? "naijahomemade" : `tg_${finalUploaderId}`;
+    const defaultDisplayName = safeCategory === "premium" ? "Naija Homemade Series" : `Creator ${finalUploaderId}`;
     const targetUsername = creator_username 
       ? String(creator_username).trim().toLowerCase().replace(/[^a-z0-9_]/g, '')
-      : `tg_${finalUploaderId}`;
-    const targetDisplayName = creator_display_name || creator_name || targetUsername;
-    const safeCategory = category ? category.toLowerCase().trim() : "premium";
+      : defaultUsername;
+    const targetDisplayName = creator_display_name || creator_name || defaultDisplayName;
 
     // Ensure uploader exists in users table to satisfy foreign key constraint or legacy queries
     await pool.query(

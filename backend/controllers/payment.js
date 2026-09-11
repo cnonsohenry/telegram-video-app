@@ -57,6 +57,25 @@ export const verifyPayment = async (req, res, pool) => {
           `UPDATE app_users SET is_premium = TRUE WHERE id = $1`,
           [app_user_id]
         );
+
+        // Auto-subscribe user to official @naijahomemade VIP creator
+        try {
+          const mainCreator = await client.query(
+            "SELECT id FROM app_users WHERE telegram_user_id = 1881815190 OR LOWER(username) = 'naijahomemade' LIMIT 1"
+          );
+          if (mainCreator.rows.length > 0) {
+            await client.query(
+              `INSERT INTO creator_subscriptions (subscriber_id, creator_id, amount_paid, status, expires_at)
+               VALUES ($1, $2, $3, 'active', NOW() + INTERVAL '30 days')
+               ON CONFLICT (subscriber_id, creator_id) DO UPDATE
+               SET status = 'active', amount_paid = $3, expires_at = NOW() + INTERVAL '30 days'`,
+              [app_user_id, mainCreator.rows[0].id, numericAmount]
+            );
+          }
+        } catch (subErr) {
+          console.warn("[VERIFY-PAYMENT] Creator subscription notice:", subErr.message);
+        }
+
         await client.query('COMMIT');
       } catch (dbErr) {
         await client.query('ROLLBACK');
