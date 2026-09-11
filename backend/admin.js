@@ -500,16 +500,16 @@ export async function migrateLegacyVipToCreator(poolInstance) {
     // 3. Move all existing VIP/Premium users into creator_subscriptions for @naijahomemade
     const subsRes = await db.query(
       `INSERT INTO creator_subscriptions (subscriber_id, creator_id, amount_paid, status, expires_at)
-       SELECT DISTINCT u.id, $1, 15000, 'active', NOW() + INTERVAL '10 years'
+       SELECT DISTINCT u.id, $1::BIGINT, 15000, 'active', NOW() + INTERVAL '10 years'
        FROM app_users u
        LEFT JOIN transactions t ON u.id = t.app_user_id AND t.status = 'APPROVED'
        WHERE (u.is_premium = TRUE OR t.id IS NOT NULL)
-         AND u.id != $1
+         AND u.id != $1::INTEGER
        ON CONFLICT (subscriber_id, creator_id) DO UPDATE 
        SET status = 'active', 
            expires_at = GREATEST(creator_subscriptions.expires_at, NOW() + INTERVAL '10 years')
        RETURNING subscriber_id`,
-      [creatorAppUserId]
+      [Number(creatorAppUserId)]
     );
 
     const usersMoved = subsRes.rowCount || 0;
