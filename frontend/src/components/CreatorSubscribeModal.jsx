@@ -99,35 +99,36 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
   };
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={modalBoxStyle} onClick={(e) => e.stopPropagation()}>
-        
-        {/* Header Bar */}
-        <div style={headerStyle}>
-          {cryptoDetails && pollingStatus !== "success" ? (
-            <button 
-              onClick={() => { setCryptoDetails(null); setSelectedCoin(null); setError(""); }} 
-              style={iconBtnStyle}
-              title="Back to coin selection"
-            >
-              <ArrowLeft size={20} color="#fff" />
-            </button>
-          ) : (
-            <div style={{ width: "32px" }} />
-          )}
+    <div style={fullscreenContainerStyle}>
+      {/* Instagram-style Top Navigation Bar */}
+      <div style={topNavStyle}>
+        <button 
+          onClick={() => {
+            if (cryptoDetails && pollingStatus !== "success") {
+              setCryptoDetails(null);
+              setSelectedCoin(null);
+              setError("");
+            } else {
+              onClose();
+            }
+          }} 
+          style={navBackBtnStyle}
+          aria-label="Back"
+        >
+          <ArrowLeft size={24} color="#fff" />
+        </button>
 
-          <div style={{ textAlign: "center", flex: 1 }}>
-            <h2 style={titleStyle}>Creator VIP Pass</h2>
-            <span style={subtitleStyle}>30 Days Unlimited Access</span>
-          </div>
-
-          <button onClick={onClose} style={iconBtnStyle}>
-            <X size={20} color="#888" />
-          </button>
+        <div style={{ textAlign: "center", flex: 1 }}>
+          <span style={topNavTitleStyle}>
+            VIP Pass: @{creator?.username || "creator"}
+          </span>
         </div>
 
-        {/* Content Body */}
-        <div style={contentBodyStyle}>
+        <div style={{ width: "36px" }} />
+      </div>
+
+      <div style={scrollAreaStyle}>
+        <div style={innerContentStyle}>
           
           {/* STATE 1: SUCCESS */}
           {pollingStatus === "success" ? (
@@ -348,43 +349,65 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
 }
 
 // 🖌 Styles
-const overlayStyle = {
+const fullscreenContainerStyle = {
   position: "fixed",
   inset: 0,
   zIndex: 100002,
-  backgroundColor: "rgba(0, 0, 0, 0.85)",
-  backdropFilter: "blur(10px)",
+  backgroundColor: "#000000",
   display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "16px"
+  flexDirection: "column",
+  overflow: "hidden",
+  animation: "fadeIn 0.2s ease-out"
 };
 
-const modalBoxStyle = {
-  backgroundColor: "#131316",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
-  borderRadius: "24px",
+const topNavStyle = {
+  height: "50px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "0 16px",
+  borderBottom: "1px solid #1a1a1a",
+  backgroundColor: "#000000",
+  position: "sticky",
+  top: 0,
+  zIndex: 50,
+  flexShrink: 0
+};
+
+const navBackBtnStyle = {
+  background: "none",
+  border: "none",
+  color: "#fff",
+  cursor: "pointer",
+  padding: "6px",
+  display: "flex",
+  alignItems: "center"
+};
+
+const topNavTitleStyle = {
+  fontSize: "16px",
+  fontWeight: "700",
+  color: "#fff",
+  letterSpacing: "0.2px"
+};
+
+const scrollAreaStyle = {
+  flex: 1,
+  overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  padding: "20px 16px 40px",
+  boxSizing: "border-box"
+};
+
+const innerContentStyle = {
   width: "100%",
   maxWidth: "460px",
-  maxHeight: "92vh",
-  overflowY: "auto",
-  boxShadow: "0 25px 60px rgba(0, 0, 0, 0.9)",
   display: "flex",
   flexDirection: "column"
 };
-
-const headerStyle = {
-  padding: "16px 20px",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between"
-};
-
-const titleStyle = { margin: 0, fontSize: "16px", fontWeight: "800", color: "#fff" };
-const subtitleStyle = { fontSize: "11px", color: "#00aff0", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" };
-const iconBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center" };
-const contentBodyStyle = { padding: "20px" };
 
 const creatorBannerCardStyle = {
   display: "flex",

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Sparkles, CheckCircle, ShieldCheck, DollarSign, Camera, Globe, Loader2 } from "lucide-react";
+import { ArrowLeft, X, Sparkles, CheckCircle, ShieldCheck, DollarSign, Camera, Globe, Loader2 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 
 const BANNER_PRESETS = [
@@ -89,30 +89,27 @@ export default function CreatorSetupModal({ user, onClose, onSetupSuccess }) {
   };
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={modalBoxStyle} onClick={(e) => e.stopPropagation()}>
-        
-        {/* Header */}
-        <div style={headerStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={sparkleIconStyle}>
-              <Sparkles size={20} color="#fff" />
-            </div>
-            <div>
-              <h2 style={titleStyle}>Become a Creator</h2>
-              <p style={subtitleStyle}>Monetize your content & build your fan community</p>
-            </div>
-          </div>
-          <button onClick={onClose} style={closeBtnStyle}>
-            <X size={20} color="#888" />
-          </button>
-        </div>
+    <div style={fullscreenContainerStyle}>
+      {/* Instagram Top Navigation Bar */}
+      <div style={topNavStyle}>
+        <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
+          <ArrowLeft size={24} color="#fff" />
+        </button>
 
-        {error && (
-          <div style={errorBannerStyle}>
-            <span>{error}</span>
-          </div>
-        )}
+        <span style={topNavTitleStyle}>
+          Creator Setup
+        </span>
+
+        <div style={{ width: "36px" }} />
+      </div>
+
+      <div style={scrollAreaStyle}>
+        <div style={innerContentStyle}>
+          {error && (
+            <div style={errorBannerStyle}>
+              <span>{error}</span>
+            </div>
+          )}
 
         <form onSubmit={handleSubmit} style={formStyle}>
           {/* Banner Selector */}
@@ -292,49 +289,72 @@ export default function CreatorSetupModal({ user, onClose, onSetupSuccess }) {
               </div>
             )}
           </button>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );
 }
 
 // 🖌 Styles
-const overlayStyle = {
+const fullscreenContainerStyle = {
   position: "fixed",
   inset: 0,
   zIndex: 100000,
-  backgroundColor: "rgba(0, 0, 0, 0.85)",
-  backdropFilter: "blur(8px)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "16px"
-};
-
-const modalBoxStyle = {
-  backgroundColor: "#121214",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
-  borderRadius: "24px",
-  width: "100%",
-  maxWidth: "520px",
-  maxHeight: "90vh",
-  overflowY: "auto",
-  boxShadow: "0 20px 50px rgba(0, 0, 0, 0.9)",
+  backgroundColor: "#000000",
   display: "flex",
   flexDirection: "column",
-  animation: "fadeInUp 0.3s ease-out"
+  overflow: "hidden",
+  animation: "fadeIn 0.2s ease-out"
 };
 
-const headerStyle = {
-  padding: "20px 24px",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+const topNavStyle = {
+  height: "50px",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
+  padding: "0 16px",
+  borderBottom: "1px solid #1a1a1a",
+  backgroundColor: "#000000",
   position: "sticky",
   top: 0,
-  backgroundColor: "#121214",
-  zIndex: 10
+  zIndex: 50,
+  flexShrink: 0
+};
+
+const navBackBtnStyle = {
+  background: "none",
+  border: "none",
+  color: "#fff",
+  cursor: "pointer",
+  padding: "6px",
+  display: "flex",
+  alignItems: "center"
+};
+
+const topNavTitleStyle = {
+  fontSize: "16px",
+  fontWeight: "700",
+  color: "#fff",
+  letterSpacing: "0.2px"
+};
+
+const scrollAreaStyle = {
+  flex: 1,
+  overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  padding: "20px 16px 60px",
+  boxSizing: "border-box"
+};
+
+const innerContentStyle = {
+  width: "100%",
+  maxWidth: "520px",
+  display: "flex",
+  flexDirection: "column"
 };
 
 const sparkleIconStyle = {

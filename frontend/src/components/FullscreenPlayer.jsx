@@ -563,36 +563,52 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
 
       {/* Edit Video Modal */}
       {isEditingMode && (
-        <div style={modalOverlayStyle} onClick={(e) => { e.stopPropagation(); setIsEditingMode(false); }}>
-          <form onSubmit={handleSaveEdit} style={modalBoxStyle} onClick={(e) => e.stopPropagation()}>
-            <div style={modalHeaderStyle}>
-              <h2 style={{margin:0, fontSize: "18px", color: "#fff"}}>Edit Video</h2>
-              <X size={20} cursor="pointer" onClick={() => setIsEditingMode(false)} color="#8e8e93"/>
-            </div>
+        <div style={editFullscreenStyle} onClick={(e) => e.stopPropagation()}>
+          <div style={editTopNavStyle}>
+            <button 
+              type="button" 
+              onClick={() => setIsEditingMode(false)}
+              style={editNavBackBtnStyle}
+              aria-label="Back"
+            >
+              <ArrowLeft size={24} color="#fff" />
+            </button>
+            <span style={editTopNavTitleStyle}>Edit Info</span>
+            <button 
+              type="button" 
+              onClick={handleSaveEdit}
+              style={editTopNavDoneBtnStyle}
+            >
+              Done
+            </button>
+          </div>
 
-            <div style={inputGroupStyle}>
-              <label style={formLabelStyle}>Caption</label>
-              <input 
-                type="text" 
-                value={editForm.caption} 
-                onChange={e => setEditForm({...editForm, caption: e.target.value})} 
-                style={formInputStyle} 
-              />
-            </div>
-            <div style={inputGroupStyle}>
-              <label style={formLabelStyle}>Category</label>
-              <select 
-                value={editForm.category} 
-                onChange={e => setEditForm({...editForm, category: e.target.value})} 
-                style={formInputStyle}
-              >
-                {(APP_CONFIG.categories || fallbackCategories).map((cat) => (
-                  <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" style={saveBtnStyle}>Save Changes</button>
-          </form>
+          <div style={editScrollAreaStyle}>
+            <form onSubmit={handleSaveEdit} style={editFormInnerStyle}>
+              <div style={inputGroupStyle}>
+                <label style={formLabelStyle}>Caption</label>
+                <input 
+                  type="text" 
+                  value={editForm.caption} 
+                  onChange={e => setEditForm({...editForm, caption: e.target.value})} 
+                  style={formInputStyle} 
+                />
+              </div>
+              <div style={inputGroupStyle}>
+                <label style={formLabelStyle}>Category</label>
+                <select 
+                  value={editForm.category} 
+                  onChange={e => setEditForm({...editForm, category: e.target.value})} 
+                  style={formInputStyle}
+                >
+                  {(APP_CONFIG.categories || fallbackCategories).map((cat) => (
+                    <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
+              <button type="submit" style={saveBtnStyle}>Save Changes</button>
+            </form>
+          </div>
         </div>
       )}
 
@@ -644,9 +660,68 @@ const timeDisplayStyle = { fontSize: "11px", fontWeight: "500", color: "#ccc", t
 const engagementBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 10px", borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: "14px" };
 const engagementBtnStyle = { background: "transparent", border: "none", display: "flex", alignItems: "center", gap: "6px", color: "#e7e9ea", fontSize: "13px", fontWeight: "600", cursor: "pointer", textShadow: "0px 1px 2px rgba(0,0,0,0.8)" };
 
-const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999999 };
-const modalBoxStyle = { background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "16px", padding: "25px", width: "100%", maxWidth: "400px", margin: "0 15px", zIndex: 10000000 };
-const modalHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" };
+const editFullscreenStyle = {
+  position: "fixed",
+  inset: 0,
+  background: "#000000",
+  display: "flex",
+  flexDirection: "column",
+  zIndex: 9999999,
+  animation: "fadeIn 0.2s ease-out"
+};
+
+const editTopNavStyle = {
+  height: "50px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "0 16px",
+  borderBottom: "1px solid #1a1a1a",
+  backgroundColor: "#000000",
+  flexShrink: 0
+};
+
+const editNavBackBtnStyle = {
+  background: "none",
+  border: "none",
+  color: "#fff",
+  cursor: "pointer",
+  padding: "6px",
+  display: "flex",
+  alignItems: "center"
+};
+
+const editTopNavTitleStyle = {
+  fontSize: "16px",
+  fontWeight: "700",
+  color: "#fff",
+  letterSpacing: "0.2px"
+};
+
+const editTopNavDoneBtnStyle = {
+  background: "none",
+  border: "none",
+  color: "var(--primary-color, #0095f6)",
+  fontSize: "15px",
+  fontWeight: "700",
+  cursor: "pointer",
+  padding: "6px"
+};
+
+const editScrollAreaStyle = {
+  flex: 1,
+  overflowY: "auto",
+  padding: "24px 16px"
+};
+
+const editFormInnerStyle = {
+  width: "100%",
+  maxWidth: "500px",
+  margin: "0 auto",
+  display: "flex",
+  flexDirection: "column",
+  gap: "16px"
+};
 const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "6px", marginBottom: "15px" };
 const formLabelStyle = { fontSize: "13px", color: "#8e8e93", fontWeight: "600" };
 const formInputStyle = { background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", padding: "12px", borderRadius: "8px", color: "#fff", fontSize: "14px", outline: "none" };

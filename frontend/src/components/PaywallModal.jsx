@@ -179,24 +179,32 @@ export default function PaywallModal({ onClose, user }) {
   };
 
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
-        
-        <div style={topBarStyle}>
-          {!verifying && verifyStatus !== "success" && (selectedMethod || showAuthAlert) && (
-            <button onClick={resetState} style={iconButtonStyle}>
-              <ArrowLeft size={20} color="#fff" />
-            </button>
-          )}
-          <div style={{ flex: 1 }}></div>
-          {!verifying && verifyStatus !== "success" && (
-            <button onClick={onClose} style={iconButtonStyle}>
-              <X size={20} color="#fff" />
-            </button>
-          )}
-        </div>
+    <div style={fullscreenContainerStyle}>
+      {/* Instagram-style Top Navigation Bar */}
+      <div style={topNavStyle}>
+        <button 
+          onClick={() => {
+            if (!verifying && verifyStatus !== "success" && (selectedMethod || showAuthAlert)) {
+              resetState();
+            } else if (!verifying) {
+              onClose();
+            }
+          }} 
+          style={navBackBtnStyle}
+          aria-label="Back"
+        >
+          <ArrowLeft size={24} color="#fff" />
+        </button>
 
-        <div style={contentContainerStyle}>
+        <span style={topNavTitleStyle}>
+          {selectedPackage ? selectedPackage.label : "VIP Access Pass"}
+        </span>
+
+        <div style={{ width: "36px" }} />
+      </div>
+
+      <div style={scrollAreaStyle}>
+        <div style={innerContentStyle}>
 
           {showAuthAlert && (
             <div style={{ ...centerFlexStyle, textAlign: "center", animation: "fadeInUp 0.3s ease-out" }}>
@@ -432,27 +440,27 @@ export default function PaywallModal({ onClose, user }) {
               </button>
             </div>
           )}
-        </div>
 
-        <div style={footerStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#8e8e93", fontSize: "12px" }}>
-            <ShieldCheck size={14} color="#34C759" />
-            <span style={{ fontWeight: "600" }}>256-bit Secure</span>
+          <div style={footerStyle}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#8e8e93", fontSize: "12px" }}>
+              <ShieldCheck size={14} color="#34C759" />
+              <span style={{ fontWeight: "600" }}>256-bit Secure</span>
+            </div>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <CreditCard size={18} color="#666" />
+              <Bitcoin size={18} color="#666" />
+              <Wallet size={18} color="#666" />
+            </div>
           </div>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <CreditCard size={18} color="#666" />
-            <Bitcoin size={18} color="#666" />
-            <Wallet size={18} color="#666" />
-          </div>
-        </div>
 
-        <style>{`
-          @keyframes spin { 100% { transform: rotate(360deg); } }
-          @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-          ::-webkit-scrollbar { width: 6px; }
-          ::-webkit-scrollbar-track { background: transparent; }
-          ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        `}</style>
+          <style>{`
+            @keyframes spin { 100% { transform: rotate(360deg); } }
+            @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+            ::-webkit-scrollbar { width: 6px; }
+            ::-webkit-scrollbar-track { background: transparent; }
+            ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+          `}</style>
+        </div>
       </div>
     </div>
   );
@@ -465,16 +473,72 @@ const Benefit = ({ text }) => (
   </div>
 );
 
-// 🖌 UI STYLES (Unchanged)
-const overlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999, padding: "20px" };
-const modalStyle = { background: "#0B0F1A", border: "1px solid var(--border-color)", borderRadius: "24px", width: "100%", maxWidth: "400px", height: "90vh", maxHeight: "650px", display: "flex", flexDirection: "column", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", animation: "fadeInUp 0.3s ease-out", padding: "20px" };
+// 🖌 UI STYLES
+const fullscreenContainerStyle = {
+  position: "fixed",
+  inset: 0,
+  width: "100%",
+  height: "100%",
+  backgroundColor: "#000000",
+  zIndex: 99999,
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  animation: "fadeIn 0.2s ease-out"
+};
 
-const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexShrink: 0 };
-const iconButtonStyle = { background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
+const topNavStyle = {
+  height: "50px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "0 16px",
+  borderBottom: "1px solid #1a1a1a",
+  backgroundColor: "#000000",
+  position: "sticky",
+  top: 0,
+  zIndex: 50,
+  flexShrink: 0
+};
 
-const contentContainerStyle = { flex: 1, overflowY: "auto", overflowX: "hidden", paddingRight: "5px", display: "flex", flexDirection: "column" };
+const navBackBtnStyle = {
+  background: "none",
+  border: "none",
+  color: "#fff",
+  cursor: "pointer",
+  padding: "6px",
+  display: "flex",
+  alignItems: "center"
+};
+
+const topNavTitleStyle = {
+  fontSize: "16px",
+  fontWeight: "700",
+  color: "#fff",
+  letterSpacing: "0.2px"
+};
+
+const scrollAreaStyle = {
+  flex: 1,
+  overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  padding: "24px 16px 40px",
+  boxSizing: "border-box"
+};
+
+const innerContentStyle = {
+  width: "100%",
+  maxWidth: "460px",
+  display: "flex",
+  flexDirection: "column",
+  flex: 1
+};
+
 const centerFlexStyle = { display: "flex", flexDirection: "column", flex: 1, justifyContent: "center" };
-const footerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "15px", marginTop: "15px", borderTop: "1px solid rgba(255,255,255,0.05)", flexShrink: 0 };
+const footerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "20px", marginTop: "30px", borderTop: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 };
 
 const headerStyle = { textAlign: "center", marginBottom: "25px" };
 const iconWrapperStyle = { width: "64px", height: "64px", borderRadius: "50%", background: "rgba(255, 59, 48, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 15px auto" };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { 
-  X, Sparkles, Users, DollarSign, Heart, Eye, ThumbsUp, 
+  ArrowLeft, X, Sparkles, Users, DollarSign, Heart, Eye, ThumbsUp, 
   MessageCircle, Settings, Calendar, Lock, CheckCircle, 
   CheckCircle2, Clock, TrendingUp, Edit3, Save, ExternalLink, 
   Loader2, AlertCircle, ShieldCheck, Plus, UploadCloud, Trash2
@@ -146,58 +146,56 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
   const creator = data?.creator || user || {};
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={modalBoxStyle} onClick={(e) => e.stopPropagation()}>
-        
-        {/* Top Navbar */}
-        <div style={topNavStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={studioLogoBadgeStyle}>
-              <Sparkles size={18} color="#FFD700" />
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <h2 style={studioTitleStyle}>{creator.display_name || creator.username} Studio</h2>
-                {creator.is_verified && <CheckCircle size={15} color="#00aff0" fill="#00aff0" />}
-              </div>
-              <span style={studioSubtitleStyle}>Creator Monetization & Fan Intelligence</span>
-            </div>
+    <div style={fullscreenContainerStyle}>
+      {/* Top Navbar */}
+      <div style={topNavStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
+            <ArrowLeft size={24} color="#fff" />
+          </button>
+          <div style={studioLogoBadgeStyle}>
+            <Sparkles size={18} color="#FFD700" />
           </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <button 
-              onClick={() => {
-                setUploadDefaultCategory("hotties");
-                setShowUploadModal(true);
-              }} 
-              style={{
-                ...previewBtnStyle,
-                background: "linear-gradient(135deg, #00aff0, #0088cc)",
-                borderColor: "transparent",
-                color: "#fff",
-                fontWeight: "700"
-              }}
-              title="Upload video"
-            >
-              <Plus size={15} />
-              <span>Upload Video</span>
-            </button>
-            <button 
-              onClick={() => {
-                onClose();
-                window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: creator.username }));
-              }} 
-              style={previewBtnStyle}
-              title="Preview public profile"
-            >
-              <ExternalLink size={15} />
-              <span className="hide-on-mobile">Public Profile</span>
-            </button>
-            <button onClick={onClose} style={closeBtnStyle}>
-              <X size={20} color="#888" />
-            </button>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <h2 style={studioTitleStyle}>{creator.display_name || creator.username} Studio</h2>
+              {creator.is_verified && <CheckCircle size={15} color="#00aff0" fill="#00aff0" />}
+            </div>
+            <span style={studioSubtitleStyle}>Creator Monetization & Fan Intelligence</span>
           </div>
         </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <button 
+            onClick={() => {
+              setUploadDefaultCategory("hotties");
+              setShowUploadModal(true);
+            }} 
+            style={{
+              ...previewBtnStyle,
+              background: "linear-gradient(135deg, #00aff0, #0088cc)",
+              borderColor: "transparent",
+              color: "#fff",
+              fontWeight: "700"
+            }}
+            title="Upload video"
+          >
+            <Plus size={15} />
+            <span>Upload Video</span>
+          </button>
+          <button 
+            onClick={() => {
+              onClose();
+              window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: creator.username }));
+            }} 
+            style={previewBtnStyle}
+            title="Preview public profile"
+          >
+            <ExternalLink size={15} />
+            <span className="hide-on-mobile">Public Profile</span>
+          </button>
+        </div>
+      </div>
 
         {/* Tab Navigation */}
         <div style={tabsBarStyle}>
@@ -793,8 +791,6 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
           )}
         </div>
 
-      </div>
-
       {/* Creator Video Upload Modal */}
       {showUploadModal && (
         <CreatorUploadModal 
@@ -815,38 +811,35 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
 }
 
 // 🖌 Styles
-const overlayStyle = {
+const fullscreenContainerStyle = {
   position: "fixed",
   inset: 0,
   zIndex: 100003,
-  backgroundColor: "rgba(0, 0, 0, 0.88)",
-  backdropFilter: "blur(10px)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "16px"
-};
-
-const modalBoxStyle = {
-  backgroundColor: "#111113",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
-  borderRadius: "24px",
-  width: "100%",
-  maxWidth: "860px",
-  height: "88vh",
-  boxShadow: "0 25px 70px rgba(0, 0, 0, 0.95)",
+  backgroundColor: "#000000",
   display: "flex",
   flexDirection: "column",
-  overflow: "hidden"
+  overflow: "hidden",
+  animation: "fadeIn 0.2s ease-out"
+};
+
+const navBackBtnStyle = {
+  background: "none",
+  border: "none",
+  color: "#fff",
+  cursor: "pointer",
+  padding: "6px",
+  display: "flex",
+  alignItems: "center"
 };
 
 const topNavStyle = {
-  padding: "16px 24px",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+  padding: "12px 16px",
+  borderBottom: "1px solid #1c1c1e",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  background: "#161619"
+  backgroundColor: "#000000",
+  flexShrink: 0
 };
 
 const studioLogoBadgeStyle = {
@@ -882,10 +875,10 @@ const closeBtnStyle = { background: "none", border: "none", cursor: "pointer", p
 const tabsBarStyle = {
   display: "flex",
   overflowX: "auto",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+  borderBottom: "1px solid #1a1a1a",
   padding: "0 16px",
   gap: "10px",
-  background: "#131316",
+  background: "#000000",
   flexShrink: 0
 };
 
@@ -906,7 +899,11 @@ const tabBtnStyle = {
 const contentAreaStyle = {
   flex: 1,
   overflowY: "auto",
-  padding: "24px"
+  padding: "24px 16px 60px",
+  maxWidth: "960px",
+  margin: "0 auto",
+  width: "100%",
+  boxSizing: "border-box"
 };
 
 const loaderCenterStyle = {

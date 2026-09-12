@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link, X, Send, Instagram } from "lucide-react"; // 🟢 ADDED INSTAGRAM ICON
+import { ArrowLeft, Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link, X, Send, Instagram } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -299,27 +299,24 @@ export default function AdminUpload({ onClose }) {
   };
 
   return (
-    <div style={containerStyle}>
-      <button onClick={onClose} style={closeButtonStyle}>
-        <X size={28} />
-      </button>
+    <div style={fullscreenContainerStyle}>
+      {/* Instagram-style Top Navigation Bar */}
+      <div style={topNavStyle}>
+        <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
+          <ArrowLeft size={24} color="#fff" />
+        </button>
 
-      <div style={cardStyle} className="admin-card">
-        <div style={headerStyle}>
-          <h2 style={{ margin: 0, fontSize: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-            {uploadMode === "local" ? <Video color="#ff3b30" /> : 
-             uploadMode === "twitter" ? <Twitter color="#1DA1F2" /> : 
-             uploadMode === "instagram" ? <Instagram color="#E1306C" /> : 
-             <Send color="#0088cc" />} 
-            Admin Upload
-          </h2>
-          <p style={{ margin: "5px 0 0", fontSize: "12px", color: "#888" }}>
-            Add content to your premium feed
-          </p>
-        </div>
+        <span style={topNavTitleStyle}>
+          Admin Upload
+        </span>
 
-        {/* 🟢 NEW: 4-Way Tabs Container */}
-        <div style={tabsContainerStyle}>
+        <div style={{ width: "36px" }} />
+      </div>
+
+      <div style={scrollAreaStyle}>
+        <div style={innerContentStyle}>
+          {/* 🟢 NEW: 4-Way Tabs Container */}
+          <div style={tabsContainerStyle}>
           <button 
             onClick={() => setUploadMode("local")} 
             style={{ ...tabStyle, padding: "8px 4px", background: uploadMode === "local" ? "#333" : "transparent", color: uploadMode === "local" ? "#fff" : "#666" }}
@@ -583,19 +580,73 @@ export default function AdminUpload({ onClose }) {
         <style>{`
           .spin { animation: spin 1s linear infinite; }
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          .admin-card::-webkit-scrollbar { display: none; }
-          .admin-card { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
+        </div>
       </div>
     </div>
   );
 }
 
 // 🎨 DARK THEME STYLES
-const containerStyle = { position: "fixed", inset: 0, zIndex: 99999, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", color: "#fff", fontFamily: "sans-serif", touchAction: "none" };
-const closeButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", right: "20px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "8px", borderRadius: "50%", cursor: "pointer", zIndex: 100000, display: "flex", alignItems: "center", justifyContent: "center" };
-const cardStyle = { width: "100%", maxWidth: "400px", maxHeight: "90dvh", overflowY: "auto", margin: "0 auto", background: "#1c1c1e", borderRadius: "16px", padding: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.5)", border: "1px solid #333", position: "relative" };
-const headerStyle = { marginBottom: "20px", textAlign: "center" };
+const fullscreenContainerStyle = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 99999,
+  backgroundColor: "#000000",
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  animation: "fadeIn 0.2s ease-out"
+};
+
+const topNavStyle = {
+  height: "50px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "0 16px",
+  borderBottom: "1px solid #1a1a1a",
+  backgroundColor: "#000000",
+  position: "sticky",
+  top: 0,
+  zIndex: 50,
+  flexShrink: 0
+};
+
+const navBackBtnStyle = {
+  background: "none",
+  border: "none",
+  color: "#fff",
+  cursor: "pointer",
+  padding: "6px",
+  display: "flex",
+  alignItems: "center"
+};
+
+const topNavTitleStyle = {
+  fontSize: "16px",
+  fontWeight: "700",
+  color: "#fff",
+  letterSpacing: "0.2px"
+};
+
+const scrollAreaStyle = {
+  flex: 1,
+  overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  padding: "20px 16px 60px",
+  boxSizing: "border-box"
+};
+
+const innerContentStyle = {
+  width: "100%",
+  maxWidth: "500px",
+  display: "flex",
+  flexDirection: "column"
+};
 const tabsContainerStyle = { display: "flex", gap: "6px", marginBottom: "24px", background: "#121212", padding: "4px", borderRadius: "10px" };
 const tabStyle = { flex: 1, padding: "8px 4px", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
 const formStyle = { display: "flex", flexDirection: "column", gap: "20px" };

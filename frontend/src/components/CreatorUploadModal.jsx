@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
-  X, UploadCloud, Film, Lock, Globe, Sparkles, AlertCircle, 
+  ArrowLeft, X, UploadCloud, Film, Lock, Globe, Sparkles, AlertCircle, 
   CheckCircle2, Loader2, Play, Trash2, ShieldCheck, Flame, 
   GraduationCap, Zap, Video
 } from "lucide-react";
@@ -206,36 +206,33 @@ export default function CreatorUploadModal({
   if (!isOpen) return null;
 
   return (
-    <div style={overlayStyle} onClick={uploadStatus === "uploading" || uploadStatus === "processing" ? undefined : onClose}>
-      <div 
-        style={modalContainerStyle} 
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div style={headerStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={headerIconStyle}>
-              <UploadCloud size={20} color="var(--primary-color, #00aff0)" />
-            </div>
-            <div>
-              <h2 style={titleStyle}>Upload Creator Video</h2>
-              <p style={subtitleStyle}>Publish to Cloudflare R2: Public Feed or VIP Exclusive Channel</p>
-            </div>
-          </div>
-          {uploadStatus !== "uploading" && uploadStatus !== "processing" && (
-            <button onClick={onClose} style={closeBtnStyle} aria-label="Close">
-              <X size={20} color="#8e8e93" />
-            </button>
-          )}
-        </div>
-
-        {/* Error notification */}
-        {errorMessage && (
-          <div style={errorBannerStyle}>
-            <AlertCircle size={18} color="#ff3b30" style={{ flexShrink: 0 }} />
-            <span>{errorMessage}</span>
-          </div>
+    <div style={fullscreenContainerStyle}>
+      {/* Instagram-style Top Navigation Bar */}
+      <div style={topNavStyle}>
+        {uploadStatus !== "uploading" && uploadStatus !== "processing" ? (
+          <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
+            <ArrowLeft size={24} color="#fff" />
+          </button>
+        ) : (
+          <div style={{ width: "36px" }} />
         )}
+
+        <span style={topNavTitleStyle}>
+          {uploadStatus === "success" ? "Video Uploaded" : "New Post"}
+        </span>
+
+        <div style={{ width: "36px" }} />
+      </div>
+
+      <div style={scrollAreaStyle}>
+        <div style={innerContentStyle}>
+          {/* Error notification */}
+          {errorMessage && (
+            <div style={errorBannerStyle}>
+              <AlertCircle size={18} color="#ff3b30" style={{ flexShrink: 0 }} />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
         {/* Upload State = Success */}
         {uploadStatus === "success" ? (
@@ -522,47 +519,71 @@ export default function CreatorUploadModal({
             </div>
           </form>
         )}
+        </div>
       </div>
     </div>
   );
 }
 
 // ---------------- STYLES ----------------
-const overlayStyle = {
+const fullscreenContainerStyle = {
   position: "fixed",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: "rgba(0, 0, 0, 0.85)",
-  backdropFilter: "blur(8px)",
-  WebkitBackdropFilter: "blur(8px)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 9999,
-  padding: "16px"
-};
-
-const modalContainerStyle = {
-  width: "100%",
-  maxWidth: "520px",
-  backgroundColor: "#121214",
-  border: "1px solid #28282b",
-  borderRadius: "20px",
-  boxShadow: "0 24px 60px rgba(0, 0, 0, 0.7)",
-  overflow: "hidden",
+  inset: 0,
+  zIndex: 100000,
+  backgroundColor: "#000000",
   display: "flex",
   flexDirection: "column",
-  maxHeight: "90vh"
+  overflow: "hidden",
+  animation: "fadeIn 0.2s ease-out"
 };
 
-const headerStyle = {
-  padding: "18px 22px",
-  borderBottom: "1px solid #222",
+const topNavStyle = {
+  height: "50px",
   display: "flex",
   alignItems: "center",
-  justifyContent: "space-between"
+  justifyContent: "space-between",
+  padding: "0 16px",
+  borderBottom: "1px solid #1a1a1a",
+  backgroundColor: "#000000",
+  position: "sticky",
+  top: 0,
+  zIndex: 50,
+  flexShrink: 0
+};
+
+const navBackBtnStyle = {
+  background: "none",
+  border: "none",
+  color: "#fff",
+  cursor: "pointer",
+  padding: "6px",
+  display: "flex",
+  alignItems: "center"
+};
+
+const topNavTitleStyle = {
+  fontSize: "16px",
+  fontWeight: "700",
+  color: "#fff",
+  letterSpacing: "0.2px"
+};
+
+const scrollAreaStyle = {
+  flex: 1,
+  overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  padding: "20px 16px 60px",
+  boxSizing: "border-box"
+};
+
+const innerContentStyle = {
+  width: "100%",
+  maxWidth: "540px",
+  display: "flex",
+  flexDirection: "column"
 };
 
 const headerIconStyle = {
