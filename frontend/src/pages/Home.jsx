@@ -128,7 +128,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
        }
     }
 
-    if (baseList.length > 0 && premiumPool.length > 0) {
+    if (currentCategory !== "premium" && baseList.length > 0 && premiumPool.length > 0) {
       const newList = [...baseList];
       const totalChunks = Math.ceil(newList.length / fetchLimit);
 
@@ -342,9 +342,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
         
+        const cleanGroupVideos = Array.isArray(groupVideos)
+          ? groupVideos.map(v => ({ ...v, is_group: false, group_count: 1 }))
+          : [];
+
         const groupData = {
           title: video.caption || "Collection",
-          videos: groupVideos
+          videos: cleanGroupVideos
         };
         setActiveGroup(groupData);
         activeGroupRef.current = groupData;
@@ -516,7 +520,16 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     window.location.reload();
   };
 
-  const actualVideosToDisplay = activeGroup ? activeGroup.videos : rawVideosToDisplay;
+  const actualVideosToDisplay = useMemo(() => {
+    if (activeGroup) {
+      return (activeGroup.videos || []).map(v => ({
+        ...v,
+        is_group: false,
+        group_count: 1
+      }));
+    }
+    return rawVideosToDisplay;
+  }, [activeGroup, rawVideosToDisplay]);
 
   const previewThumbnails = useMemo(() => {
     if (!actualVideosToDisplay || actualVideosToDisplay.length === 0) return [];

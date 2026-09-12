@@ -31,6 +31,17 @@ export function useVideos(currentCategory, limit = 12) {
         }
         url = `${APP_CONFIG.apiUrl}/api/interactions/liked?page=${targetPage}&limit=${limit}`;
         headers["Authorization"] = `Bearer ${token}`;
+      } else if (currentCategory === "saved") {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setVideos([]);
+          setHasMore(false);
+          setLoading(false);
+          isFetching.current = false;
+          return;
+        }
+        url = `${APP_CONFIG.apiUrl}/api/interactions/saved?page=${targetPage}&limit=${limit}`;
+        headers["Authorization"] = `Bearer ${token}`;
       } else {
         // 🟢 THE FIX: Swap the hardcoded domain for your dynamic config URL
         url = `${APP_CONFIG.apiUrl}/api/videos?page=${targetPage}&limit=${limit}&category=${currentCategory}`;

@@ -705,17 +705,21 @@ router.get("/:username", optionalAuth, async (req, res) => {
 
     // 4. Fetch First 12 Videos
     const videosRes = await pool.query(
-      `SELECT v.*, COALESCE(u.username, u.full_name, 'Member') as uploader_name
-       FROM videos v
-       LEFT JOIN users u ON v.uploader_id = u.user_id
-       WHERE LOWER(COALESCE(u.username, '')) = LOWER($1) 
-          OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
-          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
-          OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
-          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
-          OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)
-       ORDER BY v.created_at DESC
-       LIMIT 12`,
+      `WITH GroupedVideos AS (
+        SELECT v.*,
+          COALESCE(u.username, u.full_name, $1) as uploader_name,
+          ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
+          COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
+        FROM videos v
+        LEFT JOIN users u ON v.uploader_id = u.user_id
+        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1) 
+           OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+           OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+           OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
+           OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
+           OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)
+      )
+      SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT 12`,
       [creator.username, username, String(creator.id || '0'), creator.telegram_user_id || null]
     );
 
@@ -735,7 +739,8 @@ router.get("/:username", optionalAuth, async (req, res) => {
       saves_count: Number(v.saves_count || 0),
       thumbnail_url: formatThumbnailUrl(v, apiBaseUrl),
       video_url: null,
-      is_group: Boolean(v.media_group_id && v.media_group_id !== 'none'),
+      is_group: Number(v.group_count || 1) > 1,
+      group_count: Number(v.group_count || 1),
       created_at: v.created_at
     }));
 
@@ -793,22 +798,26 @@ router.get("/:username/videos", async (req, res) => {
     }
 
     const videosRes = await pool.query(
-      `SELECT v.*, COALESCE(u.username, u.full_name, $1) as uploader_name
-       FROM videos v
-       LEFT JOIN users u ON v.uploader_id = u.user_id
-       WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
-          OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
-          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
-          OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
-          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
-          OR ($6::BIGINT IS NOT NULL AND v.uploader_id = $6::BIGINT)
-       ORDER BY v.created_at DESC
-       LIMIT $4 OFFSET $5`,
+      `WITH GroupedVideos AS (
+        SELECT v.*,
+          COALESCE(u.username, u.full_name, $1) as uploader_name,
+          ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
+          COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
+        FROM videos v
+        LEFT JOIN users u ON v.uploader_id = u.user_id
+        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
+           OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+           OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+           OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
+           OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
+           OR ($6::BIGINT IS NOT NULL AND v.uploader_id = $6::BIGINT)
+      )
+      SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT $4 OFFSET $5`,
       [username, creatorUsername, String(creatorId || '0'), limit, offset, creatorTgId]
     );
 
     const countRes = await pool.query(
-      `SELECT COUNT(*)
+      `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END)
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
@@ -838,7 +847,8 @@ router.get("/:username/videos", async (req, res) => {
       saves_count: Number(v.saves_count || 0),
       thumbnail_url: formatThumbnailUrl(v, apiBaseUrl),
       video_url: null,
-      is_group: Boolean(v.media_group_id && v.media_group_id !== 'none'),
+      is_group: Number(v.group_count || 1) > 1,
+      group_count: Number(v.group_count || 1),
       created_at: v.created_at
     }));
 

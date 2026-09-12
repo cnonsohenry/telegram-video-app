@@ -25,9 +25,15 @@ export default function Profile({
   setShowPaywall, 
   onUpdateUser 
 }) {
-  const [activeTab, setActiveTab] = useState("videos");
+  const [activeTab, setActiveTab] = useState(user?.is_creator ? "videos" : "likes");
   const [currentView, setCurrentView] = useState("profile");
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
+
+  useEffect(() => {
+    if (!user?.is_creator && (activeTab === "videos" || activeTab === "reels" || activeTab === "premium")) {
+      setActiveTab("likes");
+    }
+  }, [user?.is_creator]);
   
   const [activeGroup, setActiveGroup] = useState(null);
   const [deletedVideoIds, setDeletedVideoIds] = useState(new Set());
@@ -161,9 +167,8 @@ export default function Profile({
 
   const fetchLimit = isDesktop ? 15 : 12;
 
-  const { videos: shots, loading: shotsLoading, loadMore: loadMoreShots } = useVideos("shots", fetchLimit);
-  const { videos: premium, loading: premiumLoading, loadMore: loadMorePremium } = useVideos("premium", fetchLimit);
   const { videos: liked, loading: likedLoading, loadMore: loadMoreLiked } = useVideos("likes", fetchLimit);
+  const { videos: saved, loading: savedLoading, loadMore: loadMoreSaved } = useVideos("saved", fetchLimit);
 
   // Creator's own posts state
   const [creatorPosts, setCreatorPosts] = useState([]);
@@ -213,39 +218,49 @@ export default function Profile({
     }
   };
 
-  let rawVideosToDisplay = shots || [];
-  let loading = shotsLoading;
-  let loadMore = loadMoreShots;
+  let rawVideosToDisplay = [];
+  let loading = false;
+  let loadMore = () => {};
 
-  if (user?.is_creator && activeTab === "videos") {
-    rawVideosToDisplay = creatorPosts;
-    loading = creatorPostsLoading;
-    loadMore = () => {
-      if (!creatorPostsLoading && hasMoreCreatorPosts) {
-        fetchCreatorPosts(creatorPostsPage, false);
-      }
-    };
-  } else if (user?.is_creator && activeTab === "premium") {
-    // Creator sees their own VIP Exclusive / Premium uploaded content
-    rawVideosToDisplay = creatorPosts.filter(v => v.category === "premium");
-    loading = creatorPostsLoading;
-    loadMore = () => {
-      if (!creatorPostsLoading && hasMoreCreatorPosts) {
-        fetchCreatorPosts(creatorPostsPage, false);
-      }
-    };
-  } else if (activeTab === "premium") {
-    rawVideosToDisplay = premium || [];
-    loading = premiumLoading;
-    loadMore = loadMorePremium;
-  } else if (activeTab === "likes") {
-    rawVideosToDisplay = liked || [];
-    loading = likedLoading;
-    loadMore = loadMoreLiked;
-  } else if (activeTab === "reels") {
-    rawVideosToDisplay = shots || [];
-    loading = shotsLoading;
-    loadMore = loadMoreShots;
+  if (user?.is_creator) {
+    if (activeTab === "videos" || activeTab === "reels") {
+      rawVideosToDisplay = creatorPosts;
+      loading = creatorPostsLoading;
+      loadMore = () => {
+        if (!creatorPostsLoading && hasMoreCreatorPosts) {
+          fetchCreatorPosts(creatorPostsPage, false);
+        }
+      };
+    } else if (activeTab === "premium") {
+      // Creator sees their own VIP Exclusive / Premium uploaded content
+      rawVideosToDisplay = creatorPosts.filter(v => v.category === "premium");
+      loading = creatorPostsLoading;
+      loadMore = () => {
+        if (!creatorPostsLoading && hasMoreCreatorPosts) {
+          fetchCreatorPosts(creatorPostsPage, false);
+        }
+      };
+    } else if (activeTab === "likes") {
+      rawVideosToDisplay = liked || [];
+      loading = likedLoading;
+      loadMore = loadMoreLiked;
+    } else if (activeTab === "saved") {
+      rawVideosToDisplay = saved || [];
+      loading = savedLoading;
+      loadMore = loadMoreSaved;
+    }
+  } else {
+    // Non-creator viewer profile: strictly user-centric interactions (Liked, Saved)
+    // Creators' uploaded content NEVER shows on regular user profiles
+    if (activeTab === "likes") {
+      rawVideosToDisplay = liked || [];
+      loading = likedLoading;
+      loadMore = loadMoreLiked;
+    } else if (activeTab === "saved") {
+      rawVideosToDisplay = saved || [];
+      loading = savedLoading;
+      loadMore = loadMoreSaved;
+    }
   }
 
   useEffect(() => {
@@ -269,7 +284,16 @@ export default function Profile({
     !deletedVideoIds.has(String(v.id || v.message_id))
   );
 
-  const videosToDisplay = activeGroup ? activeGroup.videos : filteredRawVideos;
+  const videosToDisplay = useMemo(() => {
+    if (activeGroup) {
+      return (activeGroup.videos || []).map(v => ({
+        ...v,
+        is_group: false,
+        group_count: 1
+      }));
+    }
+    return filteredRawVideos;
+  }, [activeGroup, filteredRawVideos]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -325,9 +349,13 @@ export default function Profile({
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`);
         const groupVideos = await res.json();
         
+        const cleanGroupVideos = Array.isArray(groupVideos)
+          ? groupVideos.map(v => ({ ...v, is_group: false, group_count: 1 }))
+          : [];
+
         const groupData = {
           title: video.caption || "Collection",
-          videos: groupVideos
+          videos: cleanGroupVideos
         };
         setActiveGroup(groupData);
         activeGroupRef.current = groupData;
@@ -408,9 +436,11 @@ export default function Profile({
     return Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
   };
 
-  const postsCount = creatorStats.posts || (user?.is_creator ? creatorPosts.length : rawVideosToDisplay.length) || 0;
-  const followersCount = creatorStats.subscribers || 0;
-  const followingCount = creatorStats.views || creatorStats.likes || 0;
+  const postsCount = user?.is_creator ? (creatorStats.posts || creatorPosts.length || 0) : 0;
+  const followersCount = user?.is_creator ? (creatorStats.subscribers || 0) : 0;
+  const followingCount = user?.is_creator 
+    ? (creatorStats.views || creatorStats.likes || 0) 
+    : (user?.subscriptions?.length || 0);
 
   return (
     <div
@@ -527,7 +557,7 @@ export default function Profile({
 
                 {/* Creator Category in subtle Instagram gray */}
                 <div style={{ fontSize: "12.5px", color: "#8e8e93", marginTop: "2px", fontWeight: "500" }}>
-                  {user?.creator_category || (user?.is_creator ? "Digital Creator" : "Video Enthusiast")}
+                  {user?.creator_category || (user?.is_creator ? "Digital Creator" : "Member")}
                 </div>
 
                 {/* Bio text */}
@@ -538,7 +568,7 @@ export default function Profile({
                   margin: "8px 0 6px 0",
                   whiteSpace: "pre-wrap"
                 }}>
-                  {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
+                  {user?.creator_bio || user?.bio || (user?.is_creator ? APP_CONFIG.profileBioSubtitle : "Welcome to my profile.")}
                 </p>
 
                 {/* Website Link with link icon */}
@@ -696,7 +726,7 @@ export default function Profile({
                   </div>
 
                   <div style={{ fontSize: "13px", color: "#8e8e93", marginTop: "2px" }}>
-                    {user?.creator_category || (user?.is_creator ? "Digital Creator" : "Video Enthusiast")}
+                    {user?.creator_category || (user?.is_creator ? "Digital Creator" : "Member")}
                   </div>
 
                   <p style={{
@@ -707,7 +737,7 @@ export default function Profile({
                     whiteSpace: "pre-wrap",
                     maxWidth: "540px"
                   }}>
-                    {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
+                    {user?.creator_bio || user?.bio || (user?.is_creator ? APP_CONFIG.profileBioSubtitle : "Welcome to my profile.")}
                   </p>
 
                   <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", fontSize: "13.5px" }}>
@@ -856,37 +886,65 @@ export default function Profile({
           top: isDesktop ? "0" : (shouldHideUI ? "0px" : "48px"),
           transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
         }}>
-          <TabButton 
-            isDesktop={isDesktop} 
-            active={activeTab === "videos"} 
-            onClick={() => setActiveTab("videos")} 
-            icon={<Grid3X3 size={isDesktop ? 16 : 22} />} 
-            label="POSTS" 
-          />
-          <TabButton 
-            isDesktop={isDesktop} 
-            active={activeTab === "reels"} 
-            onClick={() => setActiveTab("reels")} 
-            icon={<Film size={isDesktop ? 16 : 22} />} 
-            label="REELS" 
-          />
-          <TabButton 
-            isDesktop={isDesktop} 
-            active={activeTab === "premium"} 
-            onClick={() => setActiveTab("premium")} 
-            icon={<Lock size={isDesktop ? 16 : 22} />} 
-            label="VIP EXCLUSIVE" 
-          />
-          <TabButton 
-            isDesktop={isDesktop} 
-            active={activeTab === "likes"} 
-            onClick={() => setActiveTab("likes")} 
-            icon={<Heart size={isDesktop ? 16 : 22} />} 
-            label="LIKED" 
-          />
+          {user?.is_creator ? (
+            <>
+              <TabButton 
+                isDesktop={isDesktop} 
+                active={activeTab === "videos"} 
+                onClick={() => setActiveTab("videos")} 
+                icon={<Grid3X3 size={isDesktop ? 16 : 22} />} 
+                label="POSTS" 
+              />
+              <TabButton 
+                isDesktop={isDesktop} 
+                active={activeTab === "premium"} 
+                onClick={() => setActiveTab("premium")} 
+                icon={<Lock size={isDesktop ? 16 : 22} />} 
+                label="VIP EXCLUSIVE" 
+              />
+              <TabButton 
+                isDesktop={isDesktop} 
+                active={activeTab === "likes"} 
+                onClick={() => setActiveTab("likes")} 
+                icon={<Heart size={isDesktop ? 16 : 22} />} 
+                label="LIKED" 
+              />
+              <TabButton 
+                isDesktop={isDesktop} 
+                active={activeTab === "saved"} 
+                onClick={() => setActiveTab("saved")} 
+                icon={<Bookmark size={isDesktop ? 16 : 22} />} 
+                label="SAVED" 
+              />
+            </>
+          ) : (
+            <>
+              <TabButton 
+                isDesktop={isDesktop} 
+                active={activeTab === "likes"} 
+                onClick={() => setActiveTab("likes")} 
+                icon={<Heart size={isDesktop ? 16 : 22} />} 
+                label="LIKED" 
+              />
+              <TabButton 
+                isDesktop={isDesktop} 
+                active={activeTab === "saved"} 
+                onClick={() => setActiveTab("saved")} 
+                icon={<Bookmark size={isDesktop ? 16 : 22} />} 
+                label="SAVED" 
+              />
+              <TabButton 
+                isDesktop={isDesktop} 
+                active={activeTab === "subscriptions"} 
+                onClick={() => setActiveTab("subscriptions")} 
+                icon={<Sparkles size={isDesktop ? 16 : 22} />} 
+                label="VIP PASSES" 
+              />
+            </>
+          )}
         </div>
 
-        {/* 🌟 VIDEO FEED GRID (Same as Home.jsx) */}
+        {/* 🌟 VIDEO FEED GRID / SUBSCRIPTIONS */}
         <div style={{ 
           paddingTop: isDesktop ? "20px" : "14px",
           paddingBottom: "30px",
@@ -909,143 +967,177 @@ export default function Profile({
             </div>
           )}
 
-          {activeTab === "premium" && !user?.is_creator && (() => {
-            const isSubscribedToNaija = isUserSubscribedToCreator(user, { category: 'premium', uploader_handle: 'naijahomemade' });
-            return (
-              <div style={{
-                margin: isDesktop ? "0 0 20px 0" : "0 0 14px 0",
-                padding: isDesktop ? "16px 20px" : "14px 16px",
-                background: "linear-gradient(135deg, rgba(255, 215, 0, 0.12), rgba(255, 140, 0, 0.06))",
-                borderRadius: "14px",
-                border: "1px solid rgba(255, 215, 0, 0.25)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: "12px"
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <div style={{
-                    width: "40px",
-                    height: "40px",
-                    borderRadius: "50%",
-                    background: "rgba(255, 215, 0, 0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0
-                  }}>
-                    <Sparkles size={20} color="#FFD700" />
+          {activeTab === "subscriptions" ? (
+            <div style={{ maxWidth: "600px", margin: "0 auto", padding: "10px 0" }}>
+              {(!user?.subscriptions || user.subscriptions.length === 0) ? (
+                <div style={{ padding: "60px 20px", textAlign: "center", color: "#8e8e93" }}>
+                  <div style={{ width: "60px", height: "60px", borderRadius: "50%", border: "2px solid #333", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px auto" }}>
+                    <Sparkles size={28} color="#FFD700" />
                   </div>
-                  <div>
-                    <div style={{ fontSize: "14px", fontWeight: "700", color: "#fff" }}>
-                      {isSubscribedToNaija ? "VIP Pass Active (Subscribed)" : "VIP Exclusive Channel"}
-                    </div>
-                    <div style={{ fontSize: "12px", color: "#b3b3b3", marginTop: "2px" }}>
-                      {isSubscribedToNaija 
-                        ? "You have full access to all private releases from Naija Homemade Series (@naijahomemade)"
-                        : "Subscribe to Naija Homemade Series (@naijahomemade) to unlock all private releases"}
-                    </div>
-                  </div>
+                  <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#fff", margin: "0 0 6px 0" }}>
+                    No Active VIP Passes
+                  </h3>
+                  <p style={{ fontSize: "13px", color: "#8e8e93", maxWidth: "320px", margin: "0 auto 20px auto", lineHeight: "1.4" }}>
+                    Subscribe to your favorite creators to unlock their private releases and VIP exclusive content.
+                  </p>
                 </div>
-                <button
-                  onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
-                    detail: { username: "naijahomemade", autoSubscribe: !isSubscribedToNaija } 
-                  }))}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: "100px",
-                    background: isSubscribedToNaija ? "rgba(255, 215, 0, 0.18)" : "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
-                    border: isSubscribedToNaija ? "1px solid rgba(255, 215, 0, 0.4)" : "none",
-                    color: isSubscribedToNaija ? "#FFD700" : "#000",
-                    fontSize: "12.5px",
-                    fontWeight: "800",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px"
-                  }}
-                >
-                  <span>{isSubscribedToNaija ? "View Creator Channel" : "Subscribe to @naijahomemade"}</span>
-                  <ChevronRight size={14} color={isSubscribedToNaija ? "#FFD700" : "#000"} />
-                </button>
-              </div>
-            );
-          })()}
-
-          <div style={{ 
-            display: "grid", 
-            gridTemplateColumns: isDesktop ? "repeat(5, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", 
-            gap: isDesktop ? "20px" : "10px",
-            alignItems: "start",
-            animation: "fadeIn 0.3s ease-out",
-            width: "100%"
-          }}>
-            {videosToDisplay.map((v) => (
-              <VideoCard 
-                key={`${v.chat_id}:${v.message_id}`} 
-                video={v} 
-                onOpen={(vData, e) => handleOpenVideo(vData, e)} 
-              />
-            ))}
-          </div>
-          
-          {loading && !activeGroup && (
-            <div style={loaderStyle}>Loading posts...</div>
-          )}
-          
-          {!loading && !activeGroup && filteredRawVideos.length === 0 && (
-            <div style={{ padding: "80px 20px", textAlign: "center", color: "#8e8e93" }}>
-              <div style={{ width: "60px", height: "60px", borderRadius: "50%", border: "2px solid #333", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px auto" }}>
-                {activeTab === "likes" ? <Heart size={28} color="#555" /> : activeTab === "premium" ? <Lock size={28} color="#555" /> : <Grid3X3 size={28} color="#555" />}
-              </div>
-              <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#fff", margin: "0 0 6px 0" }}>
-                {activeTab === "likes" 
-                  ? "No Liked Videos Yet" 
-                  : activeTab === "premium"
-                  ? "No VIP Exclusive Posts"
-                  : "No Posts Yet"}
-              </h3>
-              <p style={{ fontSize: "13px", color: "#8e8e93", maxWidth: "300px", margin: "0 auto", lineHeight: "1.4" }}>
-                {activeTab === "likes" 
-                  ? "Videos you like will appear here." 
-                  : activeTab === "premium"
-                  ? "Exclusive paywalled content for your subscribers will be displayed here."
-                  : (user?.is_creator 
-                      ? "Share high quality videos and reels to engage your audience." 
-                      : "When you share photos and videos, they will appear on your profile.")}
-              </p>
-              {user?.is_creator && activeTab !== "likes" && (
-                <button
-                  onClick={() => {
-                    setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
-                    setShowUploadModal(true);
-                  }}
-                  style={{
-                    marginTop: "16px",
-                    padding: "10px 20px",
-                    borderRadius: "10px",
-                    background: activeTab === "premium" ? "linear-gradient(135deg, #FFD700, #ffae00)" : "linear-gradient(135deg, #00aff0, #0088cc)",
-                    color: activeTab === "premium" ? "#000" : "#fff",
-                    border: "none",
-                    fontSize: "13.5px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.4)"
-                  }}
-                >
-                  <Plus size={16} />
-                  <span>Upload {activeTab === "premium" ? "VIP Exclusive Post" : "First Video"}</span>
-                </button>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {user.subscriptions.map((sub, idx) => (
+                    <div key={idx} style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#161616",
+                      border: "1px solid #262626",
+                      borderRadius: "14px",
+                      padding: "14px 16px"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "50%",
+                          background: "linear-gradient(135deg, #FFD700, #ff8c00)",
+                          padding: "2px",
+                          flexShrink: 0
+                        }}>
+                          <img 
+                            src={`/api/avatar?user_id=${sub.creator_id}`}
+                            onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                            alt=""
+                            style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
+                          />
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontSize: "14px", fontWeight: "700", color: "#fff" }}>
+                              {sub.creator_display_name || sub.creator_username || "Creator"}
+                            </span>
+                            <CheckCircle size={14} color="#0095f6" fill="#0095f6" />
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
+                            @{sub.creator_username || "creator"} · <span style={{ color: "#00d084", fontWeight: "600" }}>Active VIP Pass</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent("openCreatorProfile", {
+                            detail: { username: sub.creator_username }
+                          }));
+                        }}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "100px",
+                          background: "rgba(255, 215, 0, 0.15)",
+                          border: "1px solid rgba(255, 215, 0, 0.4)",
+                          color: "#FFD700",
+                          fontSize: "12px",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                      >
+                        <span>View Channel</span>
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          )}
+          ) : (
+            <>
+              <div style={{ 
+                display: "grid", 
+                gridTemplateColumns: isDesktop ? "repeat(5, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", 
+                gap: isDesktop ? "20px" : "10px",
+                alignItems: "start",
+                animation: "fadeIn 0.3s ease-out",
+                width: "100%"
+              }}>
+                {videosToDisplay.map((v) => (
+                  <VideoCard 
+                    key={`${v.chat_id}:${v.message_id}`} 
+                    video={v} 
+                    onOpen={(vData, e) => handleOpenVideo(vData, e)} 
+                  />
+                ))}
+              </div>
+              
+              {loading && !activeGroup && (
+                <div style={loaderStyle}>Loading posts...</div>
+              )}
+              
+              {!loading && !activeGroup && filteredRawVideos.length === 0 && (
+                <div style={{ padding: "80px 20px", textAlign: "center", color: "#8e8e93" }}>
+                  <div style={{ width: "60px", height: "60px", borderRadius: "50%", border: "2px solid #333", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px auto" }}>
+                    {activeTab === "likes" ? (
+                      <Heart size={28} color="#555" />
+                    ) : activeTab === "saved" ? (
+                      <Bookmark size={28} color="#555" />
+                    ) : activeTab === "premium" ? (
+                      <Lock size={28} color="#555" />
+                    ) : (
+                      <Grid3X3 size={28} color="#555" />
+                    )}
+                  </div>
+                  <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#fff", margin: "0 0 6px 0" }}>
+                    {activeTab === "likes" 
+                      ? "No Liked Videos Yet" 
+                      : activeTab === "saved"
+                      ? "No Saved Videos Yet"
+                      : activeTab === "premium"
+                      ? "No VIP Exclusive Posts"
+                      : "No Posts Yet"}
+                  </h3>
+                  <p style={{ fontSize: "13px", color: "#8e8e93", maxWidth: "300px", margin: "0 auto", lineHeight: "1.4" }}>
+                    {activeTab === "likes" 
+                      ? "Videos you like will appear here." 
+                      : activeTab === "saved"
+                      ? "Videos you bookmark will appear here for easy access."
+                      : activeTab === "premium"
+                      ? "Exclusive paywalled content for your subscribers will be displayed here."
+                      : (user?.is_creator 
+                          ? "Share high quality videos and reels to engage your audience." 
+                          : "No posts to display.")}
+                  </p>
+                  {user?.is_creator && (activeTab === "videos" || activeTab === "premium") && (
+                    <button
+                      onClick={() => {
+                        setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                        setShowUploadModal(true);
+                      }}
+                      style={{
+                        marginTop: "16px",
+                        padding: "10px 20px",
+                        borderRadius: "10px",
+                        background: activeTab === "premium" ? "linear-gradient(135deg, #FFD700, #ffae00)" : "linear-gradient(135deg, #00aff0, #0088cc)",
+                        color: activeTab === "premium" ? "#000" : "#fff",
+                        border: "none",
+                        fontSize: "13.5px",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        boxShadow: "0 4px 14px rgba(0, 0, 0, 0.4)"
+                      }}
+                    >
+                      <Plus size={16} />
+                      <span>Upload {activeTab === "premium" ? "VIP Exclusive Post" : "First Video"}</span>
+                    </button>
+                  )}
+                </div>
+              )}
 
-          {!loading && !activeGroup && filteredRawVideos.length > 0 && (
-            <div ref={loaderRef} style={{ height: "10px", width: "100%" }} />
+              {!loading && !activeGroup && filteredRawVideos.length > 0 && (
+                <div ref={loaderRef} style={{ height: "10px", width: "100%" }} />
+              )}
+            </>
           )}
 
         </div>

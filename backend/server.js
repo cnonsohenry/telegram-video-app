@@ -1031,7 +1031,8 @@ app.get("/api/group", async (req, res) => {
     
     res.json(rows.map(v => ({ 
       ...mapVideoToResponse(v, apiBaseUrl), 
-      is_group: false 
+      is_group: false,
+      group_count: 1
     })));
   } catch (err) {
     console.error("Group fetch error:", err);
@@ -1188,6 +1189,44 @@ app.get("/api/interactions/liked", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error("Liked videos error:", err);
     res.status(500).json({ error: "Failed to fetch liked videos" });
+  }
+});
+
+app.get("/api/interactions/saved", authenticateToken, async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const user_id = req.user.id;
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 12);
+    const offset = (page - 1) * limit;
+    const apiBaseUrl = process.env.API_BASE_URL;
+
+    const countRes = await pool.query("SELECT COUNT(*) FROM saves WHERE user_id = $1", [user_id]);
+    const total = Number(countRes.rows[0]?.count || 0);
+
+    const query = `
+      SELECT v.*, 
+        COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+        COALESCE(au.username, u.username, 'creator') as uploader_handle
+      FROM saves s
+      JOIN videos v ON s.message_id = v.message_id
+      LEFT JOIN users u ON v.uploader_id = u.user_id
+      LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+      WHERE s.user_id = $1
+      ORDER BY s.created_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const { rows } = await pool.query(query, [user_id, limit, offset]);
+    res.json({
+      page,
+      limit,
+      total,
+      videos: rows.map(v => mapVideoToResponse(v, apiBaseUrl))
+    });
+  } catch (err) {
+    console.error("Saved videos error:", err);
+    res.status(500).json({ error: "Failed to fetch saved videos" });
   }
 });
 
