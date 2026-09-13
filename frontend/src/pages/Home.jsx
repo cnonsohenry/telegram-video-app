@@ -579,13 +579,34 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
               <button 
                 key={index} 
                 onClick={() => handleTabClick(index)} 
-                style={{ flex: 1, padding: "14px 0", background: "none", border: "none", color: activeTab === index ? "#fff" : "#8e8e8e", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", position: "relative" }}
+                style={{ 
+                  flex: 1, 
+                  padding: "13px 0 11px 0", 
+                  background: "none", 
+                  border: "none", 
+                  color: activeTab === index ? "#ffffff" : "#71767b", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  position: "relative",
+                  cursor: "pointer",
+                  WebkitTapHighlightColor: "transparent",
+                  transition: "color 0.2s ease"
+                }}
               >
-                {tab.icon}
-                <span style={{ fontSize: "10px", fontWeight: "700" }}>{tab.label}</span>
+                <span style={{ 
+                  fontSize: "14px", 
+                  fontWeight: activeTab === index ? "700" : "500", 
+                  letterSpacing: "0.2px",
+                  transition: "font-weight 0.15s ease"
+                }}>
+                  {tab.label}
+                </span>
               </button>
             ))}
-            <div style={{ ...indicatorStyle, transform: `translateX(${activeTab * 100}%)`, width: `${100 / APP_CONFIG.tabs.length}%` }} />
+            <div style={{ ...indicatorStyle, transform: `translateX(${activeTab * 100}%)`, width: `${100 / APP_CONFIG.tabs.length}%` }}>
+              <div style={indicatorPillStyle} />
+            </div>
           </nav>
         )}
       </div>
@@ -628,7 +649,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
               paddingBottom: "0px", // 🟢 Fixed: No more shrinking scroll space
             }}>
               <div style={{ 
-                 paddingTop: isDesktop ? "30px" : "140px", 
+                 paddingTop: isDesktop ? "30px" : "115px", 
                  paddingLeft: isDesktop ? "25px" : "15px",
                  paddingRight: isDesktop ? "25px" : "15px",
                  paddingBottom: "30px"
@@ -771,7 +792,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 // 🖌 STYLES
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "12px", animation: "pulse 1.5s infinite" };
 const mobileNavStyle = { display: "flex", zIndex: 1000, background: "var(--bg-color)", borderBottom: "1px solid var(--border-color)" };
-const indicatorStyle = { position: "absolute", bottom: 0, left: 0, height: "3px", background: "var(--primary-color)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" };
+const indicatorStyle = { position: "absolute", bottom: 0, left: 0, display: "flex", justifyContent: "center", transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)", pointerEvents: "none" };
+const indicatorPillStyle = { width: "36px", height: "3px", borderRadius: "3px", background: "var(--primary-color)" };
 const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", padding: "20px 0" };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
