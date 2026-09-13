@@ -273,7 +273,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                       </div>
                       <span style={kpiLabelStyle}>Fan Tips Received</span>
                       <div style={kpiValueStyle}>
-                        ₦{(stats.tips_total_ngn || 0).toLocaleString()}
+                        ${(stats.tips_total ?? stats.tips_total_ngn ?? 0).toLocaleString()}
                       </div>
                       <span style={kpiSubtextStyle}>{stats.tips_count || 0} supporters tipped</span>
                     </div>
@@ -285,7 +285,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                       <span style={kpiLabelStyle}>Active VIP Subscribers</span>
                       <div style={kpiValueStyle}>{stats.active_subscribers || 0}</div>
                       <span style={kpiSubtextStyle}>
-                        Monthly Rate: ₦{Number(creator.subscription_price || 0).toLocaleString()}
+                        Monthly Rate: ${Number(creator.subscription_price || 0).toLocaleString()}/mo
                       </span>
                     </div>
 
@@ -308,10 +308,10 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                         Projected Monthly Recurring Revenue (MRR)
                       </span>
                       <div style={{ fontSize: "24px", fontWeight: "900", color: "#00d084", marginTop: "4px" }}>
-                        ₦{(stats.estimated_mrr_ngn || 0).toLocaleString()} / month
+                        ${(stats.estimated_mrr ?? stats.estimated_mrr_ngn ?? 0).toLocaleString()} / month
                       </div>
                       <span style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px", display: "block" }}>
-                        Based on {stats.active_subscribers || 0} active fans at ₦{Number(creator.subscription_price || 0).toLocaleString()}/mo
+                        Based on {stats.active_subscribers || 0} active fans at ${Number(creator.subscription_price || 0).toLocaleString()}/mo
                       </span>
                     </div>
                     <button 
@@ -364,7 +364,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                               </div>
                               <div style={{ textAlign: "right" }}>
                                 <span style={{ fontSize: "13px", fontWeight: "800", color: "#00d084" }}>
-                                  +₦{Number(t.amount || 0).toLocaleString()}
+                                  +${Number(t.amount || 0).toLocaleString()}
                                 </span>
                                 <span style={{ fontSize: "10px", color: "#777", display: "block" }}>
                                   {new Date(t.created_at).toLocaleDateString()}
@@ -535,7 +535,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                               </div>
                             </div>
                             <div style={{ fontSize: "16px", fontWeight: "900", color: "#00d084" }}>
-                              +₦{Number(t.amount).toLocaleString()}
+                              +${Number(t.amount).toLocaleString()}
                             </div>
                           </div>
                           {t.message && (
@@ -709,13 +709,13 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                   {error && <div style={errorBannerStyle}>{error}</div>}
 
                   <div style={formRowStyle}>
-                    <label style={fieldLabelStyle}>Monthly VIP Subscription Price (₦ NGN)</label>
+                    <label style={fieldLabelStyle}>Monthly VIP Subscription Price ($ USD)</label>
                     <div style={{ position: "relative" }}>
-                      <span style={priceSymbolStyle}>₦</span>
+                      <span style={priceSymbolStyle}>$</span>
                       <input 
-                        type="number"
+                        type="number" 
                         min={0}
-                        step={500}
+                        step={1}
                         value={editPrice}
                         onChange={(e) => setEditPrice(e.target.value)}
                         style={{ ...inputStyle, paddingLeft: "36px" }}
@@ -723,7 +723,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                       />
                     </div>
                     <span style={fieldHintStyle}>
-                      Set to 0 for free followers. Set an amount (e.g. ₦15,000) to require crypto checkout.
+                      Set to 0 for free followers. Set an amount (e.g. $15) to require crypto checkout.
                     </span>
                   </div>
 

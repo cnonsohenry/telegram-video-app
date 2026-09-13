@@ -557,7 +557,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                   </td>
                                   <td style={tdStyle}>{c.creator_category || "Creator"}</td>
                                   <td style={{ ...tdStyle, color: "#00d084", fontWeight: "700" }}>
-                                    {Number(c.subscription_price) > 0 ? `₦${Number(c.subscription_price).toLocaleString()}/mo` : "Free"}
+                                    {Number(c.subscription_price) > 0 ? `$${Number(c.subscription_price).toLocaleString()}/mo` : "Free"}
                                   </td>
                                   <td style={tdStyle}>
                                     {c.is_verified ? <CheckCircle size={15} color="#00aff0" fill="#00aff0" /> : <span style={{ color: "#8e8e93", fontSize: "12px" }}>No</span>}
@@ -621,7 +621,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     />
                     <StatCard 
                       title="Total Tips Volume" 
-                      value={`₦${Number(creatorAnalytics.totalTips).toLocaleString()}`} 
+                      value={`$${Number(creatorAnalytics.totalTips).toLocaleString()}`} 
                       icon={<Heart size={24} color="#f91880" />} 
                       bg="rgba(249, 24, 128, 0.1)" 
                     />
@@ -810,7 +810,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                 </td>
                                 <td style={{ ...tdStyle, fontWeight: "700" }}>
                                   {Number(c.subscription_price) > 0 ? (
-                                    <span style={{ color: "#00d084" }}>₦{Number(c.subscription_price).toLocaleString()}/mo</span>
+                                    <span style={{ color: "#00d084" }}>${Number(c.subscription_price).toLocaleString()}/mo</span>
                                   ) : (
                                     <span style={{ color: "#8e8e93" }}>Free</span>
                                   )}
@@ -819,7 +819,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                   {c.subscribers_count}
                                 </td>
                                 <td style={tdStyle}>
-                                  <span style={{ fontWeight: "700", color: "#f91880" }}>₦{(c.tips_total || 0).toLocaleString()}</span>
+                                  <span style={{ fontWeight: "700", color: "#f91880" }}>${(c.tips_total || 0).toLocaleString()}</span>
                                   <span style={{ display: "block", fontSize: "10px", color: "#8e8e93" }}>{c.tips_count || 0} tips</span>
                                 </td>
                                 <td style={tdStyle}>
@@ -1172,11 +1172,11 @@ export default function AdminDashboard({ user, onLogout }) {
             </div>
 
             <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Monthly Subscription Price (₦ NGN)</label>
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Monthly Subscription Price ($ USD)</label>
               <input 
                 type="number" 
                 min={0}
-                step={500}
+                step={1}
                 value={editingCreator.subscription_price || 0} 
                 onChange={e => setEditingCreator({ ...editingCreator, subscription_price: e.target.value })} 
                 style={formInputStyle} 

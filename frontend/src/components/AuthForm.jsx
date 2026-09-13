@@ -15,13 +15,7 @@ const CREATOR_CATEGORIES = [
   "Cosplay & Fantasy"
 ];
 
-const PRICE_PRESETS = [
-  { label: "Free", value: 0 },
-  { label: "₦5,000 / month", value: 5000 },
-  { label: "₦10,000 / month", value: 10000 },
-  { label: "₦20,000 / month", value: 20000 },
-  { label: "₦50,000 / month", value: 50000 },
-];
+
 
 const FloatingSelect = ({ label, value, onChange, options, ...props }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -139,7 +133,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
     display_name: "",
     creator_category: "Model & Glamour",
     creator_bio: "",
-    subscription_price: 10000
+    subscription_price: 0
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -397,15 +391,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
               />
             )}
 
-            {/* CREATOR ONLY: Subscription Fee Preset */}
-            {authTab === "creator" && (
-              <FloatingSelect 
-                label="Monthly Fan Subscription Fee"
-                value={formData.subscription_price}
-                onChange={e => setFormData({ ...formData, subscription_price: Number(e.target.value) })}
-                options={PRICE_PRESETS}
-              />
-            )}
+
             
             {/* Email Address */}
             <FloatingInput 

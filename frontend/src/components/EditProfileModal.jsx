@@ -181,12 +181,12 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess }) {
           {/* Monthly Price (for creators) */}
           {user?.is_creator && (
             <div style={fieldGroupStyle}>
-              <label style={labelStyle}>Monthly Subscription Price (₦)</label>
+              <label style={labelStyle}>Monthly Subscription Price ($)</label>
               <input
                 type="number"
                 min={0}
-                step={500}
-                placeholder="15000"
+                step={1}
+                placeholder="15"
                 value={subscriptionPrice}
                 onChange={(e) => setSubscriptionPrice(e.target.value)}
                 style={inputStyle}

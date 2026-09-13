@@ -6,15 +6,15 @@ import {
 import { APP_CONFIG } from "../config";
 
 const TIP_PRESETS = [
-  { amountNgn: 3000, amountUsd: 3, label: "₦3,000 ($3)" },
-  { amountNgn: 5000, amountUsd: 6, label: "₦5,000 ($6)" },
-  { amountNgn: 10000, amountUsd: 12, label: "₦10,000 ($12)" },
-  { amountNgn: 25000, amountUsd: 30, label: "₦25,000 ($30)" },
-  { amountNgn: 50000, amountUsd: 60, label: "₦50,000 ($60)" }
+  { amountUsd: 3, label: "$3" },
+  { amountUsd: 5, label: "$5" },
+  { amountUsd: 10, label: "$10" },
+  { amountUsd: 25, label: "$25" },
+  { amountUsd: 50, label: "$50" }
 ];
 
 export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
-  const [selectedPreset, setSelectedPreset] = useState(TIP_PRESETS[1]); // Default ₦5,000 ($6)
+  const [selectedPreset, setSelectedPreset] = useState(TIP_PRESETS[1]); // Default $5
   const [customAmount, setCustomAmount] = useState("");
   const [message, setMessage] = useState("");
   
@@ -25,13 +25,9 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
   const [pollingStatus, setPollingStatus] = useState("pending");
   const [error, setError] = useState("");
 
-  const effectiveAmountNgn = customAmount 
-    ? Number(customAmount) 
-    : (selectedPreset?.amountNgn || 5000);
-
   const effectiveAmountUsd = customAmount 
-    ? Math.max(3, Math.round(Number(customAmount) / 850)) 
-    : (selectedPreset?.amountUsd || 6);
+    ? Math.max(2, Number(customAmount)) 
+    : (selectedPreset?.amountUsd || 5);
 
   // Prevent background scroll while modal is active
   useEffect(() => {
@@ -51,7 +47,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
             setPollingStatus("success");
             clearInterval(pollInterval);
             if (onTipSuccess) {
-              onTipSuccess(effectiveAmountNgn);
+              onTipSuccess(effectiveAmountUsd);
             }
           }
         } catch (err) {
@@ -65,11 +61,11 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
       }
     }
     return () => clearInterval(pollInterval);
-  }, [cryptoDetails, hasSentPayment, pollingStatus, effectiveAmountNgn, onTipSuccess]);
+  }, [cryptoDetails, hasSentPayment, pollingStatus, effectiveAmountUsd, onTipSuccess]);
 
   const handleSelectCoin = async (coinId) => {
     if (!effectiveAmountUsd || effectiveAmountUsd < 2) {
-      setError("Minimum tip amount via crypto is $2 USD (~₦2,000).");
+      setError("Minimum tip amount via crypto is $2 USD.");
       return;
     }
 
@@ -156,7 +152,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
               </div>
               <h3 style={successTitleStyle}>Tip Sent Successfully!</h3>
               <p style={successSubStyle}>
-                You sent a tip of <b>₦{effectiveAmountNgn.toLocaleString()} (${effectiveAmountUsd} USD)</b> to <b>{creator?.display_name || creator?.username}</b>. Thank you for supporting creators!
+                You sent a tip of <b>${effectiveAmountUsd} USD</b> to <b>{creator?.display_name || creator?.username}</b>. Thank you for supporting creators!
               </p>
               <div style={successCreatorCardStyle}>
                 <img 
@@ -201,7 +197,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                 <div style={{ textAlign: "right" }}>
                   <span style={{ fontSize: "11px", color: "#8e8e93" }}>TIP AMOUNT</span>
                   <div style={{ fontSize: "15px", fontWeight: "900", color: "#f91880" }}>
-                    ₦{effectiveAmountNgn.toLocaleString()} (${effectiveAmountUsd})
+                    ${effectiveAmountUsd} USD
                   </div>
                 </div>
               </div>
@@ -303,11 +299,11 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                 <label style={labelStyle}>Select Tip Amount</label>
                 <div style={presetGridStyle}>
                   {TIP_PRESETS.map((p) => {
-                    const isSelected = selectedPreset?.amountNgn === p.amountNgn && !customAmount;
+                    const isSelected = selectedPreset?.amountUsd === p.amountUsd && !customAmount;
                     return (
                       <button
                         type="button"
-                        key={p.amountNgn}
+                        key={p.amountUsd}
                         onClick={() => { setSelectedPreset(p); setCustomAmount(""); }}
                         style={{
                           ...presetBtnStyle,
@@ -325,21 +321,14 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
 
               {/* Custom Amount Input */}
               <div style={fieldGroupStyle}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <label style={labelStyle}>Or Custom Amount (₦)</label>
-                  {customAmount && (
-                    <span style={{ fontSize: "11px", color: "#00d084", fontWeight: "700" }}>
-                      ≈ ${effectiveAmountUsd} USD
-                    </span>
-                  )}
-                </div>
+                <label style={labelStyle}>Or Custom Amount ($)</label>
                 <div style={{ position: "relative" }}>
-                  <span style={currencySymbolStyle}>₦</span>
+                  <span style={currencySymbolStyle}>$</span>
                   <input
                     type="number"
-                    min={2000}
-                    step={500}
-                    placeholder="e.g. 15000"
+                    min={2}
+                    step={1}
+                    placeholder="e.g. 15"
                     value={customAmount}
                     onChange={(e) => { setCustomAmount(e.target.value); setSelectedPreset(null); }}
                     style={{ ...inputStyle, paddingLeft: "36px" }}
@@ -363,7 +352,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
               {/* Crypto Coin Grid */}
               <div style={fieldGroupStyle}>
                 <label style={labelStyle}>
-                  Select Crypto to Send ₦{effectiveAmountNgn.toLocaleString()} (~${effectiveAmountUsd} USD)
+                  Select Crypto to Send ${effectiveAmountUsd} USD
                 </label>
 
                 {generating ? (

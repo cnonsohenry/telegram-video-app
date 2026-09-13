@@ -599,7 +599,7 @@ export default function Profile({
                   <div style={{ marginTop: "8px" }}>
                     <span style={vipPricingBadgeStyle}>
                       <Sparkles size={12} color="#FFD700" />
-                      <span>VIP Channel: {Number(user.subscription_price) > 0 ? `₦${Number(user.subscription_price).toLocaleString()} / mo` : "Free Access"}</span>
+                      <span>VIP Channel: {Number(user.subscription_price) > 0 ? `$${Number(user.subscription_price).toLocaleString()} / mo` : "Free Access"}</span>
                     </span>
                   </div>
                 )}
@@ -761,7 +761,7 @@ export default function Profile({
                     {user?.is_creator && (
                       <span style={vipPricingBadgeStyle}>
                         <Sparkles size={12} color="#FFD700" />
-                        <span>VIP: {Number(user.subscription_price) > 0 ? `₦${Number(user.subscription_price).toLocaleString()}/mo` : "Free"}</span>
+                        <span>VIP: {Number(user.subscription_price) > 0 ? `$${Number(user.subscription_price).toLocaleString()}/mo` : "Free"}</span>
                       </span>
                     )}
                   </div>
@@ -786,7 +786,7 @@ export default function Profile({
                   </div>
                   <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
                     {creatorStats.subscribers > 0 
-                      ? `${creatorStats.subscribers} VIP fans · ₦${(creatorStats.subscribers * (Number(user.subscription_price) || 0)).toLocaleString()} projected MRR` 
+                      ? `${creatorStats.subscribers} VIP fans · $${(creatorStats.subscribers * (Number(user.subscription_price) || 0)).toLocaleString()} projected MRR` 
                       : "Insights, fan subscriptions & creator monetization tools"}
                   </div>
                 </div>

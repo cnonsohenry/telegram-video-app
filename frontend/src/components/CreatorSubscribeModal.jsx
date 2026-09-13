@@ -14,9 +14,8 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
   const [pollingStatus, setPollingStatus] = useState("pending");
   const [error, setError] = useState("");
 
-  const priceNgn = Number(creator?.subscription_price || 0);
-  // Convert NGN to USD (minimum $3 USD to satisfy NOWPayments network limits)
-  const priceUsd = Math.max(3, Math.round(priceNgn / 800) || 19);
+  const rawPrice = Number(creator?.subscription_price || 0);
+  const priceUsd = rawPrice > 0 ? Math.max(2, rawPrice) : 10;
 
   // Prevent background scroll while modal is open
   useEffect(() => {
@@ -183,7 +182,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                 <div style={{ textAlign: "right" }}>
                   <span style={{ fontSize: "11px", color: "#8e8e93" }}>30 DAYS PASS</span>
                   <div style={{ fontSize: "15px", fontWeight: "900", color: "#00aff0" }}>
-                    ₦{priceNgn.toLocaleString()} (${priceUsd})
+                    ${priceUsd} USD
                   </div>
                 </div>
               </div>
@@ -278,7 +277,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                   </div>
                   <span style={creatorMetaStyle}>@{creator?.username} • {creator?.creator_category || "Creator"}</span>
                   <div style={priceTagStyle}>
-                    ₦{priceNgn.toLocaleString()}/mo <span style={{ color: "#8e8e93", fontSize: "12px", fontWeight: "500" }}>(~${priceUsd} USD)</span>
+                    ${priceUsd}/mo
                   </div>
                 </div>
               </div>

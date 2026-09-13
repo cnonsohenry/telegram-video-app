@@ -22,7 +22,7 @@ export default function CreatorSetupModal({ user, onClose, onSetupSuccess }) {
   const [displayName, setDisplayName] = useState(user?.display_name || user?.username || "");
   const [category, setCategory] = useState(user?.creator_category || "Model & Glamour");
   const [bio, setBio] = useState(user?.creator_bio || "Welcome to my official VIP hub. Subscribe for daily exclusive shots and uncensored content 🔥");
-  const [subscriptionPrice, setSubscriptionPrice] = useState(user?.subscription_price ? String(user.subscription_price) : "15000");
+  const [subscriptionPrice, setSubscriptionPrice] = useState(user?.subscription_price ? String(user.subscription_price) : "15");
   const [bannerUrl, setBannerUrl] = useState(user?.banner_url || BANNER_PRESETS[0].url);
   const [customBanner, setCustomBanner] = useState("");
   const [location, setLocation] = useState(user?.location || "Lagos, Nigeria");
@@ -195,14 +195,14 @@ export default function CreatorSetupModal({ user, onClose, onSetupSuccess }) {
 
           {/* Monthly Subscription Price */}
           <div style={fieldGroupStyle}>
-            <label style={labelStyle}>Monthly Subscription Price (₦ or $)</label>
+            <label style={labelStyle}>Monthly Subscription Price ($ USD)</label>
             <div style={{ position: "relative" }}>
-              <span style={currencyPrefixStyle}>₦</span>
+              <span style={currencyPrefixStyle}>$</span>
               <input
                 type="number"
                 min={0}
-                step={500}
-                placeholder="15000 (Set 0 for Free Profile)"
+                step={1}
+                placeholder="15 (Set 0 for Free Profile)"
                 value={subscriptionPrice}
                 onChange={(e) => setSubscriptionPrice(e.target.value)}
                 style={{ ...inputStyle, paddingLeft: "36px" }}

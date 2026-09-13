@@ -189,6 +189,30 @@ async function initDatabase() {
         CREATE INDEX IF NOT EXISTS idx_app_users_lower_username ON app_users(LOWER(username));
         CREATE INDEX IF NOT EXISTS idx_app_users_telegram_user_id ON app_users(telegram_user_id);
         CREATE INDEX IF NOT EXISTS idx_app_users_is_managed ON app_users(is_managed);
+
+        UPDATE app_users 
+        SET subscription_price = CASE 
+          WHEN subscription_price >= 1000 THEN ROUND(subscription_price / 1000)
+          WHEN subscription_price >= 100 THEN ROUND(subscription_price / 100)
+          ELSE subscription_price 
+        END 
+        WHERE subscription_price >= 100;
+
+        UPDATE creator_subscriptions 
+        SET amount_paid = CASE 
+          WHEN amount_paid >= 1000 THEN ROUND(amount_paid / 1000)
+          WHEN amount_paid >= 100 THEN ROUND(amount_paid / 100)
+          ELSE amount_paid 
+        END 
+        WHERE amount_paid >= 100;
+
+        UPDATE creator_tips 
+        SET amount = CASE 
+          WHEN amount >= 1000 THEN ROUND(amount / 1000)
+          WHEN amount >= 100 THEN ROUND(amount / 100)
+          ELSE amount 
+        END 
+        WHERE amount >= 100;
       `);
 
       await pool.query(`
@@ -371,7 +395,7 @@ app.post("/webhook", async (req, res) => {
              username, display_name, email, is_creator, is_managed, 
              telegram_user_id, creator_category, subscription_price, is_verified, 
              banner_url, creator_bio, avatar_url
-           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15000, TRUE, 
+           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15, TRUE, 
              'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
              'Official creator channel. Catch all exclusive drops and daily previews here.',
              $5
@@ -542,7 +566,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
              username, display_name, email, is_creator, is_managed, 
              telegram_user_id, creator_category, subscription_price, is_verified, 
              banner_url, creator_bio, avatar_url
-           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, $5, 15000, TRUE, 
+           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, $5, 15, TRUE, 
              'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
              'Official creator channel. Catch all exclusive drops and daily previews here.',
              $6

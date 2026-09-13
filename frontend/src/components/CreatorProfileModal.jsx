@@ -330,7 +330,7 @@ export default function CreatorProfileModal({
                     <div style={{ marginTop: "8px" }}>
                       <span style={vipPricingBadgeStyle}>
                         <Sparkles size={12} color="#FFD700" />
-                        <span>VIP Channel: ₦{price.toLocaleString()}/mo</span>
+                        <span>VIP Channel: ${price.toLocaleString()}/mo</span>
                       </span>
                     </div>
                   )}
@@ -350,7 +350,7 @@ export default function CreatorProfileModal({
                     {isSubscribed ? (
                       <span>Subscribed ✓</span>
                     ) : (
-                      <span>{price > 0 ? `Subscribe · ₦${price.toLocaleString()}/mo` : "Follow"}</span>
+                      <span>{price > 0 ? `Subscribe · $${price.toLocaleString()}/mo` : "Follow"}</span>
                     )}
                   </button>
 
@@ -412,7 +412,7 @@ export default function CreatorProfileModal({
                         {isSubscribed ? (
                           <span>Subscribed ✓</span>
                         ) : (
-                          <span>{price > 0 ? `Subscribe · ₦${price.toLocaleString()}/mo` : "Follow"}</span>
+                          <span>{price > 0 ? `Subscribe · $${price.toLocaleString()}/mo` : "Follow"}</span>
                         )}
                       </button>
 
@@ -562,7 +562,7 @@ export default function CreatorProfileModal({
                     onClick={handleSubscribeToggle}
                     style={unlockNowBtnStyle}
                   >
-                    <span>{price > 0 ? `Unlock VIP for ₦${price.toLocaleString()}/mo` : "Join VIP Community"}</span>
+                    <span>{price > 0 ? `Unlock VIP for $${price.toLocaleString()}/mo` : "Join VIP Community"}</span>
                   </button>
                 </div>
               </div>
@@ -636,7 +636,7 @@ export default function CreatorProfileModal({
           creator={creatorData}
           onClose={() => setShowTipModal(false)}
           onTipSuccess={(amt) => {
-            alert(`🎉 Successfully sent ₦${amt.toLocaleString()} tip to @${creatorData?.username}!`);
+            alert(`🎉 Successfully sent $${amt.toLocaleString()} tip to @${creatorData?.username}!`);
           }}
         />
       )}

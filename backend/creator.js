@@ -574,7 +574,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
             banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
             creator_bio: "Official creator channel. Catch all exclusive drops and daily previews here.",
             creator_category: "Featured Creator",
-            subscription_price: 15000,
+            subscription_price: 15,
             social_links: tgUser.username ? { telegram: `https://t.me/${tgUser.username}` } : {},
             is_creator: true,
             is_managed: true,
@@ -608,7 +608,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
                  username, display_name, email, is_creator, is_managed, 
                  telegram_user_id, creator_category, subscription_price, is_verified, 
                  banner_url, creator_bio, avatar_url
-               ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15000, TRUE, 
+               ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15, TRUE, 
                  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
                  'Official creator channel. Follow for exclusive content and daily drops.',
                  $5
@@ -628,7 +628,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
               banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
               creator_bio: "Welcome to my official creator hub. Follow for exclusive content and daily drops.",
               creator_category: "Creator",
-              subscription_price: 15000,
+              subscription_price: 15,
               social_links: {},
               is_creator: true,
               is_managed: true,
@@ -959,8 +959,8 @@ router.post("/:username/tip", authenticateToken, async (req, res) => {
   const senderId = req.user.id;
 
   const numericAmount = Number(amount);
-  if (!Number.isFinite(numericAmount) || numericAmount < 100 || numericAmount > 5000000) {
-    return res.status(400).json({ error: "Invalid tip amount. Tips must be between ₦100 and ₦5,000,000." });
+  if (!Number.isFinite(numericAmount) || numericAmount < 1 || numericAmount > 10000) {
+    return res.status(400).json({ error: "Invalid tip amount. Tips must be between $1 and $10,000." });
   }
 
   try {
@@ -1040,7 +1040,7 @@ router.get("/featured/list", async (req, res) => {
         creator_category: "Top Creator",
         creator_bio: "Official creator on the platform. Daily exclusive videos & drops.",
         is_verified: true,
-        subscription_price: 15000
+        subscription_price: 15
       }));
 
       // Merge avoiding duplicates

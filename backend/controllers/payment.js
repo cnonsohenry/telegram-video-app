@@ -1,7 +1,7 @@
 import "dotenv/config";
 import axios from "axios";
 
-const VALID_AMOUNTS = [15000, 25000, 125000, 250000];
+const VALID_AMOUNTS = [19, 25, 95, 250, 15000, 25000, 125000, 250000];
 
 export const verifyPayment = async (req, res, pool) => {
   try {

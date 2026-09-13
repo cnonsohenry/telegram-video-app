@@ -410,7 +410,7 @@ export default function CreatorUploadModal({
                 <div style={vipNoticeBoxStyle}>
                   <Sparkles size={14} color="#FFD700" style={{ flexShrink: 0 }} />
                   <span style={{ fontSize: "12px", color: "#ffd700", lineHeight: "1.4" }}>
-                    Subscribers to your VIP pass (₦{Number(user?.subscription_price || 15000).toLocaleString()}/month) will get instant access. Free viewers will see a lock screen with a prompt to subscribe.
+                    Subscribers to your VIP pass (${Number(user?.subscription_price || 15).toLocaleString()}/month) will get instant access. Free viewers will see a lock screen with a prompt to subscribe.
                   </span>
                 </div>
               ) : (

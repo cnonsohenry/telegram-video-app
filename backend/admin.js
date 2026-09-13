@@ -240,7 +240,7 @@ router.put("/user/:id", authenticateToken, isAdmin, async (req, res) => {
           if (is_premium === true) {
             await pool.query(
               `INSERT INTO creator_subscriptions (subscriber_id, creator_id, amount_paid, status, expires_at)
-               VALUES ($1, $2, 15000, 'active', NOW() + INTERVAL '10 years')
+               VALUES ($1, $2, 15, 'active', NOW() + INTERVAL '10 years')
                ON CONFLICT (subscriber_id, creator_id) DO UPDATE 
                SET status = 'active', expires_at = GREATEST(creator_subscriptions.expires_at, NOW() + INTERVAL '10 years')`,
               [userId, mainCreator.rows[0].id]
@@ -403,7 +403,7 @@ export async function syncTelegramCreators(poolInstance) {
              username, display_name, email, is_creator, is_managed, 
              telegram_user_id, creator_category, subscription_price, is_verified, 
              banner_url, creator_bio, avatar_url
-           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, $5, 15000, TRUE, 
+           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, $5, 15, TRUE, 
              'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
              'Official Telegram channel. Catch all exclusive drops and daily previews here.',
              $6
@@ -462,7 +462,7 @@ export async function migrateLegacyVipToCreator(poolInstance) {
            banner_url, creator_bio, avatar_url
          ) VALUES (
            'naijahomemade', 'Naija Homemade Series', 'tg_1881815190@internal.naijahomemade.com',
-           TRUE, TRUE, 1881815190, 'Official VIP', 15000, TRUE,
+           TRUE, TRUE, 1881815190, 'Official VIP', 15, TRUE,
            'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
            'Official Naija Homemade VIP channel. All exclusive premium drops and uncut releases.',
            'https://videos.naijahomemade.com/assets/default-avatar.png'
@@ -481,7 +481,7 @@ export async function migrateLegacyVipToCreator(poolInstance) {
              telegram_user_id = 1881815190,
              display_name = COALESCE(display_name, 'Naija Homemade Series'),
              creator_category = COALESCE(creator_category, 'Official VIP'),
-             subscription_price = CASE WHEN subscription_price IS NULL OR subscription_price = 0 THEN 15000 ELSE subscription_price END,
+             subscription_price = CASE WHEN subscription_price IS NULL OR subscription_price = 0 THEN 15 ELSE subscription_price END,
              is_verified = TRUE
          WHERE id = $1`,
         [creatorAppUserId]
@@ -500,7 +500,7 @@ export async function migrateLegacyVipToCreator(poolInstance) {
     // 3. Move all existing VIP/Premium users into creator_subscriptions for @naijahomemade
     const subsRes = await db.query(
       `INSERT INTO creator_subscriptions (subscriber_id, creator_id, amount_paid, status, expires_at)
-       SELECT DISTINCT u.id, $1::BIGINT, 15000, 'active', NOW() + INTERVAL '10 years'
+       SELECT DISTINCT u.id, $1::BIGINT, 15, 'active', NOW() + INTERVAL '10 years'
        FROM app_users u
        LEFT JOIN transactions t ON u.id = t.app_user_id AND t.status = 'APPROVED'
        WHERE (u.is_premium = TRUE OR t.id IS NOT NULL)
