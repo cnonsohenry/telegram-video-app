@@ -1,5 +1,5 @@
 /* =======================================================
-   Backend: Creator Routes & OnlyFans-Style Monetization
+   Backend: Creator Routes & Creator Monetization
    File: backend/creator.js
 ======================================================= */
 import express from "express";

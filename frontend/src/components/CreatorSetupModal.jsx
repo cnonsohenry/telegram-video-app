@@ -265,9 +265,9 @@ export default function CreatorSetupModal({ user, onClose, onSetupSuccess }) {
 
           {/* Perks Guarantee */}
           <div style={guaranteeCardStyle}>
-            <ShieldCheck size={20} color="#00aff0" style={{ flexShrink: 0 }} />
+            <ShieldCheck size={20} color="var(--primary-color)" style={{ flexShrink: 0 }} />
             <div style={{ fontSize: "12px", color: "#ccc", lineHeight: "1.4" }}>
-              <b style={{ color: "#fff" }}>Instant Creator Verification:</b> Your profile will receive the official OnlyFans-style blue checkmark badge, customizable cover, and direct subscription tip monetization.
+              <b style={{ color: "#fff" }}>Instant Creator Verification:</b> Your profile will receive the official verified creator badge, customizable cover, and direct subscription tip monetization.
             </div>
           </div>
 

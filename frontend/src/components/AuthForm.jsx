@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Eye, EyeOff, Loader2, Check, X, AlertCircle, Sparkles, Star, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, Check, X, AlertCircle, Sparkles } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -17,11 +17,61 @@ const CREATOR_CATEGORIES = [
 
 const PRICE_PRESETS = [
   { label: "Free", value: 0 },
-  { label: "₦5,000", value: 5000 },
-  { label: "₦10,000", value: 10000 },
-  { label: "₦20,000", value: 20000 },
-  { label: "₦50,000", value: 50000 },
+  { label: "₦5,000 / month", value: 5000 },
+  { label: "₦10,000 / month", value: 10000 },
+  { label: "₦20,000 / month", value: 20000 },
+  { label: "₦50,000 / month", value: 50000 },
 ];
+
+const FloatingSelect = ({ label, value, onChange, options, ...props }) => {
+  const [isFocused, setIsFocused] = useState(false);
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      <label style={{
+        position: "absolute",
+        left: "20px",
+        top: "9px",
+        fontSize: "11px",
+        color: isFocused ? "#ccc" : "#8e8e93",
+        fontWeight: "700",
+        pointerEvents: "none",
+        zIndex: 2
+      }}>
+        {label}
+      </label>
+      <select
+        value={value}
+        onChange={onChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        style={{
+          width: "100%",
+          background: "var(--bg-color)",
+          border: `1.5px solid ${isFocused ? "#777" : "#333"}`,
+          borderRadius: "30px",
+          padding: "22px 40px 8px 20px",
+          color: "#fff",
+          fontSize: "15px",
+          outline: "none",
+          appearance: "none",
+          WebkitAppearance: "none",
+          cursor: "pointer",
+          boxSizing: "border-box",
+          transition: "border-color 0.2s, box-shadow 0.2s",
+          boxShadow: isFocused ? `0 0 0 3px rgba(255, 255, 255, 0.08)` : "none"
+        }}
+        {...props}
+      >
+        {options.map(opt => {
+          const val = typeof opt === "object" ? opt.value : opt;
+          const lab = typeof opt === "object" ? opt.label : opt;
+          return <option key={val} value={val} style={{ background: "#16181c", color: "#fff" }}>{lab}</option>;
+        })}
+      </select>
+      <div style={{ position: "absolute", right: "20px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "#8e8e93", fontSize: "11px" }}>▼</div>
+    </div>
+  );
+};
 
 const FloatingInput = ({ label, type = "text", value, onChange, rightIcon, statusColor, ...props }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -259,7 +309,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
             <span style={{ color: "var(--primary-color)" }}>{APP_CONFIG.appNameSuffix}</span>
           </h1>
 
-          {/* 🌟 ONLYFANS STYLE TAB SWITCHER: MEMBER VS CREATOR */}
+          {/* TAB SWITCHER: MEMBER VS CREATOR */}
           <div style={tabSwitcherContainer}>
             <button 
               type="button"
@@ -282,7 +332,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
               }}
               style={{
                 ...tabSwitcherButton,
-                backgroundColor: authTab === "creator" ? "#00aff0" : "transparent",
+                backgroundColor: authTab === "creator" ? "#222" : "transparent",
                 color: authTab === "creator" ? "#fff" : "#8e8e93",
                 fontWeight: authTab === "creator" ? "700" : "500",
                 display: "flex",
@@ -291,23 +341,10 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
                 gap: "6px"
               }}
             >
-              <Sparkles size={14} color={authTab === "creator" ? "#fff" : "#FFD700"} />
+              <Sparkles size={14} color={authTab === "creator" ? "var(--primary-color)" : "#8e8e93"} />
               <span>Join as Creator</span>
             </button>
           </div>
-
-          {/* Creator Intro Tagline */}
-          {authTab === "creator" && (
-            <div style={creatorIntroCard}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#00aff0", fontWeight: "700", fontSize: "12px", letterSpacing: "0.5px" }}>
-                <Star size={13} fill="#00aff0" />
-                <span>OFFICIAL ONLYFANS CREATOR HUB</span>
-              </div>
-              <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#ccc", lineHeight: "1.4" }}>
-                Monetize your content. Set subscription rates, unlock fan tips, and earn from your VIP audience.
-              </p>
-            </div>
-          )}
           
           <div style={errorContainerStyle}>
             {error && (
@@ -352,62 +389,22 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
 
             {/* CREATOR ONLY: Category Selection */}
             {authTab === "creator" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "4px 0" }}>
-                <label style={{ fontSize: "12px", color: "#8e8e93", fontWeight: "600", paddingLeft: "8px" }}>
-                  Creator Category / Niche
-                </label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                  {CREATOR_CATEGORIES.map(cat => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, creator_category: cat })}
-                      style={{
-                        background: formData.creator_category === cat ? "rgba(0, 175, 240, 0.2)" : "#16181c",
-                        border: formData.creator_category === cat ? "1.5px solid #00aff0" : "1px solid #333",
-                        color: formData.creator_category === cat ? "#00aff0" : "#a0a0a0",
-                        borderRadius: "16px",
-                        padding: "5px 12px",
-                        fontSize: "12px",
-                        fontWeight: "600",
-                        cursor: "pointer"
-                      }}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <FloatingSelect 
+                label="Creator Category / Niche"
+                value={formData.creator_category}
+                onChange={e => setFormData({ ...formData, creator_category: e.target.value })}
+                options={CREATOR_CATEGORIES}
+              />
             )}
 
             {/* CREATOR ONLY: Subscription Fee Preset */}
             {authTab === "creator" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "4px 0" }}>
-                <label style={{ fontSize: "12px", color: "#8e8e93", fontWeight: "600", paddingLeft: "8px" }}>
-                  Monthly Fan Subscription Fee
-                </label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                  {PRICE_PRESETS.map(p => (
-                    <button
-                      key={p.value}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, subscription_price: p.value })}
-                      style={{
-                        background: Number(formData.subscription_price) === p.value ? "rgba(0, 175, 240, 0.2)" : "#16181c",
-                        border: Number(formData.subscription_price) === p.value ? "1.5px solid #00aff0" : "1px solid #333",
-                        color: Number(formData.subscription_price) === p.value ? "#00aff0" : "#a0a0a0",
-                        borderRadius: "16px",
-                        padding: "5px 12px",
-                        fontSize: "12px",
-                        fontWeight: "600",
-                        cursor: "pointer"
-                      }}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <FloatingSelect 
+                label="Monthly Fan Subscription Fee"
+                value={formData.subscription_price}
+                onChange={e => setFormData({ ...formData, subscription_price: Number(e.target.value) })}
+                options={PRICE_PRESETS}
+              />
             )}
             
             {/* Email Address */}
@@ -449,13 +446,13 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
               disabled={isSubmitDisabled} 
               style={{
                 ...loginButtonStyle,
-                background: authTab === "creator" ? "#00aff0" : "var(--primary-color)",
+                background: "var(--primary-color)",
                 opacity: isSubmitDisabled ? 0.5 : 1 
               }}
             >
               {isLoading ? "Please wait..." : (
                 authTab === "creator" 
-                  ? "Create Creator Account 🚀" 
+                  ? "Sign up as Creator" 
                   : (isRegistering ? "Sign up" : "Log in")
               )}
             </button>
@@ -519,7 +516,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
                   setIsRegistering(false); 
                   setError(""); 
                 }} 
-                style={{ color: "#00aff0", fontWeight: "700", cursor: "pointer" }}
+                style={{ color: "var(--primary-color)", fontWeight: "700", cursor: "pointer" }}
               >
                 Log in here
               </span>
@@ -577,16 +574,6 @@ const tabSwitcherButton = {
   transition: "all 0.2s ease"
 };
 
-const creatorIntroCard = {
-  width: "100%",
-  backgroundColor: "rgba(0, 175, 240, 0.08)",
-  border: "1px solid rgba(0, 175, 240, 0.25)",
-  borderRadius: "14px",
-  padding: "12px 14px",
-  marginBottom: "12px",
-  boxSizing: "border-box"
-};
-
 const formStyle = { width: "100%", display: "flex", flexDirection: "column", gap: "10px" }; 
 const loginButtonStyle = { color: "#fff", border: "none", borderRadius: "30px", padding: "16px", fontSize: "15px", fontWeight: "800", marginTop: "8px", cursor: "pointer", transition: "opacity 0.2s" };
 const eyeButtonStyle = { background: "none", border: "none", color: "#666", display: "flex", cursor: "pointer", padding: "5px" };
@@ -611,7 +598,7 @@ const creatorPromptBox = {
 const creatorPromptLink = {
   background: "none",
   border: "none",
-  color: "#00aff0",
+  color: "var(--primary-color)",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",

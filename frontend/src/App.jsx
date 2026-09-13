@@ -818,7 +818,7 @@ export default function App() {
         />
       )}
 
-      {/* 🟢 ONLYFANS STYLE CREATOR PROFILE MODAL */}
+      {/* 🟢 CREATOR PROFILE MODAL */}
       {viewingCreator && (
         <CreatorProfileModal 
           creatorUsername={viewingCreator} 
