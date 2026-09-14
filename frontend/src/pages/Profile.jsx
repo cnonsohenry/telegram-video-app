@@ -437,9 +437,9 @@ export default function Profile({
   };
 
   const postsCount = user?.is_creator ? (creatorStats.posts || creatorPosts.length || 0) : 0;
-  const followersCount = user?.is_creator ? (creatorStats.subscribers || 0) : 0;
-  const followingCount = user?.is_creator 
-    ? (creatorStats.views || creatorStats.likes || 0) 
+  const followersCount = user?.is_creator ? (creatorStats.followers !== undefined ? creatorStats.followers : (creatorStats.subscribers || 0)) : 0;
+  const followingCount = (user?.follows && Array.isArray(user.follows)) 
+    ? user.follows.length 
     : (user?.subscriptions?.length || 0);
 
   return (

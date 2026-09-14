@@ -682,10 +682,20 @@ router.get("/:username", optionalAuth, async (req, res) => {
     const viewsCount = Number(statsRes.rows[0]?.views_count || 0);
     const likesCount = Number(statsRes.rows[0]?.likes_count || 0);
 
-    // Calculate fans (if real subs are 0, estimate fans from engagement for realistic feel)
-    const baseFans = Math.max(subCount, Math.floor(viewsCount * 0.05) + Math.floor(likesCount * 0.2));
+    // 3. Determine followers and subscribers counts
+    let followCount = 0;
+    try {
+      const followRes = await pool.query(
+        "SELECT COUNT(*) FROM creator_follows WHERE creator_id = $1 OR ($2::BIGINT IS NOT NULL AND creator_id = $2::BIGINT)",
+        [creator.id, creator.telegram_user_id || null]
+      );
+      followCount = Number(followRes.rows[0]?.count || 0);
+    } catch (e) {}
 
-    // 3. Determine if requesting user is subscribed
+    const totalFollowers = followCount > 0 ? followCount : baseFans;
+
+    // 4. Determine if requesting user is following & subscribed
+    let isFollowing = false;
     let isSubscribed = false;
     let isOwner = false;
 
@@ -694,16 +704,23 @@ router.get("/:username", optionalAuth, async (req, res) => {
         isOwner = true;
       } else {
         try {
-          const checkSub = await pool.query(
-            "SELECT id FROM creator_subscriptions WHERE subscriber_id = $1 AND (creator_id = $2 OR ($3::BIGINT IS NOT NULL AND creator_id = $3::BIGINT)) AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
-            [req.user.id, creator.id, creator.telegram_user_id || null]
-          );
+          const [checkFollow, checkSub] = await Promise.all([
+            pool.query(
+              "SELECT id FROM creator_follows WHERE follower_id = $1 AND (creator_id = $2 OR ($3::BIGINT IS NOT NULL AND creator_id = $3::BIGINT))",
+              [req.user.id, creator.id, creator.telegram_user_id || null]
+            ),
+            pool.query(
+              "SELECT id FROM creator_subscriptions WHERE subscriber_id = $1 AND (creator_id = $2 OR ($3::BIGINT IS NOT NULL AND creator_id = $3::BIGINT)) AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())",
+              [req.user.id, creator.id, creator.telegram_user_id || null]
+            )
+          ]);
+          isFollowing = checkFollow.rows.length > 0;
           isSubscribed = checkSub.rows.length > 0;
         } catch (e) {}
       }
     }
 
-    // 4. Fetch First 12 Videos
+    // 5. Fetch First 12 Videos
     const videosRes = await pool.query(
       `WITH GroupedVideos AS (
         SELECT v.*,
@@ -748,11 +765,13 @@ router.get("/:username", optionalAuth, async (req, res) => {
       creator: {
         ...creator,
         stats: {
-          subscribers: subCount || baseFans,
+          followers: totalFollowers,
+          subscribers: subCount,
           posts: postsCount,
           likes: likesCount,
           views: viewsCount
         },
+        is_following: isFollowing,
         is_subscribed: isSubscribed,
         is_owner: isOwner
       },
@@ -866,7 +885,77 @@ router.get("/:username/videos", async (req, res) => {
 });
 
 /* =======================================================
-   5. SUBSCRIBE / FOLLOW CREATOR
+   5. FOLLOW / UNFOLLOW CREATOR (FREE GENERAL FOLLOWING)
+   POST /api/creator/:username/follow
+======================================================= */
+router.post("/:username/follow", authenticateToken, async (req, res) => {
+  const { username } = req.params;
+  const followerId = req.user.id;
+
+  try {
+    let creatorRes = await pool.query(
+      "SELECT id, username FROM app_users WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)",
+      [username]
+    );
+
+    let creatorId = creatorRes.rows[0]?.id;
+
+    if (!creatorId) {
+      const tgRes = await pool.query(
+        "SELECT user_id FROM users WHERE LOWER(COALESCE(username, '')) = LOWER($1) OR LOWER(COALESCE(full_name, '')) = LOWER($1)",
+        [username]
+      );
+      creatorId = tgRes.rows[0]?.user_id;
+    }
+
+    if (!creatorId) {
+      return res.status(404).json({ error: "Creator not found" });
+    }
+
+    if (String(followerId) === String(creatorId)) {
+      return res.status(400).json({ error: "You cannot follow yourself" });
+    }
+
+    const existing = await pool.query(
+      "SELECT id FROM creator_follows WHERE follower_id = $1 AND creator_id = $2",
+      [followerId, creatorId]
+    );
+
+    let isFollowing = false;
+    if (existing.rows.length > 0) {
+      await pool.query(
+        "DELETE FROM creator_follows WHERE follower_id = $1 AND creator_id = $2",
+        [followerId, creatorId]
+      );
+      isFollowing = false;
+    } else {
+      await pool.query(
+        `INSERT INTO creator_follows (follower_id, creator_id) 
+         VALUES ($1, $2)
+         ON CONFLICT (follower_id, creator_id) DO NOTHING`,
+        [followerId, creatorId]
+      );
+      isFollowing = true;
+    }
+
+    const totalRes = await pool.query(
+      "SELECT COUNT(*) FROM creator_follows WHERE creator_id = $1",
+      [creatorId]
+    );
+
+    res.json({
+      success: true,
+      following: isFollowing,
+      followers_count: Number(totalRes.rows[0]?.count || 0)
+    });
+  } catch (err) {
+    console.error("[CREATOR FOLLOW ERROR]", err);
+    res.status(500).json({ error: "Failed to update follow status" });
+  }
+});
+
+/* =======================================================
+   6. SUBSCRIBE TO CREATOR (PAID VIP ACCESS)
    POST /api/creator/:username/subscribe
 ======================================================= */
 router.post("/:username/subscribe", authenticateToken, async (req, res) => {
@@ -928,6 +1017,12 @@ router.post("/:username/subscribe", authenticateToken, async (req, res) => {
          VALUES ($1, $2, 0, 'active', NULL)
          ON CONFLICT (subscriber_id, creator_id)
          DO UPDATE SET status = 'active', amount_paid = 0, expires_at = NULL`,
+        [subscriberId, creatorId]
+      );
+      await pool.query(
+        `INSERT INTO creator_follows (follower_id, creator_id)
+         VALUES ($1, $2)
+         ON CONFLICT (follower_id, creator_id) DO NOTHING`,
         [subscriberId, creatorId]
       );
       isSubscribed = true;

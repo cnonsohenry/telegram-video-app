@@ -23,6 +23,9 @@ export default function CreatorProfileModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("posts");
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribersCount, setSubscribersCount] = useState(0);
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -51,7 +54,7 @@ export default function CreatorProfileModal({
         const headers = {};
         if (token) headers.Authorization = `Bearer ${token}`;
 
-        const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${creatorUsername}`, { headers });
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorUsername)}`, { headers });
         if (!res.ok) throw new Error("Creator not found");
 
         const data = await res.json();
@@ -59,8 +62,11 @@ export default function CreatorProfileModal({
           setCreatorData(data.creator);
           setVideos(data.videos || []);
           const isSub = Boolean(data.creator.is_subscribed);
+          const isFoll = Boolean(data.creator.is_following);
           setIsSubscribed(isSub);
+          setIsFollowing(isFoll);
           setSubscribersCount(Number(data.creator.stats?.subscribers || 0));
+          setFollowersCount(Number(data.creator.stats?.followers || 0));
           setHasMoreVideos(Boolean(data.videos && data.videos.length >= 12));
           setVideoPage(1);
 
@@ -108,6 +114,43 @@ export default function CreatorProfileModal({
     }
   };
 
+  const handleFollowToggle = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to follow creators!");
+      return;
+    }
+
+    if (creatorData?.is_owner) {
+      alert("This is your own profile!");
+      return;
+    }
+
+    setIsFollowLoading(true);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorUsername)}/follow`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to update follow");
+      }
+      setIsFollowing(Boolean(data.following));
+      if (typeof data.followers_count === "number") {
+        setFollowersCount(data.followers_count);
+      }
+      window.dispatchEvent(new CustomEvent("refreshUser"));
+    } catch (e) {
+      alert(e.message || "Failed to update follow");
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
+
   const handleSubscribeToggle = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -124,12 +167,12 @@ export default function CreatorProfileModal({
 
     // If currently subscribed, confirm cancellation
     if (isSubscribed) {
-      const confirmed = window.confirm(`Are you sure you want to cancel your subscription to @${creatorData?.username || creatorUsername}?`);
+      const confirmed = window.confirm(`Are you sure you want to cancel your VIP subscription to @${creatorData?.username || creatorUsername}?`);
       if (!confirmed) return;
 
       setIsSubscribing(true);
       try {
-        const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${creatorUsername}/subscribe`, {
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorUsername)}/subscribe`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -152,16 +195,16 @@ export default function CreatorProfileModal({
       return;
     }
 
-    // If paid subscription, launch NOWPayments crypto checkout!
+    // Launch NOWPayments crypto checkout for paying and joining premium!
     if (price > 0) {
       setShowSubscribeModal(true);
       return;
     }
 
-    // Free subscription (price === 0)
+    // Free VIP tier if price === 0
     setIsSubscribing(true);
     try {
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${creatorUsername}/subscribe`, {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorUsername)}/subscribe`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -265,9 +308,15 @@ export default function CreatorProfileModal({
                       <span style={statLabelStyle}>posts</span>
                     </div>
                     <div style={statColStyle}>
-                      <span style={statNumberStyle}>{formatStat(subscribersCount)}</span>
+                      <span style={statNumberStyle}>{formatStat(followersCount)}</span>
                       <span style={statLabelStyle}>followers</span>
                     </div>
+                    {price > 0 && (
+                      <div style={statColStyle}>
+                        <span style={{ ...statNumberStyle, color: "#FFD700" }}>{formatStat(subscribersCount)}</span>
+                        <span style={statLabelStyle}>VIP fans</span>
+                      </div>
+                    )}
                     <div style={statColStyle}>
                       <span style={statNumberStyle}>{formatStat(likesCount)}</span>
                       <span style={statLabelStyle}>likes</span>
@@ -338,21 +387,38 @@ export default function CreatorProfileModal({
 
                 {/* Row 3: Action Buttons */}
                 <div style={mobileActionButtonsRow}>
-                  <button
-                    onClick={handleSubscribeToggle}
-                    disabled={isSubscribing}
-                    style={{
-                      ...mobileSubscribeBtn,
-                      backgroundColor: isSubscribed ? "#262626" : "#0095f6",
-                      color: "#ffffff"
-                    }}
-                  >
-                    {isSubscribed ? (
-                      <span>Subscribed ✓</span>
-                    ) : (
-                      <span>{price > 0 ? `Subscribe · $${price.toLocaleString()}/mo` : "Follow"}</span>
-                    )}
-                  </button>
+                  {!creatorData?.is_owner && (
+                    <button
+                      onClick={handleFollowToggle}
+                      disabled={isFollowLoading}
+                      style={{
+                        ...mobileFollowBtn,
+                        backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
+                        color: isFollowing ? "#ffffff" : "#000000",
+                        border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none"
+                      }}
+                    >
+                      {isFollowLoading ? "..." : (isFollowing ? "Following" : "Follow")}
+                    </button>
+                  )}
+
+                  {!creatorData?.is_owner && (price > 0 || isSubscribed) && (
+                    <button
+                      onClick={handleSubscribeToggle}
+                      disabled={isSubscribing}
+                      style={{
+                        ...mobileSubscribeBtn,
+                        backgroundColor: isSubscribed ? "#262626" : "#0095f6",
+                        color: "#ffffff"
+                      }}
+                    >
+                      {isSubscribed ? (
+                        <span>VIP Subscribed ✓</span>
+                      ) : (
+                        <span>Subscribe · ${price.toLocaleString()}/mo</span>
+                      )}
+                    </button>
+                  )}
 
                   <button
                     onClick={() => setShowTipModal(true)}
@@ -400,21 +466,38 @@ export default function CreatorProfileModal({
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <button
-                        onClick={handleSubscribeToggle}
-                        disabled={isSubscribing}
-                        style={{
-                          ...desktopSubscribeBtn,
-                          backgroundColor: isSubscribed ? "#262626" : "#0095f6",
-                          color: "#ffffff"
-                        }}
-                      >
-                        {isSubscribed ? (
-                          <span>Subscribed ✓</span>
-                        ) : (
-                          <span>{price > 0 ? `Subscribe · $${price.toLocaleString()}/mo` : "Follow"}</span>
-                        )}
-                      </button>
+                      {!creatorData?.is_owner && (
+                        <button
+                          onClick={handleFollowToggle}
+                          disabled={isFollowLoading}
+                          style={{
+                            ...desktopFollowBtn,
+                            backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
+                            color: isFollowing ? "#ffffff" : "#000000",
+                            border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none"
+                          }}
+                        >
+                          {isFollowLoading ? "..." : (isFollowing ? "Following" : "Follow")}
+                        </button>
+                      )}
+
+                      {!creatorData?.is_owner && (price > 0 || isSubscribed) && (
+                        <button
+                          onClick={handleSubscribeToggle}
+                          disabled={isSubscribing}
+                          style={{
+                            ...desktopSubscribeBtn,
+                            backgroundColor: isSubscribed ? "#262626" : "#0095f6",
+                            color: "#ffffff"
+                          }}
+                        >
+                          {isSubscribed ? (
+                            <span>VIP Subscribed ✓</span>
+                          ) : (
+                            <span>Subscribe · ${price.toLocaleString()}/mo</span>
+                          )}
+                        </button>
+                      )}
 
                       <button
                         onClick={() => setShowTipModal(true)}
@@ -431,15 +514,21 @@ export default function CreatorProfileModal({
                   </div>
 
                   {/* Row 2: Stats */}
-                  <div style={{ display: "flex", gap: "40px", marginBottom: "18px", fontSize: "15px" }}>
+                  <div style={{ display: "flex", gap: "32px", marginBottom: "18px", fontSize: "15px" }}>
                     <div>
                       <strong style={{ color: "#fff" }}>{formatStat(postsCount)}</strong>{" "}
                       <span style={{ color: "#8e8e93" }}>posts</span>
                     </div>
                     <div>
-                      <strong style={{ color: "#fff" }}>{formatStat(subscribersCount)}</strong>{" "}
+                      <strong style={{ color: "#fff" }}>{formatStat(followersCount)}</strong>{" "}
                       <span style={{ color: "#8e8e93" }}>followers</span>
                     </div>
+                    {price > 0 && (
+                      <div>
+                        <strong style={{ color: "#FFD700" }}>{formatStat(subscribersCount)}</strong>{" "}
+                        <span style={{ color: "#8e8e93" }}>VIP subscribers</span>
+                      </div>
+                    )}
                     <div>
                       <strong style={{ color: "#fff" }}>{formatStat(likesCount)}</strong>{" "}
                       <span style={{ color: "#8e8e93" }}>likes</span>
@@ -788,6 +877,19 @@ const mobileActionButtonsRow = {
   marginTop: "12px"
 };
 
+const mobileFollowBtn = {
+  flex: 1,
+  height: "34px",
+  borderRadius: "8px",
+  fontSize: "13px",
+  fontWeight: "700",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "all 0.2s ease"
+};
+
 const mobileSubscribeBtn = {
   flex: 1,
   height: "34px",
@@ -829,6 +931,19 @@ const mobileIconBtn = {
 };
 
 // Desktop Action Buttons
+const desktopFollowBtn = {
+  height: "34px",
+  padding: "0 22px",
+  borderRadius: "8px",
+  fontSize: "13px",
+  fontWeight: "700",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "all 0.2s ease"
+};
+
 const desktopSubscribeBtn = {
   height: "34px",
   padding: "0 20px",

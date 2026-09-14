@@ -74,3 +74,31 @@ export const getVideoCreatorHandle = (video) => {
   }
   return handle;
 };
+
+/**
+ * Check if the user is following a creator (general free follow)
+ */
+export const isUserFollowingCreator = (user, videoOrCreator) => {
+  if (!user || !videoOrCreator) return false;
+  const creatorHandle = (typeof videoOrCreator === "string" ? videoOrCreator : getVideoCreatorHandle(videoOrCreator)).toLowerCase().replace(/^@/, "").trim();
+  const creatorId = videoOrCreator?.uploader_id ? String(videoOrCreator.uploader_id) : (videoOrCreator?.id ? String(videoOrCreator.id) : null);
+
+  // Owner check
+  if (user.username && user.username.toLowerCase().replace(/^@/, "").trim() === creatorHandle) {
+    return true;
+  }
+  if (creatorId && (String(user.id) === creatorId || (user.telegram_user_id && String(user.telegram_user_id) === creatorId))) {
+    return true;
+  }
+
+  // Follows array check
+  if (Array.isArray(user.follows) && user.follows.length > 0) {
+    return user.follows.some(f => {
+      if (f.creator_username && f.creator_username.toLowerCase().replace(/^@/, "").trim() === creatorHandle) return true;
+      if (creatorId && (String(f.creator_id) === creatorId || (f.telegram_user_id && String(f.telegram_user_id) === creatorId))) return true;
+      return false;
+    });
+  }
+
+  return false;
+};

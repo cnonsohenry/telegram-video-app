@@ -183,6 +183,20 @@ async function initDatabase() {
       `);
 
       await pool.query(`
+        CREATE TABLE IF NOT EXISTS creator_follows (
+          id SERIAL PRIMARY KEY,
+          follower_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          creator_id BIGINT NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(follower_id, creator_id)
+        );
+        ALTER TABLE creator_follows DROP CONSTRAINT IF EXISTS creator_follows_creator_id_fkey;
+        ALTER TABLE creator_follows ALTER COLUMN creator_id TYPE BIGINT;
+        CREATE INDEX IF NOT EXISTS idx_follows_creator ON creator_follows(creator_id);
+        CREATE INDEX IF NOT EXISTS idx_follows_follower ON creator_follows(follower_id);
+      `);
+
+      await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_subscriptions_creator ON creator_subscriptions(creator_id);
         CREATE INDEX IF NOT EXISTS idx_subscriptions_subscriber ON creator_subscriptions(subscriber_id);
         CREATE INDEX IF NOT EXISTS idx_tips_creator ON creator_tips(creator_id);
@@ -1176,29 +1190,45 @@ app.get("/api/interactions/state/:message_id", authenticateToken, async (req, re
     const saveRes = await pool.query("SELECT 1 FROM saves WHERE user_id=$1 AND message_id=$2", [user_id, message_id]);
     
     let isFollowing = false;
+    let isSubscribed = false;
     const videoRes = await pool.query("SELECT uploader_id FROM videos WHERE message_id = $1 LIMIT 1", [message_id]);
     if (videoRes.rows.length > 0 && videoRes.rows[0].uploader_id) {
       const uploaderId = videoRes.rows[0].uploader_id;
-      const followRes = await pool.query(
-        `SELECT 1 FROM creator_subscriptions cs
-         WHERE cs.subscriber_id = $1 
-           AND (
-             cs.creator_id = $2 
-             OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2)
-             OR cs.creator_id IN (SELECT id FROM app_users WHERE id = $2)
-           )
-           AND cs.status = 'active'
-           AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
-         LIMIT 1`,
-        [user_id, uploaderId]
-      );
+      const [followRes, subRes] = await Promise.all([
+        pool.query(
+          `SELECT 1 FROM creator_follows cf
+           WHERE cf.follower_id = $1 
+             AND (
+               cf.creator_id = $2 
+               OR cf.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2)
+               OR cf.creator_id IN (SELECT id FROM app_users WHERE id = $2)
+             )
+           LIMIT 1`,
+          [user_id, uploaderId]
+        ),
+        pool.query(
+          `SELECT 1 FROM creator_subscriptions cs
+           WHERE cs.subscriber_id = $1 
+             AND (
+               cs.creator_id = $2 
+               OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2)
+               OR cs.creator_id IN (SELECT id FROM app_users WHERE id = $2)
+             )
+             AND cs.status = 'active'
+             AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
+           LIMIT 1`,
+          [user_id, uploaderId]
+        )
+      ]);
       isFollowing = followRes.rows.length > 0;
+      isSubscribed = subRes.rows.length > 0;
     }
 
     res.json({
       isLiked: likeRes.rows.length > 0,
       isSaved: saveRes.rows.length > 0,
-      isFollowing: isFollowing
+      isFollowing: isFollowing,
+      isSubscribed: isSubscribed
     });
   } catch (err) {
     res.status(500).json({ error: "State fetch failed" });

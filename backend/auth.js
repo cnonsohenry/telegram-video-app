@@ -136,7 +136,12 @@ router.post("/google", async (req, res) => {
     );
 
     const user = userQuery.rows[0];
-    user.subscriptions = await getUserSubscriptions(user.id);
+    const [userSubs, userFolls] = await Promise.all([
+      getUserSubscriptions(user.id),
+      getUserFollows(user.id)
+    ]);
+    user.subscriptions = userSubs;
+    user.follows = userFolls;
     const appToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "30d" });
 
     res.json({ token: appToken, user });
@@ -164,6 +169,26 @@ export const getUserSubscriptions = async (userId) => {
     return subsResult.rows;
   } catch (err) {
     console.error("[GET USER SUBSCRIPTIONS ERROR]", err.message);
+    return [];
+  }
+};
+
+// Helper to fetch creator follows
+export const getUserFollows = async (userId) => {
+  if (!userId) return [];
+  try {
+    const followsResult = await pool.query(
+      `SELECT cf.creator_id,
+              u.username as creator_username, u.display_name as creator_display_name,
+              u.telegram_user_id
+       FROM creator_follows cf
+       LEFT JOIN app_users u ON cf.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cf.creator_id = u.telegram_user_id)
+       WHERE cf.follower_id = $1`,
+      [userId]
+    );
+    return followsResult.rows;
+  } catch (err) {
+    console.error("[GET USER FOLLOWS ERROR]", err.message);
     return [];
   }
 };
@@ -220,6 +245,7 @@ router.post("/register", async (req, res) => {
     const token = jwt.sign({ id: newUser.rows[0].id }, JWT_SECRET, { expiresIn: "30d" });
     const userData = newUser.rows[0];
     userData.subscriptions = [];
+    userData.follows = [];
     res.json({ token, user: userData });
   } catch (err) {
     console.error("[REGISTER ERROR]", err);
@@ -250,7 +276,12 @@ router.post("/login", async (req, res) => {
 
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "30d" });
     const { password_hash, ...userData } = user;
-    userData.subscriptions = await getUserSubscriptions(user.id);
+    const [userSubs, userFolls] = await Promise.all([
+      getUserSubscriptions(user.id),
+      getUserFollows(user.id)
+    ]);
+    userData.subscriptions = userSubs;
+    userData.follows = userFolls;
     res.json({ token, user: userData });
   } catch (err) {
     console.error("[LOGIN ERROR]", err);
@@ -271,7 +302,12 @@ router.get("/me", authenticateToken, async (req, res) => {
 
     if (userResult.rows.length === 0) return res.status(404).json({ error: "User not found" });
     const user = userResult.rows[0];
-    user.subscriptions = await getUserSubscriptions(req.user.id);
+    const [userSubs, userFolls] = await Promise.all([
+      getUserSubscriptions(req.user.id),
+      getUserFollows(req.user.id)
+    ]);
+    user.subscriptions = userSubs;
+    user.follows = userFolls;
     res.json(user);
   } catch (err) {
     res.status(401).json({ error: "Session expired" });

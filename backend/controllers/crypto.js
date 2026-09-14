@@ -193,6 +193,12 @@ export const fulfillCryptoOrder = async (pool, orderId) => {
          DO UPDATE SET status = 'active', amount_paid = $3, expires_at = NOW() + INTERVAL '30 days'`,
         [tx.app_user_id, tx.creator_id, tx.expected_amount]
       );
+      await client.query(
+        `INSERT INTO creator_follows (follower_id, creator_id)
+         VALUES ($1, $2)
+         ON CONFLICT (follower_id, creator_id) DO NOTHING`,
+        [tx.app_user_id, tx.creator_id]
+      ).catch(() => {});
       console.log(`✅ User ${tx.app_user_id} subscribed to Creator ID ${tx.creator_id} via Crypto ($${tx.expected_amount})!`);
     } else if (txType === 'creator_tip' && tx.creator_id) {
       // Record creator tip

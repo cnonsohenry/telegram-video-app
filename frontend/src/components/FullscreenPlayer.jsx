@@ -8,7 +8,7 @@ import {
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
-import { getVideoCreatorHandle } from "../utils/subscription";
+import { getVideoCreatorHandle, isUserFollowingCreator } from "../utils/subscription";
 
 export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick, onCreatorClick }) {
   const videoRef = useRef(null);
@@ -39,13 +39,13 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     category: video.category || "hotties" 
   });
 
-  // Engagement States
-  const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
+  // Interaction States
   const [isLiked, setIsLiked] = useState(false);
-  const [savesCount, setSavesCount] = useState(Number(video.saves_count || 0));
+  const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
   const [isSaved, setIsSaved] = useState(false);
-  const [sharesCount, setSharesCount] = useState(Number(video.shares_count || 0));
+  const [savesCount, setSavesCount] = useState(Number(video.saves_count || 0));
   const [commentsCount, setCommentsCount] = useState(Number(video.comments_count || 0));
+  const [sharesCount, setSharesCount] = useState(Number(video.shares_count || 0));
 
   // Creator & Follow States
   const creatorHandle = getVideoCreatorHandle(video);
@@ -57,11 +57,12 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   ));
 
   const isUserFollowing = Boolean(
-    currentUser && Array.isArray(currentUser.subscriptions) && currentUser.subscriptions.some(sub => {
+    isUserFollowingCreator(currentUser, video) ||
+    (currentUser && Array.isArray(currentUser.follows) && currentUser.follows.some(sub => {
       if (sub.creator_username && sub.creator_username.toLowerCase().replace(/^@/, "").trim() === creatorHandle.toLowerCase()) return true;
       if (uploaderId && (String(sub.creator_id) === uploaderId || (sub.telegram_user_id && String(sub.telegram_user_id) === uploaderId))) return true;
       return false;
-    })
+    }))
   );
 
   const [isFollowing, setIsFollowing] = useState(isUserFollowing);
@@ -103,7 +104,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
 
     setIsFollowLoading(true);
     try {
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorHandle)}/subscribe`, {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorHandle)}/follow`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -113,22 +114,11 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
 
       const data = await res.json();
 
-      if (res.status === 402 || data.requires_payment) {
-        if (videoRef.current) {
-          videoRef.current.pause();
-          setIsPlaying(false);
-        }
-        if (onCreatorClick) {
-          onCreatorClick(creatorHandle, { autoSubscribe: true });
-        }
-        return;
-      }
-
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to follow creator");
       }
 
-      setIsFollowing(Boolean(data.subscribed));
+      setIsFollowing(Boolean(data.following));
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (err) {
       console.error("Follow error:", err);
@@ -580,14 +570,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                         style={followBtnStyle}
                         title={`Follow @${creatorHandle}`}
                       >
-                        {isFollowLoading ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <>
-                            <UserPlus size={13} />
-                            <span>Follow</span>
-                          </>
-                        )}
+                        <span>{isFollowLoading ? "..." : "Follow"}</span>
                       </button>
                     )}
                   </div>
@@ -743,20 +726,19 @@ const textDetailsStyle = { display: "flex", flexDirection: "column", gap: "4px",
 const usernameRowStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: "8px" };
 const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#fff", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 const followBtnStyle = {
-  background: "var(--primary-color, #ff3b30)",
-  color: "#ffffff",
+  background: "#ffffff",
+  color: "#000000",
   border: "none",
   borderRadius: "16px",
-  padding: "4px 12px",
+  padding: "4px 14px",
   fontSize: "12px",
-  fontWeight: "700",
+  fontWeight: "800",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: "5px",
   flexShrink: 0,
-  boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
   transition: "all 0.2s ease"
 };
 const captionStyle = { fontSize: "14px", color: "#e7e9ea", lineHeight: "1.4", wordWrap: "break-word", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
