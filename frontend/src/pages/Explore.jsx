@@ -48,23 +48,39 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 
   const handleCarouselScroll = (e) => {
     const track = e.currentTarget;
-    if (track) {
-      const width = track.clientWidth || 1;
-      const newIndex = Math.round(track.scrollLeft / width);
-      if (newIndex !== activeSlide && newIndex >= 0 && newIndex < albumVideos.length) {
-        setActiveSlide(newIndex);
+    if (track && track.children) {
+      const scrollLeft = track.scrollLeft;
+      let closestIdx = 0;
+      let minDiff = Infinity;
+      for (let i = 0; i < track.children.length; i++) {
+        const child = track.children[i];
+        const diff = Math.abs(child.offsetLeft - track.offsetLeft - scrollLeft);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIdx = i;
+        }
+      }
+      if (closestIdx !== activeSlide) {
+        setActiveSlide(closestIdx);
       }
     }
   };
 
   const scrollToSlide = (index) => {
-    if (!carouselRef.current) return;
+    if (!carouselRef.current || !carouselRef.current.children) return;
     const target = Math.max(0, Math.min(albumVideos.length - 1, index));
-    carouselRef.current.scrollTo({
-      left: target * carouselRef.current.clientWidth,
-      behavior: "smooth"
-    });
-    setActiveSlide(target);
+    const child = carouselRef.current.children[target];
+    if (child) {
+      carouselRef.current.scrollTo({
+        left: child.offsetLeft - carouselRef.current.offsetLeft,
+        behavior: "smooth"
+      });
+      setActiveSlide(target);
+    }
+  };
+
+  const scrollByCards = (direction) => {
+    scrollToSlide(activeSlide + direction);
   };
 
   const containerRef = useRef(null);
@@ -315,31 +331,47 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 
         <p style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</p>
 
-        {/* 🟢 Album Carousel or Single Video Container */}
+        {/* 🟢 Album: Separate videos with clear boundaries, aligned horizontally and swipable */}
         {isAlbum && albumVideos.length > 1 ? (
-          <div 
-            ref={containerRef}
-            style={{ ...videoContainerStyle, width: isPortrait ? "75%" : "100%", position: "relative" }}
-          >
-            {/* Swipable Carousel Track */}
+          <div ref={containerRef} style={albumWrapperStyle}>
+            {/* Desktop Nav Arrows (Left / Right) */}
+            {activeSlide > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  scrollByCards(-1);
+                }}
+                style={{ ...carouselNavBtnStyle, left: "6px" }}
+                aria-label="Previous video"
+              >
+                <ChevronLeft size={18} color="#fff" />
+              </button>
+            )}
+
+            {activeSlide < albumVideos.length - 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  scrollByCards(1);
+                }}
+                style={{ ...carouselNavBtnStyle, right: "6px" }}
+                aria-label="Next video"
+              >
+                <ChevronRight size={18} color="#fff" />
+              </button>
+            )}
+
+            {/* Horizontal Swipable Track of Separate Videos */}
             <div
               ref={carouselRef}
               onScroll={handleCarouselScroll}
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                overflowX: "auto",
-                scrollSnapType: "x mandatory",
-                WebkitOverflowScrolling: "touch",
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-                width: "100%",
-                maxHeight: "600px"
-              }}
+              style={albumRowTrackStyle}
             >
               {albumVideos.map((item, idx) => (
                 <div
-                  key={item.message_id || idx}
+                  key={item.message_id || item.id || idx}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!isUnlocked) {
@@ -354,24 +386,13 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
                     }
                     onVideoClick({ ...item, video_url: idx === 0 ? videoUrl : null });
                   }}
-                  style={{
-                    flex: "0 0 100%",
-                    width: "100%",
-                    position: "relative",
-                    scrollSnapAlign: "start",
-                    scrollSnapStop: "always",
-                    maxHeight: "600px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "#000",
-                    cursor: "pointer"
-                  }}
+                  style={albumVideoCardStyle}
                 >
+                  {/* Thumbnail / Video */}
                   {idx === 0 && videoUrl && isUnlocked ? (
                     <video 
                       ref={videoRef} 
-                      style={thumbnailImgStyle} 
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} 
                       muted 
                       loop 
                       playsInline 
@@ -382,83 +403,73 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
                   ) : (
                     <img 
                       src={item.thumbnail_url} 
-                      alt="thumbnail" 
-                      style={thumbnailImgStyle} 
+                      alt={`Video ${idx + 1}`} 
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} 
                       loading="lazy" 
                       onLoad={handleMediaLoad} 
                     />
                   )}
 
+                  {/* VIP Badge on Top Left (transparent gray shade, no icon) */}
+                  {isPremium && (
+                    <div style={vipBadgePillStyle}>
+                      <span>VIP</span>
+                    </div>
+                  )}
+
+                  {/* Clip index counter on Top Right */}
+                  <div style={albumCardCounterStyle}>
+                    {idx + 1} / {albumVideos.length}
+                  </div>
+
+                  {/* Unlocked Play Icon Overlay */}
                   {isUnlocked && (!isPlaying || idx !== 0 || isAnyModalOpen) && (
                     <div style={playOverlayStyle}>
                       <Play size={24} fill="#fff" strokeWidth={0} />
+                    </div>
+                  )}
+
+                  {/* Locked Overlay (Unblurred with Gold Lock Badge) */}
+                  {!isUnlocked && (
+                    <div style={albumLockedCardOverlayStyle}>
+                      <div style={albumLockCircleStyle}>
+                        <Lock size={20} color="#FFD700" />
+                      </div>
+                      <span style={{ color: "#fff", fontSize: "11px", fontWeight: "800", marginTop: "6px", letterSpacing: "0.5px" }}>
+                        Locked
+                      </span>
                     </div>
                   )}
                 </div>
               ))}
             </div>
 
-            {/* VIP Tag on Top Left (transparent gray shade, no icon) */}
-            {isPremium && (
-              <div style={vipBadgePillStyle}>
-                <span>VIP</span>
-              </div>
-            )}
-
-            {/* Twitter/X Counter Badge on Top Right: e.g. "1 / 4" */}
-            <div style={albumCounterBadgeStyle}>
-              {activeSlide + 1} / {albumVideos.length}
-            </div>
-
-            {/* Desktop Nav Arrows (Left / Right) */}
-            {activeSlide > 0 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  scrollToSlide(activeSlide - 1);
-                }}
-                style={{ ...carouselNavBtnStyle, left: "10px" }}
-                aria-label="Previous slide"
-              >
-                <ChevronLeft size={20} color="#fff" />
-              </button>
-            )}
-
-            {activeSlide < albumVideos.length - 1 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  scrollToSlide(activeSlide + 1);
-                }}
-                style={{ ...carouselNavBtnStyle, right: "10px" }}
-                aria-label="Next slide"
-              >
-                <ChevronRight size={20} color="#fff" />
-              </button>
-            )}
-
-            {/* Twitter-style Dots Indicator at Bottom */}
-            <div style={carouselDotsContainerStyle}>
+            {/* Indicator Dots Below Row */}
+            <div style={albumDotsContainerStyle}>
               {albumVideos.map((_, dotIdx) => (
                 <div
                   key={dotIdx}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    scrollToSlide(dotIdx);
+                  }}
                   style={{
                     width: dotIdx === activeSlide ? "16px" : "6px",
                     height: "6px",
                     borderRadius: "3px",
-                    background: dotIdx === activeSlide ? "#ffffff" : "rgba(255, 255, 255, 0.4)",
+                    background: dotIdx === activeSlide ? "#ffffff" : "rgba(255, 255, 255, 0.3)",
+                    cursor: "pointer",
                     transition: "all 0.2s ease"
                   }}
                 />
               ))}
             </div>
 
-            {/* Locked VIP Overlay (Unblurred!) */}
+            {/* If Locked: Actionable subscribe button below row */}
             {!isUnlocked && (
-              <div 
-                style={vipLockedOverlayStyle}
+              <button
+                type="button"
+                style={albumSubscribeBarBtnStyle}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (onCreatorClick) {
@@ -470,31 +481,9 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
                   }
                 }}
               >
-                <div style={vipLockCenterStyle}>
-                  <div style={vipLockCircleStyle}>
-                    <Lock size={24} color="#FFD700" />
-                  </div>
-                  <div style={{ color: "#fff", fontSize: "13px", fontWeight: "800", textAlign: "center" }}>
-                    Locked Premium Album ({albumVideos.length} clips)
-                  </div>
-                  <button
-                    type="button"
-                    style={vipSubscribeButtonStyle}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (onCreatorClick) {
-                        onCreatorClick(creatorHandle, { autoSubscribe: true });
-                      } else {
-                        window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
-                          detail: { username: creatorHandle, autoSubscribe: true } 
-                        }));
-                      }
-                    }}
-                  >
-                    <span>Subscribe to @{creatorHandle}</span>
-                  </button>
-                </div>
-              </div>
+                <Lock size={14} color="#FFD700" />
+                <span>Subscribe to @{creatorHandle} to unlock all {albumVideos.length} videos</span>
+              </button>
             )}
           </div>
         ) : (
@@ -1174,20 +1163,109 @@ const vipUnlockedBadgeStyle = {
   boxShadow: "0 2px 8px rgba(0,0,0,0.3)"
 };
 
-const albumCounterBadgeStyle = {
+const albumWrapperStyle = {
+  position: "relative",
+  width: "100%",
+  margin: "4px 0 8px 0"
+};
+
+const albumRowTrackStyle = {
+  display: "flex",
+  flexDirection: "row",
+  gap: "12px",
+  overflowX: "auto",
+  overflowY: "hidden",
+  scrollSnapType: "x mandatory",
+  WebkitOverflowScrolling: "touch",
+  scrollbarWidth: "none",
+  msOverflowStyle: "none",
+  padding: "4px 2px 8px 2px",
+  width: "100%"
+};
+
+const albumVideoCardStyle = {
+  flex: "0 0 min(260px, 80%)",
+  width: "min(260px, 80%)",
+  height: "360px",
+  borderRadius: "16px",
+  overflow: "hidden",
+  position: "relative",
+  background: "#0e0e0e",
+  border: "1.5px solid rgba(255, 255, 255, 0.16)",
+  boxShadow: "0 4px 16px rgba(0, 0, 0, 0.45)",
+  scrollSnapAlign: "start",
+  scrollSnapStop: "normal",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0
+};
+
+const albumCardCounterStyle = {
   position: "absolute",
-  top: "12px",
-  right: "12px",
-  background: "rgba(0, 0, 0, 0.6)",
+  top: "10px",
+  right: "10px",
+  background: "rgba(0, 0, 0, 0.65)",
   color: "#fff",
-  fontSize: "11px",
+  fontSize: "10.5px",
   fontWeight: "700",
   padding: "3px 8px",
-  borderRadius: "12px",
+  borderRadius: "10px",
   letterSpacing: "0.5px",
   zIndex: 11,
   pointerEvents: "none",
-  border: "1px solid rgba(255, 255, 255, 0.15)"
+  border: "1px solid rgba(255, 255, 255, 0.16)"
+};
+
+const albumLockedCardOverlayStyle = {
+  position: "absolute",
+  inset: 0,
+  background: "rgba(0, 0, 0, 0.38)",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 10,
+  pointerEvents: "none"
+};
+
+const albumLockCircleStyle = {
+  width: "46px",
+  height: "46px",
+  borderRadius: "50%",
+  background: "rgba(0, 0, 0, 0.65)",
+  border: "1.5px solid rgba(255, 215, 0, 0.45)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxShadow: "0 4px 14px rgba(0, 0, 0, 0.5)"
+};
+
+const albumSubscribeBarBtnStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  width: "100%",
+  marginTop: "10px",
+  padding: "10px 16px",
+  borderRadius: "24px",
+  background: "rgba(255, 215, 0, 0.12)",
+  border: "1px solid rgba(255, 215, 0, 0.35)",
+  color: "#FFD700",
+  fontSize: "13px",
+  fontWeight: "700",
+  cursor: "pointer",
+  transition: "background 0.2s ease"
+};
+
+const albumDotsContainerStyle = {
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  gap: "6px",
+  marginTop: "8px"
 };
 
 const carouselNavBtnStyle = {
@@ -1197,27 +1275,13 @@ const carouselNavBtnStyle = {
   width: "32px",
   height: "32px",
   borderRadius: "50%",
-  background: "rgba(0, 0, 0, 0.65)",
-  border: "1px solid rgba(255, 255, 255, 0.2)",
+  background: "rgba(0, 0, 0, 0.75)",
+  border: "1px solid rgba(255, 255, 255, 0.25)",
   color: "#fff",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   cursor: "pointer",
-  zIndex: 12
-};
-
-const carouselDotsContainerStyle = {
-  position: "absolute",
-  bottom: "10px",
-  left: "50%",
-  transform: "translateX(-50%)",
-  display: "flex",
-  alignItems: "center",
-  gap: "5px",
-  zIndex: 11,
-  pointerEvents: "none",
-  background: "rgba(0, 0, 0, 0.35)",
-  padding: "4px 8px",
-  borderRadius: "10px"
+  zIndex: 15,
+  boxShadow: "0 2px 8px rgba(0,0,0,0.5)"
 };
