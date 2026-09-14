@@ -692,7 +692,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       followCount = Number(followRes.rows[0]?.count || 0);
     } catch (e) {}
 
-    const totalFollowers = followCount > 0 ? followCount : baseFans;
+    const totalFollowers = followCount;
 
     // 4. Determine if requesting user is following & subscribed
     let isFollowing = false;
