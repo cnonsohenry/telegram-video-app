@@ -554,7 +554,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
                username, display_name, email, is_creator, is_managed, 
                telegram_user_id, creator_category, subscription_price, is_verified, 
                banner_url, creator_bio, avatar_url
-             ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15000, TRUE, 
+             ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15, TRUE, 
                'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
                'Official creator channel. Catch all exclusive drops and daily previews here.',
                $5

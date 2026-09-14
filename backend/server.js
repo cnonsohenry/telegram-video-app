@@ -294,9 +294,8 @@ async function initDatabase() {
       // Auto-sync Telegram uploaders as managed creators in app_users
       try {
         await syncTelegramCreators(pool);
-        await migrateLegacyVipToCreator(pool);
       } catch (sErr) {
-        console.warn("⚠️ [STARTUP] Telegram creators / VIP sync notice:", sErr.message);
+        console.warn("⚠️ [STARTUP] Telegram creators sync notice:", sErr.message);
       }
       break;
     } catch (err) {
@@ -891,10 +890,14 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
   }
 
   const isPremium = v.category === "premium";
+  const isWebUpload = v.chat_id === "internal" || (v.cloudflare_id && v.cloudflare_id.startsWith("r2:"));
   let uploaderName = v.uploader_name;
   let uploaderHandle = v.uploader_handle;
 
-  if (isPremium) {
+  // Only fallback to @naijahomemade for legacy Telegram VIP videos or videos explicitly belonging to 1881815190
+  const isLegacyOrNaijaHomemade = String(v.uploader_id) === "1881815190" || (!isWebUpload && (!v.uploader_id || String(v.uploader_id) === "0"));
+
+  if (isPremium && isLegacyOrNaijaHomemade) {
     if (!uploaderHandle || uploaderHandle === "creator" || uploaderHandle === "Member") {
       uploaderHandle = "naijahomemade";
     }
@@ -1462,6 +1465,19 @@ app.get("/api/avatar", async (req, res) => {
     // Prevent bad requests from breaking the image
     if (!user_id || user_id === 'undefined' || user_id === 'null') {
       return res.redirect('/assets/default-avatar.png');
+    }
+
+    // Check if user exists in app_users and has a custom avatar_url
+    try {
+      const userRes = await pool.query(
+        "SELECT avatar_url FROM app_users WHERE id = $1::BIGINT OR telegram_user_id = $1::BIGINT LIMIT 1",
+        [user_id]
+      );
+      if (userRes.rows.length > 0 && userRes.rows[0].avatar_url && !userRes.rows[0].avatar_url.includes('/api/avatar')) {
+        return res.redirect(userRes.rows[0].avatar_url);
+      }
+    } catch (dbErr) {
+      // Ignore DB error and proceed to Telegram photo lookup
     }
 
     const photosRes = await axios.get(`${TELEGRAM_API}/getUserProfilePhotos`, {
