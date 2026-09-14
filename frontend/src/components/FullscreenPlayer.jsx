@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from "react";
 import { 
   X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, 
   Share2, Download, Check, Heart, MessageCircle, Bookmark, 
-  Volume2, VolumeX, MoreVertical, Edit2, Trash2, RotateCw 
+  Volume2, VolumeX, MoreVertical, Edit2, Trash2, RotateCw,
+  UserPlus
 } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
+import { getVideoCreatorHandle } from "../utils/subscription";
 
 export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick, onCreatorClick }) {
   const videoRef = useRef(null);
@@ -45,6 +47,30 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const [sharesCount, setSharesCount] = useState(Number(video.shares_count || 0));
   const [commentsCount, setCommentsCount] = useState(Number(video.comments_count || 0));
 
+  // Creator & Follow States
+  const creatorHandle = getVideoCreatorHandle(video);
+  const uploaderId = video.uploader_id ? String(video.uploader_id) : null;
+
+  const isOwner = Boolean(currentUser && (
+    (currentUser.username && currentUser.username.toLowerCase().replace(/^@/, "").trim() === creatorHandle.toLowerCase()) ||
+    (uploaderId && (String(currentUser.id) === uploaderId || (currentUser.telegram_user_id && String(currentUser.telegram_user_id) === uploaderId)))
+  ));
+
+  const isUserFollowing = Boolean(
+    currentUser && Array.isArray(currentUser.subscriptions) && currentUser.subscriptions.some(sub => {
+      if (sub.creator_username && sub.creator_username.toLowerCase().replace(/^@/, "").trim() === creatorHandle.toLowerCase()) return true;
+      if (uploaderId && (String(sub.creator_id) === uploaderId || (sub.telegram_user_id && String(sub.telegram_user_id) === uploaderId))) return true;
+      return false;
+    })
+  );
+
+  const [isFollowing, setIsFollowing] = useState(isUserFollowing);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+
+  useEffect(() => {
+    setIsFollowing(isUserFollowing);
+  }, [isUserFollowing, video.message_id]);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -56,6 +82,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     .then(data => {
       if (data.isLiked) setIsLiked(true);
       if (data.isSaved) setIsSaved(true);
+      if (data.isFollowing) setIsFollowing(true);
     })
     .catch(err => console.error("Failed to fetch interaction state", err));
 
@@ -65,6 +92,62 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       setCanModify(false);
     }
   }, [video.message_id, video.uploader_id, currentUser]);
+
+  const handleFollowClick = async (e) => {
+    e?.stopPropagation?.();
+    const token = localStorage.getItem("token");
+    if (!token || !currentUser) {
+      alert("Please log in to follow creators");
+      return;
+    }
+
+    setIsFollowLoading(true);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorHandle)}/subscribe`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+
+      if (res.status === 402 || data.requires_payment) {
+        if (videoRef.current) {
+          videoRef.current.pause();
+          setIsPlaying(false);
+        }
+        if (onCreatorClick) {
+          onCreatorClick(creatorHandle, { autoSubscribe: true });
+        }
+        return;
+      }
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to follow creator");
+      }
+
+      setIsFollowing(Boolean(data.subscribed));
+      window.dispatchEvent(new CustomEvent("refreshUser"));
+    } catch (err) {
+      console.error("Follow error:", err);
+      alert(err.message || "Failed to follow creator");
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
+
+  const handleCreatorClick = (e) => {
+    e?.stopPropagation?.();
+    if (videoRef.current) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+    if (onCreatorClick) {
+      onCreatorClick(creatorHandle);
+    }
+  };
 
   useEffect(() => {
     setIsLoading(true);
@@ -472,31 +555,41 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 </button>
             </div>
 
-            {/* Middle Row: Avatar, Name, and Caption */}
+            {/* Middle Row: Avatar, Name, Follow button, and Caption */}
             <div style={postInfoStyle}>
                <img 
                   src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
                   alt="avatar"
                   onError={(e) => { e.target.src = '/assets/default-avatar.png'; }}
-                  style={{ ...avatarStyle, cursor: onCreatorClick && video.uploader_name ? "pointer" : "default" }}
-                  onClick={(e) => {
-                    if (onCreatorClick && video.uploader_name) {
-                      e.stopPropagation();
-                      onCreatorClick(video.uploader_name);
-                    }
-                  }}
+                  style={{ ...avatarStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+                  onClick={handleCreatorClick}
                 />
                <div style={textDetailsStyle}>
-                  <div 
-                    style={{ ...usernameStyle, cursor: onCreatorClick && video.uploader_name ? "pointer" : "default" }}
-                    onClick={(e) => {
-                      if (onCreatorClick && video.uploader_name) {
-                        e.stopPropagation();
-                        onCreatorClick(video.uploader_name);
-                      }
-                    }}
-                  >
-                    @{video.uploader_name || "Member"}
+                  <div style={usernameRowStyle}>
+                    <div 
+                      style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+                      onClick={handleCreatorClick}
+                    >
+                      @{creatorHandle}
+                    </div>
+
+                    {!isFollowing && !isOwner && (
+                      <button
+                        onClick={handleFollowClick}
+                        disabled={isFollowLoading}
+                        style={followBtnStyle}
+                        title={`Follow @${creatorHandle}`}
+                      >
+                        {isFollowLoading ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <>
+                            <UserPlus size={13} />
+                            <span>Follow</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                   <div style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</div>
                </div>
@@ -644,10 +737,28 @@ const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area
 const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "8px" };
 const floatingBtnStyle = { background: "rgba(0,0,0,0.6)", border: "none", color: "#fff", width: "40px", height: "40px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)", cursor: "pointer" };
 
-const postInfoStyle = { display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "12px" };
+const postInfoStyle = { display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "12px", width: "100%" };
 const avatarStyle = { width: "42px", height: "42px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(255,255,255,0.2)", flexShrink: 0 };
-const textDetailsStyle = { display: "flex", flexDirection: "column", gap: "4px", overflow: "hidden" };
-const usernameStyle = { fontSize: "16px", fontWeight: "700", color: "#fff", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
+const textDetailsStyle = { display: "flex", flexDirection: "column", gap: "4px", overflow: "hidden", flex: 1, minWidth: 0 };
+const usernameRowStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: "8px" };
+const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#fff", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+const followBtnStyle = {
+  background: "var(--primary-color, #ff3b30)",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "16px",
+  padding: "4px 12px",
+  fontSize: "12px",
+  fontWeight: "700",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "5px",
+  flexShrink: 0,
+  boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+  transition: "all 0.2s ease"
+};
 const captionStyle = { fontSize: "14px", color: "#e7e9ea", lineHeight: "1.4", wordWrap: "break-word", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
 
 const controlBarContainer = { display: "flex", alignItems: "center", gap: "12px", width: "100%", marginBottom: "16px" };

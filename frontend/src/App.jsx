@@ -49,6 +49,7 @@ export default function App() {
     return params.get("creator") || null;
   });
   const [creatorAutoSubscribe, setCreatorAutoSubscribe] = useState(false);
+  const [isCreatorOverVideo, setIsCreatorOverVideo] = useState(false);
 
   // 🟢 THE FIX: App Height Lock Architecture
   const windowWidth = useRef(window.innerWidth);
@@ -247,6 +248,7 @@ export default function App() {
 
       // 5. If creator profile was open and state no longer has creatorProfile, close creator modal
       if (viewingCreatorRef.current && !state.creatorProfile) {
+        setIsCreatorOverVideo(false);
         viewingCreatorRef.current = null;
         setViewingCreator(null);
         return;
@@ -319,6 +321,10 @@ export default function App() {
     const username = typeof target === 'string' ? target : (target.username || target.creatorUsername);
     if (!username) return;
 
+    if (activeVideoRef.current) {
+      setIsCreatorOverVideo(true);
+    }
+
     const autoSub = Boolean(options.autoSubscribe || target.autoSubscribe);
     setCreatorAutoSubscribe(autoSub);
     setViewingCreator(username);
@@ -332,6 +338,7 @@ export default function App() {
   }, []);
 
   const handleCloseCreator = useCallback(() => {
+    setIsCreatorOverVideo(false);
     viewingCreatorRef.current = null;
     setViewingCreator(null);
     setCreatorAutoSubscribe(false);
@@ -616,6 +623,7 @@ export default function App() {
   const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo && (activeTab !== "profile" || isLoggedIn);
 
   const handleOpenVideo = async (video) => {
+    setIsCreatorOverVideo(false);
     try {
       if (video.category === "premium" || video.is_premium) {
         const hasAccess = isUserSubscribedToCreator(user, video);
@@ -798,7 +806,7 @@ export default function App() {
       )}
 
       {activeVideo && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 999999, background: "#000" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: isCreatorOverVideo ? 999990 : 1000020, background: "#000" }}>
           <FullscreenPlayer 
             video={activeVideo}
             currentUser={user} 

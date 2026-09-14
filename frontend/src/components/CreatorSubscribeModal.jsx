@@ -351,7 +351,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
 const fullscreenContainerStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 100002,
+  zIndex: 1000030,
   backgroundColor: "#000000",
   display: "flex",
   flexDirection: "column",

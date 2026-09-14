@@ -1172,9 +1172,30 @@ app.get("/api/interactions/state/:message_id", authenticateToken, async (req, re
     const likeRes = await pool.query("SELECT 1 FROM likes WHERE user_id=$1 AND message_id=$2", [user_id, message_id]);
     const saveRes = await pool.query("SELECT 1 FROM saves WHERE user_id=$1 AND message_id=$2", [user_id, message_id]);
     
+    let isFollowing = false;
+    const videoRes = await pool.query("SELECT uploader_id FROM videos WHERE message_id = $1 LIMIT 1", [message_id]);
+    if (videoRes.rows.length > 0 && videoRes.rows[0].uploader_id) {
+      const uploaderId = videoRes.rows[0].uploader_id;
+      const followRes = await pool.query(
+        `SELECT 1 FROM creator_subscriptions cs
+         WHERE cs.subscriber_id = $1 
+           AND (
+             cs.creator_id = $2 
+             OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2)
+             OR cs.creator_id IN (SELECT id FROM app_users WHERE id = $2)
+           )
+           AND cs.status = 'active'
+           AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
+         LIMIT 1`,
+        [user_id, uploaderId]
+      );
+      isFollowing = followRes.rows.length > 0;
+    }
+
     res.json({
       isLiked: likeRes.rows.length > 0,
-      isSaved: saveRes.rows.length > 0
+      isSaved: saveRes.rows.length > 0,
+      isFollowing: isFollowing
     });
   } catch (err) {
     res.status(500).json({ error: "State fetch failed" });

@@ -134,7 +134,7 @@ export default function CommentSectionModal({ video, onClose }) {
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 
 const commentBackdropStyle = {
-  position: "fixed", inset: 0, zIndex: 999999,
+  position: "fixed", inset: 0, zIndex: 1000025,
   background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
   display: "flex", flexDirection: "column", justifyContent: "flex-end",
   animation: "fadeIn 0.2s ease"
