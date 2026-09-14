@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, Sparkles, Lock } from "lucide-react";
+import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, Sparkles, Lock, ChevronLeft, ChevronRight } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
 import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
@@ -26,6 +26,47 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   const isUnlocked = !isPremium || isUserSubscribedToCreator(user, video);
   const creatorHandle = getVideoCreatorHandle(video);
   
+  const isAlbum = Boolean(video.is_group);
+  const [albumVideos, setAlbumVideos] = useState(() => (isAlbum ? [video] : []));
+  const [activeSlide, setActiveSlide] = useState(0);
+  const carouselRef = useRef(null);
+
+  useEffect(() => {
+    if (isAlbum && video.media_group_id && video.media_group_id !== 'none') {
+      let isMounted = true;
+      fetch(`${APP_CONFIG.apiUrl}/api/group?media_group_id=${video.media_group_id}`)
+        .then(res => res.ok ? res.json() : [])
+        .then(groupItems => {
+          if (isMounted && Array.isArray(groupItems) && groupItems.length > 0) {
+            setAlbumVideos(groupItems);
+          }
+        })
+        .catch(err => console.error("Failed to load album videos in Explore", err));
+      return () => { isMounted = false; };
+    }
+  }, [isAlbum, video.media_group_id]);
+
+  const handleCarouselScroll = (e) => {
+    const track = e.currentTarget;
+    if (track) {
+      const width = track.clientWidth || 1;
+      const newIndex = Math.round(track.scrollLeft / width);
+      if (newIndex !== activeSlide && newIndex >= 0 && newIndex < albumVideos.length) {
+        setActiveSlide(newIndex);
+      }
+    }
+  };
+
+  const scrollToSlide = (index) => {
+    if (!carouselRef.current) return;
+    const target = Math.max(0, Math.min(albumVideos.length - 1, index));
+    carouselRef.current.scrollTo({
+      left: target * carouselRef.current.clientWidth,
+      behavior: "smooth"
+    });
+    setActiveSlide(target);
+  };
+
   const containerRef = useRef(null);
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -274,95 +315,276 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 
         <p style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</p>
 
-        {/* 🟢 FIX: Conditionally apply 75% or 100% width based on the isPortrait state */}
-        <div 
-          ref={containerRef} 
-          style={{ ...videoContainerStyle, width: isPortrait ? "75%" : "100%" }} 
-          onClick={() => {
-            if (!isUnlocked) {
-              if (onCreatorClick) {
-                onCreatorClick(creatorHandle, { autoSubscribe: true });
-              } else {
-                window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
-                  detail: { username: creatorHandle, autoSubscribe: true } 
-                }));
-              }
-              return;
-            }
-            onVideoClick({ ...video, video_url: videoUrl });
-          }}
-        >
-          {videoUrl && isUnlocked ? (
-            <video 
-              ref={videoRef} 
-              style={thumbnailImgStyle} 
-              muted 
-              loop 
-              playsInline 
-              poster={video.thumbnail_url} 
-              preload="metadata" 
-              onLoadedMetadata={handleMediaLoad} 
-            />
-          ) : (
-            <img 
-              src={video.thumbnail_url} 
-              alt="thumbnail" 
-              style={thumbnailImgStyle} 
-              loading="lazy" 
-              onLoad={handleMediaLoad} 
-            />
-          )}
-
-          {!isUnlocked ? (
-            <div style={vipLockedOverlayStyle}>
-              <div style={vipBadgePillStyle}>
-                <Sparkles size={11} fill="#000" color="#000" />
-                <span>VIP EXCLUSIVE</span>
-              </div>
-              <div style={vipLockCenterStyle}>
-                <div style={vipLockCircleStyle}>
-                  <Lock size={24} color="#FFD700" />
-                </div>
-                <div style={{ color: "#fff", fontSize: "13px", fontWeight: "800", textAlign: "center" }}>
-                  Locked Premium Release
-                </div>
-                <button
-                  type="button"
-                  style={vipSubscribeButtonStyle}
+        {/* 🟢 Album Carousel or Single Video Container */}
+        {isAlbum && albumVideos.length > 1 ? (
+          <div 
+            ref={containerRef}
+            style={{ ...videoContainerStyle, width: isPortrait ? "75%" : "100%", position: "relative" }}
+          >
+            {/* Swipable Carousel Track */}
+            <div
+              ref={carouselRef}
+              onScroll={handleCarouselScroll}
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                overflowX: "auto",
+                scrollSnapType: "x mandatory",
+                WebkitOverflowScrolling: "touch",
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+                width: "100%",
+                maxHeight: "600px"
+              }}
+            >
+              {albumVideos.map((item, idx) => (
+                <div
+                  key={item.message_id || idx}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (onCreatorClick) {
-                      onCreatorClick(creatorHandle, { autoSubscribe: true });
-                    } else {
-                      window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
-                        detail: { username: creatorHandle, autoSubscribe: true } 
-                      }));
+                    if (!isUnlocked) {
+                      if (onCreatorClick) {
+                        onCreatorClick(creatorHandle, { autoSubscribe: true });
+                      } else {
+                        window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+                          detail: { username: creatorHandle, autoSubscribe: true } 
+                        }));
+                      }
+                      return;
                     }
+                    onVideoClick({ ...item, video_url: idx === 0 ? videoUrl : null });
+                  }}
+                  style={{
+                    flex: "0 0 100%",
+                    width: "100%",
+                    position: "relative",
+                    scrollSnapAlign: "start",
+                    scrollSnapStop: "always",
+                    maxHeight: "600px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#000",
+                    cursor: "pointer"
                   }}
                 >
-                  <Sparkles size={13} fill="#000" color="#000" />
-                  <span>Subscribe to @{creatorHandle}</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {(!isPlaying || isAnyModalOpen) && (
-                <div style={playOverlayStyle}>
-                  <Play size={24} fill="#fff" strokeWidth={0} />
-                </div>
-              )}
-              {isPremium && (
-                <div style={vipUnlockedBadgeStyle}>
-                  <Sparkles size={11} fill="#FFD700" color="#FFD700" />
-                  <span>VIP Unlocked</span>
-                </div>
-              )}
-            </>
-          )}
+                  {idx === 0 && videoUrl && isUnlocked ? (
+                    <video 
+                      ref={videoRef} 
+                      style={thumbnailImgStyle} 
+                      muted 
+                      loop 
+                      playsInline 
+                      poster={item.thumbnail_url} 
+                      preload="metadata" 
+                      onLoadedMetadata={handleMediaLoad} 
+                    />
+                  ) : (
+                    <img 
+                      src={item.thumbnail_url} 
+                      alt="thumbnail" 
+                      style={thumbnailImgStyle} 
+                      loading="lazy" 
+                      onLoad={handleMediaLoad} 
+                    />
+                  )}
 
-          {video.is_group && <div style={groupBadgeStyle}>Album</div>}
-        </div>
+                  {isUnlocked && (!isPlaying || idx !== 0 || isAnyModalOpen) && (
+                    <div style={playOverlayStyle}>
+                      <Play size={24} fill="#fff" strokeWidth={0} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* VIP Tag on Top Left (transparent gray shade, no icon) */}
+            {isPremium && (
+              <div style={vipBadgePillStyle}>
+                <span>VIP</span>
+              </div>
+            )}
+
+            {/* Twitter/X Counter Badge on Top Right: e.g. "1 / 4" */}
+            <div style={albumCounterBadgeStyle}>
+              {activeSlide + 1} / {albumVideos.length}
+            </div>
+
+            {/* Desktop Nav Arrows (Left / Right) */}
+            {activeSlide > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  scrollToSlide(activeSlide - 1);
+                }}
+                style={{ ...carouselNavBtnStyle, left: "10px" }}
+                aria-label="Previous slide"
+              >
+                <ChevronLeft size={20} color="#fff" />
+              </button>
+            )}
+
+            {activeSlide < albumVideos.length - 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  scrollToSlide(activeSlide + 1);
+                }}
+                style={{ ...carouselNavBtnStyle, right: "10px" }}
+                aria-label="Next slide"
+              >
+                <ChevronRight size={20} color="#fff" />
+              </button>
+            )}
+
+            {/* Twitter-style Dots Indicator at Bottom */}
+            <div style={carouselDotsContainerStyle}>
+              {albumVideos.map((_, dotIdx) => (
+                <div
+                  key={dotIdx}
+                  style={{
+                    width: dotIdx === activeSlide ? "16px" : "6px",
+                    height: "6px",
+                    borderRadius: "3px",
+                    background: dotIdx === activeSlide ? "#ffffff" : "rgba(255, 255, 255, 0.4)",
+                    transition: "all 0.2s ease"
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Locked VIP Overlay (Unblurred!) */}
+            {!isUnlocked && (
+              <div 
+                style={vipLockedOverlayStyle}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onCreatorClick) {
+                    onCreatorClick(creatorHandle, { autoSubscribe: true });
+                  } else {
+                    window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+                      detail: { username: creatorHandle, autoSubscribe: true } 
+                    }));
+                  }
+                }}
+              >
+                <div style={vipLockCenterStyle}>
+                  <div style={vipLockCircleStyle}>
+                    <Lock size={24} color="#FFD700" />
+                  </div>
+                  <div style={{ color: "#fff", fontSize: "13px", fontWeight: "800", textAlign: "center" }}>
+                    Locked Premium Album ({albumVideos.length} clips)
+                  </div>
+                  <button
+                    type="button"
+                    style={vipSubscribeButtonStyle}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onCreatorClick) {
+                        onCreatorClick(creatorHandle, { autoSubscribe: true });
+                      } else {
+                        window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+                          detail: { username: creatorHandle, autoSubscribe: true } 
+                        }));
+                      }
+                    }}
+                  >
+                    <span>Subscribe to @{creatorHandle}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Standard Single Video Post */
+          <div 
+            ref={containerRef} 
+            style={{ ...videoContainerStyle, width: isPortrait ? "75%" : "100%" }} 
+            onClick={() => {
+              if (!isUnlocked) {
+                if (onCreatorClick) {
+                  onCreatorClick(creatorHandle, { autoSubscribe: true });
+                } else {
+                  window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+                    detail: { username: creatorHandle, autoSubscribe: true } 
+                  }));
+                }
+                return;
+              }
+              onVideoClick({ ...video, video_url: videoUrl });
+            }}
+          >
+            {videoUrl && isUnlocked ? (
+              <video 
+                ref={videoRef} 
+                style={thumbnailImgStyle} 
+                muted 
+                loop 
+                playsInline 
+                poster={video.thumbnail_url} 
+                preload="metadata" 
+                onLoadedMetadata={handleMediaLoad} 
+              />
+            ) : (
+              <img 
+                src={video.thumbnail_url} 
+                alt="thumbnail" 
+                style={thumbnailImgStyle} 
+                loading="lazy" 
+                onLoad={handleMediaLoad} 
+              />
+            )}
+
+            {!isUnlocked ? (
+              <div style={vipLockedOverlayStyle}>
+                <div style={vipBadgePillStyle}>
+                  <span>VIP</span>
+                </div>
+                <div style={vipLockCenterStyle}>
+                  <div style={vipLockCircleStyle}>
+                    <Lock size={24} color="#FFD700" />
+                  </div>
+                  <div style={{ color: "#fff", fontSize: "13px", fontWeight: "800", textAlign: "center" }}>
+                    Locked Premium Release
+                  </div>
+                  <button
+                    type="button"
+                    style={vipSubscribeButtonStyle}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onCreatorClick) {
+                        onCreatorClick(creatorHandle, { autoSubscribe: true });
+                      } else {
+                        window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+                          detail: { username: creatorHandle, autoSubscribe: true } 
+                        }));
+                      }
+                    }}
+                  >
+                    <span>Subscribe to @{creatorHandle}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {(!isPlaying || isAnyModalOpen) && (
+                  <div style={playOverlayStyle}>
+                    <Play size={24} fill="#fff" strokeWidth={0} />
+                  </div>
+                )}
+                {isPremium && (
+                  <div style={vipUnlockedBadgeStyle}>
+                    <span>VIP</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {video.is_group && <div style={groupBadgeStyle}>Album</div>}
+          </div>
+        )}
 
         <div style={actionBarStyle}>
           <div style={actionItemStyle}>
@@ -762,7 +984,7 @@ const videoContainerStyle = { position: "relative", borderRadius: "16px", overfl
 // 🟢 FIX: Let media scale naturally up to 600px tall
 const thumbnailImgStyle = { width: "100%", height: "auto", maxHeight: "600px", objectFit: "cover", display: "block" };
 const playOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.5)", border: "2px solid rgba(255,255,255,0.2)" };
-const groupBadgeStyle = { position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: "12px", fontWeight: "700", padding: "4px 8px", borderRadius: "12px", backdropFilter: "blur(4px)" };
+const groupBadgeStyle = { position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.15)", zIndex: 11 };
 const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "12px", maxWidth: "425px" };
 const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", color: "#71767b", fontSize: "13px", cursor: "pointer", transition: "color 0.2s ease" };
 const skeletonAvatar = { width: "40px", height: "40px", borderRadius: "50%", animation: "skeleton-loading 1.5s infinite" };
@@ -869,9 +1091,7 @@ const vipLockedOverlayStyle = {
   position: "absolute",
   inset: 0,
   zIndex: 10,
-  background: "rgba(0, 0, 0, 0.78)",
-  backdropFilter: "blur(12px)",
-  WebkitBackdropFilter: "blur(12px)",
+  background: "rgba(0, 0, 0, 0.45)",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
@@ -885,17 +1105,18 @@ const vipBadgePillStyle = {
   position: "absolute",
   top: "12px",
   left: "12px",
-  background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
-  color: "#000",
-  padding: "4px 10px",
+  background: "rgba(0, 0, 0, 0.55)",
+  color: "#ffffff",
+  border: "1px solid rgba(255, 255, 255, 0.18)",
+  padding: "3px 8px",
   borderRadius: "6px",
-  fontSize: "10.5px",
-  fontWeight: "900",
+  fontSize: "10px",
+  fontWeight: "800",
   letterSpacing: "0.5px",
   display: "flex",
   alignItems: "center",
-  gap: "5px",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.4)"
+  zIndex: 11,
+  boxShadow: "0 2px 8px rgba(0,0,0,0.3)"
 };
 
 const vipLockCenterStyle = {
@@ -910,12 +1131,12 @@ const vipLockCircleStyle = {
   width: "52px",
   height: "52px",
   borderRadius: "50%",
-  background: "rgba(255, 215, 0, 0.15)",
-  border: "1px solid rgba(255, 215, 0, 0.35)",
+  background: "rgba(0, 0, 0, 0.5)",
+  border: "1px solid rgba(255, 215, 0, 0.4)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  boxShadow: "0 0 24px rgba(255, 215, 0, 0.2)"
+  boxShadow: "0 4px 16px rgba(0, 0, 0, 0.4)"
 };
 
 const vipSubscribeButtonStyle = {
@@ -939,16 +1160,64 @@ const vipUnlockedBadgeStyle = {
   position: "absolute",
   top: "12px",
   left: "12px",
-  background: "rgba(0,0,0,0.65)",
-  backdropFilter: "blur(6px)",
-  border: "1px solid rgba(255, 215, 0, 0.4)",
-  color: "#FFD700",
-  padding: "4px 8px",
+  background: "rgba(0, 0, 0, 0.55)",
+  color: "#ffffff",
+  border: "1px solid rgba(255, 255, 255, 0.18)",
+  padding: "3px 8px",
   borderRadius: "6px",
-  fontSize: "11px",
+  fontSize: "10px",
   fontWeight: "800",
+  letterSpacing: "0.5px",
   display: "flex",
   alignItems: "center",
-  gap: "4px",
-  zIndex: 10
+  zIndex: 11,
+  boxShadow: "0 2px 8px rgba(0,0,0,0.3)"
+};
+
+const albumCounterBadgeStyle = {
+  position: "absolute",
+  top: "12px",
+  right: "12px",
+  background: "rgba(0, 0, 0, 0.6)",
+  color: "#fff",
+  fontSize: "11px",
+  fontWeight: "700",
+  padding: "3px 8px",
+  borderRadius: "12px",
+  letterSpacing: "0.5px",
+  zIndex: 11,
+  pointerEvents: "none",
+  border: "1px solid rgba(255, 255, 255, 0.15)"
+};
+
+const carouselNavBtnStyle = {
+  position: "absolute",
+  top: "50%",
+  transform: "translateY(-50%)",
+  width: "32px",
+  height: "32px",
+  borderRadius: "50%",
+  background: "rgba(0, 0, 0, 0.65)",
+  border: "1px solid rgba(255, 255, 255, 0.2)",
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  zIndex: 12
+};
+
+const carouselDotsContainerStyle = {
+  position: "absolute",
+  bottom: "10px",
+  left: "50%",
+  transform: "translateX(-50%)",
+  display: "flex",
+  alignItems: "center",
+  gap: "5px",
+  zIndex: 11,
+  pointerEvents: "none",
+  background: "rgba(0, 0, 0, 0.35)",
+  padding: "4px 8px",
+  borderRadius: "10px"
 };
