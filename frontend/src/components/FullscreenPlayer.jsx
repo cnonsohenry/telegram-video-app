@@ -3,18 +3,37 @@ import {
   X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, 
   Share2, Download, Check, Heart, MessageCircle, Bookmark, 
   Volume2, VolumeX, MoreVertical, Edit2, Trash2, RotateCw,
-  UserPlus
+  UserPlus, SkipForward, ExternalLink
 } from "lucide-react";
 
-// 🟢 IMPORT YOUR CENTRAL CONFIG
+// 🟢 IMPORT YOUR CENTRAL CONFIG & AD UTILITIES
 import { APP_CONFIG } from "../config";
 import { getVideoCreatorHandle, isUserFollowingCreator } from "../utils/subscription";
+import { shouldPlayVastAd, recordVastAdPlayed, getVastConfig } from "../utils/adManager";
+import { fetchVastAd, sendVastBeacons } from "../utils/vastParser";
 
 export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick, onCreatorClick }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null); 
   const hlsRef = useRef(null);
   
+  // VAST Pre-roll States
+  const [adState, setAdState] = useState(() => shouldPlayVastAd(currentUser) ? "loading" : "finished");
+  const [adData, setAdData] = useState(null);
+  const [adCountdown, setAdCountdown] = useState(5);
+  const [adCanSkip, setAdCanSkip] = useState(false);
+  const [isAdMuted, setIsAdMuted] = useState(false);
+  const [adCurrentTime, setAdCurrentTime] = useState(0);
+  const [adDuration, setAdDuration] = useState(0);
+  const adVideoRef = useRef(null);
+  const adTrackedRef = useRef({
+    start: false,
+    firstQuartile: false,
+    midpoint: false,
+    thirdQuartile: false,
+    complete: false
+  });
+
   // Video States
   const [isPlaying, setIsPlaying] = useState(false); 
   const [isLoading, setIsLoading] = useState(true);
@@ -145,7 +164,155 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     setDuration(0);
     setIsPlaying(false);
     setShowMenu(false); 
-  }, [video.message_id]);
+
+    let isMounted = true;
+
+    if (shouldPlayVastAd(currentUser)) {
+      setAdState("loading");
+      setAdData(null);
+      adTrackedRef.current = {
+        start: false,
+        firstQuartile: false,
+        midpoint: false,
+        thirdQuartile: false,
+        complete: false
+      };
+
+      const { vastTag, skipSeconds } = getVastConfig();
+      fetchVastAd(vastTag)
+        .then((parsedAd) => {
+          if (!isMounted) return;
+          if (parsedAd && parsedAd.mediaUrl) {
+            setAdData(parsedAd);
+            setAdCountdown(parsedAd.skipOffsetSeconds || skipSeconds || 5);
+            setAdCanSkip(false);
+            setAdCurrentTime(0);
+            setAdDuration(parsedAd.durationSeconds || 30);
+            setAdState("playing");
+            recordVastAdPlayed();
+          } else {
+            setAdState("finished");
+          }
+        })
+        .catch((err) => {
+          console.warn("[VAST] Pre-roll fetch failed, skipping ad:", err);
+          if (isMounted) setAdState("finished");
+        });
+    } else {
+      setAdState("finished");
+      setAdData(null);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [video.message_id, currentUser]);
+
+  // Autoplay recovery for Ad Video
+  useEffect(() => {
+    if (adState === "playing" && adVideoRef.current) {
+      const playPromise = adVideoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          if (adVideoRef.current) {
+            adVideoRef.current.muted = true;
+            setIsAdMuted(true);
+            adVideoRef.current.play().catch(() => {});
+          }
+        });
+      }
+    }
+  }, [adState, adData]);
+
+  // VAST Ad Event Handlers
+  const handleAdPlay = () => {
+    if (!adTrackedRef.current.start && adData) {
+      adTrackedRef.current.start = true;
+      sendVastBeacons(adData.impressionUrls);
+      sendVastBeacons(adData.trackingEvents.start);
+    }
+  };
+
+  const handleAdTimeUpdate = () => {
+    const el = adVideoRef.current;
+    if (!el || !adData) return;
+
+    const cur = el.currentTime;
+    const dur = el.duration || adData.durationSeconds || 30;
+    setAdCurrentTime(cur);
+    setAdDuration(dur);
+
+    const skipOffset = adData.skipOffsetSeconds || 5;
+    const remaining = Math.max(0, Math.ceil(skipOffset - cur));
+    setAdCountdown(remaining);
+    if (remaining === 0 && !adCanSkip) {
+      setAdCanSkip(true);
+    }
+
+    if (dur > 0) {
+      const pct = (cur / dur) * 100;
+      if (pct >= 25 && !adTrackedRef.current.firstQuartile) {
+        adTrackedRef.current.firstQuartile = true;
+        sendVastBeacons(adData.trackingEvents.firstQuartile);
+      }
+      if (pct >= 50 && !adTrackedRef.current.midpoint) {
+        adTrackedRef.current.midpoint = true;
+        sendVastBeacons(adData.trackingEvents.midpoint);
+      }
+      if (pct >= 75 && !adTrackedRef.current.thirdQuartile) {
+        adTrackedRef.current.thirdQuartile = true;
+        sendVastBeacons(adData.trackingEvents.thirdQuartile);
+      }
+    }
+  };
+
+  const handleAdEnded = () => {
+    if (adData && !adTrackedRef.current.complete) {
+      adTrackedRef.current.complete = true;
+      sendVastBeacons(adData.trackingEvents.complete);
+    }
+    setAdState("finished");
+  };
+
+  const handleAdSkip = (e) => {
+    e?.stopPropagation?.();
+    if (!adCanSkip) return;
+    if (adData) {
+      sendVastBeacons(adData.trackingEvents.skip);
+    }
+    setAdState("finished");
+  };
+
+  const handleAdClick = (e) => {
+    e?.stopPropagation?.();
+    if (!adData || !adData.clickThroughUrl) return;
+
+    sendVastBeacons(adData.clickTrackingUrls);
+
+    const dest = adData.clickThroughUrl;
+    if (window.Telegram?.WebApp?.openLink) {
+      window.Telegram.WebApp.openLink(dest, { try_instant_view: false });
+    } else {
+      window.open(dest, "_blank");
+    }
+  };
+
+  const handleAdError = () => {
+    if (adData) {
+      sendVastBeacons(adData.errorUrls, { errorCode: 405 });
+    }
+    setAdState("finished");
+  };
+
+  const handleClose = () => {
+    if (adVideoRef.current) {
+      try { adVideoRef.current.pause(); } catch (_) {}
+    }
+    if (videoRef.current) {
+      try { videoRef.current.pause(); } catch (_) {}
+    }
+    onClose();
+  };
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -158,6 +325,11 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
 
     if (!video.video_url) {
       setIsLoading(true);
+      return;
+    }
+
+    // 🟢 Wait until VAST pre-roll is finished or skipped
+    if (adState !== "finished") {
       return;
     }
 
@@ -213,7 +385,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
         hlsRef.current = null;
       }
     };
-  }, [video.video_url, video.message_id]);
+  }, [video.video_url, video.message_id, adState]);
 
   const handleTimeUpdate = () => {
     if (videoRef.current && !isDragging) {
@@ -432,33 +604,45 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       {/* Header Buttons */}
       {!isDesktop ? (
         <button 
-          onClick={(e) => { e.stopPropagation(); onClose(); }} 
-          style={{ ...mobileBackButtonStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none", zIndex: 10006 }}
+          onClick={(e) => { e.stopPropagation(); handleClose(); }} 
+          style={{ 
+            ...mobileBackButtonStyle, 
+            opacity: (showControls || adState === "playing") ? 1 : 0, 
+            pointerEvents: (showControls || adState === "playing") ? "auto" : "none", 
+            zIndex: 10010 
+          }}
         >
           <ArrowLeft size={28} />
         </button>
       ) : (
         <button 
-          onClick={(e) => { e.stopPropagation(); onClose(); }} 
-          style={{ ...desktopCloseButtonStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none", zIndex: 10006 }}
+          onClick={(e) => { e.stopPropagation(); handleClose(); }} 
+          style={{ 
+            ...desktopCloseButtonStyle, 
+            opacity: (showControls || adState === "playing") ? 1 : 0, 
+            pointerEvents: (showControls || adState === "playing") ? "auto" : "none", 
+            zIndex: 10010 
+          }}
         >
           <X size={24} />
         </button>
       )}
 
-      {/* 3-Dot Menu Button */}
-      <button 
-        onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
-        style={{ 
-          ...menuButtonStyle, 
-          right: isDesktop ? "90px" : "20px",
-          opacity: showControls ? 1 : 0, 
-          pointerEvents: showControls ? "auto" : "none", 
-          zIndex: 10006 
-        }}
-      >
-        <MoreVertical size={24} />
-      </button>
+      {/* 3-Dot Menu Button - only visible on main video */}
+      {adState === "finished" && (
+        <button 
+          onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
+          style={{ 
+            ...menuButtonStyle, 
+            right: isDesktop ? "90px" : "20px",
+            opacity: showControls ? 1 : 0, 
+            pointerEvents: showControls ? "auto" : "none", 
+            zIndex: 10006 
+          }}
+        >
+          <MoreVertical size={24} />
+        </button>
+      )}
 
       {/* Dropdown Menu */}
       {showMenu && (
@@ -494,14 +678,228 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       )}
 
       <div style={stageStyle} onClick={(e) => e.stopPropagation()}>
-        <div onClick={handleInteraction} style={videoWrapperStyle}>
+        <div onClick={adState === "finished" ? handleInteraction : undefined} style={videoWrapperStyle}>
           
-          {isLoading && !isDragging && (
+          {((isLoading && !isDragging && adState === "finished") || adState === "loading") && (
             <div style={loaderContainerStyle}>
               <Loader2 size={48} color="var(--primary-color)" className="spin-animation" />
             </div>
           )}
 
+          {/* 🟢 VAST Pre-roll Ad Layer */}
+          {adState === "playing" && adData && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 10005,
+                backgroundColor: "#000",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden"
+              }}
+              onClick={handleAdClick}
+            >
+              <video
+                ref={adVideoRef}
+                src={adData.mediaUrl}
+                crossOrigin="anonymous"
+                autoPlay
+                playsInline
+                muted={isAdMuted}
+                onPlay={handleAdPlay}
+                onTimeUpdate={handleAdTimeUpdate}
+                onEnded={handleAdEnded}
+                onError={handleAdError}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  cursor: "pointer"
+                }}
+              />
+
+              {/* Top-Left: "AD · SPONSORED" Badge */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: !isDesktop ? "max(24px, env(safe-area-inset-top))" : "32px",
+                  left: !isDesktop ? "76px" : "30px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "7px",
+                  backgroundColor: "rgba(0,0,0,0.7)",
+                  backdropFilter: "blur(10px)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  borderRadius: "20px",
+                  padding: "6px 14px",
+                  color: "#fff",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  letterSpacing: "0.5px",
+                  pointerEvents: "none",
+                  zIndex: 10007
+                }}
+              >
+                <span
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    backgroundColor: "#f59e0b",
+                    boxShadow: "0 0 8px #f59e0b"
+                  }}
+                />
+                AD · SPONSORED
+              </div>
+
+              {/* Top-Right: Countdown / Skip Ad Button */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: !isDesktop ? "max(24px, env(safe-area-inset-top))" : "32px",
+                  right: isDesktop ? "90px" : "20px",
+                  zIndex: 10008
+                }}
+              >
+                {adCanSkip ? (
+                  <button
+                    onClick={handleAdSkip}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      backgroundColor: "#ffffff",
+                      color: "#000000",
+                      border: "none",
+                      borderRadius: "24px",
+                      padding: "8px 18px",
+                      fontSize: "13px",
+                      fontWeight: "800",
+                      cursor: "pointer",
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+                      transition: "transform 0.15s ease"
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                  >
+                    <span>Skip Ad</span>
+                    <SkipForward size={16} fill="#000" />
+                  </button>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      backgroundColor: "rgba(0,0,0,0.7)",
+                      backdropFilter: "blur(10px)",
+                      border: "1px solid rgba(255,255,255,0.18)",
+                      borderRadius: "20px",
+                      padding: "7px 16px",
+                      color: "#e2e8f0",
+                      fontSize: "13px",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Skip in {adCountdown}s
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Row inside Ad: CTA Visit Sponsor & Mute Toggle */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "20px",
+                  left: "20px",
+                  right: "20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  zIndex: 10008,
+                  pointerEvents: "auto"
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {adData.clickThroughUrl ? (
+                  <button
+                    onClick={handleAdClick}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      backgroundColor: "var(--primary-color, #e11d48)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "24px",
+                      padding: "10px 20px",
+                      fontSize: "13px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.4)"
+                    }}
+                  >
+                    <span>Visit Sponsor</span>
+                    <ExternalLink size={15} />
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const next = !isAdMuted;
+                    setIsAdMuted(next);
+                    if (adVideoRef.current) {
+                      adVideoRef.current.muted = next;
+                    }
+                  }}
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "50%",
+                    backgroundColor: "rgba(0,0,0,0.7)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer"
+                  }}
+                  title={isAdMuted ? "Unmute Ad" : "Mute Ad"}
+                >
+                  {isAdMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                </button>
+              </div>
+
+              {/* Ad Progress Bar */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: "3px",
+                  backgroundColor: "rgba(255,255,255,0.2)"
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${adDuration > 0 ? (adCurrentTime / adDuration) * 100 : 0}%`,
+                    backgroundColor: "#f59e0b",
+                    transition: "width 0.2s linear"
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Main Video */}
           <video
             ref={videoRef}
             crossOrigin="anonymous"
@@ -517,123 +915,128 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 objectFit: isZoomed ? "cover" : "contain",
                 // 🟢 NEW: Transition and Transform for flipping
                 transition: "all 0.3s ease",
-                transform: isRotated ? "rotate(90deg)" : "none" 
+                transform: isRotated ? "rotate(90deg)" : "none",
+                display: adState === "playing" ? "none" : "block"
             }}
           />
 
-          <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
+          {adState === "finished" && (
+            <>
+              <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
 
-          <div style={{ ...bottomUIWrapper, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
-            
-            {/* Top Row: Floating Controls */}
-            <div style={floatingControlsRow}>
-                {/* 🟢 NEW: Flip/Rotate Button */}
-                <button onClick={(e) => { e.stopPropagation(); setIsRotated(!isRotated); }} style={floatingBtnStyle}>
-                  <RotateCw size={18} />
-                </button>
+              <div style={{ ...bottomUIWrapper, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
+                
+                {/* Top Row: Floating Controls */}
+                <div style={floatingControlsRow}>
+                    {/* 🟢 NEW: Flip/Rotate Button */}
+                    <button onClick={(e) => { e.stopPropagation(); setIsRotated(!isRotated); }} style={floatingBtnStyle}>
+                      <RotateCw size={18} />
+                    </button>
 
-                {/* 🟢 NEW: Direct Download Button */}
-                <button onClick={handleDownload} style={floatingBtnStyle}>
-                  {isDownloading ? <Loader2 size={18} className="spin-animation" /> : <Download size={18} />}
-                </button>
+                    {/* 🟢 NEW: Direct Download Button */}
+                    <button onClick={handleDownload} style={floatingBtnStyle}>
+                      {isDownloading ? <Loader2 size={18} className="spin-animation" /> : <Download size={18} />}
+                    </button>
 
-                <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} style={floatingBtnStyle}>
-                  {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }} style={floatingBtnStyle}>
-                  {isZoomed ? <Minimize size={18} /> : <Maximize size={18} />}
-                </button>
-            </div>
+                    <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} style={floatingBtnStyle}>
+                      {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }} style={floatingBtnStyle}>
+                      {isZoomed ? <Minimize size={18} /> : <Maximize size={18} />}
+                    </button>
+                </div>
 
-            {/* Middle Row: Avatar, Name, Follow button, and Caption */}
-            <div style={postInfoStyle}>
-               <img 
-                  src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
-                  alt="avatar"
-                  onError={(e) => { e.target.src = '/assets/default-avatar.png'; }}
-                  style={{ ...avatarStyle, cursor: onCreatorClick ? "pointer" : "default" }}
-                  onClick={handleCreatorClick}
-                />
-               <div style={textDetailsStyle}>
-                  <div style={usernameRowStyle}>
-                    <div 
-                      style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+                {/* Middle Row: Avatar, Name, Follow button, and Caption */}
+                <div style={postInfoStyle}>
+                   <img 
+                      src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
+                      alt="avatar"
+                      onError={(e) => { e.target.src = '/assets/default-avatar.png'; }}
+                      style={{ ...avatarStyle, cursor: onCreatorClick ? "pointer" : "default" }}
                       onClick={handleCreatorClick}
-                    >
-                      @{creatorHandle}
-                    </div>
+                    />
+                   <div style={textDetailsStyle}>
+                      <div style={usernameRowStyle}>
+                        <div 
+                          style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+                          onClick={handleCreatorClick}
+                        >
+                          @{creatorHandle}
+                        </div>
 
-                    {!isFollowing && !isOwner && (
-                      <button
-                        onClick={handleFollowClick}
-                        disabled={isFollowLoading}
-                        style={followBtnStyle}
-                        title={`Follow @${creatorHandle}`}
-                      >
-                        <span>{isFollowLoading ? "..." : "Follow"}</span>
-                      </button>
-                    )}
-                  </div>
-                  <div style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</div>
-               </div>
-            </div>
+                        {!isFollowing && !isOwner && (
+                          <button
+                            onClick={handleFollowClick}
+                            disabled={isFollowLoading}
+                            style={followBtnStyle}
+                            title={`Follow @${creatorHandle}`}
+                          >
+                            <span>{isFollowLoading ? "..." : "Follow"}</span>
+                          </button>
+                        )}
+                      </div>
+                      <div style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</div>
+                   </div>
+                </div>
 
-            {/* Bottom Row: Play/Pause firmly docked next to Progress Bar */}
-            <div style={controlBarContainer}>
-               <button onClick={handleTogglePlay} style={playPauseBtnStyle}>
-                 {isPlaying ? <Pause size={36} fill="#fff" color="#fff" /> : <Play size={36} fill="#fff" color="#fff" />}
-               </button>
+                {/* Bottom Row: Play/Pause firmly docked next to Progress Bar */}
+                <div style={controlBarContainer}>
+                   <button onClick={handleTogglePlay} style={playPauseBtnStyle}>
+                     {isPlaying ? <Pause size={36} fill="#fff" color="#fff" /> : <Play size={36} fill="#fff" color="#fff" />}
+                   </button>
 
-               <div style={progressContainerStyle}>
-                 <input 
-                   type="range" min="0" max={duration || 100} step="0.1"
-                   value={currentTime || 0} 
-                   onMouseDown={(e) => { e.stopPropagation(); setIsDragging(true); }}
-                   onTouchStart={(e) => { e.stopPropagation(); setIsDragging(true); }}
-                   onChange={(e) => { e.stopPropagation(); setCurrentTime(parseFloat(e.target.value)); }}
-                   onMouseUp={(e) => {
-                     e.stopPropagation();
-                     setIsDragging(false);
-                     if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
-                   }}
-                   onTouchEnd={(e) => {
-                     e.stopPropagation();
-                     setIsDragging(false);
-                     if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
-                   }}
-                   className="x-range"
-                   style={{
-                     ...rangeInputBaseStyle,
-                     background: `linear-gradient(to right, #ffffff ${progressPercent}%, rgba(255,255,255,0.3) ${progressPercent}%)`
-                   }}
-                 />
-                 <div style={timeDisplayStyle}>
-                   {formatTime(currentTime)} / {formatTime(duration)}
-                 </div>
-               </div>
-            </div>
+                   <div style={progressContainerStyle}>
+                     <input 
+                       type="range" min="0" max={duration || 100} step="0.1"
+                       value={currentTime || 0} 
+                       onMouseDown={(e) => { e.stopPropagation(); setIsDragging(true); }}
+                       onTouchStart={(e) => { e.stopPropagation(); setIsDragging(true); }}
+                       onChange={(e) => { e.stopPropagation(); setCurrentTime(parseFloat(e.target.value)); }}
+                       onMouseUp={(e) => {
+                         e.stopPropagation();
+                         setIsDragging(false);
+                         if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
+                       }}
+                       onTouchEnd={(e) => {
+                         e.stopPropagation();
+                         setIsDragging(false);
+                         if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
+                       }}
+                       className="x-range"
+                       style={{
+                         ...rangeInputBaseStyle,
+                         background: `linear-gradient(to right, #ffffff ${progressPercent}%, rgba(255,255,255,0.3) ${progressPercent}%)`
+                       }}
+                     />
+                     <div style={timeDisplayStyle}>
+                       {formatTime(currentTime)} / {formatTime(duration)}
+                     </div>
+                   </div>
+                </div>
 
-            {/* 🟢 RESTORED: Action Bar (Like, Comment, Save, Share) */}
-            <div style={engagementBarStyle}>
-               <button style={engagementBtnStyle} onClick={handleLike}>
-                  <Heart size={22} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#fff"} />
-                  <span>{likesCount > 0 ? likesCount : 'Like'}</span>
-               </button>
-               <button style={engagementBtnStyle} onClick={handleCommentClick}>
-                  <MessageCircle size={22} color="#fff" />
-                  <span>{commentsCount > 0 ? commentsCount : 'Reply'}</span>
-               </button>
-               <button style={engagementBtnStyle} onClick={handleSaveToProfile}>
-                  <Bookmark size={22} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#fff"} />
-                  <span>{savesCount > 0 ? savesCount : 'Save'}</span>
-               </button>
-               <button style={engagementBtnStyle} onClick={handleShare}>
-                  {copied ? <Check size={22} color="#4ade80" /> : <Share2 size={22} color="#fff" />}
-                  <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
-               </button>
-            </div>
+                {/* 🟢 RESTORED: Action Bar (Like, Comment, Save, Share) */}
+                <div style={engagementBarStyle}>
+                   <button style={engagementBtnStyle} onClick={handleLike}>
+                      <Heart size={22} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#fff"} />
+                      <span>{likesCount > 0 ? likesCount : 'Like'}</span>
+                   </button>
+                   <button style={engagementBtnStyle} onClick={handleCommentClick}>
+                      <MessageCircle size={22} color="#fff" />
+                      <span>{commentsCount > 0 ? commentsCount : 'Reply'}</span>
+                   </button>
+                   <button style={engagementBtnStyle} onClick={handleSaveToProfile}>
+                      <Bookmark size={22} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#fff"} />
+                      <span>{savesCount > 0 ? savesCount : 'Save'}</span>
+                   </button>
+                   <button style={engagementBtnStyle} onClick={handleShare}>
+                      {copied ? <Check size={22} color="#4ade80" /> : <Share2 size={22} color="#fff" />}
+                      <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
+                   </button>
+                </div>
 
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
