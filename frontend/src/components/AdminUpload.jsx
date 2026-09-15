@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Upload, CheckCircle, AlertCircle, Loader2, Video, FileVideo, Twitter, Link, X, Send, Instagram } from "lucide-react";
+import { 
+  ArrowLeft, Upload, CheckCircle, AlertCircle, Loader2, Video, 
+  FileVideo, Twitter, Link, X, Send, Instagram, Scissors, Play, Pause, Clock 
+} from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -18,6 +21,15 @@ export default function AdminUpload({ onClose }) {
   // Storage Target & Watermark State
   const [uploadTarget, setUploadTarget] = useState("r2"); 
   const [applyWatermark, setApplyWatermark] = useState(true); 
+
+  // 🟢 NEW: Video Trimming / Clipping State (Beginning, Center, Ending)
+  const [trimMode, setTrimMode] = useState("full"); // "full", "beginning", "center", "ending"
+  const [trimDuration, setTrimDuration] = useState(30); // in seconds
+  const [customDuration, setCustomDuration] = useState("");
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  const previewVideoRef = useRef(null);
 
   // Twitter State
   const [twitterUrl, setTwitterUrl] = useState("");
@@ -51,12 +63,83 @@ export default function AdminUpload({ onClose }) {
       document.body.style.top = "";
       document.body.style.width = "";
       window.scrollTo(0, scrollY);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
     };
-  }, []);
+  }, [previewUrl]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      const newUrl = URL.createObjectURL(selectedFile);
+      setPreviewUrl(newUrl);
+      setIsPlayingPreview(false);
+      setVideoDuration(0);
+    }
+  };
+
+  // Helper to compute slice start, end, and duration
+  const getTrimRange = () => {
+    const desiredDuration = customDuration ? parseFloat(customDuration) : parseFloat(trimDuration);
+    const clipLen = (!isNaN(desiredDuration) && desiredDuration > 0) ? desiredDuration : 30;
+
+    if (!videoDuration || videoDuration <= 0) {
+      return { start: 0, end: clipLen, duration: clipLen };
+    }
+
+    const actualLen = Math.min(videoDuration, clipLen);
+    let start = 0;
+
+    if (trimMode === "beginning") {
+      start = 0;
+    } else if (trimMode === "center") {
+      start = Math.max(0, (videoDuration - actualLen) / 2);
+    } else if (trimMode === "ending") {
+      start = Math.max(0, videoDuration - actualLen);
+    }
+
+    const end = Math.min(videoDuration, start + actualLen);
+    return {
+      start: Math.round(start * 10) / 10,
+      end: Math.round(end * 10) / 10,
+      duration: Math.round(actualLen * 10) / 10
+    };
+  };
+
+  const formatTime = (secs) => {
+    if (isNaN(secs) || secs === null || secs === undefined || secs < 0) return "00:00";
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const handleTogglePreview = () => {
+    const videoEl = previewVideoRef.current;
+    if (!videoEl) return;
+
+    if (isPlayingPreview) {
+      videoEl.pause();
+      setIsPlayingPreview(false);
+    } else {
+      const { start } = getTrimRange();
+      videoEl.currentTime = start;
+      videoEl.play().catch(() => {});
+      setIsPlayingPreview(true);
+    }
+  };
+
+  const handlePreviewTimeUpdate = () => {
+    const videoEl = previewVideoRef.current;
+    if (!videoEl || !isPlayingPreview) return;
+
+    const { start, end } = getTrimRange();
+    if (videoEl.currentTime >= end) {
+      videoEl.currentTime = start;
     }
   };
 
@@ -118,6 +201,15 @@ export default function AdminUpload({ onClose }) {
     formData.append("upload_target", uploadTarget); 
     formData.append("apply_watermark", applyWatermark); 
 
+    // 🟢 NEW: Video Trimming Parameters (Beginning, Center, Ending)
+    formData.append("trim_mode", trimMode);
+    if (trimMode !== "full") {
+      const { start, end, duration: finalDur } = getTrimRange();
+      formData.append("trim_duration", finalDur.toString());
+      formData.append("trim_start", start.toString());
+      formData.append("trim_end", end.toString());
+    }
+
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/upload-premium`, {
@@ -135,6 +227,12 @@ export default function AdminUpload({ onClose }) {
           setStatus("idle");
           setCaption("");
           setFile(null);
+          setTrimMode("full");
+          setVideoDuration(0);
+          if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+            setPreviewUrl(null);
+          }
         }, 3000);
       } else {
         setStatus("error");
@@ -161,6 +259,11 @@ export default function AdminUpload({ onClose }) {
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-telethon`;
 
+    const { start: tStart, duration: tDur } = getTrimRange();
+    const callbackUrl = trimMode !== "full"
+      ? `${APP_CONFIG.apiUrl}/api/admin/upload-premium?trim_mode=${trimMode}&trim_duration=${tDur}&trim_start=${tStart}`
+      : `${APP_CONFIG.apiUrl}/api/admin/upload-premium`;
+
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -171,7 +274,7 @@ export default function AdminUpload({ onClose }) {
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
-          callback_url: `${APP_CONFIG.apiUrl}/api/admin/upload-premium`,
+          callback_url: callbackUrl,
           apply_watermark: applyWatermark 
         }),
       });
@@ -210,6 +313,11 @@ export default function AdminUpload({ onClose }) {
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-link`;
 
+    const { start: tgStart, duration: tgDur } = getTrimRange();
+    const callbackUrl = trimMode !== "full"
+      ? `${APP_CONFIG.apiUrl}/api/admin/upload-premium?trim_mode=${trimMode}&trim_duration=${tgDur}&trim_start=${tgStart}`
+      : `${APP_CONFIG.apiUrl}/api/admin/upload-premium`;
+
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -220,7 +328,7 @@ export default function AdminUpload({ onClose }) {
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
-          callback_url: `${APP_CONFIG.apiUrl}/api/admin/upload-premium`,
+          callback_url: callbackUrl,
           apply_watermark: applyWatermark 
         }),
       });
@@ -243,7 +351,7 @@ export default function AdminUpload({ onClose }) {
       console.error("Telegram Import error:", err);
       alert("Network Error: Is the FastAPI server running?");
     } finally {
-      processingLock.current = false;
+      processingLock.current = false; 
     }
   };
 
@@ -261,6 +369,11 @@ export default function AdminUpload({ onClose }) {
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-instagram-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-instagram-telethon`;
 
+    const { start: igStart, duration: igDur } = getTrimRange();
+    const callbackUrl = trimMode !== "full"
+      ? `${APP_CONFIG.apiUrl}/api/admin/upload-premium?trim_mode=${trimMode}&trim_duration=${igDur}&trim_start=${igStart}`
+      : `${APP_CONFIG.apiUrl}/api/admin/upload-premium`;
+
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -271,7 +384,7 @@ export default function AdminUpload({ onClose }) {
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
-          callback_url: `${APP_CONFIG.apiUrl}/api/admin/upload-premium`,
+          callback_url: callbackUrl,
           apply_watermark: applyWatermark 
         }),
       });
@@ -398,6 +511,265 @@ export default function AdminUpload({ onClose }) {
                 No (Keep it raw)
               </label>
             </div>
+          </div>
+
+          {/* 🟢 VIDEO LENGTH & SECTION TRIMMING */}
+          <div style={{
+            background: "#1c1c1e",
+            border: "1px solid #2c2c2e",
+            borderRadius: "14px",
+            padding: "16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            marginTop: "6px"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Scissors size={18} color="var(--primary-color, #e11d48)" />
+                <span style={{ fontSize: "12px", fontWeight: "700", color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Video Section & Length
+                </span>
+              </div>
+              {videoDuration > 0 && (
+                <span style={{ fontSize: "12px", color: "#aaa", fontWeight: "600" }}>
+                  Total: {formatTime(videoDuration)}
+                </span>
+              )}
+            </div>
+
+            {/* Segmented Selector for Section: Full Video, Beginning, Center, Ending */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
+              {[
+                { id: "full", label: "Full Video" },
+                { id: "beginning", label: "Beginning" },
+                { id: "center", label: "Center" },
+                { id: "ending", label: "Ending" }
+              ].map(m => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    setTrimMode(m.id);
+                    setIsPlayingPreview(false);
+                  }}
+                  style={{
+                    padding: "9px 4px",
+                    borderRadius: "8px",
+                    border: trimMode === m.id ? "1px solid var(--primary-color, #e11d48)" : "1px solid #333",
+                    background: trimMode === m.id ? "rgba(225, 29, 72, 0.2)" : "#262628",
+                    color: trimMode === m.id ? "#fff" : "#999",
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease"
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {/* When not 'full', show duration chips and custom input */}
+            {trimMode !== "full" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "2px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "12px", color: "#aaa", fontWeight: "600" }}>
+                    Clip Duration:
+                  </span>
+                  <span style={{ fontSize: "12px", color: "var(--primary-color, #e11d48)", fontWeight: "700" }}>
+                    {trimDuration === "custom" ? `${customDuration || 0}s` : `${trimDuration}s`} ({trimMode})
+                  </span>
+                </div>
+
+                {/* Preset Chips */}
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                  {[15, 30, 45, 60, 90].map(sec => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => {
+                        setTrimDuration(sec);
+                        setCustomDuration("");
+                        setIsPlayingPreview(false);
+                      }}
+                      style={{
+                        flex: 1,
+                        minWidth: "48px",
+                        padding: "8px 6px",
+                        borderRadius: "8px",
+                        border: (trimDuration === sec && !customDuration) ? "1px solid var(--primary-color, #e11d48)" : "1px solid #333",
+                        background: (trimDuration === sec && !customDuration) ? "var(--primary-color, #e11d48)" : "#262628",
+                        color: (trimDuration === sec && !customDuration) ? "#fff" : "#bbb",
+                        fontSize: "12px",
+                        fontWeight: "700",
+                        cursor: "pointer"
+                      }}
+                    >
+                      {sec}s
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrimDuration("custom");
+                      if (!customDuration) setCustomDuration("30");
+                      setIsPlayingPreview(false);
+                    }}
+                    style={{
+                      flex: 1,
+                      minWidth: "56px",
+                      padding: "8px 6px",
+                      borderRadius: "8px",
+                      border: trimDuration === "custom" ? "1px solid var(--primary-color, #e11d48)" : "1px solid #333",
+                      background: trimDuration === "custom" ? "var(--primary-color, #e11d48)" : "#262628",
+                      color: trimDuration === "custom" ? "#fff" : "#bbb",
+                      fontSize: "12px",
+                      fontWeight: "700",
+                      cursor: "pointer"
+                    }}
+                  >
+                    Custom
+                  </button>
+                </div>
+
+                {trimDuration === "custom" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+                    <input
+                      type="number"
+                      min="3"
+                      max={videoDuration ? Math.floor(videoDuration) : 600}
+                      value={customDuration}
+                      onChange={(e) => {
+                        setCustomDuration(e.target.value);
+                        setIsPlayingPreview(false);
+                      }}
+                      placeholder="Seconds (e.g. 25)"
+                      style={{
+                        flex: 1,
+                        background: "#2c2c2e",
+                        border: "1px solid #3a3a3c",
+                        color: "#fff",
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        outline: "none"
+                      }}
+                    />
+                    <span style={{ fontSize: "13px", color: "#888" }}>seconds</span>
+                  </div>
+                )}
+
+                {/* Visual Timeline Slice Indicator (when duration is available) */}
+                {videoDuration > 0 && (
+                  <div style={{ marginTop: "6px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <div style={{
+                      position: "relative",
+                      width: "100%",
+                      height: "10px",
+                      backgroundColor: "#2c2c2e",
+                      borderRadius: "5px",
+                      overflow: "hidden"
+                    }}>
+                      {(() => {
+                        const { start, end } = getTrimRange();
+                        const leftPct = (start / videoDuration) * 100;
+                        const widthPct = Math.max(2, ((end - start) / videoDuration) * 100);
+                        return (
+                          <div style={{
+                            position: "absolute",
+                            left: `${leftPct}%`,
+                            width: `${widthPct}%`,
+                            top: 0,
+                            bottom: 0,
+                            backgroundColor: "var(--primary-color, #e11d48)",
+                            borderRadius: "5px",
+                            boxShadow: "0 0 10px rgba(225, 29, 72, 0.6)"
+                          }} />
+                        );
+                      })()}
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", color: "#888" }}>
+                      <span>00:00</span>
+                      {(() => {
+                        const { start, end, duration } = getTrimRange();
+                        return (
+                          <span style={{ color: "#fff", fontWeight: "700" }}>
+                            ✂️ {formatTime(start)} ➔ {formatTime(end)} ({duration}s from {trimMode})
+                          </span>
+                        );
+                      })()}
+                      <span>{formatTime(videoDuration)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Interactive Snippet Preview Player (for Local Upload) */}
+                {previewUrl && (
+                  <div style={{
+                    marginTop: "8px",
+                    background: "#121212",
+                    borderRadius: "10px",
+                    overflow: "hidden",
+                    border: "1px solid #2a2a2c",
+                    position: "relative"
+                  }}>
+                    <video
+                      ref={previewVideoRef}
+                      src={previewUrl}
+                      playsInline
+                      muted
+                      onLoadedMetadata={(e) => setVideoDuration(e.target.duration)}
+                      onTimeUpdate={handlePreviewTimeUpdate}
+                      style={{ width: "100%", maxHeight: "180px", objectFit: "contain", display: "block", background: "#000" }}
+                    />
+
+                    <div style={{
+                      padding: "8px 12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "rgba(20, 20, 20, 0.95)"
+                    }}>
+                      <button
+                        type="button"
+                        onClick={handleTogglePreview}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          border: "none",
+                          background: isPlayingPreview ? "#444" : "var(--primary-color, #e11d48)",
+                          color: "#fff",
+                          fontSize: "12px",
+                          fontWeight: "700",
+                          cursor: "pointer"
+                        }}
+                      >
+                        {isPlayingPreview ? <Pause size={14} /> : <Play size={14} />}
+                        {isPlayingPreview ? "Pause Preview" : "Play Snippet"}
+                      </button>
+
+                      <span style={{ fontSize: "11px", color: "#888" }}>
+                        {isPlayingPreview ? "Looping snippet preview" : "Preview snippet before uploading"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Hidden video element to detect duration if preview player is not mounted */}
+            {previewUrl && trimMode === "full" && (
+              <video
+                src={previewUrl}
+                onLoadedMetadata={(e) => setVideoDuration(e.target.duration)}
+                style={{ display: "none" }}
+              />
+            )}
           </div>
         </div>
 

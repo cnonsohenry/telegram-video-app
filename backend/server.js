@@ -601,6 +601,53 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     let savedCloudflareId = "none";
     const internalId = `${safeCategory}_${Date.now()}`;
 
+    // 🟢 Trimming / Clipping Feature (Beginning, Center, Ending)
+    const trimMode = (req.body.trim_mode || req.query.trim_mode || "full").toLowerCase().trim();
+    const reqTrimDuration = parseFloat(req.body.trim_duration || req.query.trim_duration || 0);
+    const reqTrimStart = parseFloat(req.body.trim_start || req.query.trim_start);
+
+    if (trimMode && trimMode !== "full" && videoFile && fs.existsSync(videoFile.path)) {
+      try {
+        const { stdout } = await execPromise(
+          `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoFile.path}"`
+        );
+        const totalDuration = parseFloat(stdout.trim()) || 0;
+        console.log(`[TRIM] Total video duration: ${totalDuration}s, mode: ${trimMode}, requested duration: ${reqTrimDuration}s`);
+
+        if (totalDuration > 0) {
+          const clipDuration = (reqTrimDuration > 0 && reqTrimDuration < totalDuration)
+            ? reqTrimDuration
+            : Math.min(totalDuration, 30);
+
+          let startSec = 0;
+          if (!isNaN(reqTrimStart) && reqTrimStart >= 0) {
+            startSec = Math.min(Math.max(0, reqTrimStart), Math.max(0, totalDuration - clipDuration));
+          } else if (trimMode === "beginning") {
+            startSec = 0;
+          } else if (trimMode === "center" || trimMode === "middle") {
+            startSec = Math.max(0, (totalDuration - clipDuration) / 2);
+          } else if (trimMode === "ending" || trimMode === "end") {
+            startSec = Math.max(0, totalDuration - clipDuration);
+          }
+
+          const trimmedPath = `${videoFile.path}_trimmed.mp4`;
+          console.log(`[TRIM] Slicing video: start=${startSec.toFixed(2)}s, duration=${clipDuration.toFixed(2)}s`);
+
+          await execPromise(
+            `ffmpeg -ss ${startSec} -i "${videoFile.path}" -t ${clipDuration} -map 0:v -map 0:a? -c:v libx264 -preset ultrafast -crf 22 -c:a aac -b:a 128k -movflags +faststart "${trimmedPath}" -y`
+          );
+
+          if (fs.existsSync(trimmedPath)) {
+            fs.unlinkSync(videoFile.path);
+            fs.renameSync(trimmedPath, videoFile.path);
+            console.log(`✅ [TRIM] Video successfully trimmed to ${clipDuration.toFixed(2)}s!`);
+          }
+        }
+      } catch (trimErr) {
+        console.error("⚠️ [TRIM] Video trimming failed, keeping original:", trimErr.message);
+      }
+    }
+
     try {
       const thumbPath = `${videoFile.path}.jpg`;
       await execPromise(`ffmpeg -i ${videoFile.path} -ss 00:00:01.000 -vframes 1 -vf scale=400:-1 -q:v 5 ${thumbPath} -y`);
@@ -621,7 +668,9 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     const useR2 = !upload_target || upload_target === "r2";
     if (useR2) {
       const fileStream = fs.createReadStream(videoFile.path);
-      const extension = videoFile.originalname.split('.').pop() || "mp4";
+      const extension = (trimMode && trimMode !== "full") 
+        ? "mp4" 
+        : (videoFile.originalname?.split('.').pop() || "mp4");
       const r2Key = `${safeCategory}/${internalId}.${extension}`; 
       
       await r2.send(new PutObjectCommand({
