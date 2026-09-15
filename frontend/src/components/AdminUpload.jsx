@@ -184,6 +184,21 @@ export default function AdminUpload({ onClose }) {
     }
   };
 
+  const parseApiResponse = async (res, defaultActionName = "Action") => {
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      return await res.json();
+    }
+    const text = await res.text();
+    if (res.status === 524) {
+      throw new Error("Server processing timed out on Cloudflare (>100s). For long videos, select a trimmed snippet (e.g. 15s–90s) to process in under 5 seconds, or try disabling the watermark.");
+    }
+    if (res.status === 502 || res.status === 504) {
+      throw new Error(`Gateway Error (${res.status}): The backend is restarting or temporarily busy. Please try again.`);
+    }
+    throw new Error(text.slice(0, 150) || `${defaultActionName} failed (HTTP ${res.status}).`);
+  };
+
   const handleUpload = async (e) => {
     e.preventDefault();
     if (processingLock.current) return;
@@ -201,7 +216,7 @@ export default function AdminUpload({ onClose }) {
     formData.append("upload_target", uploadTarget); 
     formData.append("apply_watermark", applyWatermark); 
 
-    // 🟢 NEW: Video Trimming Parameters (Beginning, Center, Ending)
+    // 🟢 Video Trimming Parameters (Beginning, Center, Ending)
     formData.append("trim_mode", trimMode);
     if (trimMode !== "full") {
       const { start, end, duration: finalDur } = getTrimRange();
@@ -218,7 +233,7 @@ export default function AdminUpload({ onClose }) {
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res, "Direct Upload");
 
       if (res.ok && data.success) {
         setStatus("success");
@@ -236,12 +251,12 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setStatus("error");
-        alert(data.error || "Upload failed. Check your Admin ID.");
+        alert(data.error || data.detail || "Upload failed. Check your Admin ID.");
       }
     } catch (err) {
       setStatus("error");
       console.error("Upload error:", err);
-      alert("Network Error: Could not connect to server.");
+      alert(err.message || "Network Error: Could not connect to server.");
     } finally {
       processingLock.current = false;
     }
@@ -275,11 +290,14 @@ export default function AdminUpload({ onClose }) {
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
           callback_url: callbackUrl,
-          apply_watermark: applyWatermark 
+          apply_watermark: applyWatermark,
+          trim_mode: trimMode,
+          trim_duration: tDur,
+          trim_start: tStart
         }),
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res, "Twitter Import");
 
       if (res.ok) {
         setTwitterStatus("success");
@@ -290,12 +308,12 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setTwitterStatus("error");
-        alert(data.detail || "Import failed. Check the URL.");
+        alert(data.detail || data.message || "Import failed. Check the URL.");
       }
     } catch (err) {
       setTwitterStatus("error");
       console.error("Twitter Import error:", err);
-      alert("Network Error: Is the FastAPI server running?");
+      alert(err.message || "Network Error: Is the FastAPI server running?");
     } finally {
       processingLock.current = false; 
     }
@@ -329,11 +347,14 @@ export default function AdminUpload({ onClose }) {
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
           callback_url: callbackUrl,
-          apply_watermark: applyWatermark 
+          apply_watermark: applyWatermark,
+          trim_mode: trimMode,
+          trim_duration: tgDur,
+          trim_start: tgStart
         }),
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res, "Telegram Import");
 
       if (res.ok) {
         setTelegramStatus("success");
@@ -344,18 +365,18 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setTelegramStatus("error");
-        alert(data.detail || "Import failed. Check the URL.");
+        alert(data.detail || data.message || "Import failed. Check the URL.");
       }
     } catch (err) {
       setTelegramStatus("error");
       console.error("Telegram Import error:", err);
-      alert("Network Error: Is the FastAPI server running?");
+      alert(err.message || "Network Error: Is the FastAPI server running?");
     } finally {
       processingLock.current = false; 
     }
   };
 
-  // 🟢 NEW: Instagram Import Handler
+  // 🟢 Instagram Import Handler
   const handleInstagramImport = async (e) => {
     e.preventDefault();
     if (processingLock.current) return;
@@ -364,7 +385,6 @@ export default function AdminUpload({ onClose }) {
     processingLock.current = true;
     setInstagramStatus("processing");
 
-    // Make sure your backend proxy points `/twitter-api` to the fastAPI server correctly!
     const endpoint = pipelineRoute === "direct" 
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-instagram-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-instagram-telethon`;
@@ -385,11 +405,14 @@ export default function AdminUpload({ onClose }) {
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
           callback_url: callbackUrl,
-          apply_watermark: applyWatermark 
+          apply_watermark: applyWatermark,
+          trim_mode: trimMode,
+          trim_duration: igDur,
+          trim_start: igStart
         }),
       });
 
-      const data = await res.json();
+      const data = await parseApiResponse(res, "Instagram Import");
 
       if (res.ok) {
         setInstagramStatus("success");
@@ -400,12 +423,12 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setInstagramStatus("error");
-        alert(data.detail || "Import failed. Check the URL or IG might be blocking.");
+        alert(data.detail || data.message || "Import failed. Check the URL or IG might be blocking.");
       }
     } catch (err) {
       setInstagramStatus("error");
       console.error("Instagram Import error:", err);
-      alert("Network Error: Is the FastAPI server running?");
+      alert(err.message || "Network Error: Is the FastAPI server running?");
     } finally {
       processingLock.current = false; 
     }
