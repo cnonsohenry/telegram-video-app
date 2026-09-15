@@ -6,14 +6,12 @@ import VideoCard from "../components/VideoCard";
 import PullToRefresh from "../components/PullToRefresh"; 
 import { useVideos } from "../hooks/useVideos";
 import { expandApp } from "../utils/telegram";
-import { openRewardedAd } from "../utils/rewardedAd";
-import { adReturnWatcher } from "../utils/adReturnWatcher";
+import { triggerSmartlinkIfEligible } from "../utils/adManager";
 import LegalFooter from "../components/LegalFooter";
 import { APP_CONFIG } from "../config"; 
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription"; 
 
 const MAX_CACHE_SIZE = 4;
-const AD_FREQUENCY = 3;
 const TREND_TIMEFRAMES = ["all_time", "monthly", "weekly"];
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
@@ -390,27 +388,14 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       return; 
     }
 
-    const videosWatchedCount = parseInt(localStorage.getItem("ad_frequency_counter") || "0", 10);
-    const shouldShowAd = videosWatchedCount % AD_FREQUENCY === 0;
-
-    localStorage.setItem("ad_frequency_counter", (videosWatchedCount + 1).toString());
-
     const nextSet = new Set(unlockedVideos);
     nextSet.add(videoKey);
     setUnlockedVideos(nextSet);
     localStorage.setItem("unlockedVideos", JSON.stringify([...nextSet]));
 
-    if (shouldShowAd) {
-      try {
-        openRewardedAd();
-        await adReturnWatcher();
-        playVideo(video);
-      } catch (err) { 
-        playVideo(video); 
-      }
-    } else {
-      playVideo(video);
-    }
+    // 🟢 Centralized Ad & Smartlink Management (Reduced frequency, cooldown & VIP exemption)
+    await triggerSmartlinkIfEligible(user);
+    playVideo(video);
   }, [user, unlockedVideos, activeGroup]);
   
   useEffect(() => {

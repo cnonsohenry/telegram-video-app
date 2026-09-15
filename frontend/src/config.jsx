@@ -41,6 +41,12 @@ export const APP_CONFIG = {
   ],
 
   // 🟢 NEW: Paywall & Monetization Config
+  ads: {
+    smartlinkUrl: "https://www.effectivegatecpm.com/wmmi5uv2w5?key=23fa23a9f5a389595c81f702d570419b",
+    adFrequency: 6, // Reduced from 3 to 6: triggers on every 6th free video
+    minMinutesBetweenAds: 8, // Minimum 8 minutes cooldown between smartlinks
+    exoClickPopZoneId: "5883574"
+  },
   supportTelegramLink: "",
   bankDetails: {
     bankName: "",

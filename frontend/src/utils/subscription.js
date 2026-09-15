@@ -102,3 +102,16 @@ export const isUserFollowingCreator = (user, videoOrCreator) => {
 
   return false;
 };
+
+/**
+ * Check if the user is exempt from all ads (VIP subscriber, creator, admin, or active memberships)
+ */
+export const isUserAdExempt = (user) => {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  if (user.is_premium) return true;
+  if (user.is_creator) return true;
+  if (Array.isArray(user.subscriptions) && user.subscriptions.length > 0) return true;
+  return false;
+};
+

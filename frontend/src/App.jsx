@@ -14,7 +14,8 @@ import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
 import { APP_CONFIG } from "./config";
-import { isUserSubscribedToCreator, getVideoCreatorHandle } from "./utils/subscription";
+import { isUserSubscribedToCreator, getVideoCreatorHandle, isUserAdExempt } from "./utils/subscription";
+import { triggerSmartlinkIfEligible, syncVipAdFreeState } from "./utils/adManager";
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -448,14 +449,19 @@ export default function App() {
     document.title = `${APP_CONFIG.appNamePrefix}${APP_CONFIG.appNameSuffix}`;
   }, []);
 
-  const isAdFreeZone = needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || !!viewingCreator || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo;
+  // 🟢 Synchronize VIP Ad-Free status to localStorage and ad scripts
+  useEffect(() => {
+    syncVipAdFreeState(user);
+  }, [user]);
+
+  const isVipExempt = isUserAdExempt(user);
+  const isAdFreeZone = isVipExempt || needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || !!viewingCreator || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo;
   
   useAdZapper(isAdFreeZone);
 
   useEffect(() => {
     const styleId = "nuclear-ad-blocker";
     let styleEl = document.getElementById(styleId);
-    let adKillerInterval; 
 
     if (isAdFreeZone) {
       if (!styleEl) {
@@ -482,25 +488,15 @@ export default function App() {
         document.head.appendChild(styleEl);
       }
 
-      const nukeAds = () => {
-        const ads = document.querySelectorAll('iframe[src*="adsterra"], div[id^="container-"], .adsterra-social-bar, [id*="effectivegatecpm"], .adsterra-wrapper');
-        ads.forEach(ad => ad.remove());
-        
-        if (document.body.style.paddingTop) document.body.style.paddingTop = "";
-        if (document.body.style.marginTop) document.body.style.marginTop = "";
-      };
-
-      nukeAds(); 
-      adKillerInterval = setInterval(nukeAds, 400); 
-
+      // Initial clean sweep without repetitive battery-draining intervals
+      const ads = document.querySelectorAll('iframe[src*="adsterra"], div[id^="container-"], .adsterra-social-bar, [id*="effectivegatecpm"], .adsterra-wrapper');
+      ads.forEach(ad => ad.remove());
+      
+      if (document.body.style.paddingTop) document.body.style.paddingTop = "";
+      if (document.body.style.marginTop) document.body.style.marginTop = "";
     } else {
       if (styleEl) styleEl.remove();
-      if (adKillerInterval) clearInterval(adKillerInterval);
     }
-
-    return () => {
-      if (adKillerInterval) clearInterval(adKillerInterval);
-    };
   }, [isAdFreeZone]);
 
   useEffect(() => {
@@ -632,6 +628,9 @@ export default function App() {
           handleOpenCreator(creatorHandle, { autoSubscribe: true });
           return;
         }
+      } else {
+        // Free video from Explore or Creator profile: check ad eligibility
+        await triggerSmartlinkIfEligible(user);
       }
 
       // Clear completely first
