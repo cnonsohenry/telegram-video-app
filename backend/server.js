@@ -1061,10 +1061,120 @@ app.get('/v/:message_id', async (req, res) => {
 });
 
 /* =====================
-   Embed Video Route
+   Standalone Embed Video Player
+   Used by Twitter Player Cards & Google Video Sitemap (<video:player_loc>)
 ===================== */
-app.get('/embed/:message_id', (req, res) => {
-  res.redirect(302, `/v/${req.params.message_id}`);
+app.get('/embed/:message_id', async (req, res) => {
+  try {
+    const { message_id } = req.params;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
+    const publicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://bucket.naijahomemade.com';
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://videos.naijahomemade.com';
+
+    const result = await pool.query(
+      `SELECT chat_id, message_id, file_id, cloudflare_id, category, caption, views, uploader_id 
+       FROM videos 
+       WHERE message_id = $1 LIMIT 1`,
+      [message_id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).send('<!DOCTYPE html><html><body style="background:#000;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">Video not found</body></html>');
+    }
+
+    const video = result.rows[0];
+
+    // Premium videos cannot be embedded without active subscription
+    if (video.category === 'premium') {
+      return res.redirect(302, `/v/${encodeURIComponent(message_id)}`);
+    }
+
+    let videoUrl = '';
+    let isHls = false;
+
+    if (video.cloudflare_id && video.cloudflare_id !== 'none') {
+      if (video.cloudflare_id.startsWith('r2:')) {
+        const r2Key = video.cloudflare_id.replace('r2:', '');
+        videoUrl = `${publicDomain}/${r2Key}`;
+      } else {
+        const cleanId = video.cloudflare_id.split('?')[0];
+        videoUrl = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
+        isHls = true;
+      }
+    } else {
+      videoUrl = `${apiBaseUrl}/api/video?chat_id=${encodeURIComponent(video.chat_id)}&message_id=${encodeURIComponent(video.message_id)}&noview=1`;
+    }
+
+    const sig = signThumbnail(video.chat_id, video.message_id);
+    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== 'none' && !video.cloudflare_id.startsWith('r2:'))
+      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=720`
+      : `${apiBaseUrl}/api/thumbnail?chat_id=${encodeURIComponent(video.chat_id)}&message_id=${encodeURIComponent(video.message_id)}&sig=${sig}`;
+
+    const title = escapeHtml(video.caption || 'NaijaHomemade Video');
+    const watchUrl = `${frontendUrl}/v/${encodeURIComponent(message_id)}`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>${title}</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background-color: #000; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .player-container {
+      position: relative; width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      background: #000;
+    }
+    video {
+      width: 100%; height: 100%; max-height: 100vh;
+      object-fit: contain; background: #000;
+    }
+    .watermark {
+      position: absolute; top: 12px; right: 12px; z-index: 10;
+      background: rgba(0, 0, 0, 0.65); padding: 5px 10px; border-radius: 6px;
+      color: #fff; font-size: 11px; font-weight: 700; text-decoration: none;
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+      letter-spacing: -0.3px; transition: opacity 0.2s;
+    }
+    .watermark:hover { opacity: 0.85; }
+    .watermark span { color: #ff3b30; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+  <div class="player-container">
+    <a href="${watchUrl}" target="_blank" rel="noopener" class="watermark">
+      Naija<span>homemade</span>
+    </a>
+    <video id="player" controls playsinline poster="${escapeHtml(thumbUrl)}" preload="metadata"></video>
+  </div>
+  <script>
+    const video = document.getElementById('player');
+    const src = ${JSON.stringify(videoUrl)};
+    const isHls = ${isHls};
+    if (isHls && window.Hls && window.Hls.isSupported()) {
+      const hls = new Hls({ startLevel: 0 });
+      hls.loadSource(src);
+      hls.attachMedia(video);
+    } else {
+      video.src = src;
+    }
+  </script>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (err) {
+    console.error('Embed Player Error:', err.message);
+    res.status(500).send('Video player error');
+  }
 });
 
 /* =====================
@@ -1816,6 +1926,7 @@ app.get('/sitemap.xml', async (req, res) => {
 
     const baseUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
     const apiBaseUrl = process.env.API_BASE_URL || 'https://videos.naijahomemade.com';
+    const publicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://bucket.naijahomemade.com';
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n`;
@@ -1859,6 +1970,21 @@ app.get('/sitemap.xml', async (req, res) => {
       const pubDate = new Date(video.created_at || Date.now()).toISOString();
       const viewCount = Math.max(0, parseInt(video.views, 10) || 0);
 
+      let contentLocXml = '';
+      if (video.cloudflare_id && video.cloudflare_id !== 'none') {
+        let contentUrl = '';
+        if (video.cloudflare_id.startsWith('r2:')) {
+          const r2Key = video.cloudflare_id.replace('r2:', '');
+          contentUrl = `${publicDomain}/${r2Key}`;
+        } else {
+          const cleanId = video.cloudflare_id.split('?')[0];
+          contentUrl = `https://videodelivery.net/${cleanId}/manifest/video.m3u8`;
+        }
+        if (contentUrl) {
+          contentLocXml = `      <video:content_loc>${escapeXml(contentUrl)}</video:content_loc>\n`;
+        }
+      }
+
       xml += `  <url>\n`;
       xml += `    <loc>${baseUrl}/v/${video.message_id}</loc>\n`;
       xml += `    <lastmod>${pubDate}</lastmod>\n`;
@@ -1868,7 +1994,10 @@ app.get('/sitemap.xml', async (req, res) => {
       xml += `      <video:thumbnail_loc>${escapeXml(thumbUrl)}</video:thumbnail_loc>\n`;
       xml += `      <video:title>${escapeXml(title)}</video:title>\n`;
       xml += `      <video:description>${escapeXml(desc)}</video:description>\n`;
-      xml += `      <video:player_loc allow_embed="yes" autoplay="ap=1">${baseUrl}/v/${video.message_id}</video:player_loc>\n`;
+      if (contentLocXml) {
+        xml += contentLocXml;
+      }
+      xml += `      <video:player_loc allow_embed="yes" autoplay="ap=1">${baseUrl}/embed/${video.message_id}</video:player_loc>\n`;
       xml += `      <video:view_count>${viewCount}</video:view_count>\n`;
       xml += `      <video:publication_date>${pubDate}</video:publication_date>\n`;
       xml += `      <video:family_friendly>no</video:family_friendly>\n`;
