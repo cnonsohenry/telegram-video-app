@@ -967,7 +967,7 @@ app.get('/v/:message_id', async (req, res) => {
     if (!result.rows.length) return res.redirect(302, '/');
 
     const video = result.rows[0];
-    const isPremium = video.category === 'premium' || video.is_premium === true;
+    const isPremium = video.category === 'premium';
     const robots = isPremium
       ? 'noindex, follow'
       : 'index, follow, max-image-preview:large, max-video-preview:-1';
@@ -1810,7 +1810,6 @@ app.get('/sitemap.xml', async (req, res) => {
       FROM videos 
       WHERE (status = 'ready' OR status IS NULL)
         AND (category IS NULL OR category != 'premium')
-        AND (is_premium IS NULL OR is_premium = false)
       ORDER BY created_at DESC 
       LIMIT 5000
     `);
