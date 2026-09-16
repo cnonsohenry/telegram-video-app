@@ -81,17 +81,31 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   // If the hook's videos haven't changed since the category switched, they are stale!
   const isVideosFresh = videos !== staleVideosRef.current;
 
-  useEffect(() => {
-    fetch(`${APP_CONFIG.apiUrl}/api/videos?category=premium&limit=20`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.videos) {
-          const shuffled = data.videos.sort(() => 0.5 - Math.random());
-          setPremiumPool(shuffled);
-        }
-      })
-      .catch(err => console.error("Failed to load premium pool", err));
+  const isFetchingPremium = useRef(false);
+
+  const fetchMorePremium = useCallback(async () => {
+    if (isFetchingPremium.current) return;
+    isFetchingPremium.current = true;
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=premium&limit=50&sort=random`);
+      const data = await res.json();
+      if (data?.videos && data.videos.length > 0) {
+        setPremiumPool(prev => {
+          const existingIds = new Set(prev.map(v => v.message_id));
+          const newVideos = data.videos.filter(v => !existingIds.has(v.message_id));
+          return [...prev, ...newVideos];
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load premium pool", err);
+    } finally {
+      isFetchingPremium.current = false;
+    }
   }, []);
+
+  useEffect(() => {
+    fetchMorePremium();
+  }, [fetchMorePremium]);
 
   const updateCache = useCallback((category, data) => {
     setCacheOrder(prevOrder => {
@@ -158,6 +172,12 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   }, [videoCache, currentCategory, loading, videos, isChangingTab, premiumPool, fetchLimit, isDesktop, isVideosFresh]);
 
   useEffect(() => {
+    if (premiumPool.length > 0 && premiumTracker.current >= premiumPool.length - 15) {
+      fetchMorePremium();
+    }
+  }, [rawVideosToDisplay.length, premiumPool.length, fetchMorePremium]);
+
+  useEffect(() => {
     if (!loading) setIsChangingTab(false);
   }, [loading]);
 
@@ -208,6 +228,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       setVideoCache(prev => {
         const newCache = { ...prev };
         delete newCache["trends"];
+        return newCache;
+      });
+    } else if (APP_CONFIG.categories[index] === "premium" && !fromHistory) {
+      // 🟢 Always clear the cache for VIP/Premium on direct click so it generates a fresh random seed and feed
+      setVideoCache(prev => {
+        const newCache = { ...prev };
+        delete newCache["premium"];
         return newCache;
       });
     }
@@ -417,7 +444,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         if (!videoCache[cat]) {
           try {
             const fetchCat = idx === 3 ? `${cat}&timeframe=${trendsTimeframe}` : cat;
-            const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${fetchCat}&limit=${fetchLimit}`);
+            let prefetchUrl = `${APP_CONFIG.apiUrl}/api/videos?category=${fetchCat}&limit=${fetchLimit}`;
+            if (cat === "premium") {
+              prefetchUrl += `&sort=random`;
+            } else if (cat === "trends") {
+              prefetchUrl += `&sort=trending`;
+            }
+            const res = await fetch(prefetchUrl);
             if (res.ok) {
               const data = await res.json();
               updateCache(cat, data.videos);

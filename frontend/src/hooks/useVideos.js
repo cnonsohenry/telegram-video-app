@@ -10,6 +10,7 @@ export function useVideos(currentCategory, limit = 12) {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const isFetching = useRef(false);
+  const sessionSeed = useRef(Math.random().toString(36).substring(7));
 
   const fetchData = useCallback(async (targetPage, isNew) => {
     if (isFetching.current) return;
@@ -49,6 +50,8 @@ export function useVideos(currentCategory, limit = 12) {
         // 🟢 THE FIX: Dynamically check if this is your "Trending" category (usually the 4th tab)
         if (currentCategory === APP_CONFIG.categories[3] || currentCategory === "trends") {
           url += `&sort=trending`;
+        } else if (currentCategory === "premium") {
+          url += `&sort=random&seed=${sessionSeed.current}`;
         }
       }
       
@@ -91,6 +94,7 @@ export function useVideos(currentCategory, limit = 12) {
     setVideos([]); 
     setSidebarSuggestions([]); // Clear the sidebar so the skeleton animation plays!
     setPage(1);
+    sessionSeed.current = Math.random().toString(36).substring(7);
     
     // Trigger the first fetch
     fetchData(1, true);

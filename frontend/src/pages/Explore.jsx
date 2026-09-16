@@ -727,8 +727,7 @@ export default function Explore({
       }
       
       const fetches = exploreCategories.map(async (cat) => {
-        const randomPage = Math.floor(Math.random() * 5) + 1; 
-        let res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${cat}&limit=8&page=${randomPage}`);
+        let res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${cat}&limit=8&sort=random`);
         let data = res.ok ? await res.json() : { videos: [] };
         
         if (!data.videos || data.videos.length === 0) {
@@ -743,7 +742,6 @@ export default function Explore({
       let combined = [];
       results.forEach(data => {
         if (data && data.videos) combined = [...combined, ...data.videos];
-        if (data && data.suggestions) combined = [...combined, ...data.suggestions]; 
       });
 
       const uniqueMap = new Map();

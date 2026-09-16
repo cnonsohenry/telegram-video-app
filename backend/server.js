@@ -1004,6 +1004,11 @@ app.get("/api/videos", async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category || "hotties";
     
+    // 🟢 NEW: Extract sort and seed parameters
+    const sort = (req.query.sort || "").toLowerCase().trim();
+    const isRandom = sort === "random" || req.query.random === "true";
+    const seed = req.query.seed ? String(req.query.seed).trim() : "";
+    
     // 🟢 NEW: Extract timeframe from query (defaults to all_time)
     const timeframe = req.query.timeframe || "all_time";
     
@@ -1011,7 +1016,7 @@ app.get("/api/videos", async (req, res) => {
 
     let query;
     let queryValues;
-    let timeFilter = ""; // 🟢 NEW: Placeholder for our time constraint
+    let timeFilter = ""; // 🟢 Placeholder for our time constraint
 
     if (category === "trends") {
       // 🟢 NEW: Set the time filter based on the requested timeframe
@@ -1036,7 +1041,30 @@ app.get("/api/videos", async (req, res) => {
         SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY views DESC LIMIT $1 OFFSET $2
       `;
       queryValues = [limit, offset];
-    } else {
+    } else if (isRandom) {
+      // 🟢 Random sorting across all time (supports deterministic seed for gap-free pagination)
+      const hasCategory = category && category !== "all";
+      const catFilter = hasCategory ? "WHERE category = $1" : "";
+      
+      let orderClause;
+      if (hasCategory) {
+        if (seed) {
+          orderClause = "ORDER BY MD5(id::text || $2) LIMIT $3 OFFSET $4";
+          queryValues = [category, seed, limit, offset];
+        } else {
+          orderClause = "ORDER BY RANDOM() LIMIT $2 OFFSET $3";
+          queryValues = [category, limit, offset];
+        }
+      } else {
+        if (seed) {
+          orderClause = "ORDER BY MD5(id::text || $1) LIMIT $2 OFFSET $3";
+          queryValues = [seed, limit, offset];
+        } else {
+          orderClause = "ORDER BY RANDOM() LIMIT $1 OFFSET $2";
+          queryValues = [limit, offset];
+        }
+      }
+
       query = `
         WITH GroupedVideos AS (
           SELECT v.*, 
@@ -1047,11 +1075,36 @@ app.get("/api/videos", async (req, res) => {
           FROM videos v 
           LEFT JOIN users u ON v.uploader_id = u.user_id
           LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
-          WHERE category = $1
+          ${catFilter}
         )
-        SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+        SELECT * FROM GroupedVideos WHERE rn = 1 ${orderClause}
       `;
-      queryValues = [category, limit, offset];
+    } else {
+      const hasCategory = category && category !== "all";
+      const catFilter = hasCategory ? "WHERE category = $1" : "";
+
+      if (hasCategory) {
+        queryValues = [category, limit, offset];
+      } else {
+        queryValues = [limit, offset];
+      }
+
+      const limitOffsetPlaceholders = hasCategory ? "LIMIT $2 OFFSET $3" : "LIMIT $1 OFFSET $2";
+
+      query = `
+        WITH GroupedVideos AS (
+          SELECT v.*, 
+            COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+            COALESCE(au.username, u.username, 'creator') as uploader_handle,
+            ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
+            COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
+          FROM videos v 
+          LEFT JOIN users u ON v.uploader_id = u.user_id
+          LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+          ${catFilter}
+        )
+        SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC ${limitOffsetPlaceholders}
+      `;
     }
 
     const videosRes = await pool.query(query, queryValues);
@@ -1072,14 +1125,18 @@ app.get("/api/videos", async (req, res) => {
     }
 
     let countQuery;
+    let countValues;
     if (category === "trends") {
-      // 🟢 NEW: Apply the time filter to the total count calculation as well
       countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v ${timeFilter}`;
-    } else {
+      countValues = [];
+    } else if (category && category !== "all") {
       countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos WHERE category = $1`;
+      countValues = [category];
+    } else {
+      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos`;
+      countValues = [];
     }
     
-    const countValues = category === "trends" ? [] : [category];
     const totalRes = await pool.query(countQuery, countValues);
     const total = Number(totalRes.rows[0].count);
 
