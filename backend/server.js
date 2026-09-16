@@ -879,28 +879,70 @@ function escapeHtml(str = '') {
     .replace(/'/g, '&#39;');
 }
 
+function escapeXml(unsafe = '') {
+  return String(unsafe)
+    .replace(/[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]/gu, '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function safeJsonForScriptTag(obj) {
   return JSON.stringify(obj).replace(/</g, '\\u003c');
 }
 
-function buildSeoTags({ pageTitle, description, thumbUrl, canonicalUrl, appName, schema }) {
+function stripDefaultSeoTags(html) {
+  return html
+    .replace(/<title>[\s\S]*?<\/title>/gi, '')
+    .replace(/<link[^>]+rel=["']canonical["'][^>]*>/gi, '')
+    .replace(/<meta[^>]+name=["'](description|robots|twitter:[^"']+)["'][^>]*>/gi, '')
+    .replace(/<meta[^>]+property=["'](og:[^"']+)["'][^>]*>/gi, '')
+    .replace(/<script[^>]+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi, '');
+}
+
+function buildSeoTags({ pageTitle, description, thumbUrl, canonicalUrl, appName, schema, videoUrl, isVideo = true }) {
   const title = escapeHtml(pageTitle);
   const desc = escapeHtml(description);
+  const escapedThumb = escapeHtml(thumbUrl);
+  const escapedCanonical = escapeHtml(canonicalUrl);
+  const escapedAppName = escapeHtml(appName);
+
+  let extraVideoTags = '';
+  if (isVideo && videoUrl) {
+    const escapedVideo = escapeHtml(videoUrl);
+    extraVideoTags = `
+    <meta property="og:video" content="${escapedVideo}">
+    <meta property="og:video:secure_url" content="${escapedVideo}">
+    <meta property="og:video:type" content="text/html">
+    <meta property="og:video:width" content="1080">
+    <meta property="og:video:height" content="1920">
+    <meta name="twitter:card" content="player">
+    <meta name="twitter:player" content="${escapedVideo}">
+    <meta name="twitter:player:width" content="1080">
+    <meta name="twitter:player:height" content="1920">`;
+  } else {
+    extraVideoTags = `
+    <meta name="twitter:card" content="summary_large_image">`;
+  }
+
   return `
     <title>${title}</title>
     <meta name="description" content="${desc}">
-    <meta name="robots" content="index, follow">
-    <link rel="canonical" href="${canonicalUrl}" />
-    <meta property="og:type" content="video.other">
-    <meta property="og:site_name" content="${escapeHtml(appName)}">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-video-preview:-1">
+    <link rel="canonical" href="${escapedCanonical}" />
+    <meta property="og:locale" content="en_US">
+    <meta property="og:type" content="${isVideo ? 'video.other' : 'website'}">
+    <meta property="og:site_name" content="${escapedAppName}">
     <meta property="og:title" content="${title}">
     <meta property="og:description" content="${desc}">
-    <meta property="og:image" content="${thumbUrl}">
-    <meta property="og:url" content="${canonicalUrl}">
-    <meta name="twitter:card" content="summary_large_image">
+    <meta property="og:image" content="${escapedThumb}">
+    <meta property="og:url" content="${escapedCanonical}">
+    ${extraVideoTags}
     <meta name="twitter:title" content="${title}">
     <meta name="twitter:description" content="${desc}">
-    <meta name="twitter:image" content="${thumbUrl}">
+    <meta name="twitter:image" content="${escapedThumb}">
     <script type="application/ld+json">${safeJsonForScriptTag(schema)}</script>
   </head>`;
 }
@@ -928,7 +970,7 @@ app.get('/v/:message_id', async (req, res) => {
 
     const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== 'none' && !video.cloudflare_id.startsWith('r2:'))
       ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
-      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}&sig=${sig}`;
+      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${encodeURIComponent(video.chat_id)}&message_id=${encodeURIComponent(video.message_id)}&sig=${sig}`;
 
     const safeCategory = video.category
       ? video.category.charAt(0).toUpperCase() + video.category.slice(1)
@@ -959,6 +1001,7 @@ app.get('/v/:message_id', async (req, res) => {
       || `Watch exclusive Nigerian homemade ${safeCategory} videos on ${appName}.`;
 
     const canonicalUrl = `${frontendUrl}/v/${message_id}`;
+    const embedUrl = `${frontendUrl}/embed/${message_id}`;
 
     const schema = {
       '@context': 'https://schema.org',
@@ -966,11 +1009,34 @@ app.get('/v/:message_id', async (req, res) => {
       name: pageTitle,
       description: finalDescription,
       thumbnailUrl: [thumbUrl],
-      uploadDate: video.created_at || new Date().toISOString(),
-      author: { '@type': 'Person', name: video.uploader_name || 'Member' },
+      uploadDate: new Date(video.created_at || Date.now()).toISOString(),
+      embedUrl: embedUrl,
+      isFamilyFriendly: "false",
+      interactionStatistic: [
+        {
+          '@type': 'InteractionCounter',
+          interactionType: { '@type': 'https://schema.org/WatchAction' },
+          userInteractionCount: Number(video.views || 0)
+        },
+        {
+          '@type': 'InteractionCounter',
+          interactionType: { '@type': 'https://schema.org/LikeAction' },
+          userInteractionCount: Number(video.likes_count || 0)
+        }
+      ],
+      author: { '@type': 'Person', name: video.uploader_name || 'Member' }
     };
 
-    const seoTags = buildSeoTags({ pageTitle, description: finalDescription, thumbUrl, canonicalUrl, appName, schema });
+    const seoTags = buildSeoTags({
+      pageTitle,
+      description: finalDescription,
+      thumbUrl,
+      canonicalUrl,
+      appName,
+      schema,
+      videoUrl: embedUrl,
+      isVideo: true
+    });
 
     let html = getTemplate();
 
@@ -978,16 +1044,20 @@ app.get('/v/:message_id', async (req, res) => {
       throw new Error('SEO injector: no </head> tag in build template');
     }
 
-    html = html
-      .replace(/<title>.*?<\/title>/i, '')
-      .replace(/<meta name="description" content=".*?">/i, '')
-      .replace('</head>', seoTags);
+    html = stripDefaultSeoTags(html).replace('</head>', seoTags);
 
     res.send(html);
   } catch (err) {
     console.error('Share Link Error:', err.message);
     res.redirect('/');
   }
+});
+
+/* =====================
+   Embed Video Route
+===================== */
+app.get('/embed/:message_id', (req, res) => {
+  res.redirect(302, `/v/${req.params.message_id}`);
 });
 
 /* =====================
@@ -1696,40 +1766,119 @@ app.get("/api/avatar", async (req, res) => {
 });
 
 /* =====================
-   DYNAMIC SITEMAP.XML
+   ROBOTS.TXT
 ===================== */
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.send(`User-agent: *
+Allow: /
+Allow: /v/
+Allow: /explore
+Disallow: /api/
+Disallow: /status
+Disallow: /admin
+Disallow: /login
+Disallow: /*?token=*
+Disallow: /*?legal=*
+
+Sitemap: https://videos.naijahomemade.com/sitemap.xml
+`);
+});
+
+/* =======================================================
+   DYNAMIC SITEMAP.XML (GOOGLE VIDEO SITEMAP SPECIFICATION)
+======================================================= */
+let sitemapCache = { xml: null, expires: 0 };
+
 app.get('/sitemap.xml', async (req, res) => {
   try {
+    if (sitemapCache.xml && Date.now() < sitemapCache.expires) {
+      res.header('Content-Type', 'application/xml');
+      res.header('Cache-Control', 'public, max-age=3600');
+      return res.send(sitemapCache.xml);
+    }
+
     const result = await pool.query(`
-      SELECT message_id, created_at 
+      SELECT message_id, chat_id, cloudflare_id, caption, category, views, created_at, seo_description
       FROM videos 
+      WHERE status = 'ready' OR status IS NULL
       ORDER BY created_at DESC 
       LIMIT 5000
     `);
 
     const baseUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://videos.naijahomemade.com';
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n`;
 
-    xml += `  <url>\n`;
-    xml += `    <loc>${baseUrl}/</loc>\n`;
-    xml += `    <changefreq>hourly</changefreq>\n`;
-    xml += `    <priority>1.0</priority>\n`;
-    xml += `  </url>\n`;
+    // Static & Category landing pages
+    const staticPages = [
+      { loc: `${baseUrl}/`, changefreq: 'hourly', priority: '1.0' },
+      { loc: `${baseUrl}/explore`, changefreq: 'daily', priority: '0.9' },
+      { loc: `${baseUrl}/?cat=hotties`, changefreq: 'daily', priority: '0.9' },
+      { loc: `${baseUrl}/?cat=knacks`, changefreq: 'daily', priority: '0.9' },
+      { loc: `${baseUrl}/?cat=baddies`, changefreq: 'daily', priority: '0.9' },
+      { loc: `${baseUrl}/?cat=trends`, changefreq: 'daily', priority: '0.9' },
+      { loc: `${baseUrl}/?cat=premium`, changefreq: 'daily', priority: '0.9' }
+    ];
+
+    staticPages.forEach(p => {
+      xml += `  <url>\n`;
+      xml += `    <loc>${p.loc}</loc>\n`;
+      xml += `    <changefreq>${p.changefreq}</changefreq>\n`;
+      xml += `    <priority>${p.priority}</priority>\n`;
+      xml += `  </url>\n`;
+    });
 
     result.rows.forEach(video => {
+      const sig = signThumbnail(video.chat_id, video.message_id);
+      const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== 'none' && !video.cloudflare_id.startsWith('r2:'))
+        ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=720`
+        : `${apiBaseUrl}/api/thumbnail?chat_id=${encodeURIComponent(video.chat_id)}&message_id=${encodeURIComponent(video.message_id)}&sig=${sig}`;
+
+      const safeCategory = video.category
+        ? video.category.charAt(0).toUpperCase() + video.category.slice(1)
+        : 'Video';
+
+      const title = (video.caption
+        ? `${video.caption} | Trending Naija ${safeCategory}`
+        : `Nigerian Homemade ${safeCategory} Video`).slice(0, 100);
+
+      const desc = (video.seo_description || video.caption
+        ? `${video.caption} - Watch exclusive Nigerian homemade ${safeCategory} videos.`
+        : `Watch exclusive Nigerian homemade ${safeCategory} videos on NaijaHomemade.`).slice(0, 2048);
+
+      const pubDate = new Date(video.created_at || Date.now()).toISOString();
+      const viewCount = Math.max(0, parseInt(video.views, 10) || 0);
+
       xml += `  <url>\n`;
       xml += `    <loc>${baseUrl}/v/${video.message_id}</loc>\n`;
-      xml += `    <lastmod>${new Date(video.created_at).toISOString()}</lastmod>\n`;
+      xml += `    <lastmod>${pubDate}</lastmod>\n`;
       xml += `    <changefreq>never</changefreq>\n`;
       xml += `    <priority>0.8</priority>\n`;
+      xml += `    <video:video>\n`;
+      xml += `      <video:thumbnail_loc>${escapeXml(thumbUrl)}</video:thumbnail_loc>\n`;
+      xml += `      <video:title>${escapeXml(title)}</video:title>\n`;
+      xml += `      <video:description>${escapeXml(desc)}</video:description>\n`;
+      xml += `      <video:player_loc allow_embed="yes" autoplay="ap=1">${baseUrl}/v/${video.message_id}</video:player_loc>\n`;
+      xml += `      <video:view_count>${viewCount}</video:view_count>\n`;
+      xml += `      <video:publication_date>${pubDate}</video:publication_date>\n`;
+      xml += `      <video:family_friendly>no</video:family_friendly>\n`;
+      xml += `      <video:category>${escapeXml(safeCategory)}</video:category>\n`;
+      xml += `    </video:video>\n`;
       xml += `  </url>\n`;
     });
 
     xml += `</urlset>`;
 
+    sitemapCache = {
+      xml,
+      expires: Date.now() + 3600 * 1000 // 1 hour TTL
+    };
+
     res.header('Content-Type', 'application/xml');
+    res.header('Cache-Control', 'public, max-age=3600');
     res.send(xml);
   } catch (err) {
     console.error('Sitemap error:', err);
@@ -1738,7 +1887,108 @@ app.get('/sitemap.xml', async (req, res) => {
 });
 
 /* =======================================================
-   🤖 PRERENDER MIDDLEWARE (SELF-HOSTED OPEN SOURCE)
+   ⚡ FAST SERVER-SIDE BOT SEO INJECTOR (ROOT & CATEGORIES)
+   Intercepts search crawlers and social link scrapers in <15ms
+   without 15-second headless Chromium rendering lag.
+======================================================= */
+const BOT_UA_REGEX = /googlebot|bingbot|yandex|baiduspider|twitterbot|facebookexternalhit|rogerbot|linkedinbot|embedly|quora link preview|showyoubot|outbrain|pinterest\/0\.|pinterestbot|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|applebot|exobot|discordbot/i;
+
+app.use((req, res, next) => {
+  const ua = req.headers['user-agent'] || '';
+  const isBot = BOT_UA_REGEX.test(ua) || req.query._escaped_fragment_ !== undefined;
+
+  if (!isBot) return next();
+
+  // Only intercept root / or /explore
+  if (req.path !== '/' && req.path !== '/explore') {
+    return next();
+  }
+
+  try {
+    const frontendUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
+    const appName = process.env.APP_NAME || 'NaijaHomemade';
+    let pageTitle = 'Naija Homemade Videos - NaijaPorn & Trending Nigerian Creators | Naijahomemade';
+    let description = 'Watch Best Naija Homemade porn videos for free on Naijahomemade.com. Discover high quality Most Relevant Naija XXX movies, leaks, and verified creator clips.';
+    let canonicalUrl = `${frontendUrl}/`;
+
+    if (req.path === '/explore') {
+      pageTitle = 'Explore Trending Nigerian Homemade Videos & Creators | NaijaHomemade';
+      description = 'Discover and stream trending Nigerian creators, verified models, and exclusive homemade videos on NaijaHomemade.';
+      canonicalUrl = `${frontendUrl}/explore`;
+    } else {
+      const cat = req.query.cat ? String(req.query.cat).toLowerCase() : '';
+      if (cat === 'hotties') {
+        pageTitle = 'Trending Naija Hotties Videos | NaijaHomemade';
+        description = 'Watch trending Nigerian hotties videos, spicy amateur clips, and exclusive creators on NaijaHomemade.';
+        canonicalUrl = `${frontendUrl}/?cat=hotties`;
+      } else if (cat === 'knacks') {
+        pageTitle = 'Naija Knacks Videos - Explicit Nigerian Homemade Clips | NaijaHomemade';
+        description = 'Stream the best Naija knacks, adult Nigerian homemade videos, and explicit creator uploads on NaijaHomemade.';
+        canonicalUrl = `${frontendUrl}/?cat=knacks`;
+      } else if (cat === 'baddies') {
+        pageTitle = 'Exclusive Naija Baddies Videos | NaijaHomemade';
+        description = 'Watch verified Naija baddies, trending hot models, and exclusive adult content on NaijaHomemade.';
+        canonicalUrl = `${frontendUrl}/?cat=baddies`;
+      } else if (cat === 'trends') {
+        pageTitle = 'Latest Naija Trends & Viral Videos | NaijaHomemade';
+        description = 'Catch up on the latest viral Nigerian trends, homemade leaks, and trending adult creator clips on NaijaHomemade.';
+        canonicalUrl = `${frontendUrl}/?cat=trends`;
+      } else if (cat === 'premium') {
+        pageTitle = 'VIP Premium Nigerian Creators & Videos | NaijaHomemade';
+        description = 'Access VIP premium content from top verified Nigerian homemade creators and exclusive series on NaijaHomemade.';
+        canonicalUrl = `${frontendUrl}/?cat=premium`;
+      }
+    }
+
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'WebSite',
+          '@id': `${frontendUrl}/#website`,
+          url: frontendUrl,
+          name: appName,
+          description: 'Watch Best Naija Homemade porn videos for free on Naijahomemade.com.',
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: `${frontendUrl}/?search={search_term_string}`,
+            'query-input': 'required name=search_term_string'
+          }
+        },
+        {
+          '@type': 'Organization',
+          '@id': `${frontendUrl}/#organization`,
+          name: appName,
+          url: frontendUrl,
+          logo: `${frontendUrl}/naija.svg`
+        }
+      ]
+    };
+
+    const seoTags = buildSeoTags({
+      pageTitle,
+      description,
+      thumbUrl: `${frontendUrl}/naija.svg`,
+      canonicalUrl,
+      appName,
+      schema,
+      isVideo: false
+    });
+
+    let html = getTemplate();
+    if (/<\/head>/i.test(html)) {
+      html = stripDefaultSeoTags(html).replace('</head>', seoTags);
+      return res.send(html);
+    }
+  } catch (err) {
+    console.error('Fast Bot SEO error:', err.message);
+  }
+
+  next();
+});
+
+/* =======================================================
+   🤖 PRERENDER MIDDLEWARE (SELF-HOSTED FALLBACK)
 ======================================================= */
 // 1. Point it to your new local engine
 prerender.set('prerenderServiceUrl', 'https://codedloud.com/');

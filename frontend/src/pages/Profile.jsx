@@ -1061,10 +1061,11 @@ export default function Profile({
                 animation: "fadeIn 0.3s ease-out",
                 width: "100%"
               }}>
-                {videosToDisplay.map((v) => (
+                {videosToDisplay.map((v, idx) => (
                   <VideoCard 
                     key={`${v.chat_id}:${v.message_id}`} 
                     video={v} 
+                    priority={idx < 2}
                     onOpen={(vData, e) => handleOpenVideo(vData, e)} 
                   />
                 ))}

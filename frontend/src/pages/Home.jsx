@@ -693,10 +693,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                    animation: "fadeIn 0.3s ease-out" 
                  }}>
                   
-                    {actualVideosToDisplay.map(v => (
+                    {actualVideosToDisplay.map((v, idx) => (
                       <VideoCard 
                         key={`${v.chat_id}:${v.message_id}`} 
                         video={v} 
+                        priority={idx < 2}
                         onOpen={(vData, e) => handleOpenVideo(vData, e)} 
                       />
                     ))}

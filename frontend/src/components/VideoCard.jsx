@@ -3,7 +3,7 @@ import { Play, Copy, Lock } from 'lucide-react';
 
 import { APP_CONFIG } from "../config";
 
-export default function VideoCard({ video, onOpen, showDetails = true }) {
+export default function VideoCard({ video, onOpen, showDetails = true, priority = false }) {
   const videoRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -104,7 +104,7 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         position: "relative", 
         width: "100%", 
         aspectRatio: "9/16",
-        objectFit: "cover",
+        objectFit: "cover", 
         background: "#080808", 
         overflow: "hidden",
         borderRadius: showDetails ? "12px" : "4px",
@@ -123,9 +123,10 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
         {thumbSrc && !hasError && (
           <img 
             src={thumbSrc} 
-            alt=""
+            alt={video.caption ? `${video.caption} - Naija video thumbnail` : "Naija video thumbnail"}
             aria-label="Thumbnail"
-            loading="eager"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             onLoad={() => setIsImgLoaded(true)}
             onError={() => { 
               setIsImgLoaded(true); 
@@ -254,7 +255,8 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
             <div style={avatarWrapperStyle}>
                <img 
                  src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
-                 alt=""
+                 alt={video.uploader_handle || "Avatar"}
+                 loading="lazy"
                  onError={(e) => { e.target.style.display = 'none'; }}
                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
                />

@@ -678,10 +678,11 @@ export default function CreatorProfileModal({
                     width: "100%",
                     animation: "fadeIn 0.3s ease-out"
                   }}>
-                    {displayedVideos.map((v) => (
+                    {displayedVideos.map((v, idx) => (
                       <VideoCard 
                         key={`${v.chat_id}:${v.message_id}`}
                         video={v}
+                        priority={idx < 2}
                         onOpen={(vData, e) => onVideoClick(vData, e)}
                       />
                     ))}
