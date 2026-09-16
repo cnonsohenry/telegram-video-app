@@ -736,12 +736,12 @@ app.get("/api/video", async (req, res) => {
       dbRes = await pool.query(
         `UPDATE videos SET views = views + 1 
          WHERE chat_id=$1 AND message_id=$2 
-         RETURNING file_id, cloudflare_id`,
+         RETURNING file_id, cloudflare_id, category, uploader_id`,
         [chat_id, message_id]
       );
     } else {
       dbRes = await pool.query(
-        `SELECT file_id, cloudflare_id FROM videos 
+        `SELECT file_id, cloudflare_id, category, uploader_id FROM videos 
          WHERE chat_id=$1 AND message_id=$2`,
         [chat_id, message_id]
       );
@@ -752,6 +752,58 @@ app.get("/api/video", async (req, res) => {
     }
 
     const video = dbRes.rows[0];
+
+    // 🟢 ACCESS CONTROL: Protect Premium Videos from unauthorized access & direct scraping
+    if (video.category === "premium") {
+      let isAuthorized = false;
+      const authHeader = req.headers["authorization"];
+      const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET);
+          const userId = decoded.id;
+          const userRole = decoded.role;
+
+          if (userRole === "admin") {
+            isAuthorized = true;
+          } else {
+            const uploaderId = video.uploader_id ? String(video.uploader_id) : null;
+            if (uploaderId && (String(userId) === uploaderId || String(decoded.telegram_user_id) === uploaderId)) {
+              isAuthorized = true;
+            } else {
+              const subCheck = await pool.query(
+                `SELECT 1 FROM creator_subscriptions cs
+                 WHERE cs.subscriber_id = $1 
+                   AND (
+                     cs.creator_id = $2 
+                     OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2)
+                     OR cs.creator_id IN (SELECT id FROM app_users WHERE id = $2)
+                   )
+                   AND cs.status = 'active'
+                   AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
+                 LIMIT 1`,
+                [userId, video.uploader_id]
+              );
+              if (subCheck.rows.length > 0) {
+                isAuthorized = true;
+              } else {
+                const userRes = await pool.query("SELECT is_premium FROM app_users WHERE id = $1", [userId]);
+                if (userRes.rows[0]?.is_premium && (!video.uploader_id || String(video.uploader_id) === "1881815190" || String(video.uploader_id) === "458")) {
+                  isAuthorized = true;
+                }
+              }
+            }
+          }
+        } catch (jwtErr) {
+          console.warn("[AUTH] Token validation failed on premium video access:", jwtErr.message);
+        }
+      }
+
+      if (!isAuthorized) {
+        return res.status(403).json({ error: "Access denied. Active subscription required to watch this video." });
+      }
+    }
 
     if (video.cloudflare_id && video.cloudflare_id !== "none") {
       if (video.cloudflare_id.startsWith("r2:")) {

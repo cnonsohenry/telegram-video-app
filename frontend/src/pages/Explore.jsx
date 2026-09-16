@@ -126,7 +126,9 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
     if (isPlaying && !videoUrl && isUnlocked) {
       timer = setTimeout(async () => {
         try {
-          const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}&noview=1`);
+          const token = localStorage.getItem("token");
+          const headers = token ? { Authorization: `Bearer ${token}` } : {};
+          const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}&noview=1`, { headers });
           if (res.ok) {
             const data = await res.json();
             if (data.video_url) setVideoUrl(data.video_url);
@@ -259,6 +261,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 
   const handleShare = async (e) => {
     e.stopPropagation();
+    if (isPremium) return;
     const shareUrl = `${window.location.origin}/v/${video.message_id}`;
     
     if (navigator.share) {
@@ -392,10 +395,15 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
                   {idx === 0 && videoUrl && isUnlocked ? (
                     <video 
                       ref={videoRef} 
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} 
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }} 
                       muted 
                       loop 
                       playsInline 
+                      controlsList="nodownload noplaybackrate noremoteplayback"
+                      disablePictureInPicture
+                      disableRemotePlayback
+                      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      onDragStart={(e) => e.preventDefault()}
                       poster={item.thumbnail_url} 
                       preload="metadata" 
                       onLoadedMetadata={handleMediaLoad} 
@@ -508,10 +516,15 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
             {videoUrl && isUnlocked ? (
               <video 
                 ref={videoRef} 
-                style={thumbnailImgStyle} 
+                style={{ ...thumbnailImgStyle, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }} 
                 muted 
                 loop 
                 playsInline 
+                controlsList="nodownload noplaybackrate noremoteplayback"
+                disablePictureInPicture
+                disableRemotePlayback
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDragStart={(e) => e.preventDefault()}
                 poster={video.thumbnail_url} 
                 preload="metadata" 
                 onLoadedMetadata={handleMediaLoad} 
@@ -596,10 +609,12 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
             <span>{savesCount > 0 ? savesCount : ''}</span>
           </div>
 
-          <div style={actionItemStyle} onClick={handleShare}>
-            <Share2 size={18} />
-            <span>{sharesCount > 0 ? sharesCount : ''}</span>
-          </div>
+          {!isPremium && (
+            <div style={actionItemStyle} onClick={handleShare}>
+              <Share2 size={18} />
+              <span>{sharesCount > 0 ? sharesCount : ''}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

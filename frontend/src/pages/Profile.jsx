@@ -388,7 +388,9 @@ export default function Profile({
 
     try {
       setActiveVideo({ ...video, video_url: null }); 
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`, { headers });
       if (!res.ok) throw new Error("Fetch failed");
       const data = await res.json();
       if (data.video_url) setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));

@@ -58,8 +58,22 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     category: video.category || "hotties" 
   });
 
-  // Interaction States
   const [isLiked, setIsLiked] = useState(false);
+  const isPremium = video?.category === "premium" || video?.is_premium === true;
+
+  // 🟢 Anti-Copy / Anti-Save protection for premium content
+  useEffect(() => {
+    if (!isPremium) return;
+    const handleKeyDown = (e) => {
+      // Prevent Ctrl+S / Cmd+S (Save), Ctrl+C / Cmd+C (Copy), Ctrl+U / Cmd+U (View Source)
+      if ((e.ctrlKey || e.metaKey) && ['s', 'S', 'c', 'C', 'u', 'U'].includes(e.key)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [isPremium]);
   const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
   const [isSaved, setIsSaved] = useState(false);
   const [savesCount, setSavesCount] = useState(Number(video.saves_count || 0));
@@ -453,6 +467,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const handleShare = async (e) => {
     if (e) e.stopPropagation();
     setShowMenu(false);
+    if (isPremium) return;
     const shareUrl = `${window.location.origin}/v/${video.message_id}`;
     const brandName = `${APP_CONFIG.appNamePrefix} ${APP_CONFIG.appNameSuffix}`;
 
@@ -492,7 +507,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const handleDownload = async (e) => {
     if (e) e.stopPropagation();
     setShowMenu(false);
-    if (isDownloading) return;
+    if (isPremium || isDownloading) return;
     
     setIsDownloading(true);
     try {
@@ -598,7 +613,12 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const fallbackCategories = ['hotties', 'knacks', 'baddies', 'trends', 'shots', 'premium'];
 
   return (
-    <div ref={containerRef} style={overlayStyle} onClick={onClose}>
+    <div 
+      ref={containerRef} 
+      style={overlayStyle} 
+      onClick={onClose}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+    >
       <div style={{ ...topGradientStyle, opacity: showControls ? 1 : 0, pointerEvents: "none" }} />
 
       {/* Header Buttons */}
@@ -664,15 +684,19 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
               </>
             )}
             
-            {/* 🟢 Re-Wired Dropdown Actions */}
-            <button style={dropdownItemStyle} onClick={handleShare}>
-              {copied ? <Check size={16} color="#4ade80" /> : <Share2 size={16} />} 
-              {copied ? "Copied!" : "Share"}
-            </button>
-            <button style={dropdownItemStyle} onClick={handleDownload}>
-              {isDownloading ? <Loader2 size={16} className="spin-animation" /> : <Download size={16} />} 
-              Download
-            </button>
+            {/* 🟢 Re-Wired Dropdown Actions (Hidden for premium videos) */}
+            {!isPremium && (
+              <>
+                <button style={dropdownItemStyle} onClick={handleShare}>
+                  {copied ? <Check size={16} color="#4ade80" /> : <Share2 size={16} />} 
+                  {copied ? "Copied!" : "Share"}
+                </button>
+                <button style={dropdownItemStyle} onClick={handleDownload}>
+                  {isDownloading ? <Loader2 size={16} className="spin-animation" /> : <Download size={16} />} 
+                  Download
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -905,6 +929,11 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
             crossOrigin="anonymous"
             muted={isMuted}
             playsInline loop
+            controlsList="nodownload noplaybackrate noremoteplayback"
+            disablePictureInPicture
+            disableRemotePlayback
+            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onDragStart={(e) => e.preventDefault()}
             onTimeUpdate={handleTimeUpdate}
             onWaiting={() => setIsLoading(true)}
             onCanPlay={() => setIsLoading(false)}
@@ -916,7 +945,10 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 // 🟢 NEW: Transition and Transform for flipping
                 transition: "all 0.3s ease",
                 transform: isRotated ? "rotate(90deg)" : "none",
-                display: adState === "playing" ? "none" : "block"
+                display: adState === "playing" ? "none" : "block",
+                userSelect: "none",
+                WebkitUserSelect: "none",
+                WebkitTouchCallout: "none"
             }}
           />
 
@@ -933,10 +965,12 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                       <RotateCw size={18} />
                     </button>
 
-                    {/* 🟢 NEW: Direct Download Button */}
-                    <button onClick={handleDownload} style={floatingBtnStyle}>
-                      {isDownloading ? <Loader2 size={18} className="spin-animation" /> : <Download size={18} />}
-                    </button>
+                    {/* 🟢 Direct Download Button (Hidden for premium videos) */}
+                    {!isPremium && (
+                      <button onClick={handleDownload} style={floatingBtnStyle}>
+                        {isDownloading ? <Loader2 size={18} className="spin-animation" /> : <Download size={18} />}
+                      </button>
+                    )}
 
                     <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} style={floatingBtnStyle}>
                       {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
@@ -1028,10 +1062,12 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                       <Bookmark size={22} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#fff"} />
                       <span>{savesCount > 0 ? savesCount : 'Save'}</span>
                    </button>
-                   <button style={engagementBtnStyle} onClick={handleShare}>
-                      {copied ? <Check size={22} color="#4ade80" /> : <Share2 size={22} color="#fff" />}
-                      <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
-                   </button>
+                    {!isPremium && (
+                      <button style={engagementBtnStyle} onClick={handleShare}>
+                         {copied ? <Check size={22} color="#4ade80" /> : <Share2 size={22} color="#fff" />}
+                         <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
+                      </button>
+                    )}
                 </div>
 
               </div>

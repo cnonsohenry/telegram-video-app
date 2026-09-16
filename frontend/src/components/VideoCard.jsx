@@ -146,13 +146,20 @@ export default function VideoCard({ video, onOpen, showDetails = true }) {
           ref={videoRef}
           preload="none" 
           muted loop playsInline
+          controlsList="nodownload noplaybackrate noremoteplayback"
+          disablePictureInPicture
+          disableRemotePlayback
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onDragStart={(e) => e.preventDefault()}
           onPlaying={() => setIsVideoReady(true)}
           style={{ 
             width: "100%", height: "100%", objectFit: "cover", 
             position: "absolute", inset: 0, zIndex: 3,
             opacity: (isHovered && isVideoReady) ? 1 : 0, 
-            // 🟢 FIX: Removed the dulling filters here too.
-            transition: "opacity 0.3s ease"
+            transition: "opacity 0.3s ease",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+            WebkitTouchCallout: "none"
           }}
         />
 

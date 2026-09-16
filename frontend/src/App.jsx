@@ -547,8 +547,21 @@ export default function App() {
           const res = await fetch(`${APP_CONFIG.apiUrl}/api/video/details?message_id=${sharedVideoId}`);
           if (res.ok) {
             const videoData = await res.json();
+            const isPremium = videoData.category === "premium" || videoData.is_premium === true;
+            if (isPremium) {
+              const hasAccess = isUserSubscribedToCreator(user, videoData);
+              if (!hasAccess) {
+                const creatorHandle = getVideoCreatorHandle(videoData);
+                window.dispatchEvent(new CustomEvent("openCreatorProfile", {
+                  detail: { username: creatorHandle, autoSubscribe: true }
+                }));
+                return;
+              }
+            }
             
-            const playRes = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`);
+            const token = localStorage.getItem("token");
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const playRes = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`, { headers });
             if (playRes.ok) {
               const playData = await playRes.json();
               setActiveVideo({ ...videoData, video_url: playData.video_url });
@@ -651,7 +664,9 @@ export default function App() {
 
       // Fallback for shared links or components that don't pass the URL
       setActiveVideo({ ...video, video_url: null });
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`);
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`, { headers });
       if (!res.ok) throw new Error("Server error");
       const data = await res.json();
       
