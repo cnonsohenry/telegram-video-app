@@ -902,12 +902,13 @@ function stripDefaultSeoTags(html) {
     .replace(/<script[^>]+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi, '');
 }
 
-function buildSeoTags({ pageTitle, description, thumbUrl, canonicalUrl, appName, schema, videoUrl, isVideo = true }) {
+function buildSeoTags({ pageTitle, description, thumbUrl, canonicalUrl, appName, schema, videoUrl, isVideo = true, robots = 'index, follow, max-image-preview:large, max-video-preview:-1' }) {
   const title = escapeHtml(pageTitle);
   const desc = escapeHtml(description);
   const escapedThumb = escapeHtml(thumbUrl);
   const escapedCanonical = escapeHtml(canonicalUrl);
   const escapedAppName = escapeHtml(appName);
+  const escapedRobots = escapeHtml(robots);
 
   let extraVideoTags = '';
   if (isVideo && videoUrl) {
@@ -930,7 +931,7 @@ function buildSeoTags({ pageTitle, description, thumbUrl, canonicalUrl, appName,
   return `
     <title>${title}</title>
     <meta name="description" content="${desc}">
-    <meta name="robots" content="index, follow, max-image-preview:large, max-video-preview:-1">
+    <meta name="robots" content="${escapedRobots}">
     <link rel="canonical" href="${escapedCanonical}" />
     <meta property="og:locale" content="en_US">
     <meta property="og:type" content="${isVideo ? 'video.other' : 'website'}">
@@ -966,6 +967,11 @@ app.get('/v/:message_id', async (req, res) => {
     if (!result.rows.length) return res.redirect(302, '/');
 
     const video = result.rows[0];
+    const isPremium = video.category === 'premium' || video.is_premium === true;
+    const robots = isPremium
+      ? 'noindex, follow'
+      : 'index, follow, max-image-preview:large, max-video-preview:-1';
+
     const sig = signThumbnail(video.chat_id, video.message_id);
 
     const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== 'none' && !video.cloudflare_id.startsWith('r2:'))
@@ -1035,7 +1041,8 @@ app.get('/v/:message_id', async (req, res) => {
       appName,
       schema,
       videoUrl: embedUrl,
-      isVideo: true
+      isVideo: true,
+      robots
     });
 
     let html = getTemplate();
@@ -1801,7 +1808,9 @@ app.get('/sitemap.xml', async (req, res) => {
     const result = await pool.query(`
       SELECT message_id, chat_id, cloudflare_id, caption, category, views, created_at, seo_description
       FROM videos 
-      WHERE status = 'ready' OR status IS NULL
+      WHERE (status = 'ready' OR status IS NULL)
+        AND (category IS NULL OR category != 'premium')
+        AND (is_premium IS NULL OR is_premium = false)
       ORDER BY created_at DESC 
       LIMIT 5000
     `);
@@ -1812,15 +1821,14 @@ app.get('/sitemap.xml', async (req, res) => {
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n`;
 
-    // Static & Category landing pages
+    // Static & Category landing pages (Free public sections only)
     const staticPages = [
       { loc: `${baseUrl}/`, changefreq: 'hourly', priority: '1.0' },
       { loc: `${baseUrl}/explore`, changefreq: 'daily', priority: '0.9' },
       { loc: `${baseUrl}/?cat=hotties`, changefreq: 'daily', priority: '0.9' },
       { loc: `${baseUrl}/?cat=knacks`, changefreq: 'daily', priority: '0.9' },
       { loc: `${baseUrl}/?cat=baddies`, changefreq: 'daily', priority: '0.9' },
-      { loc: `${baseUrl}/?cat=trends`, changefreq: 'daily', priority: '0.9' },
-      { loc: `${baseUrl}/?cat=premium`, changefreq: 'daily', priority: '0.9' }
+      { loc: `${baseUrl}/?cat=trends`, changefreq: 'daily', priority: '0.9' }
     ];
 
     staticPages.forEach(p => {
@@ -1910,6 +1918,7 @@ app.use((req, res, next) => {
     let pageTitle = 'Naija Homemade Videos - NaijaPorn & Trending Nigerian Creators | Naijahomemade';
     let description = 'Watch Best Naija Homemade porn videos for free on Naijahomemade.com. Discover high quality Most Relevant Naija XXX movies, leaks, and verified creator clips.';
     let canonicalUrl = `${frontendUrl}/`;
+    let robots = 'index, follow, max-image-preview:large, max-video-preview:-1';
 
     if (req.path === '/explore') {
       pageTitle = 'Explore Trending Nigerian Homemade Videos & Creators | NaijaHomemade';
@@ -1937,6 +1946,7 @@ app.use((req, res, next) => {
         pageTitle = 'VIP Premium Nigerian Creators & Videos | NaijaHomemade';
         description = 'Access VIP premium content from top verified Nigerian homemade creators and exclusive series on NaijaHomemade.';
         canonicalUrl = `${frontendUrl}/?cat=premium`;
+        robots = 'noindex, follow';
       }
     }
 
@@ -1972,7 +1982,8 @@ app.use((req, res, next) => {
       canonicalUrl,
       appName,
       schema,
-      isVideo: false
+      isVideo: false,
+      robots
     });
 
     let html = getTemplate();
