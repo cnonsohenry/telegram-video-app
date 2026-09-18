@@ -653,41 +653,97 @@ app.get("/api/video", async (req, res) => {
     if (video.category === "premium") {
       let isAuthorized = false;
       const authHeader = req.headers["authorization"];
-      const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+      const token = (authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null) || req.query.token;
 
       if (token) {
         try {
           const decoded = jwt.verify(token, JWT_SECRET);
           const userId = decoded.id;
-          const userRole = decoded.role;
 
-          if (userRole === "admin") {
-            isAuthorized = true;
-          } else {
-            const uploaderId = video.uploader_id ? String(video.uploader_id) : null;
-            if (uploaderId && (String(userId) === uploaderId || String(decoded.telegram_user_id) === uploaderId)) {
+          // Fetch requesting user's profile from app_users
+          const userRes = await pool.query(
+            "SELECT id, username, role, is_premium, is_creator, telegram_user_id FROM app_users WHERE id = $1",
+            [userId]
+          );
+
+          if (userRes.rows.length > 0) {
+            const currentUser = userRes.rows[0];
+
+            // 1. Admins have universal platform playback access
+            if (currentUser.role === "admin" || decoded.role === "admin") {
               isAuthorized = true;
-            } else {
+            }
+
+            // 2. Resolve video's creator details (if uploader_id is present)
+            let videoCreator = null;
+            if (!isAuthorized && video.uploader_id) {
+              const creatorRes = await pool.query(
+                `SELECT id, username, telegram_user_id, role, is_creator 
+                 FROM app_users 
+                 WHERE id = $1 OR (telegram_user_id IS NOT NULL AND telegram_user_id = $1)
+                 LIMIT 1`,
+                [video.uploader_id]
+              );
+              if (creatorRes.rows.length > 0) {
+                videoCreator = creatorRes.rows[0];
+              }
+            }
+
+            // 3. Ownership check: Allow creators to watch their own videos
+            if (!isAuthorized) {
+              const uploaderIdStr = video.uploader_id ? String(video.uploader_id) : null;
+              const currentUserIdStr = String(currentUser.id);
+              const currentTgIdStr = currentUser.telegram_user_id ? String(currentUser.telegram_user_id) : null;
+
+              if (uploaderIdStr && (uploaderIdStr === currentUserIdStr || (currentTgIdStr && uploaderIdStr === currentTgIdStr))) {
+                isAuthorized = true;
+              } else if (videoCreator) {
+                if (videoCreator.id === currentUser.id) {
+                  isAuthorized = true;
+                } else if (videoCreator.telegram_user_id && currentTgIdStr && String(videoCreator.telegram_user_id) === currentTgIdStr) {
+                  isAuthorized = true;
+                } else if (videoCreator.username && currentUser.username && videoCreator.username.toLowerCase() === currentUser.username.toLowerCase()) {
+                  isAuthorized = true;
+                }
+              }
+            }
+
+            // 4. Platform VIP Check (Official NaijaHomemade VIP series)
+            if (!isAuthorized && currentUser.is_premium) {
+              const isOfficialSeries = !video.uploader_id ||
+                String(video.uploader_id) === "1881815190" ||
+                String(video.uploader_id) === "458" ||
+                (videoCreator?.username && videoCreator.username.toLowerCase().includes("naijahomemade"));
+
+              if (isOfficialSeries) {
+                isAuthorized = true;
+              }
+            }
+
+            // 5. Active Creator Subscription Check
+            if (!isAuthorized) {
+              const uploaderTarget = video.uploader_id || "1881815190";
+              const targetUsername = videoCreator?.username || (!video.uploader_id ? "naijahomemade" : null);
+
               const subCheck = await pool.query(
                 `SELECT 1 FROM creator_subscriptions cs
-                 WHERE cs.subscriber_id = $1 
+                 WHERE (cs.subscriber_id = $1 OR ($2::BIGINT IS NOT NULL AND cs.subscriber_id = $2::BIGINT))
                    AND (
-                     cs.creator_id = $2 
-                     OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2)
-                     OR cs.creator_id IN (SELECT id FROM app_users WHERE id = $2)
+                     cs.creator_id = $3::BIGINT
+                     OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $3::BIGINT OR id = $3::BIGINT)
+                     OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id = $3::BIGINT OR telegram_user_id = $3::BIGINT)
+                     ${targetUsername ? "OR cs.creator_id IN (SELECT id FROM app_users WHERE LOWER(username) = LOWER($4)) OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE LOWER(username) = LOWER($4) AND telegram_user_id IS NOT NULL)" : ""}
                    )
                    AND cs.status = 'active'
                    AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
                  LIMIT 1`,
-                [userId, video.uploader_id]
+                targetUsername 
+                  ? [currentUser.id, currentUser.telegram_user_id || null, uploaderTarget, targetUsername]
+                  : [currentUser.id, currentUser.telegram_user_id || null, uploaderTarget]
               );
+
               if (subCheck.rows.length > 0) {
                 isAuthorized = true;
-              } else {
-                const userRes = await pool.query("SELECT is_premium FROM app_users WHERE id = $1", [userId]);
-                if (userRes.rows[0]?.is_premium && (!video.uploader_id || String(video.uploader_id) === "1881815190" || String(video.uploader_id) === "458")) {
-                  isAuthorized = true;
-                }
               }
             }
           }
@@ -1405,9 +1461,12 @@ app.get("/api/video/details", async (req, res) => {
     if (!message_id) return res.status(400).json({ error: "Missing message_id" });
 
     const result = await pool.query(`
-      SELECT v.chat_id, v.message_id, v.caption, v.views, v.uploader_id, u.username as uploader_name 
+      SELECT v.chat_id, v.message_id, v.caption, v.views, v.uploader_id, v.category,
+             COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+             COALESCE(au.username, u.username, 'creator') as uploader_handle
       FROM videos v 
       LEFT JOIN users u ON v.uploader_id = u.user_id 
+      LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
       WHERE v.message_id = $1 LIMIT 1
     `, [message_id]);
 
@@ -1440,9 +1499,9 @@ app.get("/api/interactions/state/:message_id", authenticateToken, async (req, re
           `SELECT 1 FROM creator_follows cf
            WHERE cf.follower_id = $1 
              AND (
-               cf.creator_id = $2 
-               OR cf.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2)
-               OR cf.creator_id IN (SELECT id FROM app_users WHERE id = $2)
+               cf.creator_id = $2::BIGINT 
+               OR cf.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2::BIGINT OR id = $2::BIGINT)
+               OR cf.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id = $2::BIGINT OR telegram_user_id = $2::BIGINT)
              )
            LIMIT 1`,
           [user_id, uploaderId]
@@ -1451,9 +1510,9 @@ app.get("/api/interactions/state/:message_id", authenticateToken, async (req, re
           `SELECT 1 FROM creator_subscriptions cs
            WHERE cs.subscriber_id = $1 
              AND (
-               cs.creator_id = $2 
-               OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2)
-               OR cs.creator_id IN (SELECT id FROM app_users WHERE id = $2)
+               cs.creator_id = $2::BIGINT 
+               OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2::BIGINT OR id = $2::BIGINT)
+               OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id = $2::BIGINT OR telegram_user_id = $2::BIGINT)
              )
              AND cs.status = 'active'
              AND (cs.expires_at IS NULL OR cs.expires_at > NOW())

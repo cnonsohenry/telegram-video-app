@@ -36,7 +36,7 @@ export const authenticateToken = (req, res, next) => {
   const token = authHeader.split(" ")[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = { id: decoded.id }; 
+    req.user = { id: decoded.id, role: decoded.role }; 
     next();
   } catch (err) {
     res.status(401).json({ error: "Session expired" });
@@ -142,7 +142,7 @@ router.post("/google", async (req, res) => {
     ]);
     user.subscriptions = userSubs;
     user.follows = userFolls;
-    const appToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "30d" });
+    const appToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "30d" });
 
     res.json({ token: appToken, user });
   } catch (err) {
@@ -242,7 +242,7 @@ router.post("/register", async (req, res) => {
       React.createElement(WelcomeEmail, { username: desiredUsername })
     ).catch(e => console.error("[WELCOME EMAIL ERROR]", e.message));
 
-    const token = jwt.sign({ id: newUser.rows[0].id }, JWT_SECRET, { expiresIn: "30d" });
+    const token = jwt.sign({ id: newUser.rows[0].id, role: newUser.rows[0].role }, JWT_SECRET, { expiresIn: "30d" });
     const userData = newUser.rows[0];
     userData.subscriptions = [];
     userData.follows = [];
@@ -274,7 +274,7 @@ router.post("/login", async (req, res) => {
     const validPass = await bcrypt.compare(password, user.password_hash);
     if (!validPass) return res.status(400).json({ error: "Invalid password" });
 
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "30d" });
+    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "30d" });
     const { password_hash, ...userData } = user;
     const [userSubs, userFolls] = await Promise.all([
       getUserSubscriptions(user.id),
