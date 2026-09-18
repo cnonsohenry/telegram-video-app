@@ -61,6 +61,10 @@ export default function AdminUpload({ onClose }) {
   const [instagramUrl, setInstagramUrl] = useState("");
   const [instagramStatus, setInstagramStatus] = useState("idle"); 
 
+  // 🟢 NEW: TikTok Import State
+  const [tiktokUrl, setTiktokUrl] = useState("");
+  const [tiktokStatus, setTiktokStatus] = useState("idle"); 
+
   const processingLock = useRef(false);
 
   useEffect(() => {
@@ -598,6 +602,86 @@ export default function AdminUpload({ onClose }) {
     }
   };
 
+  const handleTiktokImport = async (e) => {
+    e.preventDefault();
+    if (processingLock.current) return;
+    if (!tiktokUrl) return alert("Please enter a TikTok URL");
+
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Authentication required. Please log into the Admin Dashboard first.");
+
+    processingLock.current = true;
+    setTiktokStatus("processing");
+
+    const endpoint = pipelineRoute === "direct" 
+        ? `${APP_CONFIG.apiUrl}/twitter-api/import-tiktok-direct`
+        : `${APP_CONFIG.apiUrl}/twitter-api/import-tiktok-telethon`;
+
+    const finalUploaderId = uploaderId || "1881815190";
+    const finalCreatorUsername = creatorUsername || "naijahomemade";
+    const finalCreatorDisplayName = creatorDisplayName || "Naija Homemade Series";
+
+    const { start: ttStart, duration: ttDur } = getTrimRange();
+    const queryParams = new URLSearchParams({
+      creator_username: finalCreatorUsername,
+      creator_display_name: finalCreatorDisplayName,
+      uploader_id: finalUploaderId
+    });
+    if (trimMode !== "full") {
+      queryParams.set("trim_mode", trimMode);
+      queryParams.set("trim_duration", ttDur.toString());
+      queryParams.set("trim_start", ttStart.toString());
+    }
+    if (token) {
+      queryParams.set("token", token);
+    }
+    const callbackUrl = `${APP_CONFIG.apiUrl}/api/admin/upload-premium?${queryParams.toString()}`;
+
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          url: tiktokUrl,
+          admin_id: finalUploaderId, 
+          creator_username: finalCreatorUsername,
+          creator_display_name: finalCreatorDisplayName,
+          category: category,
+          telegram_dest: telegramDest,
+          upload_target: uploadTarget,
+          callback_url: callbackUrl,
+          apply_watermark: applyWatermark,
+          trim_mode: trimMode,
+          trim_duration: ttDur,
+          trim_start: ttStart
+        }),
+      });
+
+      const data = await parseApiResponse(res, "TikTok Import");
+
+      if (res.ok) {
+        setTiktokStatus("success");
+        autoShareToTelegram(data, "🎵 Fresh TikTok viral drop!");
+        setTimeout(() => {
+          setTiktokStatus("idle");
+          setTiktokUrl("");
+        }, 3000);
+      } else {
+        setTiktokStatus("error");
+        alert(data.error || data.detail || data.message || "Import failed. Check the TikTok URL.");
+      }
+    } catch (err) {
+      setTiktokStatus("error");
+      console.error("TikTok Import error:", err);
+      alert(err.message || "Network Error: Is the FastAPI server running?");
+    } finally {
+      processingLock.current = false; 
+    }
+  };
+
   return (
     <div style={fullscreenContainerStyle}>
       {/* Instagram-style Top Navigation Bar */}
@@ -615,33 +699,39 @@ export default function AdminUpload({ onClose }) {
 
       <div style={scrollAreaStyle}>
         <div style={innerContentStyle}>
-          {/* 🟢 NEW: 4-Way Tabs Container */}
+          {/* 🟢 5-Way Tabs Container */}
           <div style={tabsContainerStyle}>
-          <button 
-            onClick={() => setUploadMode("local")} 
-            style={{ ...tabStyle, padding: "8px 4px", background: uploadMode === "local" ? "#333" : "transparent", color: uploadMode === "local" ? "#fff" : "#666" }}
-          >
-            Local
-          </button>
-          <button 
-            onClick={() => setUploadMode("twitter")} 
-            style={{ ...tabStyle, padding: "8px 4px", background: uploadMode === "twitter" ? "#1DA1F220" : "transparent", color: uploadMode === "twitter" ? "#1DA1F2" : "#666" }}
-          >
-            Twitter
-          </button>
-          <button 
-            onClick={() => setUploadMode("instagram")} 
-            style={{ ...tabStyle, padding: "8px 4px", background: uploadMode === "instagram" ? "#E1306C20" : "transparent", color: uploadMode === "instagram" ? "#E1306C" : "#666" }}
-          >
-            Instagram
-          </button>
-          <button 
-            onClick={() => setUploadMode("telegram")} 
-            style={{ ...tabStyle, padding: "8px 4px", background: uploadMode === "telegram" ? "#0088cc20" : "transparent", color: uploadMode === "telegram" ? "#0088cc" : "#666" }}
-          >
-            Telegram
-          </button>
-        </div>
+            <button 
+              onClick={() => setUploadMode("local")} 
+              style={{ ...tabStyle, padding: "8px 2px", background: uploadMode === "local" ? "#333" : "transparent", color: uploadMode === "local" ? "#fff" : "#888" }}
+            >
+              Local
+            </button>
+            <button 
+              onClick={() => setUploadMode("twitter")} 
+              style={{ ...tabStyle, padding: "8px 2px", background: uploadMode === "twitter" ? "#1DA1F220" : "transparent", color: uploadMode === "twitter" ? "#1DA1F2" : "#888" }}
+            >
+              Twitter
+            </button>
+            <button 
+              onClick={() => setUploadMode("instagram")} 
+              style={{ ...tabStyle, padding: "8px 2px", background: uploadMode === "instagram" ? "#E1306C20" : "transparent", color: uploadMode === "instagram" ? "#E1306C" : "#888" }}
+            >
+              Instagram
+            </button>
+            <button 
+              onClick={() => setUploadMode("tiktok")} 
+              style={{ ...tabStyle, padding: "8px 2px", background: uploadMode === "tiktok" ? "#ff005020" : "transparent", color: uploadMode === "tiktok" ? "#ff0050" : "#888" }}
+            >
+              TikTok
+            </button>
+            <button 
+              onClick={() => setUploadMode("telegram")} 
+              style={{ ...tabStyle, padding: "8px 2px", background: uploadMode === "telegram" ? "#0088cc20" : "transparent", color: uploadMode === "telegram" ? "#0088cc" : "#888" }}
+            >
+              Telegram
+            </button>
+          </div>
 
         {/* 🟢 SHARED INPUTS */}
         <div style={formStyle}>
@@ -1133,6 +1223,52 @@ export default function AdminUpload({ onClose }) {
               style={{ ...buttonStyle, background: instagramStatus === "processing" ? "#333" : instagramStatus === "success" ? "#4cd964" : instagramStatus === "error" ? "#ff3b30" : "#E1306C" }}
             >
               {instagramStatus === "processing" ? <><Loader2 className="spin" size={18} /> Extracting & Uploading...</> : instagramStatus === "success" ? <><CheckCircle size={18} /> Successfully Imported!</> : instagramStatus === "error" ? <><AlertCircle size={18} /> Import Failed.</> : "Import Reel / Post"}
+            </button>
+          </form>
+        )}
+
+        {/* 🟢 TIKTOK IMPORT */}
+        {uploadMode === "tiktok" && (
+          <form onSubmit={handleTiktokImport} style={formStyle}>
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>Routing Pipeline</label>
+              <select value={pipelineRoute} onChange={(e) => setPipelineRoute(e.target.value)} style={inputStyle}>
+                <option value="direct">⚡ Direct to Cloudflare</option>
+                <option value="telethon">🤖 Send to Telegram Bot</option>
+              </select>
+            </div>
+
+            {pipelineRoute === "telethon" && (
+              <div style={inputGroupStyle}>
+                <label style={labelStyle}>Telegram Destination</label>
+                <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
+                  {APP_CONFIG.telegramDestinations.map(dest => (
+                    <option key={dest.id} value={dest.id}>{dest.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div style={inputGroupStyle}>
+              <label style={labelStyle}>TikTok Link</label>
+              <div style={{ position: "relative" }}>
+                <Link size={18} color="#888" style={{ position: "absolute", left: "12px", top: "12px" }} />
+                <input 
+                  type="url" 
+                  placeholder="https://www.tiktok.com/@user/video/... or https://vm.tiktok.com/..." 
+                  value={tiktokUrl}
+                  onChange={(e) => setTiktokUrl(e.target.value)}
+                  style={{ ...inputStyle, paddingLeft: "40px" }}
+                  required
+                />
+              </div>
+            </div>
+
+            <button 
+              type="submit" disabled={tiktokStatus === "processing"}
+              style={{ ...buttonStyle, background: tiktokStatus === "processing" ? "#333" : tiktokStatus === "success" ? "#4cd964" : tiktokStatus === "error" ? "#ff3b30" : "#ff0050" }}
+            >
+              {tiktokStatus === "processing" ? <><Loader2 className="spin" size={18} /> Extracting & Uploading...</> : tiktokStatus === "success" ? <><CheckCircle size={18} /> Successfully Imported!</> : tiktokStatus === "error" ? <><AlertCircle size={18} /> Import Failed.</> : "Import TikTok Video"}
             </button>
           </form>
         )}
