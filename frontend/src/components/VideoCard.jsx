@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { Play, Copy, Lock } from 'lucide-react';
 
 import { APP_CONFIG } from "../config";
+import { renderClickableCaption } from "./ClickableCaption";
 
-export default function VideoCard({ video, onOpen, showDetails = true, priority = false }) {
+export default function VideoCard({ video, onOpen, showDetails = true, priority = false, onCreatorClick }) {
   const videoRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -237,7 +238,7 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
       {showDetails && (
         <div style={{ padding: "12px 4px", display: "flex", flexDirection: "column", flexShrink: 0 }}>
           <p style={captionTextStyle}>
-            {video.caption || APP_CONFIG.defaultCaption}
+            {renderClickableCaption(video.caption || APP_CONFIG.defaultCaption, onCreatorClick)}
           </p>
           
           <div 
@@ -247,7 +248,11 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
               if (handle) {
                 e.preventDefault();
                 e.stopPropagation();
-                window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: handle }));
+                if (onCreatorClick) {
+                  onCreatorClick(handle);
+                } else {
+                  window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: handle }));
+                }
               }
             }}
             title={video.uploader_handle ? `View @${video.uploader_handle}'s profile` : (video.uploader_name ? `View ${video.uploader_name}'s profile` : "")}

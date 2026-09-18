@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X, Send, Loader2 } from "lucide-react";
 import { APP_CONFIG } from "../config";
+import { renderClickableCaption } from "./ClickableCaption";
 
 export default function CommentSectionModal({ video, onClose }) {
   const [comments, setComments] = useState([]);
@@ -85,10 +86,18 @@ export default function CommentSectionModal({ video, onClose }) {
                 <div key={c.id} style={commentItemStyle}>
                   <img src={c.avatar_url || '/assets/default-avatar.png'} alt="avatar" style={commentAvatarStyle} />
                   <div style={commentContentWrapper}>
-                    <span style={commentUsernameStyle}>
+                    <span 
+                      style={{ ...commentUsernameStyle, cursor: "pointer" }}
+                      onClick={() => {
+                        if (c.username) {
+                          window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: c.username }));
+                        }
+                      }}
+                      title={`View @${c.username}'s profile`}
+                    >
                       @{c.username} <span style={commentDateStyle}>{new Date(c.created_at).toLocaleDateString()}</span>
                     </span>
-                    <p style={commentText}>{c.content}</p>
+                    <p style={commentText}>{renderClickableCaption(c.content)}</p>
                   </div>
                 </div>
               ))

@@ -11,6 +11,7 @@ import { APP_CONFIG } from "../config";
 import { getVideoCreatorHandle, isUserFollowingCreator } from "../utils/subscription";
 import { shouldPlayVastAd, recordVastAdPlayed, getVastConfig } from "../utils/adManager";
 import { fetchVastAd, sendVastBeacons } from "../utils/vastParser";
+import { renderClickableCaption } from "./ClickableCaption";
 
 export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick, onCreatorClick }) {
   const videoRef = useRef(null);
@@ -161,14 +162,17 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     }
   };
 
-  const handleCreatorClick = (e) => {
+  const handleCreatorClick = (e, customHandle) => {
     e?.stopPropagation?.();
     if (videoRef.current) {
       videoRef.current.pause();
       setIsPlaying(false);
     }
+    const targetHandle = customHandle || creatorHandle;
     if (onCreatorClick) {
-      onCreatorClick(creatorHandle);
+      onCreatorClick(targetHandle);
+    } else {
+      window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: targetHandle }));
     }
   };
 
@@ -1009,7 +1013,9 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                           </button>
                         )}
                       </div>
-                      <div style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</div>
+                      <div style={captionStyle}>
+                        {renderClickableCaption(video.caption || APP_CONFIG.defaultCaption, (handle) => handleCreatorClick(null, handle))}
+                      </div>
                    </div>
                 </div>
 

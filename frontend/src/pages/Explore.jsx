@@ -4,6 +4,7 @@ import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
 import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
+import { renderClickableCaption } from "../components/ClickableCaption";
 
 // 🟢 INDIVIDUAL POST COMPONENT
 const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen, onCreatorClick, user }) => {
@@ -332,7 +333,9 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
           <span style={timeStyle}>&middot; {new Date(video.created_at).toLocaleDateString()} &middot; {isPremium ? "VIP Exclusive" : video.category}</span>
         </div>
 
-        <p style={captionStyle}>{video.caption || APP_CONFIG.defaultCaption}</p>
+        <p style={captionStyle}>
+          {renderClickableCaption(video.caption || APP_CONFIG.defaultCaption, onCreatorClick)}
+        </p>
 
         {/* 🟢 Album: Separate videos with clear boundaries, aligned horizontally and swipable */}
         {isAlbum && albumVideos.length > 1 ? (

@@ -3,6 +3,7 @@ import { Play, Lock } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
+import { renderClickableCaption } from "./ClickableCaption";
 
 export default function SuggestedSidebar({ onVideoClick }) {
   const [suggestions, setSuggestions] = useState([]);
@@ -80,8 +81,7 @@ export default function SuggestedSidebar({ onVideoClick }) {
                   lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", 
                   WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" 
                 }}>
-                  {/* 🟢 THE FIX: Dynamic Default Caption */}
-                  {v.caption || APP_CONFIG.defaultCaption}
+                  {renderClickableCaption(v.caption || APP_CONFIG.defaultCaption)}
                 </p>
                 <div style={{ color: "#8e8e8e", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
                   <Play size={10} fill="#8e8e8e" strokeWidth={0} />

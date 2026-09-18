@@ -318,8 +318,9 @@ export default function App() {
 
   // 🟢 Seamless Creator Profile navigation
   const handleOpenCreator = useCallback((target, options = {}) => {
-    if (!target) return;
-    const username = typeof target === 'string' ? target : (target.username || target.creatorUsername);
+    const rawUsername = typeof target === 'string' ? target : (target.username || target.creatorUsername);
+    if (!rawUsername) return;
+    const username = String(rawUsername).replace(/^@/, '').trim();
     if (!username) return;
 
     if (activeVideoRef.current) {

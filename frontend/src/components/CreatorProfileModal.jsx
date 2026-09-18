@@ -50,11 +50,12 @@ export default function CreatorProfileModal({
 
     const fetchCreator = async () => {
       try {
+        const cleanUsername = String(creatorUsername || "").replace(/^@/, "").trim();
         const token = localStorage.getItem("token");
         const headers = {};
         if (token) headers.Authorization = `Bearer ${token}`;
 
-        const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorUsername)}`, { headers });
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUsername)}`, { headers });
         if (!res.ok) throw new Error("Creator not found");
 
         const data = await res.json();
@@ -93,7 +94,8 @@ export default function CreatorProfileModal({
     setLoadingMoreVideos(true);
     const nextPage = videoPage + 1;
     try {
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorUsername)}/videos?page=${nextPage}&limit=12`);
+      const cleanUsername = String(creatorUsername || "").replace(/^@/, "").trim();
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUsername)}/videos?page=${nextPage}&limit=12`);
       const data = await res.json();
       if (data?.videos && data.videos.length > 0) {
         setVideos(prev => {

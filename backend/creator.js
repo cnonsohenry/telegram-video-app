@@ -12,6 +12,12 @@ import { uploadVideoToR2, deleteMediaFromR2, R2_PUBLIC_DOMAIN } from "./r2.js";
 
 const router = express.Router();
 
+// Automatically strip leading @ from :username param across all creator routes
+router.param("username", (req, res, next, val) => {
+  req.params.username = val ? String(val).replace(/^@/, "").trim() : val;
+  next();
+});
+
 const upload = multer({ 
   dest: "uploads/",
   limits: {
