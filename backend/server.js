@@ -46,7 +46,11 @@ process.on('unhandledRejection', (reason, promise) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ALLOWED_USERS = [1881815190, 993163169, 5806906139, 5441995861];
+const API_SECRETS = [
+  process.env.SIGNING_SECRET,
+  process.env.JWT_SECRET,
+  process.env.ADMIN_PASSWORD
+].filter(Boolean);
 const agent = new https.Agent({ family: 4 });
 
 const app = express();
@@ -371,121 +375,11 @@ async function uploadThumbnailToR2(thumbFileId, chatId, messageId) {
 }
 
 /* =====================
-   Webhook
+   Webhook (Legacy - Deprecated)
 ===================== */
-app.post("/webhook", async (req, res) => {
-  try {
-    const update = req.body;
-    const message = update.message || update.channel_post || update.edited_message;
-    if (!message) return res.sendStatus(200);
-
-    const userId = message.from?.id;
-    if (!userId || !ALLOWED_USERS.includes(userId)) return res.sendStatus(200); 
-
-    const username = message.from.username || null;
-    const fullName = message.from.first_name || 'Member';
-
-    await pool.query(
-      `INSERT INTO users (user_id, username, full_name)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (user_id) 
-       DO UPDATE SET username = EXCLUDED.username, full_name = EXCLUDED.full_name`,
-      [userId, username, fullName]
-    );
-
-    // Sync uploader into app_users as managed creator
-    try {
-      const tgUsername = username ? username.toLowerCase().replace(/[^a-z0-9_]/g, '') : `tg_${userId}`;
-      const existingTg = await pool.query(
-        "SELECT id FROM app_users WHERE telegram_user_id = $1 OR (username IS NOT NULL AND LOWER(username) = LOWER($2))",
-        [userId, tgUsername]
-      );
-      if (existingTg.rows.length === 0) {
-        const uCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [tgUsername]);
-        const safeUname = uCheck.rows.length > 0 ? `${tgUsername}_${userId.toString().slice(-4)}` : tgUsername;
-        await pool.query(
-          `INSERT INTO app_users (
-             username, display_name, email, is_creator, is_managed, 
-             telegram_user_id, creator_category, subscription_price, is_verified, 
-             banner_url, creator_bio, avatar_url
-           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15, TRUE, 
-             'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
-             'Official creator channel. Catch all exclusive drops and daily previews here.',
-             $5
-           )
-           ON CONFLICT (telegram_user_id) DO UPDATE 
-           SET is_creator = TRUE, is_managed = TRUE`,
-          [safeUname, fullName, `tg_${userId}@internal.naijahomemade.com`, userId, `/api/avatar?user_id=${userId}`]
-        );
-      } else {
-        await pool.query(
-          "UPDATE app_users SET is_creator = TRUE, is_managed = TRUE, telegram_user_id = COALESCE(telegram_user_id, $1) WHERE id = $2",
-          [userId, existingTg.rows[0].id]
-        );
-      }
-    } catch (auErr) {
-      console.warn("[TELEGRAM WEBHOOK] Managed creator sync notice:", auErr.message);
-    }
-
-    const media = message.video || 
-                  (message.document && message.document.mime_type?.startsWith("video/")) || 
-                  message.video_note || 
-                  message.animation;
-
-    if (!media) return res.sendStatus(200);
-
-    const rawCaption = message.caption || "";
-    let category = "hotties"; 
-    
-    if (rawCaption.toLowerCase().includes("#knacks")) category = "knacks";
-    else if (rawCaption.toLowerCase().includes("#baddies")) category = "baddies";
-    else if (rawCaption.toLowerCase().includes("#trends")) category = "trends";
-    else if (rawCaption.toLowerCase().includes("#shots")) category = "shots";
-    else if (rawCaption.toLowerCase().includes("#premium")) category = "premium"; 
-    else if (rawCaption.toLowerCase().includes("#hotties")) category = "hotties";
-
-    let cleanCaption = rawCaption.replace(/#\w+/g, "").trim();
-
-    const chatId = (message.forward_from_chat?.id ?? message.chat.id).toString();
-    const messageId = (message.forward_from_message_id ?? message.message_id).toString();
-    const mediaGroupId = message.media_group_id || null;
-
-    if (mediaGroupId && !rawCaption) {
-      const siblingRes = await pool.query(
-        `SELECT category, caption FROM videos WHERE media_group_id = $1 LIMIT 1`,
-        [mediaGroupId]
-      );
-      if (siblingRes.rows.length > 0) {
-        category = siblingRes.rows[0].category;
-        cleanCaption = siblingRes.rows[0].caption;
-      }
-    }
-    
-    const thumb = media.thumb || media.thumbs?.[0] || media.thumbnail || null;
-    const thumbFileId = thumb?.file_id || null;
-
-    if (thumbFileId) {
-      uploadThumbnailToR2(thumbFileId, chatId, messageId);
-    }
-
-    await pool.query(
-      `INSERT INTO videos (chat_id, message_id, file_id, thumb_file_id, uploader_id, category, caption, media_group_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (chat_id, message_id) 
-       DO UPDATE SET 
-          thumb_file_id = EXCLUDED.thumb_file_id,
-          category = EXCLUDED.category,
-          caption = EXCLUDED.caption,
-          uploader_id = EXCLUDED.uploader_id,
-          media_group_id = EXCLUDED.media_group_id`,
-      [chatId, messageId, media.file_id, thumbFileId, userId, category, cleanCaption, mediaGroupId]
-    );
-
-    res.sendStatus(200);
-  } catch (err) {
-    console.error("Webhook Error:", err.message);
-    res.sendStatus(200);
-  }
+app.post("/webhook", (req, res) => {
+  // Webhook video ingestion deprecated in favor of API upload engine
+  res.sendStatus(200);
 });
 
 /* =====================
@@ -528,9 +422,9 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       } catch (e) {}
     }
 
-    // 2. OR uploader_id is in ALLOWED_USERS (for FastAPI worker callback or Telegram admin)
-    const numericUploaderId = Number(uploader_id);
-    if (!isAuthorized && numericUploaderId && ALLOWED_USERS.includes(numericUploaderId)) {
+    // 2. OR API Key / Secret in headers or body
+    const apiKey = req.headers['x-api-key'] || req.headers['x-api-secret'] || req.body.api_key;
+    if (!isAuthorized && apiKey && API_SECRETS.includes(apiKey)) {
       isAuthorized = true;
     }
 
@@ -543,13 +437,15 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     if (!videoFile) return res.status(400).json({ error: "No video file provided" });
 
-    const finalUploaderId = (numericUploaderId && ALLOWED_USERS.includes(numericUploaderId))
-      ? numericUploaderId 
-      : (numericUploaderId || ALLOWED_USERS[0]);
+    // Handle uploader ID (channel ID, user ID, or fallback)
+    const numericUploaderId = uploader_id ? Number(uploader_id) : null;
+    const finalUploaderId = numericUploaderId || (req.body.admin_id ? Number(req.body.admin_id) : null) || 1881815190;
 
     const safeCategory = category ? category.toLowerCase().trim() : "premium";
-    const defaultUsername = safeCategory === "premium" ? "naijahomemade" : `tg_${finalUploaderId}`;
-    const defaultDisplayName = safeCategory === "premium" ? "Naija Homemade Series" : `Creator ${finalUploaderId}`;
+    const cleanIdStr = String(finalUploaderId).replace('-', '');
+    const isChannel = finalUploaderId < 0;
+    const defaultUsername = (safeCategory === "premium" && !isChannel) ? "naijahomemade" : `tg_${cleanIdStr}`;
+    const defaultDisplayName = (safeCategory === "premium" && !isChannel) ? "Naija Homemade Series" : (isChannel ? `Channel ${cleanIdStr}` : `Creator ${finalUploaderId}`);
     const targetUsername = creator_username 
       ? String(creator_username).trim().toLowerCase().replace(/[^a-z0-9_]/g, '')
       : defaultUsername;
@@ -560,8 +456,8 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       `INSERT INTO users (user_id, username, full_name)
        VALUES ($1, $2, $3)
        ON CONFLICT (user_id) DO UPDATE 
-       SET username = COALESCE(users.username, EXCLUDED.username),
-           full_name = COALESCE(users.full_name, EXCLUDED.full_name)`,
+       SET username = COALESCE(EXCLUDED.username, users.username),
+           full_name = COALESCE(EXCLUDED.full_name, users.full_name)`,
       [finalUploaderId, targetUsername, targetDisplayName]
     );
 
@@ -573,7 +469,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       );
       if (existingTg.rows.length === 0) {
         const uCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [targetUsername]);
-        const safeUname = uCheck.rows.length > 0 ? `${targetUsername}_${finalUploaderId.toString().slice(-4)}` : targetUsername;
+        const safeUname = uCheck.rows.length > 0 ? `${targetUsername}_${cleanIdStr.slice(-4)}` : targetUsername;
         await pool.query(
           `INSERT INTO app_users (
              username, display_name, email, is_creator, is_managed, 
@@ -586,7 +482,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
            )
            ON CONFLICT (telegram_user_id) DO UPDATE 
            SET is_creator = TRUE, is_managed = TRUE`,
-          [safeUname, targetDisplayName, `tg_${finalUploaderId}@internal.naijahomemade.com`, finalUploaderId, safeCategory, `/api/avatar?user_id=${finalUploaderId}`]
+          [safeUname, targetDisplayName, `tg_${cleanIdStr}@internal.naijahomemade.com`, finalUploaderId, safeCategory, `/api/avatar?user_id=${finalUploaderId}`]
         );
       } else {
         await pool.query(
@@ -1855,18 +1751,30 @@ app.get("/api/avatar", async (req, res) => {
       // Ignore DB error and proceed to Telegram photo lookup
     }
 
-    const photosRes = await axios.get(`${TELEGRAM_API}/getUserProfilePhotos`, {
-      params: { user_id, limit: 1 }
-    });
+    const numericId = Number(user_id);
+    let fileId = null;
 
-    const photos = photosRes.data.result.photos;
-    
-    // If user has no photos, redirect to default gracefully instead of returning 204
-    if (!photos || photos.length === 0) {
+    if (numericId < 0) {
+      // Telegram Channel or Supergroup photo lookup via getChat
+      const chatRes = await axios.get(`${TELEGRAM_API}/getChat`, {
+        params: { chat_id: user_id }
+      });
+      fileId = chatRes.data?.result?.photo?.big_file_id || chatRes.data?.result?.photo?.small_file_id;
+    } else {
+      // Telegram User profile photos lookup
+      const photosRes = await axios.get(`${TELEGRAM_API}/getUserProfilePhotos`, {
+        params: { user_id, limit: 1 }
+      });
+      const photos = photosRes.data?.result?.photos;
+      if (photos && photos.length > 0) {
+        fileId = photos[0][photos[0].length - 1]?.file_id || photos[0][0]?.file_id;
+      }
+    }
+
+    if (!fileId) {
       return res.redirect('/assets/default-avatar.png');
     }
 
-    const fileId = photos[0][0].file_id;
     const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId } });
     const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
     
