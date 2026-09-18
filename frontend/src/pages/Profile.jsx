@@ -16,6 +16,7 @@ import { useVideos } from "../hooks/useVideos";
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
+import { showToast } from "../utils/toast";
 
 export default function Profile({ 
   user, 
@@ -370,7 +371,7 @@ export default function Profile({
           scrollContainerRef.current.scrollTop = 0;
         }
       } catch (err) {
-        alert("🚨 Failed to load album contents.");
+        showToast("🚨 Failed to load album contents.", "error");
       }
       return;
     }
@@ -419,7 +420,7 @@ export default function Profile({
       }).catch(() => {});
     } else {
       navigator.clipboard.writeText(shareUrl);
-      alert("Profile link copied to clipboard!");
+      showToast("Profile link copied to clipboard!", "success");
     }
   };
 

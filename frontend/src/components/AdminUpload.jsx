@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   ArrowLeft, Upload, CheckCircle, AlertCircle, Loader2, Video, 
-  FileVideo, Twitter, Link, X, Send, Instagram, Scissors, Play, Pause, Clock 
+  FileVideo, Twitter, Link, X, Send, Instagram, Scissors, Play, Pause, Clock,
+  ChevronDown, Check, Plus, Search, Sparkles, Bot, Zap, HardDrive, Droplets
 } from "lucide-react";
 
-// 🟢 IMPORT YOUR CENTRAL CONFIG
+// 🟢 IMPORT YOUR CENTRAL CONFIG & UTILITIES
 import { APP_CONFIG } from "../config";
+import { showToast } from "../utils/toast";
 
 // Preset Creators & Channels aligned with forwarder tasks
 const PRESET_CREATORS = [
@@ -15,6 +17,452 @@ const PRESET_CREATORS = [
   { username: "nh_shorts", displayName: "NH Shorts", uploaderId: "-1003950008310", label: "⚡ NH Shorts (@nh_shorts)" },
   { username: "nh_knacks", displayName: "NH Knacks", uploaderId: "-1003997134224", label: "🍑 NH Knacks (@nh_knacks)" },
 ];
+
+function CreatorDropdown({ creators, selectedKey, onSelect }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const selectedCreator = creators.find(c => c.username === selectedKey);
+  const filteredCreators = creators.filter(c => 
+    !search || 
+    (c.displayName && c.displayName.toLowerCase().includes(search.toLowerCase())) || 
+    (c.username && c.username.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  return (
+    <div ref={dropdownRef} style={{ position: "relative", width: "100%" }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          background: "#1c1c1f",
+          border: isOpen ? "1px solid var(--primary-color, #e11d48)" : "1px solid #333338",
+          borderRadius: "12px",
+          padding: "10px 14px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+          color: "#fff",
+          transition: "all 0.2s ease",
+          textAlign: "left",
+          outline: "none"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, overflow: "hidden" }}>
+          <div style={{
+            width: "32px",
+            height: "32px",
+            borderRadius: "50%",
+            background: selectedKey === "custom" 
+              ? "rgba(255, 165, 0, 0.2)" 
+              : "linear-gradient(135deg, rgba(225,29,72,0.4), rgba(255,255,255,0.05))",
+            border: selectedKey === "custom" ? "1px solid #ffa500" : "1px solid rgba(255,255,255,0.15)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            fontSize: "14px"
+          }}>
+            {selectedKey === "custom" ? "⚙️" : (selectedCreator?.displayName?.charAt(0) || "👤")}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+            <span style={{ fontSize: "14px", fontWeight: "700", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {selectedKey === "custom" ? "Custom Creator / Channel" : (selectedCreator?.displayName || "Select Creator")}
+            </span>
+            <span style={{ fontSize: "11px", color: selectedKey === "custom" ? "#ffa500" : "#888", whiteSpace: "nowrap" }}>
+              {selectedKey === "custom" ? "Manual Attribution Override" : `@${selectedCreator?.username || "unassigned"}`}
+            </span>
+          </div>
+        </div>
+        <ChevronDown 
+          size={18} 
+          color="#aaa" 
+          style={{ 
+            transition: "transform 0.2s ease",
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            flexShrink: 0,
+            marginLeft: "8px"
+          }} 
+        />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 6px)",
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+          background: "#18181b",
+          border: "1px solid #33333a",
+          borderRadius: "14px",
+          boxShadow: "0 16px 36px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.05)",
+          backdropFilter: "blur(20px)",
+          overflow: "hidden",
+          animation: "dropdownFadeIn 0.15s ease-out"
+        }}>
+          {creators.length > 5 && (
+            <div style={{ padding: "8px 10px", borderBottom: "1px solid #28282c" }}>
+              <div style={{ position: "relative" }}>
+                <Search size={14} color="#777" style={{ position: "absolute", left: "10px", top: "9px" }} />
+                <input
+                  type="text"
+                  placeholder="Search creators..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    background: "#222226",
+                    border: "1px solid #333338",
+                    borderRadius: "8px",
+                    padding: "6px 10px 6px 30px",
+                    fontSize: "12px",
+                    color: "#fff",
+                    outline: "none"
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div style={{ maxHeight: "240px", overflowY: "auto", padding: "6px" }}>
+            {filteredCreators.map(c => {
+              const isSelected = selectedKey === c.username;
+              return (
+                <div
+                  key={c.username}
+                  onClick={() => {
+                    onSelect(c.username);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    background: isSelected ? "rgba(225, 29, 72, 0.15)" : "transparent",
+                    color: isSelected ? "#fff" : "#ccc",
+                    transition: "background 0.15s"
+                  }}
+                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#242428"; }}
+                  onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                    <div style={{
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "50%",
+                      background: isSelected ? "var(--primary-color, #e11d48)" : "#2a2a2e",
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "12px",
+                      fontWeight: "700",
+                      flexShrink: 0
+                    }}>
+                      {c.displayName?.charAt(0) || "👤"}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                      <span style={{ fontSize: "13px", fontWeight: isSelected ? "700" : "500", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {c.displayName}
+                      </span>
+                      <span style={{ fontSize: "11px", color: isSelected ? "rgba(255,255,255,0.8)" : "#777" }}>
+                        @{c.username}
+                      </span>
+                    </div>
+                  </div>
+                  {isSelected && <Check size={16} color="var(--primary-color, #e11d48)" style={{ flexShrink: 0, marginLeft: "8px" }} />}
+                </div>
+              );
+            })}
+
+            <div style={{ height: "1px", background: "#28282c", margin: "4px 0" }} />
+
+            <div
+              onClick={() => {
+                onSelect("custom");
+                setIsOpen(false);
+                setSearch("");
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 10px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                background: selectedKey === "custom" ? "rgba(255, 165, 0, 0.15)" : "transparent",
+                color: selectedKey === "custom" ? "#ffa500" : "#aaa",
+                transition: "background 0.15s"
+              }}
+              onMouseEnter={(e) => { if (selectedKey !== "custom") e.currentTarget.style.background = "#242428"; }}
+              onMouseLeave={(e) => { if (selectedKey !== "custom") e.currentTarget.style.background = "transparent"; }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  background: "#2a2a2e",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "12px",
+                  color: "#ffa500"
+                }}>
+                  <Plus size={14} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <span style={{ fontSize: "13px", fontWeight: "600", color: "#ffa500" }}>
+                    Custom Creator / Channel...
+                  </span>
+                  <span style={{ fontSize: "11px", color: "#777" }}>
+                    Enter manual handle & Telegram ID
+                  </span>
+                </div>
+              </div>
+              {selectedKey === "custom" && <Check size={16} color="#ffa500" />}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TelegramDestDropdown({ destinations, selectedDestId, onSelect }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const selectedDest = destinations.find(d => d.id === selectedDestId) || destinations[0];
+
+  return (
+    <div ref={dropdownRef} style={{ position: "relative", width: "100%" }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          background: "#1c1c1f",
+          border: isOpen ? "1px solid #0088cc" : "1px solid #333338",
+          borderRadius: "12px",
+          padding: "10px 14px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+          color: "#fff",
+          transition: "border-color 0.2s",
+          outline: "none"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "50%",
+            background: "rgba(0, 136, 204, 0.2)",
+            border: "1px solid rgba(0, 136, 204, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#0088cc"
+          }}>
+            <Send size={14} />
+          </div>
+          <span style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>
+            {selectedDest?.label || "Select Destination Channel"}
+          </span>
+        </div>
+        <ChevronDown 
+          size={18} 
+          color="#aaa" 
+          style={{ 
+            transition: "transform 0.2s ease",
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)"
+          }} 
+        />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 6px)",
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+          background: "#18181b",
+          border: "1px solid #33333a",
+          borderRadius: "14px",
+          boxShadow: "0 16px 36px rgba(0,0,0,0.85)",
+          backdropFilter: "blur(20px)",
+          padding: "6px",
+          maxHeight: "220px",
+          overflowY: "auto",
+          animation: "dropdownFadeIn 0.15s ease-out"
+        }}>
+          {destinations.map(d => {
+            const isSelected = selectedDestId === d.id;
+            return (
+              <div
+                key={d.id}
+                onClick={() => {
+                  onSelect(d.id);
+                  setIsOpen(false);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "9px 12px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  background: isSelected ? "rgba(0, 136, 204, 0.2)" : "transparent",
+                  color: isSelected ? "#fff" : "#ccc",
+                  transition: "background 0.15s"
+                }}
+                onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#242428"; }}
+                onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
+              >
+                <span style={{ fontSize: "13px", fontWeight: isSelected ? "700" : "500" }}>
+                  {d.label}
+                </span>
+                {isSelected && <Check size={16} color="#0088cc" />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RoutingPipelineControl({ pipelineRoute, setPipelineRoute, telegramDest, setTelegramDest }) {
+  return (
+    <>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <label style={{ fontSize: "12px", fontWeight: "700", color: "#888", textTransform: "uppercase" }}>
+            Routing Pipeline
+          </label>
+          <span style={{ fontSize: "11px", color: pipelineRoute === "direct" ? "var(--primary-color, #e11d48)" : "#0088cc", fontWeight: "600" }}>
+            {pipelineRoute === "direct" ? "Direct Cloudflare" : "Bot Forwarder"}
+          </span>
+        </div>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "6px",
+          background: "#161618",
+          border: "1px solid #2c2c30",
+          borderRadius: "10px",
+          padding: "4px"
+        }}>
+          <button
+            type="button"
+            onClick={() => setPipelineRoute("direct")}
+            style={{
+              padding: "10px 8px",
+              borderRadius: "8px",
+              border: "none",
+              background: pipelineRoute === "direct" ? "var(--primary-color, #e11d48)" : "transparent",
+              color: pipelineRoute === "direct" ? "#fff" : "#888",
+              fontSize: "12px",
+              fontWeight: "700",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              transition: "all 0.15s ease"
+            }}
+          >
+            <Zap size={14} />
+            <span>Direct to CF</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPipelineRoute("telethon")}
+            style={{
+              padding: "10px 8px",
+              borderRadius: "8px",
+              border: "none",
+              background: pipelineRoute === "telethon" ? "#0088cc" : "transparent",
+              color: pipelineRoute === "telethon" ? "#fff" : "#888",
+              fontSize: "12px",
+              fontWeight: "700",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              transition: "all 0.15s ease"
+            }}
+          >
+            <Bot size={14} />
+            <span>Telegram Bot</span>
+          </button>
+        </div>
+      </div>
+
+      {pipelineRoute === "telethon" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <label style={{ fontSize: "12px", fontWeight: "700", color: "#888", textTransform: "uppercase" }}>
+            Telegram Destination
+          </label>
+          <TelegramDestDropdown 
+            destinations={APP_CONFIG.telegramDestinations}
+            selectedDestId={telegramDest}
+            onSelect={(id) => setTelegramDest(id)}
+          />
+        </div>
+      )}
+    </>
+  );
+}
 
 export default function AdminUpload({ onClose }) {
   const [uploadMode, setUploadMode] = useState("local"); 
@@ -130,8 +578,8 @@ export default function AdminUpload({ onClose }) {
     }
   };
 
-  const handleCreatorChange = (e) => {
-    const val = e.target.value;
+  const handleCreatorChange = (valOrEvent) => {
+    const val = typeof valOrEvent === "string" ? valOrEvent : valOrEvent?.target?.value;
     setSelectedCreatorKey(val);
     if (val === "custom") {
       setIsCustomCreator(true);
@@ -149,8 +597,8 @@ export default function AdminUpload({ onClose }) {
     }
   };
 
-  const handleCategoryChange = (e) => {
-    const newCat = e.target.value;
+  const handleCategoryChange = (newCatOrEvent) => {
+    const newCat = typeof newCatOrEvent === "string" ? newCatOrEvent : newCatOrEvent?.target?.value;
     setCategory(newCat);
     if (!isCustomCreator) {
       if (newCat === "premium") selectCreatorByUsername("naijahomemade");
@@ -294,10 +742,10 @@ export default function AdminUpload({ onClose }) {
   const handleUpload = async (e) => {
     e.preventDefault();
     if (processingLock.current) return;
-    if (!file) return alert("Please select a video file");
+    if (!file) return showToast("Please select a video file", "error");
 
     const token = localStorage.getItem("token");
-    if (!token) return alert("Authentication required. Please log into the Admin Dashboard first.");
+    if (!token) return showToast("Authentication required. Please log into the Admin Dashboard first.", "error");
 
     processingLock.current = true;
     setStatus("uploading");
@@ -336,6 +784,7 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok && data.success) {
         setStatus("success");
+        showToast("Video uploaded successfully!", "success");
         autoShareToTelegram(data, caption);
         setTimeout(() => {
           setStatus("idle");
@@ -350,12 +799,12 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setStatus("error");
-        alert(data.error || data.detail || "Upload failed.");
+        showToast(data.error || data.detail || "Upload failed.", "error");
       }
     } catch (err) {
       setStatus("error");
       console.error("Upload error:", err);
-      alert(err.message || "Network Error: Could not connect to server.");
+      showToast(err.message || "Network Error: Could not connect to server.", "error");
     } finally {
       processingLock.current = false;
     }
@@ -364,10 +813,10 @@ export default function AdminUpload({ onClose }) {
   const handleTwitterImport = async (e) => {
     e.preventDefault();
     if (processingLock.current) return;
-    if (!twitterUrl) return alert("Please enter a Twitter URL");
+    if (!twitterUrl) return showToast("Please enter a Twitter URL", "error");
 
     const token = localStorage.getItem("token");
-    if (!token) return alert("Authentication required. Please log into the Admin Dashboard first.");
+    if (!token) return showToast("Authentication required. Please log into the Admin Dashboard first.", "error");
 
     processingLock.current = true;
     setTwitterStatus("processing");
@@ -423,6 +872,7 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok) {
         setTwitterStatus("success");
+        showToast("Twitter video imported successfully!", "success");
         autoShareToTelegram(data);
         setTimeout(() => {
           setTwitterStatus("idle");
@@ -430,12 +880,12 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setTwitterStatus("error");
-        alert(data.error || data.detail || data.message || "Import failed. Check the URL.");
+        showToast(data.error || data.detail || data.message || "Import failed. Check the URL.", "error");
       }
     } catch (err) {
       setTwitterStatus("error");
       console.error("Twitter Import error:", err);
-      alert(err.message || "Network Error: Is the FastAPI server running?");
+      showToast(err.message || "Network Error: Is the FastAPI server running?", "error");
     } finally {
       processingLock.current = false; 
     }
@@ -444,10 +894,10 @@ export default function AdminUpload({ onClose }) {
   const handleTelegramImport = async (e) => {
     e.preventDefault();
     if (processingLock.current) return;
-    if (!telegramUrl) return alert("Please enter a Telegram Link");
+    if (!telegramUrl) return showToast("Please enter a Telegram Link", "error");
 
     const token = localStorage.getItem("token");
-    if (!token) return alert("Authentication required. Please log into the Admin Dashboard first.");
+    if (!token) return showToast("Authentication required. Please log into the Admin Dashboard first.", "error");
 
     processingLock.current = true;
     setTelegramStatus("processing");
@@ -503,6 +953,7 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok) {
         setTelegramStatus("success");
+        showToast("Telegram video imported successfully!", "success");
         autoShareToTelegram(data, "🔥 Fresh exclusive content just dropped!");
         setTimeout(() => {
           setTelegramStatus("idle");
@@ -510,12 +961,12 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setTelegramStatus("error");
-        alert(data.error || data.detail || data.message || "Import failed. Check the URL.");
+        showToast(data.error || data.detail || data.message || "Import failed. Check the URL.", "error");
       }
     } catch (err) {
       setTelegramStatus("error");
       console.error("Telegram Import error:", err);
-      alert(err.message || "Network Error: Is the FastAPI server running?");
+      showToast(err.message || "Network Error: Is the FastAPI server running?", "error");
     } finally {
       processingLock.current = false; 
     }
@@ -525,10 +976,10 @@ export default function AdminUpload({ onClose }) {
   const handleInstagramImport = async (e) => {
     e.preventDefault();
     if (processingLock.current) return;
-    if (!instagramUrl) return alert("Please enter an Instagram URL");
+    if (!instagramUrl) return showToast("Please enter an Instagram URL", "error");
 
     const token = localStorage.getItem("token");
-    if (!token) return alert("Authentication required. Please log into the Admin Dashboard first.");
+    if (!token) return showToast("Authentication required. Please log into the Admin Dashboard first.", "error");
 
     processingLock.current = true;
     setInstagramStatus("processing");
@@ -584,6 +1035,7 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok) {
         setInstagramStatus("success");
+        showToast("Instagram media imported successfully!", "success");
         autoShareToTelegram(data, "📸 Fresh IG exclusive dropped!");
         setTimeout(() => {
           setInstagramStatus("idle");
@@ -591,12 +1043,12 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setInstagramStatus("error");
-        alert(data.error || data.detail || data.message || "Import failed. Check the URL or IG might be blocking.");
+        showToast(data.error || data.detail || data.message || "Import failed. Check the URL or IG might be blocking.", "error");
       }
     } catch (err) {
       setInstagramStatus("error");
       console.error("Instagram Import error:", err);
-      alert(err.message || "Network Error: Is the FastAPI server running?");
+      showToast(err.message || "Network Error: Is the FastAPI server running?", "error");
     } finally {
       processingLock.current = false; 
     }
@@ -605,10 +1057,10 @@ export default function AdminUpload({ onClose }) {
   const handleTiktokImport = async (e) => {
     e.preventDefault();
     if (processingLock.current) return;
-    if (!tiktokUrl) return alert("Please enter a TikTok URL");
+    if (!tiktokUrl) return showToast("Please enter a TikTok URL", "error");
 
     const token = localStorage.getItem("token");
-    if (!token) return alert("Authentication required. Please log into the Admin Dashboard first.");
+    if (!token) return showToast("Authentication required. Please log into the Admin Dashboard first.", "error");
 
     processingLock.current = true;
     setTiktokStatus("processing");
@@ -664,6 +1116,7 @@ export default function AdminUpload({ onClose }) {
 
       if (res.ok) {
         setTiktokStatus("success");
+        showToast("TikTok video imported successfully!", "success");
         autoShareToTelegram(data, "🎵 Fresh TikTok viral drop!");
         setTimeout(() => {
           setTiktokStatus("idle");
@@ -671,12 +1124,12 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setTiktokStatus("error");
-        alert(data.error || data.detail || data.message || "Import failed. Check the TikTok URL.");
+        showToast(data.error || data.detail || data.message || "Import failed. Check the TikTok URL.", "error");
       }
     } catch (err) {
       setTiktokStatus("error");
       console.error("TikTok Import error:", err);
-      alert(err.message || "Network Error: Is the FastAPI server running?");
+      showToast(err.message || "Network Error: Is the FastAPI server running?", "error");
     } finally {
       processingLock.current = false; 
     }
@@ -737,12 +1190,11 @@ export default function AdminUpload({ onClose }) {
         <div style={formStyle}>
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Assign Creator / Channel</label>
-            <select value={selectedCreatorKey} onChange={handleCreatorChange} style={inputStyle}>
-              {creatorsList.map(c => (
-                <option key={c.username} value={c.username}>{c.label || `${c.displayName} (@${c.username})`}</option>
-              ))}
-              <option value="custom">➕ Custom Creator / Channel...</option>
-            </select>
+            <CreatorDropdown 
+              creators={creatorsList}
+              selectedKey={selectedCreatorKey}
+              onSelect={handleCreatorChange}
+            />
           </div>
 
           {isCustomCreator && (
@@ -794,47 +1246,184 @@ export default function AdminUpload({ onClose }) {
           )}
 
           <div style={inputGroupStyle}>
-            <label style={labelStyle}>Category</label>
-            <select value={category} onChange={handleCategoryChange} style={inputStyle}>
-              <option value="premium">Premium</option>
-              <option value="shots">Shots</option>
-              {APP_CONFIG.categories.map(cat => (
-                <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-              ))}
-            </select>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <label style={labelStyle}>Category</label>
+              <span style={{ fontSize: "11px", color: category === "premium" ? "#ffd700" : "var(--primary-color, #e11d48)", fontWeight: "700", textTransform: "uppercase" }}>
+                Active: {category}
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+              {[
+                { id: "premium", label: "Premium", icon: "💎", isVip: true },
+                { id: "shots", label: "Shots", icon: "⚡" },
+                ...APP_CONFIG.categories
+                  .filter(cat => cat !== "premium" && cat !== "shots")
+                  .map(cat => ({
+                    id: cat,
+                    label: cat.charAt(0).toUpperCase() + cat.slice(1),
+                    icon: cat === "baddies" ? "🔥" : cat === "hotties" ? "💃" : cat === "knacks" ? "🍑" : cat === "trends" ? "📈" : "🎬",
+                    isVip: false
+                  }))
+              ].map(cat => {
+                const isSelected = category === cat.id;
+                const isVip = cat.isVip;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => handleCategoryChange(cat.id)}
+                    style={{
+                      padding: "10px 6px",
+                      borderRadius: "10px",
+                      border: isSelected
+                        ? (isVip ? "1.5px solid #ffd700" : "1.5px solid var(--primary-color, #e11d48)")
+                        : "1px solid #333338",
+                      background: isSelected
+                        ? (isVip ? "rgba(255, 215, 0, 0.16)" : "rgba(225, 29, 72, 0.18)")
+                        : "#1c1c1f",
+                      color: isSelected ? (isVip ? "#ffd700" : "#fff") : "#999",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      fontSize: "12px",
+                      fontWeight: isSelected ? "700" : "600",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      boxShadow: isSelected ? (isVip ? "0 0 10px rgba(255, 215, 0, 0.25)" : "0 0 10px rgba(225, 29, 72, 0.25)") : "none"
+                    }}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div style={inputGroupStyle}>
-            <label style={labelStyle}>Storage Destination</label>
-            <select value={uploadTarget} onChange={(e) => setUploadTarget(e.target.value)} style={inputStyle}>
-              <option value="r2">Cloudflare R2 (Budget-Friendly Storage)</option>
-              <option value="stream">Cloudflare Stream (Fast Encoding)</option>
-            </select>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <label style={labelStyle}>Storage Destination</label>
+              <span style={{ fontSize: "11px", color: "#888" }}>
+                {uploadTarget === "r2" ? "Zero egress fees" : "Instant fast streaming"}
+              </span>
+            </div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "6px",
+              background: "#161618",
+              border: "1px solid #2c2c30",
+              borderRadius: "10px",
+              padding: "4px"
+            }}>
+              <button
+                type="button"
+                onClick={() => setUploadTarget("r2")}
+                style={{
+                  padding: "9px 8px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: uploadTarget === "r2" ? "var(--primary-color, #e11d48)" : "transparent",
+                  color: uploadTarget === "r2" ? "#fff" : "#888",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  transition: "all 0.15s ease"
+                }}
+              >
+                <HardDrive size={15} />
+                <span>Cloudflare R2</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadTarget("stream")}
+                style={{
+                  padding: "9px 8px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: uploadTarget === "stream" ? "var(--primary-color, #e11d48)" : "transparent",
+                  color: uploadTarget === "stream" ? "#fff" : "#888",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  transition: "all 0.15s ease"
+                }}
+              >
+                <Zap size={15} />
+                <span>CF Stream</span>
+              </button>
+            </div>
           </div>
 
           <div style={inputGroupStyle}>
-            <label style={labelStyle}>Apply Brand Watermark?</label>
-            <div style={{ display: "flex", gap: "16px", marginTop: "4px" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", color: "#fff", cursor: "pointer" }}>
-                <input 
-                  type="radio" 
-                  name="watermark" 
-                  checked={applyWatermark === true} 
-                  onChange={() => setApplyWatermark(true)} 
-                  style={{ accentColor: "var(--primary-color)", width: "16px", height: "16px" }}
-                />
-                Yes (Stamp it)
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", color: "#fff", cursor: "pointer" }}>
-                <input 
-                  type="radio" 
-                  name="watermark" 
-                  checked={applyWatermark === false} 
-                  onChange={() => setApplyWatermark(false)} 
-                  style={{ accentColor: "var(--primary-color)", width: "16px", height: "16px" }}
-                />
-                No (Keep it raw)
-              </label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <label style={labelStyle}>Brand Watermark</label>
+              <span style={{ fontSize: "11px", color: applyWatermark ? "var(--primary-color, #e11d48)" : "#888", fontWeight: "600" }}>
+                {applyWatermark ? "Watermarked" : "Raw Source"}
+              </span>
+            </div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "6px",
+              background: "#161618",
+              border: "1px solid #2c2c30",
+              borderRadius: "10px",
+              padding: "4px"
+            }}>
+              <button
+                type="button"
+                onClick={() => setApplyWatermark(true)}
+                style={{
+                  padding: "9px 8px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: applyWatermark ? "var(--primary-color, #e11d48)" : "transparent",
+                  color: applyWatermark ? "#fff" : "#888",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  transition: "all 0.15s ease"
+                }}
+              >
+                <Droplets size={15} />
+                <span>Stamp Watermark</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setApplyWatermark(false)}
+                style={{
+                  padding: "9px 8px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: !applyWatermark ? "#333338" : "transparent",
+                  color: !applyWatermark ? "#fff" : "#888",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  transition: "all 0.15s ease"
+                }}
+              >
+                <Zap size={15} />
+                <span>Keep Raw</span>
+              </button>
             </div>
           </div>
 
@@ -1138,24 +1727,12 @@ export default function AdminUpload({ onClose }) {
         {/* 🟢 TWITTER IMPORT */}
         {uploadMode === "twitter" && (
           <form onSubmit={handleTwitterImport} style={formStyle}>
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>Routing Pipeline</label>
-              <select value={pipelineRoute} onChange={(e) => setPipelineRoute(e.target.value)} style={inputStyle}>
-                <option value="direct">⚡ Direct to Cloudflare</option>
-                <option value="telethon">🤖 Send to Telegram Bot</option>
-              </select>
-            </div>
-
-            {pipelineRoute === "telethon" && (
-              <div style={inputGroupStyle}>
-                <label style={labelStyle}>Telegram Destination</label>
-                <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
-                  {APP_CONFIG.telegramDestinations.map(dest => (
-                    <option key={dest.id} value={dest.id}>{dest.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <RoutingPipelineControl 
+              pipelineRoute={pipelineRoute} 
+              setPipelineRoute={setPipelineRoute} 
+              telegramDest={telegramDest} 
+              setTelegramDest={setTelegramDest} 
+            />
 
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Twitter / X Link</label>
@@ -1184,24 +1761,12 @@ export default function AdminUpload({ onClose }) {
         {/* 🟢 INSTAGRAM IMPORT */}
         {uploadMode === "instagram" && (
           <form onSubmit={handleInstagramImport} style={formStyle}>
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>Routing Pipeline</label>
-              <select value={pipelineRoute} onChange={(e) => setPipelineRoute(e.target.value)} style={inputStyle}>
-                <option value="direct">⚡ Direct to Cloudflare</option>
-                <option value="telethon">🤖 Send to Telegram Bot</option>
-              </select>
-            </div>
-
-            {pipelineRoute === "telethon" && (
-              <div style={inputGroupStyle}>
-                <label style={labelStyle}>Telegram Destination</label>
-                <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
-                  {APP_CONFIG.telegramDestinations.map(dest => (
-                    <option key={dest.id} value={dest.id}>{dest.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <RoutingPipelineControl 
+              pipelineRoute={pipelineRoute} 
+              setPipelineRoute={setPipelineRoute} 
+              telegramDest={telegramDest} 
+              setTelegramDest={setTelegramDest} 
+            />
 
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Instagram Link</label>
@@ -1230,24 +1795,12 @@ export default function AdminUpload({ onClose }) {
         {/* 🟢 TIKTOK IMPORT */}
         {uploadMode === "tiktok" && (
           <form onSubmit={handleTiktokImport} style={formStyle}>
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>Routing Pipeline</label>
-              <select value={pipelineRoute} onChange={(e) => setPipelineRoute(e.target.value)} style={inputStyle}>
-                <option value="direct">⚡ Direct to Cloudflare</option>
-                <option value="telethon">🤖 Send to Telegram Bot</option>
-              </select>
-            </div>
-
-            {pipelineRoute === "telethon" && (
-              <div style={inputGroupStyle}>
-                <label style={labelStyle}>Telegram Destination</label>
-                <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
-                  {APP_CONFIG.telegramDestinations.map(dest => (
-                    <option key={dest.id} value={dest.id}>{dest.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <RoutingPipelineControl 
+              pipelineRoute={pipelineRoute} 
+              setPipelineRoute={setPipelineRoute} 
+              telegramDest={telegramDest} 
+              setTelegramDest={setTelegramDest} 
+            />
 
             <div style={inputGroupStyle}>
               <label style={labelStyle}>TikTok Link</label>
@@ -1276,25 +1829,12 @@ export default function AdminUpload({ onClose }) {
         {/* 🟢 TELEGRAM IMPORT */}
         {uploadMode === "telegram" && (
           <form onSubmit={handleTelegramImport} style={formStyle}>
-            
-            <div style={inputGroupStyle}>
-              <label style={labelStyle}>Routing Pipeline</label>
-              <select value={pipelineRoute} onChange={(e) => setPipelineRoute(e.target.value)} style={inputStyle}>
-                <option value="direct">⚡ Direct to Cloudflare</option>
-                <option value="telethon">🤖 Send to Telegram Bot</option>
-              </select>
-            </div>
-
-            {pipelineRoute === "telethon" && (
-              <div style={inputGroupStyle}>
-                <label style={labelStyle}>Telegram Destination</label>
-                <select value={telegramDest} onChange={(e) => setTelegramDest(e.target.value)} style={inputStyle}>
-                  {APP_CONFIG.telegramDestinations.map(dest => (
-                    <option key={dest.id} value={dest.id}>{dest.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <RoutingPipelineControl 
+              pipelineRoute={pipelineRoute} 
+              setPipelineRoute={setPipelineRoute} 
+              telegramDest={telegramDest} 
+              setTelegramDest={setTelegramDest} 
+            />
 
             <div style={inputGroupStyle}>
               <label style={labelStyle}>Telegram Post Link</label>
@@ -1323,6 +1863,10 @@ export default function AdminUpload({ onClose }) {
         <style>{`
           .spin { animation: spin 1s linear infinite; }
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          @keyframes dropdownFadeIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
         `}</style>
         </div>
       </div>

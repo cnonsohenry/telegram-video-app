@@ -3,6 +3,7 @@ import { X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, ArrowLeft, Copy, Q
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
+import { showToast } from "../utils/toast";
 
 export default function PaywallModal({ onClose, user }) {
   const [selectedMethod, setSelectedMethod] = useState(null); 
@@ -72,7 +73,7 @@ export default function PaywallModal({ onClose, user }) {
 
   const startVerification = async () => {
     if (!senderName.trim()) {
-      alert("Please enter the exact name you are sending from.");
+      showToast("Please enter the exact name you are sending from.", "error");
       return;
     }
 
@@ -102,7 +103,7 @@ export default function PaywallModal({ onClose, user }) {
         const data = await res.json();
 
         if (res.status === 400 || res.status === 500) {
-           alert(`Backend Error: ${data.error || data.message}`);
+           showToast(`Backend Error: ${data.error || data.message}`, "error");
            setVerifying(false);
            return; 
         }
@@ -146,10 +147,10 @@ export default function PaywallModal({ onClose, user }) {
       if (data.success) {
         setCryptoPaymentDetails(data);
       } else {
-        alert(`Error: ${data.error}`);
+        showToast(`Error: ${data.error}`, "error");
       }
     } catch (err) {
-      alert("Network error. Please try again.");
+      showToast("Network error. Please try again.", "error");
     } finally {
       setGeneratingCrypto(false);
     }

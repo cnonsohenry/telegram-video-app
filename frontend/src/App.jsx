@@ -10,12 +10,15 @@ import PaywallModal from "./components/PaywallModal";
 import LegalPages from "./pages/LegalPages"; 
 import CommentSectionModal from "./components/CommentSectionModal"; 
 import CreatorProfileModal from "./components/CreatorProfileModal";
+import AppToast from "./components/AppToast";
+import LoginPromptModal from "./components/LoginPromptModal";
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
 import { APP_CONFIG } from "./config";
 import { isUserSubscribedToCreator, getVideoCreatorHandle, isUserAdExempt } from "./utils/subscription";
 import { triggerSmartlinkIfEligible, syncVipAdFreeState } from "./utils/adManager";
+import { showToast } from "./utils/toast";
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -51,6 +54,7 @@ export default function App() {
   });
   const [creatorAutoSubscribe, setCreatorAutoSubscribe] = useState(false);
   const [isCreatorOverVideo, setIsCreatorOverVideo] = useState(false);
+  const [loginPromptAction, setLoginPromptAction] = useState(null);
 
   // 🟢 THE FIX: App Height Lock Architecture
   const windowWidth = useRef(window.innerWidth);
@@ -383,11 +387,17 @@ export default function App() {
         }
       }
     };
+    const handleOpenLoginPrompt = (e) => {
+      setLoginPromptAction(e.detail?.action || "continue");
+    };
+
     window.addEventListener("openCreatorProfile", handleOpenCreatorEvent);
     window.addEventListener("refreshUser", refreshUser);
+    window.addEventListener("openLoginPrompt", handleOpenLoginPrompt);
     return () => {
       window.removeEventListener("openCreatorProfile", handleOpenCreatorEvent);
       window.removeEventListener("refreshUser", refreshUser);
+      window.removeEventListener("openLoginPrompt", handleOpenLoginPrompt);
     };
   }, [handleOpenCreator, refreshUser]);
 
@@ -678,7 +688,7 @@ export default function App() {
       }
     } catch (e) { 
       setActiveVideo(null);
-      alert(`🚨 Playback Error: ${e.message}`); 
+      showToast(`🚨 Playback Error: ${e.message}`, "error"); 
     }
   };
 
@@ -853,6 +863,20 @@ export default function App() {
           onSubscriptionUpdated={refreshUser}
         />
       )}
+      {/* 🟢 GLOBAL TOAST NOTIFICATIONS */}
+      <AppToast />
+
+      {/* 🟢 APP-NATIVE LOGIN PROMPT MODAL */}
+      <LoginPromptModal 
+        isOpen={Boolean(loginPromptAction)} 
+        action={loginPromptAction || "continue"} 
+        onClose={() => setLoginPromptAction(null)} 
+        onLogin={() => {
+          setLoginPromptAction(null);
+          if (activeVideo) setActiveVideo(null);
+          handleTabSwitch("profile");
+        }} 
+      />
       
     </div>
   );

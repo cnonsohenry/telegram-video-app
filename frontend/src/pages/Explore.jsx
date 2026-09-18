@@ -5,6 +5,7 @@ import PullToRefresh from "../components/PullToRefresh";
 import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
 import { renderClickableCaption } from "../components/ClickableCaption";
+import { promptLogin, showToast } from "../utils/toast";
 
 // 🟢 INDIVIDUAL POST COMPONENT
 const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen, onCreatorClick, user }) => {
@@ -229,7 +230,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   const handleLike = async (e) => {
     e.stopPropagation();
     const token = localStorage.getItem("token");
-    if (!token) return alert("Please log in to like videos!");
+    if (!token) return promptLogin("like");
 
     setIsLiked(!isLiked);
     setLikesCount(prev => isLiked ? Math.max(0, prev - 1) : prev + 1);
@@ -246,7 +247,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   const handleSave = async (e) => {
     e.stopPropagation();
     const token = localStorage.getItem("token");
-    if (!token) return alert("Please log in to save videos!");
+    if (!token) return promptLogin("save");
 
     setIsSaved(!isSaved);
     setSavesCount(prev => isSaved ? Math.max(0, prev - 1) : prev + 1);
@@ -269,7 +270,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
       navigator.share({ title: video.caption, url: shareUrl }).catch(() => {});
     } else {
       navigator.clipboard.writeText(shareUrl);
-      alert("Link copied to clipboard!");
+      showToast("Link copied to clipboard!", "success");
     }
 
     setSharesCount(prev => prev + 1);
@@ -283,7 +284,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
   const handleCommentClick = (e) => {
     e.stopPropagation();
     const token = localStorage.getItem("token");
-    if (!token) return alert("Please log in to comment!");
+    if (!token) return promptLogin("comment");
     
     setCommentsCount(prev => prev + 1); 
     onCommentClick(video);

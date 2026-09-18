@@ -12,6 +12,7 @@ import { getVideoCreatorHandle, isUserFollowingCreator } from "../utils/subscrip
 import { shouldPlayVastAd, recordVastAdPlayed, getVastConfig } from "../utils/adManager";
 import { fetchVastAd, sendVastBeacons } from "../utils/vastParser";
 import { renderClickableCaption } from "./ClickableCaption";
+import { promptLogin, showToast } from "../utils/toast";
 
 export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick, onCreatorClick }) {
   const videoRef = useRef(null);
@@ -132,7 +133,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     e?.stopPropagation?.();
     const token = localStorage.getItem("token");
     if (!token || !currentUser) {
-      alert("Please log in to follow creators");
+      promptLogin("follow");
       return;
     }
 
@@ -153,10 +154,11 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       }
 
       setIsFollowing(Boolean(data.following));
+      showToast(data.following ? `Following @${creatorHandle}` : `Unfollowed @${creatorHandle}`, "info");
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (err) {
       console.error("Follow error:", err);
-      alert(err.message || "Failed to follow creator");
+      showToast(err.message || "Failed to follow creator", "error");
     } finally {
       setIsFollowLoading(false);
     }
@@ -437,7 +439,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const handleLike = async (e) => {
     e.stopPropagation();
     const token = localStorage.getItem("token");
-    if (!token) return alert("Please log in to like videos!");
+    if (!token) return promptLogin("like");
 
     setIsLiked(!isLiked);
     setLikesCount(prev => isLiked ? Math.max(0, prev - 1) : prev + 1);
@@ -454,7 +456,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const handleSaveToProfile = async (e) => {
     e.stopPropagation();
     const token = localStorage.getItem("token");
-    if (!token) return alert("Please log in to save videos!");
+    if (!token) return promptLogin("save");
 
     setIsSaved(!isSaved);
     setSavesCount(prev => isSaved ? Math.max(0, prev - 1) : prev + 1);
@@ -500,7 +502,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const handleCommentClick = (e) => {
     e.stopPropagation();
     const token = localStorage.getItem("token");
-    if (!token) return alert("Please log in to comment!");
+    if (!token) return promptLogin("comment");
     
     if (onCommentClick) {
         setCommentsCount(prev => prev + 1); 
@@ -530,8 +532,9 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
+      showToast("Download started", "success");
     } catch (err) {
-      alert("Download failed. Please try again.");
+      showToast("Download failed. Please try again.", "error");
     } finally {
       setIsDownloading(false);
     }
@@ -560,11 +563,13 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
         video.caption = editForm.caption;
         video.category = editForm.category;
         setIsEditingMode(false);
+        showToast("Video details updated!", "success");
       } else {
-        alert("Failed to save changes. Make sure you have the right permissions.");
+        showToast("Failed to save changes. Make sure you have the right permissions.", "error");
       }
     } catch (err) {
       console.error(err);
+      showToast("Error updating video.", "error");
     }
   };
 
@@ -585,11 +590,13 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
         if (res.ok) {
           onClose(); 
           window.dispatchEvent(new CustomEvent('videoDeleted', { detail: identifier }));
+          showToast("Video deleted successfully", "info");
         } else {
-          alert("Failed to delete video. Make sure you have the right permissions.");
+          showToast("Failed to delete video. Make sure you have the right permissions.", "error");
         }
       } catch (err) {
         console.error(err);
+        showToast("Error deleting video.", "error");
       }
     }
   };

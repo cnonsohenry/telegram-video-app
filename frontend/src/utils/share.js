@@ -1,4 +1,6 @@
 // src/utils/share.js
+import { showToast } from "./toast";
+
 export const shareVideo = async (video) => {
   const shareData = {
     title: video.caption || "Check out this shot!",
@@ -13,7 +15,7 @@ export const shareVideo = async (video) => {
     } else {
       // 🟢 Fallback: Copy to clipboard
       await navigator.clipboard.writeText(shareData.url);
-      alert("Link copied to clipboard!");
+      showToast("Link copied to clipboard!", "success");
     }
   } catch (err) {
     console.error("Share failed", err);

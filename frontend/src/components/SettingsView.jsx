@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, User, Lock, Bell, LogOut, ChevronRight, Palette } from "lucide-react";
 import LegalFooter from "./LegalFooter";
+import { showToast } from "../utils/toast";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -123,7 +124,7 @@ export default function SettingsView({ onBack, onLogout }) {
 
 // 🎨 COMPONENT UI PIECES
 const SettingsItem = ({ icon, label }) => (
-  <div style={settingsItemStyle} onClick={() => alert(`${label} coming soon!`)}>
+  <div style={settingsItemStyle} onClick={() => showToast(`${label} coming soon!`, "info")}>
     {icon} <span style={{ flex: 1, marginLeft: "15px" }}>{label}</span> <ChevronRight size={16} color="#555" />
   </div>
 );

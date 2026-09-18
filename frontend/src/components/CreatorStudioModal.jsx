@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import CreatorUploadModal from "./CreatorUploadModal";
+import { showToast } from "../utils/toast";
 
 export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -94,8 +95,9 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
         };
       });
       window.dispatchEvent(new CustomEvent("videoDeleted", { detail: messageId }));
+      showToast("Video deleted successfully", "info");
     } catch (err) {
-      alert(err.message || "Failed to delete video");
+      showToast(err.message || "Failed to delete video", "error");
     } finally {
       setDeletingMessageId(null);
     }

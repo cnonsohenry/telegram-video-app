@@ -8,6 +8,7 @@ import { APP_CONFIG } from "../config";
 import VideoCard from "./VideoCard";
 import CreatorTipModal from "./CreatorTipModal";
 import CreatorSubscribeModal from "./CreatorSubscribeModal";
+import { promptLogin, showToast } from "../utils/toast";
 
 export default function CreatorProfileModal({ 
   creatorUsername, 
@@ -119,12 +120,12 @@ export default function CreatorProfileModal({
   const handleFollowToggle = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please log in to follow creators!");
+      promptLogin("follow");
       return;
     }
 
     if (creatorData?.is_owner) {
-      alert("This is your own profile!");
+      showToast("This is your own profile!", "info");
       return;
     }
 
@@ -145,9 +146,10 @@ export default function CreatorProfileModal({
       if (typeof data.followers_count === "number") {
         setFollowersCount(data.followers_count);
       }
+      showToast(data.following ? `Following @${creatorUsername}` : `Unfollowed @${creatorUsername}`, "info");
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (e) {
-      alert(e.message || "Failed to update follow");
+      showToast(e.message || "Failed to update follow", "error");
     } finally {
       setIsFollowLoading(false);
     }
@@ -156,12 +158,12 @@ export default function CreatorProfileModal({
   const handleSubscribeToggle = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please log in to subscribe to creators!");
+      promptLogin("subscribe");
       return;
     }
 
     if (creatorData?.is_owner) {
-      alert("This is your own profile!");
+      showToast("This is your own profile!", "info");
       return;
     }
 
@@ -187,10 +189,11 @@ export default function CreatorProfileModal({
         }
         setIsSubscribed(false);
         setSubscribersCount(data.subscribers_count);
+        showToast("VIP subscription cancelled", "info");
         if (onSubscriptionUpdated) onSubscriptionUpdated();
         window.dispatchEvent(new CustomEvent("refreshUser"));
       } catch (e) {
-        alert(e.message || "Failed to cancel subscription");
+        showToast(e.message || "Failed to cancel subscription", "error");
       } finally {
         setIsSubscribing(false);
       }
@@ -219,10 +222,11 @@ export default function CreatorProfileModal({
       }
       setIsSubscribed(data.subscribed);
       setSubscribersCount(data.subscribers_count);
+      showToast("Subscribed to VIP tier!", "success");
       if (onSubscriptionUpdated) onSubscriptionUpdated();
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (e) {
-      alert(e.message || "Failed to update subscription");
+      showToast(e.message || "Failed to update subscription", "error");
     } finally {
       setIsSubscribing(false);
     }
@@ -237,7 +241,7 @@ export default function CreatorProfileModal({
       }).catch(() => {});
     } else {
       navigator.clipboard.writeText(shareUrl);
-      alert("Profile link copied to clipboard!");
+      showToast("Profile link copied to clipboard!", "success");
     }
   };
 
@@ -728,7 +732,7 @@ export default function CreatorProfileModal({
           creator={creatorData}
           onClose={() => setShowTipModal(false)}
           onTipSuccess={(amt) => {
-            alert(`🎉 Successfully sent $${amt.toLocaleString()} tip to @${creatorData?.username}!`);
+            showToast(`🎉 Successfully sent $${amt.toLocaleString()} tip to @${creatorData?.username}!`, "success");
           }}
         />
       )}

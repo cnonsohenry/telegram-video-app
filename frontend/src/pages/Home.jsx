@@ -10,6 +10,7 @@ import { triggerSmartlinkIfEligible } from "../utils/adManager";
 import LegalFooter from "../components/LegalFooter";
 import { APP_CONFIG } from "../config"; 
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription"; 
+import { showToast } from "../utils/toast"; 
 
 const MAX_CACHE_SIZE = 4;
 const TREND_TIMEFRAMES = ["all_time", "monthly", "weekly"];
@@ -349,7 +350,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       }
     } catch (e) { 
       setActiveVideo(null);
-      alert(`🚨 Playback Error: ${e.message}`); 
+      showToast(`🚨 Playback Error: ${e.message}`, "error"); 
     }
   };
 
@@ -392,7 +393,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         }
 
       } catch (err) {
-        alert("🚨 Failed to load album contents.");
+        showToast("🚨 Failed to load album contents.", "error");
       }
       return;
     }

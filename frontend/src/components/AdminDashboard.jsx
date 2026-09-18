@@ -7,6 +7,7 @@ import {
 import AdminUpload from "./AdminUpload"; 
 
 import { APP_CONFIG } from "../config";
+import { showToast } from "../utils/toast";
 
 export default function AdminDashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -236,11 +237,12 @@ export default function AdminDashboard({ user, onLogout }) {
       if (data.success) {
         setCreatorsList(prev => prev.map(c => c.id === editingCreator.id ? { ...c, ...data.creator } : c));
         setEditingCreator(null);
+        showToast("Creator updated successfully!", "success");
       } else {
-        alert(data.error || "Failed to update creator");
+        showToast(data.error || "Failed to update creator", "error");
       }
     } catch (err) {
-      alert("Failed to update creator: " + err.message);
+      showToast("Failed to update creator: " + err.message, "error");
     }
   };
 
@@ -255,7 +257,7 @@ export default function AdminDashboard({ user, onLogout }) {
       });
       const data = await res.json();
       if (data.success) {
-        alert(`Successfully synced ${data.count} Telegram creator(s)!`);
+        showToast(`Successfully synced ${data.count} Telegram creator(s)!`, "success");
         // Refresh creators list
         const refreshRes = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -266,10 +268,10 @@ export default function AdminDashboard({ user, onLogout }) {
           setCreatorStats(refreshData.stats);
         }
       } else {
-        alert(data.error || "Failed to sync Telegram creators");
+        showToast(data.error || "Failed to sync Telegram creators", "error");
       }
     } catch (err) {
-      alert("Failed to sync Telegram creators: " + err.message);
+      showToast("Failed to sync Telegram creators: " + err.message, "error");
     } finally {
       setSyncingTelegram(false);
     }
@@ -336,8 +338,12 @@ export default function AdminDashboard({ user, onLogout }) {
           else setUsersList(usersList.map(u => u.id === editingItem.data.id ? editingItem.data : u));
         }
         setEditingItem(null);
-      } else alert("Failed to save changes.");
-    } catch (err) { console.error(err); }
+        showToast("Changes saved successfully!", "success");
+      } else showToast("Failed to save changes.", "error");
+    } catch (err) { 
+      console.error(err);
+      showToast("Error saving changes.", "error"); 
+    }
   };
 
   const handleDelete = async () => {
@@ -359,8 +365,12 @@ export default function AdminDashboard({ user, onLogout }) {
           else setUsersList(usersList.filter(u => u.id !== deleteWarning.id));
         }
         setDeleteWarning(null);
-      } else alert("Failed to delete item.");
-    } catch (err) { console.error(err); }
+        showToast("Item deleted successfully!", "info");
+      } else showToast("Failed to delete item.", "error");
+    } catch (err) { 
+      console.error(err);
+      showToast("Error deleting item.", "error"); 
+    }
   };
 
   const handleTabSwitch = (tab) => {
