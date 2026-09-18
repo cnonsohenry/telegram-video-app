@@ -44,10 +44,10 @@ export const APP_CONFIG = {
   ads: {
     smartlinkUrl: "https://www.effectivegatecpm.com/wmmi5uv2w5?key=23fa23a9f5a389595c81f702d570419b",
     vastTag: "https://s.magsrv.com/v1/vast.php?idzone=5880122",
-    adFrequency: 3, // Smartlink triggers on every 6th free video
+    adFrequency: 2, // Smartlink triggers on every 6th free video
     vastFrequency: 3, // VAST pre-roll triggers every 3rd free video
     vastSkipSeconds: 5, // Skip ad countdown duration
-    minMinutesBetweenAds: 6, // Minimum 6 minutes cooldown between any full-page ads/smartlinks
+    minMinutesBetweenAds: 4, // Minimum 6 minutes cooldown between any full-page ads/smartlinks
     initialFreeVideos: 2, // First 2 videos are 100% ad-free
     exoClickPopZoneId: "5883574"
   },

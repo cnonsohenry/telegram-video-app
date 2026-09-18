@@ -7,10 +7,26 @@ import {
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
 
+// Preset Creators & Channels aligned with forwarder tasks
+const PRESET_CREATORS = [
+  { username: "naijahomemade", displayName: "Naija Homemade Series", uploaderId: "1881815190", label: "🌟 Official Series (@naijahomemade)" },
+  { username: "baddies_distro", displayName: "Baddies Distro", uploaderId: "-1003754790625", label: "🔥 Baddies Distro (@baddies_distro)" },
+  { username: "alphaxdash2", displayName: "Alpha Dash", uploaderId: "-1003995508694", label: "💃 Alpha Dash / NH Hotties (@alphaxdash2)" },
+  { username: "nh_shorts", displayName: "NH Shorts", uploaderId: "-1003950008310", label: "⚡ NH Shorts (@nh_shorts)" },
+  { username: "nh_knacks", displayName: "NH Knacks", uploaderId: "-1003997134224", label: "🍑 NH Knacks (@nh_knacks)" },
+];
+
 export default function AdminUpload({ onClose }) {
   const [uploadMode, setUploadMode] = useState("local"); 
 
-  const [adminId, setAdminId] = useState(APP_CONFIG.adminUsers[0]?.id || ""); 
+  // Creator Attribution State (Replaced legacy Allowed Users / adminId)
+  const [creatorsList, setCreatorsList] = useState(PRESET_CREATORS);
+  const [selectedCreatorKey, setSelectedCreatorKey] = useState("naijahomemade");
+  const [creatorUsername, setCreatorUsername] = useState("naijahomemade");
+  const [creatorDisplayName, setCreatorDisplayName] = useState("Naija Homemade Series");
+  const [uploaderId, setUploaderId] = useState("1881815190");
+  const [isCustomCreator, setIsCustomCreator] = useState(false);
+
   const [category, setCategory] = useState("premium");
 
   // Local State
@@ -68,6 +84,78 @@ export default function AdminUpload({ onClose }) {
       }
     };
   }, [previewUrl]);
+
+  // Fetch registered creators from backend to populate dropdown dynamically
+  useEffect(() => {
+    const fetchCreators = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.creators && Array.isArray(data.creators)) {
+            const presetUnames = new Set(PRESET_CREATORS.map(p => p.username.toLowerCase()));
+            const dbCreators = data.creators
+              .filter(c => c.username && !presetUnames.has(c.username.toLowerCase()))
+              .map(c => ({
+                username: c.username,
+                displayName: c.display_name || c.username,
+                uploaderId: String(c.telegram_user_id || c.id || ""),
+                label: `👤 ${c.display_name || c.username} (@${c.username})`
+              }));
+            setCreatorsList([...PRESET_CREATORS, ...dbCreators]);
+          }
+        }
+      } catch (e) {
+        console.warn("Could not fetch creator list:", e);
+      }
+    };
+    fetchCreators();
+  }, []);
+
+  const selectCreatorByUsername = (uname) => {
+    const found = creatorsList.find(c => c.username === uname);
+    if (found) {
+      setSelectedCreatorKey(found.username);
+      setIsCustomCreator(false);
+      setCreatorUsername(found.username);
+      setCreatorDisplayName(found.displayName);
+      setUploaderId(found.uploaderId || "1881815190");
+    }
+  };
+
+  const handleCreatorChange = (e) => {
+    const val = e.target.value;
+    setSelectedCreatorKey(val);
+    if (val === "custom") {
+      setIsCustomCreator(true);
+      setCreatorUsername("");
+      setCreatorDisplayName("");
+      setUploaderId("");
+    } else {
+      setIsCustomCreator(false);
+      const found = creatorsList.find(c => c.username === val);
+      if (found) {
+        setCreatorUsername(found.username);
+        setCreatorDisplayName(found.displayName);
+        setUploaderId(found.uploaderId || "1881815190");
+      }
+    }
+  };
+
+  const handleCategoryChange = (e) => {
+    const newCat = e.target.value;
+    setCategory(newCat);
+    if (!isCustomCreator) {
+      if (newCat === "premium") selectCreatorByUsername("naijahomemade");
+      else if (newCat === "baddies") selectCreatorByUsername("baddies_distro");
+      else if (newCat === "hotties") selectCreatorByUsername("alphaxdash2");
+      else if (newCat === "shots") selectCreatorByUsername("nh_shorts");
+      else if (newCat === "knacks") selectCreatorByUsername("nh_knacks");
+    }
+  };
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -203,15 +291,23 @@ export default function AdminUpload({ onClose }) {
     e.preventDefault();
     if (processingLock.current) return;
     if (!file) return alert("Please select a video file");
-    if (!adminId) return alert("Please select your Admin Telegram ID");
+
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Authentication required. Please log into the Admin Dashboard first.");
 
     processingLock.current = true;
     setStatus("uploading");
 
+    const finalUploaderId = uploaderId || "1881815190";
+    const finalCreatorUsername = creatorUsername || "naijahomemade";
+    const finalCreatorDisplayName = creatorDisplayName || "Naija Homemade Series";
+
     const formData = new FormData();
     formData.append("video", file);
     formData.append("caption", caption);
-    formData.append("uploader_id", adminId); 
+    formData.append("uploader_id", finalUploaderId); 
+    formData.append("creator_username", finalCreatorUsername);
+    formData.append("creator_display_name", finalCreatorDisplayName);
     formData.append("category", category);
     formData.append("upload_target", uploadTarget); 
     formData.append("apply_watermark", applyWatermark); 
@@ -226,10 +322,9 @@ export default function AdminUpload({ onClose }) {
     }
 
     try {
-      const token = localStorage.getItem("token");
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/upload-premium`, {
         method: "POST",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {},
+        headers: { "Authorization": `Bearer ${token}` },
         body: formData,
       });
 
@@ -251,7 +346,7 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setStatus("error");
-        alert(data.error || data.detail || "Upload failed. Check your Admin ID.");
+        alert(data.error || data.detail || "Upload failed.");
       }
     } catch (err) {
       setStatus("error");
@@ -267,6 +362,9 @@ export default function AdminUpload({ onClose }) {
     if (processingLock.current) return;
     if (!twitterUrl) return alert("Please enter a Twitter URL");
 
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Authentication required. Please log into the Admin Dashboard first.");
+
     processingLock.current = true;
     setTwitterStatus("processing");
 
@@ -274,18 +372,38 @@ export default function AdminUpload({ onClose }) {
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-telethon`;
 
+    const finalUploaderId = uploaderId || "1881815190";
+    const finalCreatorUsername = creatorUsername || "naijahomemade";
+    const finalCreatorDisplayName = creatorDisplayName || "Naija Homemade Series";
+
     const { start: tStart, duration: tDur } = getTrimRange();
-    const callbackUrl = trimMode !== "full"
-      ? `${APP_CONFIG.apiUrl}/api/admin/upload-premium?trim_mode=${trimMode}&trim_duration=${tDur}&trim_start=${tStart}`
-      : `${APP_CONFIG.apiUrl}/api/admin/upload-premium`;
+    const queryParams = new URLSearchParams({
+      creator_username: finalCreatorUsername,
+      creator_display_name: finalCreatorDisplayName,
+      uploader_id: finalUploaderId
+    });
+    if (trimMode !== "full") {
+      queryParams.set("trim_mode", trimMode);
+      queryParams.set("trim_duration", tDur.toString());
+      queryParams.set("trim_start", tStart.toString());
+    }
+    if (token) {
+      queryParams.set("token", token);
+    }
+    const callbackUrl = `${APP_CONFIG.apiUrl}/api/admin/upload-premium?${queryParams.toString()}`;
 
     try {
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ 
           url: twitterUrl,
-          admin_id: adminId || APP_CONFIG.adminUsers[0]?.id || "1881815190", 
+          admin_id: finalUploaderId, 
+          creator_username: finalCreatorUsername,
+          creator_display_name: finalCreatorDisplayName,
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
@@ -308,7 +426,7 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setTwitterStatus("error");
-        alert(data.detail || data.message || "Import failed. Check the URL.");
+        alert(data.error || data.detail || data.message || "Import failed. Check the URL.");
       }
     } catch (err) {
       setTwitterStatus("error");
@@ -324,6 +442,9 @@ export default function AdminUpload({ onClose }) {
     if (processingLock.current) return;
     if (!telegramUrl) return alert("Please enter a Telegram Link");
 
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Authentication required. Please log into the Admin Dashboard first.");
+
     processingLock.current = true;
     setTelegramStatus("processing");
 
@@ -331,18 +452,38 @@ export default function AdminUpload({ onClose }) {
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-link`;
 
+    const finalUploaderId = uploaderId || "1881815190";
+    const finalCreatorUsername = creatorUsername || "naijahomemade";
+    const finalCreatorDisplayName = creatorDisplayName || "Naija Homemade Series";
+
     const { start: tgStart, duration: tgDur } = getTrimRange();
-    const callbackUrl = trimMode !== "full"
-      ? `${APP_CONFIG.apiUrl}/api/admin/upload-premium?trim_mode=${trimMode}&trim_duration=${tgDur}&trim_start=${tgStart}`
-      : `${APP_CONFIG.apiUrl}/api/admin/upload-premium`;
+    const queryParams = new URLSearchParams({
+      creator_username: finalCreatorUsername,
+      creator_display_name: finalCreatorDisplayName,
+      uploader_id: finalUploaderId
+    });
+    if (trimMode !== "full") {
+      queryParams.set("trim_mode", trimMode);
+      queryParams.set("trim_duration", tgDur.toString());
+      queryParams.set("trim_start", tgStart.toString());
+    }
+    if (token) {
+      queryParams.set("token", token);
+    }
+    const callbackUrl = `${APP_CONFIG.apiUrl}/api/admin/upload-premium?${queryParams.toString()}`;
 
     try {
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ 
           url: telegramUrl,
-          admin_id: adminId || APP_CONFIG.adminUsers[0]?.id || "1881815190", 
+          admin_id: finalUploaderId, 
+          creator_username: finalCreatorUsername,
+          creator_display_name: finalCreatorDisplayName,
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
@@ -365,7 +506,7 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setTelegramStatus("error");
-        alert(data.detail || data.message || "Import failed. Check the URL.");
+        alert(data.error || data.detail || data.message || "Import failed. Check the URL.");
       }
     } catch (err) {
       setTelegramStatus("error");
@@ -382,6 +523,9 @@ export default function AdminUpload({ onClose }) {
     if (processingLock.current) return;
     if (!instagramUrl) return alert("Please enter an Instagram URL");
 
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Authentication required. Please log into the Admin Dashboard first.");
+
     processingLock.current = true;
     setInstagramStatus("processing");
 
@@ -389,18 +533,38 @@ export default function AdminUpload({ onClose }) {
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-instagram-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-instagram-telethon`;
 
+    const finalUploaderId = uploaderId || "1881815190";
+    const finalCreatorUsername = creatorUsername || "naijahomemade";
+    const finalCreatorDisplayName = creatorDisplayName || "Naija Homemade Series";
+
     const { start: igStart, duration: igDur } = getTrimRange();
-    const callbackUrl = trimMode !== "full"
-      ? `${APP_CONFIG.apiUrl}/api/admin/upload-premium?trim_mode=${trimMode}&trim_duration=${igDur}&trim_start=${igStart}`
-      : `${APP_CONFIG.apiUrl}/api/admin/upload-premium`;
+    const queryParams = new URLSearchParams({
+      creator_username: finalCreatorUsername,
+      creator_display_name: finalCreatorDisplayName,
+      uploader_id: finalUploaderId
+    });
+    if (trimMode !== "full") {
+      queryParams.set("trim_mode", trimMode);
+      queryParams.set("trim_duration", igDur.toString());
+      queryParams.set("trim_start", igStart.toString());
+    }
+    if (token) {
+      queryParams.set("token", token);
+    }
+    const callbackUrl = `${APP_CONFIG.apiUrl}/api/admin/upload-premium?${queryParams.toString()}`;
 
     try {
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ 
           url: instagramUrl,
-          admin_id: adminId || APP_CONFIG.adminUsers[0]?.id || "1881815190", 
+          admin_id: finalUploaderId, 
+          creator_username: finalCreatorUsername,
+          creator_display_name: finalCreatorDisplayName,
           category: category,
           telegram_dest: telegramDest,
           upload_target: uploadTarget,
@@ -423,7 +587,7 @@ export default function AdminUpload({ onClose }) {
         }, 3000);
       } else {
         setInstagramStatus("error");
-        alert(data.detail || data.message || "Import failed. Check the URL or IG might be blocking.");
+        alert(data.error || data.detail || data.message || "Import failed. Check the URL or IG might be blocking.");
       }
     } catch (err) {
       setInstagramStatus("error");
@@ -482,18 +646,66 @@ export default function AdminUpload({ onClose }) {
         {/* 🟢 SHARED INPUTS */}
         <div style={formStyle}>
           <div style={inputGroupStyle}>
-            <label style={labelStyle}>Your Admin ID</label>
-            <select value={adminId} onChange={(e) => setAdminId(e.target.value)} style={inputStyle} required>
-              <option value="" disabled>Select your Admin ID</option>
-              {APP_CONFIG.adminUsers.map(admin => (
-                <option key={admin.id} value={admin.id}>{admin.label} ({admin.id})</option>
+            <label style={labelStyle}>Assign Creator / Channel</label>
+            <select value={selectedCreatorKey} onChange={handleCreatorChange} style={inputStyle}>
+              {creatorsList.map(c => (
+                <option key={c.username} value={c.username}>{c.label || `${c.displayName} (@${c.username})`}</option>
               ))}
+              <option value="custom">➕ Custom Creator / Channel...</option>
             </select>
           </div>
 
+          {isCustomCreator && (
+            <div style={{
+              background: "#1c1c1e",
+              border: "1px solid #3a3a3c",
+              borderRadius: "10px",
+              padding: "14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px"
+            }}>
+              <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffa500" }}>
+                ⚙️ Custom Creator / Channel Attribution
+              </div>
+              <div style={inputGroupStyle}>
+                <label style={{ ...labelStyle, fontSize: "11px" }}>Creator Username / Handle</label>
+                <input 
+                  type="text" 
+                  value={creatorUsername} 
+                  onChange={(e) => setCreatorUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                  placeholder="e.g. naijahomemade or channel_name"
+                  style={inputStyle}
+                  required
+                />
+              </div>
+              <div style={inputGroupStyle}>
+                <label style={{ ...labelStyle, fontSize: "11px" }}>Display Name</label>
+                <input 
+                  type="text" 
+                  value={creatorDisplayName} 
+                  onChange={(e) => setCreatorDisplayName(e.target.value)}
+                  placeholder="e.g. Naija Homemade Series"
+                  style={inputStyle}
+                  required
+                />
+              </div>
+              <div style={inputGroupStyle}>
+                <label style={{ ...labelStyle, fontSize: "11px" }}>Telegram Channel ID / Uploader ID</label>
+                <input 
+                  type="text" 
+                  value={uploaderId} 
+                  onChange={(e) => setUploaderId(e.target.value)}
+                  placeholder="e.g. -1003754790625 or 1881815190"
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+          )}
+
           <div style={inputGroupStyle}>
             <label style={labelStyle}>Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
+            <select value={category} onChange={handleCategoryChange} style={inputStyle}>
               <option value="premium">Premium</option>
               <option value="shots">Shots</option>
               {APP_CONFIG.categories.map(cat => (

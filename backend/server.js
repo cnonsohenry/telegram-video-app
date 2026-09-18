@@ -405,7 +405,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     // 1. JWT Bearer token with admin role
     let isAuthorized = false;
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = (authHeader && authHeader.split(' ')[1]) || req.query.token;
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -422,8 +422,8 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       } catch (e) {}
     }
 
-    // 2. OR API Key / Secret in headers or body
-    const apiKey = req.headers['x-api-key'] || req.headers['x-api-secret'] || req.body.api_key;
+    // 2. OR API Key / Secret in headers or body or query
+    const apiKey = req.headers['x-api-key'] || req.headers['x-api-secret'] || req.body.api_key || req.query.api_key;
     if (!isAuthorized && apiKey && API_SECRETS.includes(apiKey)) {
       isAuthorized = true;
     }
@@ -438,18 +438,21 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     if (!videoFile) return res.status(400).json({ error: "No video file provided" });
 
     // Handle uploader ID (channel ID, user ID, or fallback)
-    const numericUploaderId = uploader_id ? Number(uploader_id) : null;
-    const finalUploaderId = numericUploaderId || (req.body.admin_id ? Number(req.body.admin_id) : null) || 1881815190;
+    const rawUploaderId = uploader_id || req.query.uploader_id || req.body.admin_id;
+    const numericUploaderId = rawUploaderId ? Number(rawUploaderId) : null;
+    const finalUploaderId = numericUploaderId || 1881815190;
 
-    const safeCategory = category ? category.toLowerCase().trim() : "premium";
+    const rawCategory = category || req.query.category;
+    const safeCategory = rawCategory ? rawCategory.toLowerCase().trim() : "premium";
     const cleanIdStr = String(finalUploaderId).replace('-', '');
     const isChannel = finalUploaderId < 0;
     const defaultUsername = (safeCategory === "premium" && !isChannel) ? "naijahomemade" : `tg_${cleanIdStr}`;
     const defaultDisplayName = (safeCategory === "premium" && !isChannel) ? "Naija Homemade Series" : (isChannel ? `Channel ${cleanIdStr}` : `Creator ${finalUploaderId}`);
-    const targetUsername = creator_username 
-      ? String(creator_username).trim().toLowerCase().replace(/[^a-z0-9_]/g, '')
+    const rawCreatorUsername = creator_username || req.query.creator_username;
+    const targetUsername = rawCreatorUsername 
+      ? String(rawCreatorUsername).trim().toLowerCase().replace(/[^a-z0-9_]/g, '')
       : defaultUsername;
-    const targetDisplayName = creator_display_name || creator_name || defaultDisplayName;
+    const targetDisplayName = creator_display_name || req.query.creator_display_name || creator_name || defaultDisplayName;
 
     // Ensure uploader exists in users table to satisfy foreign key constraint or legacy queries
     await pool.query(
