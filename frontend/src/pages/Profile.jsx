@@ -11,6 +11,8 @@ import EditProfileModal from "../components/EditProfileModal";
 import CreatorProfileModal from "../components/CreatorProfileModal";
 import CreatorStudioModal from "../components/CreatorStudioModal";
 import CreatorUploadModal from "../components/CreatorUploadModal";
+import DiscoverCreatorsSection from "../components/DiscoverCreatorsSection";
+import DiscoverCreatorsModal from "../components/DiscoverCreatorsModal";
 import { useVideos } from "../hooks/useVideos";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
@@ -24,11 +26,22 @@ export default function Profile({
   setHideFooter, 
   setActiveVideo, 
   setShowPaywall, 
-  onUpdateUser 
+  onUpdateUser,
+  onCreatorClick,
+  onOpenDiscoverCreators
 }) {
   const [activeTab, setActiveTab] = useState(user?.is_creator ? "videos" : "likes");
   const [currentView, setCurrentView] = useState("profile");
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
+  const [showDiscoverModal, setShowDiscoverModal] = useState(false);
+
+  const handleOpenDiscover = useCallback(() => {
+    if (onOpenDiscoverCreators) {
+      onOpenDiscoverCreators();
+    } else {
+      setShowDiscoverModal(true);
+    }
+  }, [onOpenDiscoverCreators]);
 
   useEffect(() => {
     if (!user?.is_creator && (activeTab === "videos" || activeTab === "reels" || activeTab === "premium")) {
@@ -880,6 +893,34 @@ export default function Profile({
 
         </div>
 
+        {/* 🌟 DISCOVER CREATORS (JUST ABOVE CATEGORY TABS) */}
+        <div style={{ 
+          width: "100%", 
+          maxWidth: isDesktop ? "935px" : "100%",
+          margin: isDesktop ? "0 auto 8px auto" : "0 0 4px 0",
+          boxSizing: "border-box"
+        }}>
+          <DiscoverCreatorsSection 
+            user={user}
+            onCreatorClick={(uname) => {
+              if (onCreatorClick) {
+                onCreatorClick(uname);
+              } else {
+                window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
+              }
+            }}
+            onSeeAll={handleOpenDiscover}
+            title="Discover Creators"
+            style={{
+              margin: 0,
+              background: "transparent",
+              borderTop: "1px solid #262626",
+              borderBottom: "none",
+              padding: isDesktop ? "16px 0" : "14px 12px"
+            }}
+          />
+        </div>
+
         {/* 🌟 INSTAGRAM PROFILE TABS NAVIGATION */}
         <div style={{ 
           ...tabsContainerStyle, 
@@ -1202,6 +1243,23 @@ export default function Profile({
           onSuccess={handleUploadSuccess}
           defaultCategory={uploadDefaultCategory}
           user={user}
+        />
+      )}
+
+      {/* 🌟 DISCOVER CREATORS MODAL */}
+      {showDiscoverModal && (
+        <DiscoverCreatorsModal 
+          isOpen={showDiscoverModal}
+          currentUser={user}
+          onClose={() => setShowDiscoverModal(false)}
+          onCreatorClick={(uname) => {
+            setShowDiscoverModal(false);
+            if (onCreatorClick) {
+              onCreatorClick(uname);
+            } else {
+              window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
+            }
+          }}
         />
       )}
     </div>

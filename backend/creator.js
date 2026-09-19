@@ -1108,11 +1108,12 @@ router.post("/:username/tip", authenticateToken, async (req, res) => {
 router.get("/featured/list", optionalAuth, async (req, res) => {
   try {
     const currentUserId = req.user?.id || null;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 24, 1), 150);
+    const search = req.query.q || req.query.search || null;
 
     // Return exclusively genuine Telegram creators with randomized dynamic rotation
     // Strictly filter out any web user accounts
-    const creatorsRes = await pool.query(
-      `SELECT u.id, u.username, u.display_name, 
+    let query = `SELECT u.id, u.username, u.display_name, 
               COALESCE(NULLIF(u.avatar_url, ''), '/api/avatar?user_id=' || u.telegram_user_id) as avatar_url, 
               u.banner_url, u.creator_category, 
               u.creator_bio, u.is_verified, u.subscription_price, u.telegram_user_id,
@@ -1136,11 +1137,21 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
          OR u.email = 'support@naijahomemade.com' 
          OR (u.is_managed = TRUE AND (u.telegram_user_id > 10000000 OR u.telegram_user_id < 0))
        )
-       AND (u.email NOT LIKE '%@gmail.com' AND u.email NOT LIKE '%@yahoo.com' AND u.email NOT LIKE '%@hotmail.com')
-       ORDER BY RANDOM()
-       LIMIT 24`,
-      [currentUserId]
-    );
+       AND (u.email NOT LIKE '%@gmail.com' AND u.email NOT LIKE '%@yahoo.com' AND u.email NOT LIKE '%@hotmail.com')`;
+
+    const params = [currentUserId];
+    if (search && search.trim()) {
+      params.push(`%${search.trim().toLowerCase()}%`);
+      query += ` AND (LOWER(u.username) LIKE $${params.length} OR LOWER(COALESCE(u.display_name, '')) LIKE $${params.length} OR LOWER(COALESCE(u.creator_category, '')) LIKE $${params.length})`;
+      query += ` ORDER BY followers_count DESC, u.id DESC`;
+    } else {
+      query += ` ORDER BY RANDOM()`;
+    }
+
+    params.push(limit);
+    query += ` LIMIT $${params.length}`;
+
+    const creatorsRes = await pool.query(query, params);
 
     let creators = creatorsRes.rows.map(c => ({
       ...c,

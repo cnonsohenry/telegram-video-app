@@ -12,6 +12,7 @@ import CommentSectionModal from "./components/CommentSectionModal";
 import CreatorProfileModal from "./components/CreatorProfileModal";
 import AppToast from "./components/AppToast";
 import LoginPromptModal from "./components/LoginPromptModal";
+import DiscoverCreatorsModal from "./components/DiscoverCreatorsModal";
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
@@ -59,6 +60,14 @@ export default function App() {
   const [creatorAutoSubscribe, setCreatorAutoSubscribe] = useState(false);
   const [isCreatorOverVideo, setIsCreatorOverVideo] = useState(false);
   const [loginPromptAction, setLoginPromptAction] = useState(null);
+  const [showDiscoverCreators, setShowDiscoverCreators] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("page") === "discover-creators" || params.get("discover") === "creators";
+  });
+  const showDiscoverCreatorsRef = useRef(false);
+  useEffect(() => {
+    showDiscoverCreatorsRef.current = showDiscoverCreators;
+  }, [showDiscoverCreators]);
 
   // 🟢 THE FIX: App Height Lock Architecture
   const windowWidth = useRef(window.innerWidth);
@@ -268,6 +277,18 @@ export default function App() {
         return;
       }
 
+      // 5.5 If discover creators modal was open and state no longer has discoverCreators, close it
+      if (showDiscoverCreatorsRef.current && !state.discoverCreators) {
+        showDiscoverCreatorsRef.current = false;
+        setShowDiscoverCreators(false);
+        return;
+      }
+      if (state.discoverCreators && !showDiscoverCreatorsRef.current) {
+        showDiscoverCreatorsRef.current = true;
+        setShowDiscoverCreators(true);
+        return;
+      }
+
       // 6. If search overlay was open, AppHeader's popstate listener closes it
       if (state.searchOpen) {
         return;
@@ -323,6 +344,35 @@ export default function App() {
     window.addEventListener("openLegalPage", handleOpenLegalEvent);
     return () => window.removeEventListener("openLegalPage", handleOpenLegalEvent);
   }, [handleOpenLegal]);
+
+  // 🟢 Seamless Discover Creators navigation
+  const handleOpenDiscoverCreators = useCallback(() => {
+    setShowDiscoverCreators(true);
+    showDiscoverCreatorsRef.current = true;
+    const currentState = window.history.state || {};
+    if (!currentState.discoverCreators) {
+      window.history.pushState(
+        { ...currentState, discoverCreators: true },
+        document.title,
+        window.location.search ? `${window.location.search}&discover=creators` : `/?discover=creators`
+      );
+    }
+  }, []);
+
+  const handleCloseDiscoverCreators = useCallback(() => {
+    showDiscoverCreatorsRef.current = false;
+    setShowDiscoverCreators(false);
+    if (window.history.state?.discoverCreators) {
+      window.history.back();
+    } else {
+      const currentState = window.history.state || {};
+      delete currentState.discoverCreators;
+      const params = new URLSearchParams(window.location.search);
+      params.delete("discover");
+      const qs = params.toString() ? `?${params.toString()}` : (currentState.tab === "home" ? "/" : `/?tab=${currentState.tab || "explore"}`);
+      window.history.replaceState(currentState, document.title, qs);
+    }
+  }, []);
 
   // 🟢 Seamless Creator Profile navigation
   const handleOpenCreator = useCallback((target, options = {}) => {
@@ -396,14 +446,16 @@ export default function App() {
     };
 
     window.addEventListener("openCreatorProfile", handleOpenCreatorEvent);
+    window.addEventListener("openDiscoverCreators", handleOpenDiscoverCreators);
     window.addEventListener("refreshUser", refreshUser);
     window.addEventListener("openLoginPrompt", handleOpenLoginPrompt);
     return () => {
       window.removeEventListener("openCreatorProfile", handleOpenCreatorEvent);
+      window.removeEventListener("openDiscoverCreators", handleOpenDiscoverCreators);
       window.removeEventListener("refreshUser", refreshUser);
       window.removeEventListener("openLoginPrompt", handleOpenLoginPrompt);
     };
-  }, [handleOpenCreator, refreshUser]);
+  }, [handleOpenCreator, handleOpenDiscoverCreators, refreshUser]);
 
   const handleCloseVideo = useCallback(() => {
     activeVideoRef.current = null;
@@ -747,7 +799,8 @@ export default function App() {
             onVideoClick={handleOpenVideo}
             onCommentClick={setActiveCommentVideo}
             onCreatorClick={handleOpenCreator}
-            isAnyModalOpen={!!activeVideo || !!activeCommentVideo || showPaywall || !!activeLegalPage || !!viewingCreator || activeTab !== "explore"} 
+            onOpenDiscoverCreators={handleOpenDiscoverCreators}
+            isAnyModalOpen={!!activeVideo || !!activeCommentVideo || showPaywall || !!activeLegalPage || !!viewingCreator || showDiscoverCreators || activeTab !== "explore"} 
           />
         </div>
         
@@ -765,6 +818,8 @@ export default function App() {
               setHideFooter={handleProfileHideFooter} 
               setShowPaywall={setShowPaywall} 
               onUpdateUser={(updated) => setUser(prev => ({ ...prev, ...updated }))}
+              onCreatorClick={handleOpenCreator}
+              onOpenDiscoverCreators={handleOpenDiscoverCreators}
             />
           ) : (
             <AuthForm 
@@ -867,6 +922,19 @@ export default function App() {
           onSubscriptionUpdated={refreshUser}
         />
       )}
+
+      {/* 🌟 DISCOVER CREATORS MODAL */}
+      {showDiscoverCreators && (
+        <DiscoverCreatorsModal 
+          isOpen={showDiscoverCreators}
+          currentUser={user}
+          onClose={handleCloseDiscoverCreators}
+          onCreatorClick={(uname) => {
+            handleOpenCreator(uname);
+          }}
+        />
+      )}
+
       {/* 🟢 GLOBAL TOAST NOTIFICATIONS */}
       <AppToast />
 

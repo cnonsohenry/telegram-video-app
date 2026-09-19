@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, Sparkles, Lock, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, Sparkles, Lock, ChevronLeft, ChevronRight, X, ArrowRight } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
 import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
+import DiscoverCreatorsModal from "../components/DiscoverCreatorsModal";
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
 import { renderClickableCaption } from "../components/ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
@@ -626,7 +627,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
 };
 
 // 🌟 INSTAGRAM-STYLE SUGGESTED CREATORS COMPONENT
-const InstagramSuggestedCreators = ({ creators, onCreatorClick, user }) => {
+const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }) => {
   const [followingMap, setFollowingMap] = useState({});
   const [loadingMap, setLoadingMap] = useState({});
   const [dismissedSet, setDismissedSet] = useState(new Set());
@@ -701,10 +702,21 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, user }) => {
       <div style={igSuggestedHeader}>
         <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
           <Sparkles size={15} color="#00aff0" />
-          <span style={igSuggestedTitle}>Suggested for you</span>
+          <span style={igSuggestedTitle}>Discover Creators</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={igSuggestedSubtitle}>Telegram Creators</span>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onSeeAll) onSeeAll();
+              else window.dispatchEvent(new CustomEvent("openDiscoverCreators"));
+            }}
+            style={igSeeAllBtn}
+            title="See all creators"
+          >
+            <span>See All</span>
+            <ArrowRight size={13} style={{ marginLeft: "3px" }} />
+          </button>
           <div style={{ display: "flex", gap: "4px" }}>
             <button 
               onClick={() => scrollTrack(-1)} 
@@ -816,7 +828,8 @@ export default function Explore({
   onVideoClick, 
   onCommentClick, 
   isAnyModalOpen,
-  onCreatorClick
+  onCreatorClick,
+  onOpenDiscoverCreators
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [feed, setFeed] = useState([]);
@@ -826,6 +839,15 @@ export default function Explore({
   const [hasMoreSearch, setHasMoreSearch] = useState(true);
   const [featuredCreators, setFeaturedCreators] = useState([]);
   const [suggestedIndex, setSuggestedIndex] = useState(() => Math.floor(Math.random() * 4) + 2);
+  const [showDiscoverModal, setShowDiscoverModal] = useState(false);
+
+  const handleOpenDiscover = useCallback(() => {
+    if (onOpenDiscoverCreators) {
+      onOpenDiscoverCreators();
+    } else {
+      setShowDiscoverModal(true);
+    }
+  }, [onOpenDiscoverCreators]);
 
   const fetchFeaturedCreators = useCallback(async () => {
     try {
@@ -1122,6 +1144,7 @@ export default function Explore({
                       <InstagramSuggestedCreators 
                         creators={featuredCreators.slice(0, 12)}
                         onCreatorClick={onCreatorClick}
+                        onSeeAll={handleOpenDiscover}
                         user={user}
                       />
                     )}
@@ -1129,6 +1152,7 @@ export default function Explore({
                       <InstagramSuggestedCreators 
                         creators={featuredCreators.slice(12)}
                         onCreatorClick={onCreatorClick}
+                        onSeeAll={handleOpenDiscover}
                         user={user}
                       />
                     )}
@@ -1145,6 +1169,19 @@ export default function Explore({
           </div>
         </PullToRefresh>
       </div>
+
+      {/* 🌟 DISCOVER CREATORS MODAL */}
+      {showDiscoverModal && (
+        <DiscoverCreatorsModal 
+          isOpen={showDiscoverModal}
+          currentUser={user}
+          onClose={() => setShowDiscoverModal(false)}
+          onCreatorClick={(uname) => {
+            setShowDiscoverModal(false);
+            if (onCreatorClick) onCreatorClick(uname);
+          }}
+        />
+      )}
 
       <style>{`
         @keyframes skeleton-loading { 0% { background-color: #222; } 50% { background-color: #333; } 100% { background-color: #222; } }
@@ -1203,6 +1240,20 @@ const igSuggestedTitle = {
   fontWeight: "700",
   letterSpacing: "0.2px",
   color: "#ffffff"
+};
+
+const igSeeAllBtn = {
+  background: "transparent",
+  border: "none",
+  color: "#0095f6",
+  fontSize: "12.5px",
+  fontWeight: "600",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "4px 8px",
+  borderRadius: "6px",
+  transition: "background 0.2s ease, opacity 0.2s ease"
 };
 
 const igSuggestedSubtitle = {
