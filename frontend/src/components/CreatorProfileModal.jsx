@@ -146,7 +146,7 @@ export default function CreatorProfileModal({
       if (typeof data.followers_count === "number") {
         setFollowersCount(data.followers_count);
       }
-      showToast(data.following ? `Following @${creatorUsername}` : `Unfollowed @${creatorUsername}`, "info");
+      showToast(data.following ? `Following @${creatorUsername}` : `Unfollowed @${creatorUsername}`, data.following ? "success" : "error");
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (e) {
       showToast(e.message || "Failed to update follow", "error");
@@ -750,6 +750,19 @@ export default function CreatorProfileModal({
           }}
         />
       )}
+
+      <style>{`
+        @keyframes creatorModalSlideUp {
+          from {
+            opacity: 0;
+            transform: translateY(24px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -762,7 +775,8 @@ const containerStyle = {
   backgroundColor: "#000000",
   display: "flex",
   flexDirection: "column",
-  overflow: "hidden"
+  overflow: "hidden",
+  animation: "creatorModalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards"
 };
 
 const topNavStyle = {

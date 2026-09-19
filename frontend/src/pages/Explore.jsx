@@ -674,7 +674,7 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
         throw new Error(data.error || "Failed to update follow");
       }
       setFollowingMap((prev) => ({ ...prev, [uname]: Boolean(data.following) }));
-      showToast(data.following ? `Following @${uname}` : `Unfollowed @${uname}`, "info");
+      showToast(data.following ? `Following @${uname}` : `Unfollowed @${uname}`, data.following ? "success" : "error");
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (err) {
       // Revert optimistic state on failure

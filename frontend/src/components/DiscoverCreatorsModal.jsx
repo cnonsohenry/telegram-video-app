@@ -153,7 +153,7 @@ export default function DiscoverCreatorsModal({
         throw new Error(data.error || "Failed to update follow");
       }
       setFollowingMap(prev => ({ ...prev, [uname]: Boolean(data.following) }));
-      showToast(data.following ? `Following @${uname}` : `Unfollowed @${uname}`, "info");
+      showToast(data.following ? `Following @${uname}` : `Unfollowed @${uname}`, data.following ? "success" : "error");
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (err) {
       setFollowingMap(prev => ({ ...prev, [uname]: isCurrentlyFollowing }));
@@ -407,6 +407,20 @@ export default function DiscoverCreatorsModal({
           )}
         </div>
       </div>
+      <style>{`
+        @keyframes discoverFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes discoverDesktopSlideIn {
+          from { opacity: 0; transform: scale(0.96) translateY(12px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes discoverMobileSlideUp {
+          from { opacity: 0; transform: translateY(28px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -420,7 +434,8 @@ const backdropStyle = {
   backdropFilter: "blur(10px)",
   display: "flex",
   alignItems: "center",
-  justifyContent: "center"
+  justifyContent: "center",
+  animation: "discoverFadeIn 0.2s ease-out forwards"
 };
 
 const desktopModalStyle = {
@@ -435,7 +450,7 @@ const desktopModalStyle = {
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
-  animation: "modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)"
+  animation: "discoverDesktopSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards"
 };
 
 const mobileModalStyle = {
@@ -446,7 +461,8 @@ const mobileModalStyle = {
   backgroundColor: "#000000",
   display: "flex",
   flexDirection: "column",
-  overflow: "hidden"
+  overflow: "hidden",
+  animation: "discoverMobileSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards"
 };
 
 const headerStyle = {

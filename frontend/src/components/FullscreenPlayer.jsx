@@ -154,7 +154,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       }
 
       setIsFollowing(Boolean(data.following));
-      showToast(data.following ? `Following @${creatorHandle}` : `Unfollowed @${creatorHandle}`, "info");
+      showToast(data.following ? `Following @${creatorHandle}` : `Unfollowed @${creatorHandle}`, data.following ? "success" : "error");
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (err) {
       console.error("Follow error:", err);
