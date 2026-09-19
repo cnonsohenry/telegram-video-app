@@ -25,6 +25,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   
   // 🟢 Initialize activeTab from URL search params if present (?tab=explore, ?tab=profile, etc.)
+  // When a user visits the domain without explicit parameters, randomly display between Home or Explore
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
@@ -33,7 +34,10 @@ export default function App() {
     }
     if (params.get("admin") === "true") return "admin";
     if (window.location.pathname === "/login") return "profile";
-    return "home";
+    if (params.get("cat")) return "home";
+
+    // 🎲 Randomly display between Home and Explore on root visit
+    return Math.random() < 0.5 ? "home" : "explore";
   });
 
   const [isFooterVisible, setIsFooterVisible] = useState(true);
@@ -116,7 +120,7 @@ export default function App() {
       const tabParam = params.get("tab");
       const currentTab = tabParam && ["home", "explore", "profile", "admin"].includes(tabParam.toLowerCase())
         ? tabParam.toLowerCase()
-        : (params.get("admin") === "true" ? "admin" : (window.location.pathname === "/login" ? "profile" : "home"));
+        : (params.get("admin") === "true" ? "admin" : (window.location.pathname === "/login" ? "profile" : activeTab));
       
       const catParam = params.get("cat");
       const legalParam = params.get("legal");
@@ -129,7 +133,7 @@ export default function App() {
         ...(creatorParam ? { creatorProfile: creatorParam } : {})
       }, document.title, window.location.href);
     }
-  }, []);
+  }, [activeTab]);
 
   // 🟢 2. Create exclusive, stable callbacks for each specific tab
   const handleHomeHideFooter = useCallback((hide) => {
