@@ -223,9 +223,10 @@ export default function DiscoverCreatorsSection({
               <button 
                 style={{
                   ...igFollowBtn,
-                  backgroundColor: isFollowing ? "#262626" : "#0095f6",
-                  border: isFollowing ? "1px solid rgba(255, 255, 255, 0.2)" : "none",
-                  color: "#ffffff"
+                  backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
+                  border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none",
+                  color: isFollowing ? "#ffffff" : "#000000",
+                  fontWeight: "700"
                 }}
                 onClick={(e) => handleFollowToggle(e, creator)}
                 disabled={isLoading}

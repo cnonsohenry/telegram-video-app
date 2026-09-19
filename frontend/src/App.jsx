@@ -890,7 +890,7 @@ export default function App() {
       )}
 
       {activeVideo && (
-        <div style={{ position: "fixed", inset: 0, zIndex: isCreatorOverVideo ? 999990 : 1000020, background: "#000" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: isCreatorOverVideo ? 999990 : 1000030, background: "#000" }}>
           <FullscreenPlayer 
             video={activeVideo}
             currentUser={user} 
@@ -910,6 +910,18 @@ export default function App() {
         />
       )}
 
+      {/* 🌟 DISCOVER CREATORS MODAL */}
+      {showDiscoverCreators && (
+        <DiscoverCreatorsModal 
+          isOpen={showDiscoverCreators}
+          currentUser={user}
+          onClose={handleCloseDiscoverCreators}
+          onCreatorClick={(uname) => {
+            handleOpenCreator(uname);
+          }}
+        />
+      )}
+
       {/* 🟢 CREATOR PROFILE MODAL */}
       {viewingCreator && (
         <CreatorProfileModal 
@@ -920,18 +932,6 @@ export default function App() {
           onVideoClick={handleOpenVideo} 
           setShowPaywall={setShowPaywall} 
           onSubscriptionUpdated={refreshUser}
-        />
-      )}
-
-      {/* 🌟 DISCOVER CREATORS MODAL */}
-      {showDiscoverCreators && (
-        <DiscoverCreatorsModal 
-          isOpen={showDiscoverCreators}
-          currentUser={user}
-          onClose={handleCloseDiscoverCreators}
-          onCreatorClick={(uname) => {
-            handleOpenCreator(uname);
-          }}
         />
       )}
 

@@ -391,9 +391,10 @@ export default function DiscoverCreatorsModal({
                         disabled={isUpdating}
                         style={{
                           ...followBtnStyle,
-                          background: isFollowing ? "#262626" : "#0095f6",
-                          color: "#ffffff",
-                          border: isFollowing ? "1px solid rgba(255, 255, 255, 0.2)" : "none"
+                          background: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
+                          color: isFollowing ? "#ffffff" : "#000000",
+                          border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none",
+                          fontWeight: "700"
                         }}
                       >
                         {isFollowing ? "Following" : "Follow"}
