@@ -827,25 +827,28 @@ export default function Explore({
   const [featuredCreators, setFeaturedCreators] = useState([]);
   const [suggestedIndex, setSuggestedIndex] = useState(() => Math.floor(Math.random() * 4) + 2);
 
-  useEffect(() => {
-    let isMounted = true;
-    const token = localStorage.getItem("token");
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    fetch(`${APP_CONFIG.apiUrl}/api/creator/featured/list`, { headers })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (isMounted && data?.creators) {
-          // Strictly filter for Telegram user creators (positive telegram_user_id, not channels)
+  const fetchFeaturedCreators = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/featured/list`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.creators) {
+          // Strictly filter out any web users (gmail, yahoo, hotmail)
           const tgOnly = data.creators.filter(c => {
-            const uid = Number(c.telegram_user_id || c.id);
-            return uid > 0 && !String(c.username).startsWith("-100");
+            const email = String(c.email || "").toLowerCase();
+            return !email.includes("@gmail.com") && !email.includes("@yahoo.com") && !email.includes("@hotmail.com");
           });
           setFeaturedCreators(tgOnly);
         }
-      })
-      .catch(() => {});
-    return () => { isMounted = false; };
+      }
+    } catch (e) {}
   }, []);
+
+  useEffect(() => {
+    fetchFeaturedCreators();
+  }, [fetchFeaturedCreators]);
 
   // 🟢 SCROLL UI STATES
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
@@ -927,8 +930,13 @@ export default function Explore({
   }, []);
 
   const loadRandomFeed = async (isLoadMore = false) => {
-    if (isLoadMore) setLoadingMore(true);
-    else setLoading(true);
+    if (isLoadMore) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setSuggestedIndex(Math.floor(Math.random() * 4) + 2);
+      fetchFeaturedCreators();
+    }
 
     try {
       const exploreCategories = [...APP_CONFIG.categories];
@@ -1066,6 +1074,7 @@ export default function Explore({
             setSearchPage(1);
             setHasMoreSearch(true);
             setSuggestedIndex(Math.floor(Math.random() * 4) + 2);
+            fetchFeaturedCreators();
             if (searchQuery.trim()) await loadSearchFeed(1, false);
             else await loadRandomFeed(false);
           }}
@@ -1089,10 +1098,12 @@ export default function Explore({
             ) : (
               feed.map((video, idx) => {
                 const isLast = feed.length === idx + 1;
-                const isSuggestedSpot = !searchQuery.trim() && featuredCreators.length > 0 && (
+                const isFirstSuggestedSpot = !searchQuery.trim() && featuredCreators.length > 0 && (
                   (idx === suggestedIndex) ||
-                  (idx === feed.length - 1 && feed.length <= suggestedIndex) ||
-                  (feed.length > 15 && idx === suggestedIndex + 14)
+                  (idx === feed.length - 1 && feed.length <= suggestedIndex)
+                );
+                const isSecondSuggestedSpot = !searchQuery.trim() && featuredCreators.length > 8 && (
+                  feed.length > 15 && idx === suggestedIndex + 14
                 );
 
                 return (
@@ -1107,9 +1118,16 @@ export default function Explore({
                       onCreatorClick={onCreatorClick}
                       user={user}
                     />
-                    {isSuggestedSpot && (
+                    {isFirstSuggestedSpot && (
                       <InstagramSuggestedCreators 
-                        creators={featuredCreators}
+                        creators={featuredCreators.slice(0, 12)}
+                        onCreatorClick={onCreatorClick}
+                        user={user}
+                      />
+                    )}
+                    {isSecondSuggestedSpot && (
+                      <InstagramSuggestedCreators 
+                        creators={featuredCreators.slice(12)}
                         onCreatorClick={onCreatorClick}
                         user={user}
                       />

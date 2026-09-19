@@ -1102,14 +1102,15 @@ router.post("/:username/tip", authenticateToken, async (req, res) => {
 });
 
 /* =======================================================
-   7. GET FEATURED CREATORS (TELEGRAM USER CREATORS ONLY)
+   7. GET FEATURED CREATORS (AUTHENTIC TELEGRAM CREATORS ONLY)
    GET /api/creator/featured/list
 ======================================================= */
 router.get("/featured/list", optionalAuth, async (req, res) => {
   try {
     const currentUserId = req.user?.id || null;
 
-    // Return exclusively Telegram user creators (telegram_user_id > 0, excluding channels < 0 and web-only accounts)
+    // Return exclusively genuine Telegram creators with randomized dynamic rotation
+    // Strictly filter out any web user accounts
     const creatorsRes = await pool.query(
       `SELECT u.id, u.username, u.display_name, 
               COALESCE(NULLIF(u.avatar_url, ''), '/api/avatar?user_id=' || u.telegram_user_id) as avatar_url, 
@@ -1130,9 +1131,14 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
          my_follow.follower_id = $1::INTEGER AND 
          (my_follow.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND my_follow.creator_id = u.telegram_user_id))
        )
-       WHERE u.telegram_user_id IS NOT NULL AND u.telegram_user_id > 0
-       ORDER BY u.is_verified DESC, followers_count DESC, u.id DESC
-       LIMIT 15`,
+       WHERE (
+         u.email LIKE 'tg_%@internal.naijahomemade.com' 
+         OR u.email = 'support@naijahomemade.com' 
+         OR (u.is_managed = TRUE AND (u.telegram_user_id > 10000000 OR u.telegram_user_id < 0))
+       )
+       AND (u.email NOT LIKE '%@gmail.com' AND u.email NOT LIKE '%@yahoo.com' AND u.email NOT LIKE '%@hotmail.com')
+       ORDER BY RANDOM()
+       LIMIT 24`,
       [currentUserId]
     );
 
@@ -1141,42 +1147,6 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
       followers_count: Number(c.followers_count || 0),
       is_following: Boolean(c.is_following)
     }));
-
-    // If fewer than 4 registered creators, supplement with telegram users (user_id > 0)
-    if (creators.length < 4) {
-      const uploaderRes = await pool.query(
-        `SELECT u.user_id as id, u.username, u.full_name as display_name,
-                COUNT(v.id) as video_count,
-                COALESCE(SUM(v.views), 0) as total_views
-         FROM users u
-         JOIN videos v ON u.user_id = v.uploader_id
-         WHERE u.user_id > 0
-         GROUP BY u.user_id, u.username, u.full_name
-         ORDER BY total_views DESC
-         LIMIT 6`
-      );
-
-      const existingUsernames = new Set(creators.map(c => c.username?.toLowerCase()));
-      for (const u of uploaderRes.rows) {
-        if (!existingUsernames.has(u.username?.toLowerCase())) {
-          creators.push({
-            id: u.id,
-            username: u.username,
-            display_name: u.display_name || u.username,
-            avatar_url: `/api/avatar?user_id=${u.id}`,
-            banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
-            creator_category: "Telegram Creator",
-            creator_bio: "Official creator channel. Daily exclusive videos & drops.",
-            is_verified: true,
-            subscription_price: 15,
-            telegram_user_id: u.id,
-            followers_count: 0,
-            is_following: false
-          });
-          existingUsernames.add(u.username?.toLowerCase());
-        }
-      }
-    }
 
     res.json({ creators });
   } catch (err) {

@@ -353,14 +353,25 @@ export async function syncTelegramCreators(poolInstance) {
       const uploaderIdNum = Number(uploaderIdStr);
       if (!uploaderIdNum || isNaN(uploaderIdNum)) continue;
 
+      // Strictly skip web accounts (web user IDs are positive integers < 10,000,000)
+      if (uploaderIdNum > 0 && uploaderIdNum < 10000000) continue;
+
       // Check if already in app_users
       const existing = await db.query(
-        `SELECT id, username, telegram_user_id, is_managed 
+        `SELECT id, username, telegram_user_id, is_managed, email 
          FROM app_users 
          WHERE telegram_user_id = $1 
             OR (username IS NOT NULL AND LOWER(username) = LOWER($2))`,
         [uploaderIdNum, info.username || '']
       );
+
+      // Do NOT overwrite web user accounts with personal emails
+      if (existing.rows.length > 0) {
+        const userRow = existing.rows[0];
+        if (userRow.email && (userRow.email.includes('@gmail.com') || userRow.email.includes('@yahoo.com') || userRow.email.includes('@hotmail.com'))) {
+          continue;
+        }
+      }
 
       const defaultCategory = info.top_category && info.top_category !== 'none' 
         ? (info.top_category.charAt(0).toUpperCase() + info.top_category.slice(1)) 
