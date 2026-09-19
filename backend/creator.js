@@ -1102,24 +1102,47 @@ router.post("/:username/tip", authenticateToken, async (req, res) => {
 });
 
 /* =======================================================
-   7. GET FEATURED CREATORS
+   7. GET FEATURED CREATORS (TELEGRAM USER CREATORS ONLY)
    GET /api/creator/featured/list
 ======================================================= */
-router.get("/featured/list", async (req, res) => {
+router.get("/featured/list", optionalAuth, async (req, res) => {
   try {
-    // Return verified creators or users with the highest activity
+    const currentUserId = req.user?.id || null;
+
+    // Return exclusively Telegram user creators (telegram_user_id > 0, excluding channels < 0 and web-only accounts)
     const creatorsRes = await pool.query(
-      `SELECT id, username, display_name, avatar_url, banner_url, creator_category, 
-              creator_bio, is_verified, subscription_price
-       FROM app_users 
-       WHERE is_creator = TRUE 
-       ORDER BY id DESC 
-       LIMIT 10`
+      `SELECT u.id, u.username, u.display_name, 
+              COALESCE(NULLIF(u.avatar_url, ''), '/api/avatar?user_id=' || u.telegram_user_id) as avatar_url, 
+              u.banner_url, u.creator_category, 
+              u.creator_bio, u.is_verified, u.subscription_price, u.telegram_user_id,
+              COALESCE(followers.cnt, 0)::INT as followers_count,
+              CASE 
+                WHEN $1::INTEGER IS NOT NULL AND my_follow.id IS NOT NULL THEN TRUE 
+                ELSE FALSE 
+              END as is_following
+       FROM app_users u
+       LEFT JOIN (
+         SELECT creator_id, COUNT(*) as cnt 
+         FROM creator_follows 
+         GROUP BY creator_id
+       ) followers ON (followers.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND followers.creator_id = u.telegram_user_id))
+       LEFT JOIN creator_follows my_follow ON (
+         my_follow.follower_id = $1::INTEGER AND 
+         (my_follow.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND my_follow.creator_id = u.telegram_user_id))
+       )
+       WHERE u.telegram_user_id IS NOT NULL AND u.telegram_user_id > 0
+       ORDER BY u.is_verified DESC, followers_count DESC, u.id DESC
+       LIMIT 15`,
+      [currentUserId]
     );
 
-    let creators = creatorsRes.rows;
+    let creators = creatorsRes.rows.map(c => ({
+      ...c,
+      followers_count: Number(c.followers_count || 0),
+      is_following: Boolean(c.is_following)
+    }));
 
-    // If fewer than 4 registered creators, supplement with top uploaders
+    // If fewer than 4 registered creators, supplement with telegram users (user_id > 0)
     if (creators.length < 4) {
       const uploaderRes = await pool.query(
         `SELECT u.user_id as id, u.username, u.full_name as display_name,
@@ -1127,28 +1150,30 @@ router.get("/featured/list", async (req, res) => {
                 COALESCE(SUM(v.views), 0) as total_views
          FROM users u
          JOIN videos v ON u.user_id = v.uploader_id
+         WHERE u.user_id > 0
          GROUP BY u.user_id, u.username, u.full_name
          ORDER BY total_views DESC
          LIMIT 6`
       );
 
-      const mappedUploaders = uploaderRes.rows.map(u => ({
-        id: u.id,
-        username: u.username,
-        display_name: u.display_name || u.username,
-        avatar_url: `/api/avatar?user_id=${u.id}`,
-        banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
-        creator_category: "Top Creator",
-        creator_bio: "Official creator on the platform. Daily exclusive videos & drops.",
-        is_verified: true,
-        subscription_price: 15
-      }));
-
-      // Merge avoiding duplicates
-      const existingUsernames = new Set(creators.map(c => c.username.toLowerCase()));
-      for (const u of mappedUploaders) {
-        if (!existingUsernames.has(u.username.toLowerCase())) {
-          creators.push(u);
+      const existingUsernames = new Set(creators.map(c => c.username?.toLowerCase()));
+      for (const u of uploaderRes.rows) {
+        if (!existingUsernames.has(u.username?.toLowerCase())) {
+          creators.push({
+            id: u.id,
+            username: u.username,
+            display_name: u.display_name || u.username,
+            avatar_url: `/api/avatar?user_id=${u.id}`,
+            banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
+            creator_category: "Telegram Creator",
+            creator_bio: "Official creator channel. Daily exclusive videos & drops.",
+            is_verified: true,
+            subscription_price: 15,
+            telegram_user_id: u.id,
+            followers_count: 0,
+            is_following: false
+          });
+          existingUsernames.add(u.username?.toLowerCase());
         }
       }
     }
