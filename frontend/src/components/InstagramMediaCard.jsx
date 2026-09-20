@@ -92,7 +92,7 @@ export default function InstagramMediaCard({
     maximumFractionDigits: 1
   }).format(Number(video.likes || Math.max(1, Math.round(Number(video.views || 0) * 0.12))));
 
-  const isLocked = video.category === "premium";
+  const isLocked = video.category === "premium" || Boolean(video.is_premium);
 
   return (
     <div
@@ -217,27 +217,29 @@ export default function InstagramMediaCard({
       </div>
 
       {/* Bottom-Left View Count (always visible on mobile, or subtle bottom shadow) */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: "6px",
-          left: "8px",
-          zIndex: 5,
-          display: "flex",
-          alignItems: "center",
-          gap: "4px",
-          color: "#fff",
-          textShadow: "0 1px 4px rgba(0,0,0,0.8)",
-          fontSize: "11px",
-          fontWeight: "700"
-        }}
-      >
-        <Play size={10} fill="#fff" strokeWidth={0} />
-        <span>{formattedViews}</span>
-      </div>
+      {!isLocked && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "6px",
+            left: "8px",
+            zIndex: 5,
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            color: "#fff",
+            textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+            fontSize: "11px",
+            fontWeight: "700"
+          }}
+        >
+          <Play size={10} fill="#fff" strokeWidth={0} />
+          <span>{formattedViews}</span>
+        </div>
+      )}
 
       {/* Desktop Hover Overlay (Instagram classic stats overlay) */}
-      {isDesktop && (
+      {isDesktop && !isLocked && (
         <div
           style={{
             position: "absolute",

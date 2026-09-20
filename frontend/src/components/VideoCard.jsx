@@ -218,7 +218,7 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
           </div>
         )}
 
-        {showDetails && (
+        {showDetails && !(video.category === "premium" || video.is_premium) && (
           <div style={{
             position: "absolute", bottom: 10, left: 10, zIndex: 10, 
             display: "flex", alignItems: "center", gap: 6, 

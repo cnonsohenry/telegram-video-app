@@ -593,34 +593,34 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
           </div>
         )}
 
-        <div style={actionBarStyle}>
-          <div style={actionItemStyle}>
-            <Eye size={18} />
-            <span>{Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}</span>
-          </div>
-          
-          <div style={actionItemStyle} onClick={handleCommentClick}>
-            <MessageCircle size={18} />
-            <span>{commentsCount > 0 ? commentsCount : ''}</span>
-          </div>
+        {!isPremium && (
+          <div style={actionBarStyle}>
+            <div style={actionItemStyle}>
+              <Eye size={18} />
+              <span>{Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}</span>
+            </div>
+            
+            <div style={actionItemStyle} onClick={handleCommentClick}>
+              <MessageCircle size={18} />
+              <span>{commentsCount > 0 ? commentsCount : ''}</span>
+            </div>
 
-          <div style={{ ...actionItemStyle, color: isLiked ? "#f91880" : "#71767b" }} onClick={handleLike}>
-            <Heart size={18} fill={isLiked ? "#f91880" : "none"} />
-            <span>{likesCount > 0 ? likesCount : ''}</span>
-          </div>
+            <div style={{ ...actionItemStyle, color: isLiked ? "#f91880" : "#71767b" }} onClick={handleLike}>
+              <Heart size={18} fill={isLiked ? "#f91880" : "none"} />
+              <span>{likesCount > 0 ? likesCount : ''}</span>
+            </div>
 
-          <div style={{ ...actionItemStyle, color: isSaved ? "var(--primary-color)" : "#71767b" }} onClick={handleSave}>
-            <Bookmark size={18} fill={isSaved ? "var(--primary-color)" : "none"} />
-            <span>{savesCount > 0 ? savesCount : ''}</span>
-          </div>
+            <div style={{ ...actionItemStyle, color: isSaved ? "var(--primary-color)" : "#71767b" }} onClick={handleSave}>
+              <Bookmark size={18} fill={isSaved ? "var(--primary-color)" : "none"} />
+              <span>{savesCount > 0 ? savesCount : ''}</span>
+            </div>
 
-          {!isPremium && (
             <div style={actionItemStyle} onClick={handleShare}>
               <Share2 size={18} />
               <span>{sharesCount > 0 ? sharesCount : ''}</span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

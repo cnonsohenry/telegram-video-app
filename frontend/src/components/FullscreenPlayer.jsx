@@ -3,7 +3,7 @@ import {
   X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, 
   Share2, Download, Check, Heart, MessageCircle, Bookmark, 
   Volume2, VolumeX, MoreVertical, Edit2, Trash2, RotateCw,
-  UserPlus, SkipForward, ExternalLink
+  UserPlus, SkipForward, ExternalLink, Eye
 } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG & AD UTILITIES
@@ -1061,27 +1061,31 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                    </div>
                 </div>
 
-                {/* 🟢 RESTORED: Action Bar (Like, Comment, Save, Share) */}
-                <div style={engagementBarStyle}>
-                   <button style={engagementBtnStyle} onClick={handleLike}>
-                      <Heart size={22} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#fff"} />
-                      <span>{likesCount > 0 ? likesCount : 'Like'}</span>
-                   </button>
-                   <button style={engagementBtnStyle} onClick={handleCommentClick}>
-                      <MessageCircle size={22} color="#fff" />
-                      <span>{commentsCount > 0 ? commentsCount : 'Reply'}</span>
-                   </button>
-                   <button style={engagementBtnStyle} onClick={handleSaveToProfile}>
-                      <Bookmark size={22} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#fff"} />
-                      <span>{savesCount > 0 ? savesCount : 'Save'}</span>
-                   </button>
-                    {!isPremium && (
-                      <button style={engagementBtnStyle} onClick={handleShare}>
-                         {copied ? <Check size={22} color="#4ade80" /> : <Share2 size={22} color="#fff" />}
-                         <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
-                      </button>
-                    )}
-                </div>
+                 {/* 🟢 RESTORED: Action Bar (Views, Like, Comment, Save, Share) */}
+                 <div style={engagementBarStyle}>
+                    <div style={{ ...engagementBtnStyle, cursor: "default" }}>
+                       <Eye size={22} color="#fff" />
+                       <span>{Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}</span>
+                    </div>
+                    <button style={engagementBtnStyle} onClick={handleLike}>
+                       <Heart size={22} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#fff"} />
+                       <span>{likesCount > 0 ? likesCount : 'Like'}</span>
+                    </button>
+                    <button style={engagementBtnStyle} onClick={handleCommentClick}>
+                       <MessageCircle size={22} color="#fff" />
+                       <span>{commentsCount > 0 ? commentsCount : 'Reply'}</span>
+                    </button>
+                    <button style={engagementBtnStyle} onClick={handleSaveToProfile}>
+                       <Bookmark size={22} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#fff"} />
+                       <span>{savesCount > 0 ? savesCount : 'Save'}</span>
+                    </button>
+                     {!isPremium && (
+                       <button style={engagementBtnStyle} onClick={handleShare}>
+                          {copied ? <Check size={22} color="#4ade80" /> : <Share2 size={22} color="#fff" />}
+                          <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
+                       </button>
+                     )}
+                 </div>
 
               </div>
             </>

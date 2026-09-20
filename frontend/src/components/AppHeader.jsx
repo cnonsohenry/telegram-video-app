@@ -249,11 +249,30 @@ export default function AppHeader({
                         <div key={v.message_id} onClick={(e) => handleExecuteSearch(v, e)} style={suggestedVideoItem(isDesktop)}>
                           <div style={suggestedThumbWrapper(isDesktop)}>
                             <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
-                            {isDesktop && (
-                              <div style={viewsOverlay}>
-                                <Play size={10} fill="#fff" strokeWidth={0} />
-                                {Number(v.views).toLocaleString()}
+                            {(v.category === "premium" || v.is_premium) ? (
+                              <div style={{
+                                position: "absolute",
+                                top: "6px",
+                                left: "6px",
+                                background: "rgba(0, 0, 0, 0.55)",
+                                color: "#ffffff",
+                                border: "1px solid rgba(255, 255, 255, 0.18)",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                fontSize: "9px",
+                                fontWeight: "800",
+                                letterSpacing: "0.5px",
+                                zIndex: 2
+                              }}>
+                                VIP
                               </div>
+                            ) : (
+                              isDesktop && (
+                                <div style={viewsOverlay}>
+                                  <Play size={10} fill="#fff" strokeWidth={0} />
+                                  {Number(v.views).toLocaleString()}
+                                </div>
+                              )
                             )}
                           </div>
                           <div style={suggestedVideoInfo(isDesktop)}>
@@ -261,7 +280,7 @@ export default function AppHeader({
                             <p style={suggestedCaption}>{v.caption || APP_CONFIG.defaultCaption}</p>
                             <span style={suggestedUploader}>
                               @{v.uploader_name} 
-                              {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
+                              {!isDesktop && !(v.category === "premium" || v.is_premium) && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
                             </span>
                           </div>
                         </div>
@@ -290,11 +309,30 @@ export default function AppHeader({
                           <div key={`live-${v.message_id}`} onClick={(e) => handleExecuteSearch(v, e)} style={suggestedVideoItem(isDesktop)}>
                             <div style={suggestedThumbWrapper(isDesktop)}>
                               <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
-                              {isDesktop && (
-                                <div style={viewsOverlay}>
-                                  <Play size={10} fill="#fff" strokeWidth={0} />
-                                  {Number(v.views).toLocaleString()}
+                              {(v.category === "premium" || v.is_premium) ? (
+                                <div style={{
+                                  position: "absolute",
+                                  top: "6px",
+                                  left: "6px",
+                                  background: "rgba(0, 0, 0, 0.55)",
+                                  color: "#ffffff",
+                                  border: "1px solid rgba(255, 255, 255, 0.18)",
+                                  padding: "2px 6px",
+                                  borderRadius: "4px",
+                                  fontSize: "9px",
+                                  fontWeight: "800",
+                                  letterSpacing: "0.5px",
+                                  zIndex: 2
+                                }}>
+                                  VIP
                                 </div>
+                              ) : (
+                                isDesktop && (
+                                  <div style={viewsOverlay}>
+                                    <Play size={10} fill="#fff" strokeWidth={0} />
+                                    {Number(v.views).toLocaleString()}
+                                  </div>
+                                )
                               )}
                             </div>
                             <div style={suggestedVideoInfo(isDesktop)}>
@@ -302,7 +340,7 @@ export default function AppHeader({
                               <p style={suggestedCaption}>{v.caption || APP_CONFIG.defaultCaption}</p>
                               <span style={suggestedUploader}>
                                 @{v.uploader_name} 
-                                {!isDesktop && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
+                                {!isDesktop && !(v.category === "premium" || v.is_premium) && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
                               </span>
                             </div>
                           </div>
@@ -314,10 +352,29 @@ export default function AppHeader({
                           <div key={`grid-${v.message_id}`} onClick={(e) => handleExecuteSearch(v, e)} style={submittedVideoItem}>
                             <div style={submittedThumbWrapper}>
                               <img src={v.thumbnail_url} style={suggestedThumb} alt="" />
-                              <div style={viewsOverlay}>
-                                <Play size={10} fill="#fff" strokeWidth={0} />
-                                {Number(v.views).toLocaleString()}
-                              </div>
+                              {(v.category === "premium" || v.is_premium) ? (
+                                <div style={{
+                                  position: "absolute",
+                                  top: "6px",
+                                  left: "6px",
+                                  background: "rgba(0, 0, 0, 0.55)",
+                                  color: "#ffffff",
+                                  border: "1px solid rgba(255, 255, 255, 0.18)",
+                                  padding: "2px 6px",
+                                  borderRadius: "4px",
+                                  fontSize: "9px",
+                                  fontWeight: "800",
+                                  letterSpacing: "0.5px",
+                                  zIndex: 2
+                                }}>
+                                  VIP
+                                </div>
+                              ) : (
+                                <div style={viewsOverlay}>
+                                  <Play size={10} fill="#fff" strokeWidth={0} />
+                                  {Number(v.views).toLocaleString()}
+                                </div>
+                              )}
                             </div>
                             <div style={submittedVideoInfo}>
                               {/* 🟢 THE FIX: Dynamic default caption */}

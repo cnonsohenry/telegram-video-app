@@ -83,10 +83,12 @@ export default function SuggestedSidebar({ onVideoClick }) {
                 }}>
                   {renderClickableCaption(v.caption || APP_CONFIG.defaultCaption)}
                 </p>
-                <div style={{ color: "#8e8e8e", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <Play size={10} fill="#8e8e8e" strokeWidth={0} />
-                  <span>{Number(v.views || 0).toLocaleString()} views</span>
-                </div>
+                {!(v.category === "premium" || v.is_premium) && (
+                  <div style={{ color: "#8e8e8e", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Play size={10} fill="#8e8e8e" strokeWidth={0} />
+                    <span>{Number(v.views || 0).toLocaleString()} views</span>
+                  </div>
+                )}
                 <div style={{ color: "#555", fontSize: "11px", fontWeight: "700", marginTop: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {/* 🟢 THE FIX: Dynamic Default Uploader */}
                   @{v.uploader_name || APP_CONFIG.defaultUploader}
