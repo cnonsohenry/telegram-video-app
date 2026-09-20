@@ -5,6 +5,7 @@ import {
   GraduationCap, Zap, Video
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
+import { showToast } from "../utils/toast";
 
 const PUBLIC_CATEGORIES = [
   { id: "hotties", label: "Hotties", icon: Flame, desc: "Trending & popular model drops" },
@@ -32,6 +33,45 @@ export default function CreatorUploadModal({
   const [uploadStatus, setUploadStatus] = useState("idle"); // 'idle' | 'uploading' | 'processing' | 'success' | 'error'
   const [errorMessage, setErrorMessage] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // VIP Subscription Price Requirement
+  const [newPriceInput, setNewPriceInput] = useState("");
+  const [savingPrice, setSavingPrice] = useState(false);
+  const [currentSubPrice, setCurrentSubPrice] = useState(Number(user?.subscription_price || 0));
+
+  useEffect(() => {
+    setCurrentSubPrice(Number(user?.subscription_price || 0));
+  }, [user?.subscription_price]);
+
+  const handleSavePrice = async () => {
+    const val = Math.max(1, Number(newPriceInput) || 0);
+    if (val <= 0) return;
+    setSavingPrice(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/profile`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ subscription_price: val })
+      });
+      if (res.ok) {
+        setCurrentSubPrice(val);
+        if (user) user.subscription_price = val;
+        showToast(`Monthly VIP subscription fee set to $${val}!`, "success");
+        window.dispatchEvent(new CustomEvent("refreshUser"));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || "Failed to set subscription price", "error");
+      }
+    } catch (e) {
+      showToast("Network error setting price", "error");
+    } finally {
+      setSavingPrice(false);
+    }
+  };
 
   const fileInputRef = useRef(null);
   const activeXhrRef = useRef(null);
@@ -135,6 +175,12 @@ export default function CreatorUploadModal({
     const token = localStorage.getItem("token");
     if (!token) {
       setErrorMessage("You must be logged in to upload videos.");
+      setUploadStatus("error");
+      return;
+    }
+
+    if (isVip && currentSubPrice <= 0) {
+      setErrorMessage("Please set your monthly VIP subscription price before publishing VIP Exclusive content.");
       setUploadStatus("error");
       return;
     }
@@ -407,12 +453,73 @@ export default function CreatorUploadModal({
 
               {/* VIP Note if selected */}
               {isVip ? (
-                <div style={vipNoticeBoxStyle}>
-                  <Sparkles size={14} color="#FFD700" style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: "12px", color: "#ffd700", lineHeight: "1.4" }}>
-                    Subscribers to your VIP pass (${Number(user?.subscription_price || 15).toLocaleString()}/month) will get instant access. Free viewers will see a lock screen with a prompt to subscribe.
-                  </span>
-                </div>
+                currentSubPrice > 0 ? (
+                  <div style={vipNoticeBoxStyle}>
+                    <Sparkles size={14} color="#FFD700" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: "12px", color: "#ffd700", lineHeight: "1.4" }}>
+                      Subscribers to your VIP pass (${currentSubPrice.toLocaleString()}/month) will get instant access. Free viewers will see a lock screen with a prompt to subscribe.
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{
+                    ...vipNoticeBoxStyle,
+                    borderColor: "rgba(255, 59, 48, 0.4)",
+                    backgroundColor: "rgba(255, 59, 48, 0.08)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <AlertCircle size={16} color="#ff3b30" style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: "13px", fontWeight: "700", color: "#ff453a" }}>
+                        Subscription Fee Required
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "12px", color: "#e0e0e0", lineHeight: "1.4" }}>
+                      You cannot post VIP Exclusive content until you set your monthly subscription price.
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                      <input 
+                        type="number"
+                        min="1"
+                        max="1000"
+                        placeholder="e.g. 10"
+                        value={newPriceInput}
+                        onChange={(e) => setNewPriceInput(e.target.value)}
+                        style={{
+                          width: "90px",
+                          padding: "6px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #444",
+                          backgroundColor: "#1c1c1e",
+                          color: "#fff",
+                          fontSize: "13px",
+                          fontWeight: "700"
+                        }}
+                      />
+                      <span style={{ fontSize: "12px", color: "#aaa" }}>USD/month</span>
+                      <button
+                        type="button"
+                        onClick={handleSavePrice}
+                        disabled={savingPrice || !newPriceInput || Number(newPriceInput) <= 0}
+                        style={{
+                          marginLeft: "auto",
+                          padding: "6px 14px",
+                          borderRadius: "6px",
+                          border: "none",
+                          backgroundColor: "#FFD700",
+                          color: "#000",
+                          fontWeight: "800",
+                          fontSize: "12px",
+                          cursor: (savingPrice || !newPriceInput || Number(newPriceInput) <= 0) ? "not-allowed" : "pointer",
+                          opacity: (savingPrice || !newPriceInput || Number(newPriceInput) <= 0) ? 0.6 : 1
+                        }}
+                      >
+                        {savingPrice ? "Saving..." : "Set Price"}
+                      </button>
+                    </div>
+                  </div>
+                )
               ) : (
                 /* Public category pills */
                 <div style={{ marginTop: "12px" }}>
@@ -489,10 +596,10 @@ export default function CreatorUploadModal({
               )}
               <button
                 type="submit"
-                disabled={!videoFile || uploadStatus === "uploading" || uploadStatus === "processing"}
+                disabled={!videoFile || uploadStatus === "uploading" || uploadStatus === "processing" || (isVip && currentSubPrice <= 0)}
                 style={{
                   ...submitBtnStyle,
-                  opacity: (!videoFile || uploadStatus === "uploading" || uploadStatus === "processing") ? 0.6 : 1,
+                  opacity: (!videoFile || uploadStatus === "uploading" || uploadStatus === "processing" || (isVip && currentSubPrice <= 0)) ? 0.6 : 1,
                   background: isVip 
                     ? "linear-gradient(135deg, #FFD700, #ffae00)" 
                     : "linear-gradient(135deg, #00aff0, #0088cc)",

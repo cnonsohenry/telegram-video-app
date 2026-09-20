@@ -16,10 +16,18 @@ export const isUserSubscribedToCreator = (user, video) => {
     return true;
   }
 
-  if (!user) return false;
-  if (user.role === "admin") return true;
+  // If already flagged as subscribed or granted access
+  if (video.is_subscribed || video.has_access) {
+    return true;
+  }
 
   const creatorHandle = getVideoCreatorHandle(video).toLowerCase();
+  const isOfficial = creatorHandle === "naijahomemade";
+
+  // If creator did not set any subscription fee (subscription_price <= 0), access is granted freely!
+  if (!isOfficial && video.subscription_price !== undefined && Number(video.subscription_price || 0) <= 0) {
+    return true;
+  }
   const uploaderId = video.uploader_id ? String(video.uploader_id) : null;
 
   // Owner check

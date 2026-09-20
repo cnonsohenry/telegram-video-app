@@ -702,7 +702,9 @@ export default function App() {
     setIsCreatorOverVideo(false);
     try {
       if (video.category === "premium" || video.is_premium) {
-        const hasAccess = isUserSubscribedToCreator(user, video);
+        const creatorPrice = video.subscription_price !== undefined ? Number(video.subscription_price) : null;
+        const hasFee = creatorPrice === null ? true : creatorPrice > 0;
+        const hasAccess = Boolean(video.is_subscribed || !hasFee || isUserSubscribedToCreator(user, video));
         if (!hasAccess) {
           const creatorHandle = getVideoCreatorHandle(video);
           handleOpenCreator(creatorHandle, { autoSubscribe: true });

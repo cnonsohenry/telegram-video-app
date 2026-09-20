@@ -331,7 +331,7 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
   try {
     // 1. Fetch user & ensure creator access
     const userRes = await pool.query(
-      `SELECT id, username, display_name, is_creator, role, is_verified 
+      `SELECT id, username, display_name, is_creator, role, is_verified, subscription_price 
        FROM app_users WHERE id = $1`,
       [userId]
     );
@@ -369,6 +369,15 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
 
     // 3. Determine category (VIP / Premium vs Public Category)
     const isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
+
+    // 🛑 GUARD: Disallow publishing VIP Exclusive content if creator has not set a subscription price
+    if (isVip && Number(creator.subscription_price || 0) <= 0) {
+      if (fs.existsSync(videoFile.path)) fs.unlinkSync(videoFile.path);
+      return res.status(400).json({
+        error: "Please set your monthly VIP subscription price in Creator Studio before publishing VIP Exclusive content."
+      });
+    }
+
     const allowedPublicCategories = ["hotties", "amateur", "college", "trends", "shots", "general"];
     let safeCategory = "hotties";
     if (isVip) {
@@ -747,12 +756,16 @@ router.get("/:username", optionalAuth, async (req, res) => {
     );
 
     const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const creatorSubPrice = Number(creator.subscription_price || 0);
     const mappedVideos = videosRes.rows.map(v => ({
       id: v.id,
       chat_id: v.chat_id,
       message_id: v.message_id,
       uploader_id: v.uploader_id,
       uploader_name: v.uploader_name || creator.username,
+      uploader_handle: creator.username || username,
+      subscription_price: creatorSubPrice,
+      is_premium: v.category === "premium",
       category: v.category,
       caption: v.caption,
       views: Number(v.views || 0),
@@ -801,7 +814,7 @@ router.get("/:username/videos", async (req, res) => {
 
   try {
     const appUserRes = await pool.query(
-      `SELECT id, username, telegram_user_id 
+      `SELECT id, username, telegram_user_id, subscription_price 
        FROM app_users 
        WHERE LOWER(username) = LOWER($1) 
           OR LOWER(COALESCE(display_name, '')) = LOWER($1)
@@ -811,6 +824,7 @@ router.get("/:username/videos", async (req, res) => {
     let creatorId = appUserRes.rows[0]?.id;
     let creatorTgId = appUserRes.rows[0]?.telegram_user_id || null;
     let creatorUsername = appUserRes.rows[0]?.username || username;
+    let creatorSubPrice = Number(appUserRes.rows[0]?.subscription_price || 0);
 
     if (!creatorId) {
       const tgRes = await pool.query(
@@ -820,6 +834,7 @@ router.get("/:username/videos", async (req, res) => {
       creatorId = tgRes.rows[0]?.user_id;
       creatorTgId = tgRes.rows[0]?.user_id;
       if (tgRes.rows[0]?.username) creatorUsername = tgRes.rows[0].username;
+      creatorSubPrice = 15;
     }
 
     const videosRes = await pool.query(
@@ -863,6 +878,9 @@ router.get("/:username/videos", async (req, res) => {
       message_id: v.message_id,
       uploader_id: v.uploader_id,
       uploader_name: v.uploader_name || username,
+      uploader_handle: creatorUsername,
+      subscription_price: creatorSubPrice,
+      is_premium: v.category === "premium",
       category: v.category,
       caption: v.caption,
       views: Number(v.views || 0),

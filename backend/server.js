@@ -654,104 +654,108 @@ app.get("/api/video", async (req, res) => {
 
     // 🟢 ACCESS CONTROL: Protect Premium Videos from unauthorized access & direct scraping
     if (video.category === "premium") {
-      let isAuthorized = false;
-      const authHeader = req.headers["authorization"];
-      const token = (authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null) || req.query.token;
+      // 1. Resolve video's creator details (if uploader_id is present)
+      let videoCreator = null;
+      if (video.uploader_id) {
+        const creatorRes = await pool.query(
+          `SELECT id, username, telegram_user_id, role, is_creator, subscription_price 
+           FROM app_users 
+           WHERE id = $1 OR (telegram_user_id IS NOT NULL AND telegram_user_id = $1)
+           LIMIT 1`,
+          [video.uploader_id]
+        );
+        if (creatorRes.rows.length > 0) {
+          videoCreator = creatorRes.rows[0];
+        }
+      }
 
-      if (token) {
-        try {
-          const decoded = jwt.verify(token, JWT_SECRET);
-          const userId = decoded.id;
+      const isOfficialSeries = !video.uploader_id ||
+        String(video.uploader_id) === "1881815190" ||
+        String(video.uploader_id) === "458" ||
+        (videoCreator?.username && videoCreator.username.toLowerCase().includes("naijahomemade"));
 
-          // Fetch requesting user's profile from app_users
-          const userRes = await pool.query(
-            "SELECT id, username, role, is_premium, is_creator, telegram_user_id FROM app_users WHERE id = $1",
-            [userId]
-          );
+      const creatorFee = Number(videoCreator?.subscription_price || 0);
 
-          if (userRes.rows.length > 0) {
-            const currentUser = userRes.rows[0];
+      // If this video belongs to a creator who charges $0 (no fee set), allow free playback for everyone
+      let isAuthorized = !isOfficialSeries && creatorFee <= 0;
 
-            // 1. Admins have universal platform playback access
-            if (currentUser.role === "admin" || decoded.role === "admin") {
-              isAuthorized = true;
-            }
+      if (!isAuthorized) {
+        const authHeader = req.headers["authorization"];
+        const token = (authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null) || req.query.token;
 
-            // 2. Resolve video's creator details (if uploader_id is present)
-            let videoCreator = null;
-            if (!isAuthorized && video.uploader_id) {
-              const creatorRes = await pool.query(
-                `SELECT id, username, telegram_user_id, role, is_creator 
-                 FROM app_users 
-                 WHERE id = $1 OR (telegram_user_id IS NOT NULL AND telegram_user_id = $1)
-                 LIMIT 1`,
-                [video.uploader_id]
-              );
-              if (creatorRes.rows.length > 0) {
-                videoCreator = creatorRes.rows[0];
-              }
-            }
+        if (token) {
+          try {
+            const decoded = jwt.verify(token, JWT_SECRET);
+            const userId = decoded.id;
 
-            // 3. Ownership check: Allow creators to watch their own videos
-            if (!isAuthorized) {
-              const uploaderIdStr = video.uploader_id ? String(video.uploader_id) : null;
-              const currentUserIdStr = String(currentUser.id);
-              const currentTgIdStr = currentUser.telegram_user_id ? String(currentUser.telegram_user_id) : null;
+            // Fetch requesting user's profile from app_users
+            const userRes = await pool.query(
+              "SELECT id, username, role, is_premium, is_creator, telegram_user_id FROM app_users WHERE id = $1",
+              [userId]
+            );
 
-              if (uploaderIdStr && (uploaderIdStr === currentUserIdStr || (currentTgIdStr && uploaderIdStr === currentTgIdStr))) {
+            if (userRes.rows.length > 0) {
+              const currentUser = userRes.rows[0];
+
+              // 1. Admins have universal platform playback access
+              if (currentUser.role === "admin" || decoded.role === "admin") {
                 isAuthorized = true;
-              } else if (videoCreator) {
-                if (videoCreator.id === currentUser.id) {
+              }
+
+              // 2. Ownership check: Allow creators to watch their own videos
+              if (!isAuthorized) {
+                const uploaderIdStr = video.uploader_id ? String(video.uploader_id) : null;
+                const currentUserIdStr = String(currentUser.id);
+                const currentTgIdStr = currentUser.telegram_user_id ? String(currentUser.telegram_user_id) : null;
+
+                if (uploaderIdStr && (uploaderIdStr === currentUserIdStr || (currentTgIdStr && uploaderIdStr === currentTgIdStr))) {
                   isAuthorized = true;
-                } else if (videoCreator.telegram_user_id && currentTgIdStr && String(videoCreator.telegram_user_id) === currentTgIdStr) {
-                  isAuthorized = true;
-                } else if (videoCreator.username && currentUser.username && videoCreator.username.toLowerCase() === currentUser.username.toLowerCase()) {
+                } else if (videoCreator) {
+                  if (videoCreator.id === currentUser.id) {
+                    isAuthorized = true;
+                  } else if (videoCreator.telegram_user_id && currentTgIdStr && String(videoCreator.telegram_user_id) === currentTgIdStr) {
+                    isAuthorized = true;
+                  } else if (videoCreator.username && currentUser.username && videoCreator.username.toLowerCase() === currentUser.username.toLowerCase()) {
+                    isAuthorized = true;
+                  }
+                }
+              }
+
+              // 3. Platform VIP Check (Official NaijaHomemade VIP series)
+              if (!isAuthorized && currentUser.is_premium && isOfficialSeries) {
+                isAuthorized = true;
+              }
+
+              // 4. Active Creator Subscription Check
+              if (!isAuthorized) {
+                const uploaderTarget = video.uploader_id || "1881815190";
+                const targetUsername = videoCreator?.username || (!video.uploader_id ? "naijahomemade" : null);
+
+                const subCheck = await pool.query(
+                  `SELECT 1 FROM creator_subscriptions cs
+                   WHERE (cs.subscriber_id = $1 OR ($2::BIGINT IS NOT NULL AND cs.subscriber_id = $2::BIGINT))
+                     AND (
+                       cs.creator_id = $3::BIGINT
+                       OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $3::BIGINT OR id = $3::BIGINT)
+                       OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id = $3::BIGINT OR telegram_user_id = $3::BIGINT)
+                       ${targetUsername ? "OR cs.creator_id IN (SELECT id FROM app_users WHERE LOWER(username) = LOWER($4)) OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE LOWER(username) = LOWER($4) AND telegram_user_id IS NOT NULL)" : ""}
+                     )
+                     AND cs.status = 'active'
+                     AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
+                   LIMIT 1`,
+                  targetUsername 
+                    ? [currentUser.id, currentUser.telegram_user_id || null, uploaderTarget, targetUsername]
+                    : [currentUser.id, currentUser.telegram_user_id || null, uploaderTarget]
+                );
+
+                if (subCheck.rows.length > 0) {
                   isAuthorized = true;
                 }
               }
             }
-
-            // 4. Platform VIP Check (Official NaijaHomemade VIP series)
-            if (!isAuthorized && currentUser.is_premium) {
-              const isOfficialSeries = !video.uploader_id ||
-                String(video.uploader_id) === "1881815190" ||
-                String(video.uploader_id) === "458" ||
-                (videoCreator?.username && videoCreator.username.toLowerCase().includes("naijahomemade"));
-
-              if (isOfficialSeries) {
-                isAuthorized = true;
-              }
-            }
-
-            // 5. Active Creator Subscription Check
-            if (!isAuthorized) {
-              const uploaderTarget = video.uploader_id || "1881815190";
-              const targetUsername = videoCreator?.username || (!video.uploader_id ? "naijahomemade" : null);
-
-              const subCheck = await pool.query(
-                `SELECT 1 FROM creator_subscriptions cs
-                 WHERE (cs.subscriber_id = $1 OR ($2::BIGINT IS NOT NULL AND cs.subscriber_id = $2::BIGINT))
-                   AND (
-                     cs.creator_id = $3::BIGINT
-                     OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $3::BIGINT OR id = $3::BIGINT)
-                     OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id = $3::BIGINT OR telegram_user_id = $3::BIGINT)
-                     ${targetUsername ? "OR cs.creator_id IN (SELECT id FROM app_users WHERE LOWER(username) = LOWER($4)) OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE LOWER(username) = LOWER($4) AND telegram_user_id IS NOT NULL)" : ""}
-                   )
-                   AND cs.status = 'active'
-                   AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
-                 LIMIT 1`,
-                targetUsername 
-                  ? [currentUser.id, currentUser.telegram_user_id || null, uploaderTarget, targetUsername]
-                  : [currentUser.id, currentUser.telegram_user_id || null, uploaderTarget]
-              );
-
-              if (subCheck.rows.length > 0) {
-                isAuthorized = true;
-              }
-            }
+          } catch (jwtErr) {
+            console.warn("[AUTH] Token validation failed on premium video access:", jwtErr.message);
           }
-        } catch (jwtErr) {
-          console.warn("[AUTH] Token validation failed on premium video access:", jwtErr.message);
         }
       }
 
@@ -1172,6 +1176,8 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     views: v.views,
     caption: v.caption,
     category: v.category,
+    is_premium: isPremium,
+    subscription_price: Number(v.subscription_price || 0),
     uploader_id: v.uploader_id,
     uploader_name: uploaderName,
     uploader_handle: uploaderHandle,
@@ -1225,6 +1231,7 @@ app.get("/api/videos", async (req, res) => {
           SELECT v.*, 
             COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
             COALESCE(au.username, u.username, 'creator') as uploader_handle,
+            COALESCE(au.subscription_price, 0) as subscription_price,
             ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.views DESC) as rn,
             COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
           FROM videos v 
@@ -1264,6 +1271,7 @@ app.get("/api/videos", async (req, res) => {
           SELECT v.*, 
             COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
             COALESCE(au.username, u.username, 'creator') as uploader_handle,
+            COALESCE(au.subscription_price, 0) as subscription_price,
             ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
             COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
           FROM videos v 
@@ -1290,6 +1298,7 @@ app.get("/api/videos", async (req, res) => {
           SELECT v.*, 
             COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
             COALESCE(au.username, u.username, 'creator') as uploader_handle,
+            COALESCE(au.subscription_price, 0) as subscription_price,
             ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
             COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
           FROM videos v 
@@ -1308,7 +1317,8 @@ app.get("/api/videos", async (req, res) => {
       const suggestQuery = `
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
-          COALESCE(au.username, u.username, 'creator') as uploader_handle 
+          COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.subscription_price, 0) as subscription_price
         FROM videos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id 
         LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
@@ -1360,7 +1370,8 @@ app.get("/api/group", async (req, res) => {
     const query = `
       SELECT v.*, 
         COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
-        COALESCE(au.username, u.username, 'creator') as uploader_handle 
+        COALESCE(au.username, u.username, 'creator') as uploader_handle,
+        COALESCE(au.subscription_price, 0) as subscription_price
       FROM videos v 
       LEFT JOIN users u ON v.uploader_id = u.user_id 
       LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
@@ -1466,7 +1477,8 @@ app.get("/api/video/details", async (req, res) => {
     const result = await pool.query(`
       SELECT v.chat_id, v.message_id, v.caption, v.views, v.uploader_id, v.category,
              COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
-             COALESCE(au.username, u.username, 'creator') as uploader_handle
+             COALESCE(au.username, u.username, 'creator') as uploader_handle,
+             COALESCE(au.subscription_price, 0) as subscription_price
       FROM videos v 
       LEFT JOIN users u ON v.uploader_id = u.user_id 
       LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
@@ -1588,7 +1600,8 @@ app.get("/api/interactions/saved", authenticateToken, async (req, res) => {
     const query = `
       SELECT v.*, 
         COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
-        COALESCE(au.username, u.username, 'creator') as uploader_handle
+        COALESCE(au.username, u.username, 'creator') as uploader_handle,
+        COALESCE(au.subscription_price, 0) as subscription_price
       FROM saves s
       JOIN videos v ON s.message_id = v.message_id
       LEFT JOIN users u ON v.uploader_id = u.user_id

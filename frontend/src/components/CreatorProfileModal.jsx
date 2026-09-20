@@ -90,6 +90,12 @@ export default function CreatorProfileModal({
     };
   }, [creatorUsername]);
 
+  useEffect(() => {
+    if (autoOpenSubscribe && !isSubscribed && creatorData && !creatorData.is_owner && Number(creatorData.subscription_price || 0) > 0) {
+      setShowSubscribeModal(true);
+    }
+  }, [autoOpenSubscribe, isSubscribed, creatorData]);
+
   const handleLoadMoreVideos = async () => {
     if (loadingMoreVideos || !hasMoreVideos) return;
     setLoadingMoreVideos(true);
@@ -258,8 +264,42 @@ export default function CreatorProfileModal({
   const displayedVideos = activeTab === "reels" 
     ? videos.filter(v => !v.is_group) 
     : activeTab === "premium"
-    ? videos.filter(v => v.category === "premium")
+    ? videos.filter(v => v.category === "premium" || v.is_premium)
     : videos;
+
+  const handleVideoCardClick = (vData, e) => {
+    const isPremiumVideo = vData.category === "premium" || Boolean(vData.is_premium);
+    const creatorPrice = Number(creatorData?.subscription_price || 0);
+    const isOwner = Boolean(
+      creatorData?.is_owner || 
+      (currentUser && (
+        (currentUser.username && currentUser.username.toLowerCase().replace(/^@/, "").trim() === (creatorData?.username || creatorUsername || "").toLowerCase().replace(/^@/, "").trim()) ||
+        (currentUser.id && creatorData?.id && String(currentUser.id) === String(creatorData.id))
+      ))
+    );
+    // If the creator did not set any subscription fee (creatorPrice <= 0), it is free to play!
+    const hasFee = creatorPrice > 0;
+    const hasAccess = !hasFee || isSubscribed || isOwner || currentUser?.role === "admin";
+
+    if (isPremiumVideo && !hasAccess) {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        promptLogin("subscribe");
+        return;
+      }
+      setShowSubscribeModal(true);
+      return;
+    }
+
+    if (onVideoClick) {
+      onVideoClick({
+        ...vData,
+        uploader_handle: creatorData?.username || creatorUsername,
+        subscription_price: creatorPrice,
+        is_subscribed: hasAccess
+      }, e);
+    }
+  };
 
   return (
     <div style={containerStyle}>
@@ -641,7 +681,7 @@ export default function CreatorProfileModal({
             </div>
 
             {/* 🌟 3-COLUMN INSTAGRAM SQUARE MEDIA GRID */}
-            {activeTab === "premium" && !isSubscribed && !creatorData?.is_owner ? (
+            {activeTab === "premium" && !isSubscribed && !creatorData?.is_owner && price > 0 ? (
               <div style={premiumTabContainerStyle}>
                 <div style={lockedBannerStyle}>
                   <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: "rgba(255, 215, 0, 0.12)", border: "1px solid rgba(255, 215, 0, 0.3)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px" }}>
@@ -689,7 +729,7 @@ export default function CreatorProfileModal({
                         key={`${v.chat_id}:${v.message_id}`}
                         video={v}
                         priority={idx < 2}
-                        onOpen={(vData, e) => onVideoClick(vData, e)}
+                        onOpen={(vData, e) => handleVideoCardClick(vData, e)}
                       />
                     ))}
                   </div>
