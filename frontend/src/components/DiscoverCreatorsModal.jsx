@@ -77,7 +77,8 @@ export default function DiscoverCreatorsModal({
         const data = await res.json();
         if (data?.creators) {
           // Strictly filter out any web user accounts
-          const tgOnly = data.creators.filter(c => {
+          const tgOnly = (data.creators || []).filter(c => {
+            if (!c || !c.username) return false;
             const email = String(c.email || "").toLowerCase();
             return !email.includes("@gmail.com") && !email.includes("@yahoo.com") && !email.includes("@hotmail.com");
           });
@@ -86,7 +87,7 @@ export default function DiscoverCreatorsModal({
           // Seed following map
           const initialFollows = {};
           tgOnly.forEach(c => {
-            if (c.is_following !== undefined) {
+            if (c?.username && c.is_following !== undefined) {
               initialFollows[c.username] = Boolean(c.is_following);
             }
           });

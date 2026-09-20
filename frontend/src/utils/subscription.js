@@ -28,6 +28,17 @@ export const isUserSubscribedToCreator = (user, video) => {
   if (!isOfficial && video.subscription_price !== undefined && Number(video.subscription_price || 0) <= 0) {
     return true;
   }
+
+  // If user is not logged in, they cannot have an active subscription to a paid video
+  if (!user) {
+    return false;
+  }
+
+  // Admin access
+  if (user.role === "admin") {
+    return true;
+  }
+
   const uploaderId = video.uploader_id ? String(video.uploader_id) : null;
 
   // Owner check

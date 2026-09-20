@@ -66,8 +66,8 @@ export default function DiscoverCreatorsSection({
       return;
     }
 
-    const uname = creator.username;
-    if (loadingMap[uname]) return;
+    const uname = creator?.username;
+    if (!uname || loadingMap[uname]) return;
 
     const isCurrentlyFollowing = followingMap[uname] !== undefined 
       ? followingMap[uname] 
@@ -102,7 +102,7 @@ export default function DiscoverCreatorsSection({
     }
   };
 
-  const visibleCreators = creators.filter((c) => !dismissedSet.has(c.username));
+  const visibleCreators = (creators || []).filter((c) => c && c.username && !dismissedSet.has(c.username));
   if (visibleCreators.length === 0) return null;
 
   const scrollTrack = (direction) => {
@@ -164,7 +164,8 @@ export default function DiscoverCreatorsSection({
       {/* Horizontal Carousel Track */}
       <div ref={trackRef} style={igScrollTrack}>
         {visibleCreators.map((creator) => {
-          const uname = creator.username;
+          const uname = creator?.username;
+          if (!uname) return null;
           const isFollowing = followingMap[uname] !== undefined 
             ? followingMap[uname] 
             : Boolean(creator.is_following);
