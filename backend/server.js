@@ -1142,23 +1142,9 @@ app.get('/embed/:message_id', async (req, res) => {
 
 /* =====================
    HELPER: Community Content Filter
-   Matches all contents posted by web creators (internal R2 uploads by non-managed web accounts, or flagged is_community)
+   Matches all contents posted by web creators (flagged is_community)
 ===================== */
-const IS_COMMUNITY_SQL = `(
-  v.is_community = TRUE 
-  OR (
-    v.chat_id = 'internal' 
-    AND v.cloudflare_id LIKE 'r2:%' 
-    AND EXISTS (
-      SELECT 1 FROM app_users au_comm 
-      WHERE au_comm.id = v.uploader_id 
-        AND au_comm.is_managed IS NOT TRUE 
-        AND au_comm.email NOT LIKE 'tg_%@internal.naijahomemade.com' 
-        AND au_comm.email != 'support@naijahomemade.com' 
-        AND (au_comm.telegram_user_id IS NULL OR au_comm.telegram_user_id = 0)
-    )
-  )
-)`;
+const IS_COMMUNITY_SQL = `(v.is_community = TRUE)`;
 
 /* =====================
    HELPER: Base Mapper (Used by Videos, Suggestions & Groups)
@@ -1219,6 +1205,12 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
 };
 
 /* =====================
+   COUNT CACHE (In-Memory 60s TTL to prevent duplicate table scans)
+===================== */
+const countCache = new Map();
+const COUNT_CACHE_TTL = 60 * 1000;
+
+/* =====================
    List videos
 ===================== */
 app.get("/api/videos", async (req, res) => {
@@ -1230,7 +1222,7 @@ app.get("/api/videos", async (req, res) => {
     const category = req.query.category || "hotties";
     
     const isCommunity = req.query.community === "true" || category === "community";
-    const communityCondition = isCommunity ? IS_COMMUNITY_SQL : `NOT ${IS_COMMUNITY_SQL}`;
+    const communityCondition = isCommunity ? "v.is_community = TRUE" : "(v.is_community IS NOT TRUE)";
     
     // 🟢 NEW: Extract sort and seed parameters
     const sort = (req.query.sort || "").toLowerCase().trim();
@@ -1257,17 +1249,22 @@ app.get("/api/videos", async (req, res) => {
       query = `
         WITH GroupedVideos AS (
           SELECT v.*, 
-            COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
-            COALESCE(au.username, u.username, 'creator') as uploader_handle,
-            COALESCE(au.subscription_price, 0) as subscription_price,
             ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.views DESC) as rn,
             COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
           FROM videos v 
-          LEFT JOIN users u ON v.uploader_id = u.user_id
-          LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
           ${timeFilter}
+        ),
+        PagedVideos AS (
+          SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY views DESC LIMIT $1 OFFSET $2
         )
-        SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY views DESC LIMIT $1 OFFSET $2
+        SELECT v.*, 
+          COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+          COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.subscription_price, 0) as subscription_price
+        FROM PagedVideos v 
+        LEFT JOIN users u ON v.uploader_id = u.user_id
+        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+        ORDER BY v.views DESC
       `;
       queryValues = [limit, offset];
     } else if (isRandom) {
@@ -1299,17 +1296,21 @@ app.get("/api/videos", async (req, res) => {
       query = `
         WITH GroupedVideos AS (
           SELECT v.*, 
-            COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
-            COALESCE(au.username, u.username, 'creator') as uploader_handle,
-            COALESCE(au.subscription_price, 0) as subscription_price,
             ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
             COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
           FROM videos v 
-          LEFT JOIN users u ON v.uploader_id = u.user_id
-          LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
           ${catFilter}
+        ),
+        PagedVideos AS (
+          SELECT * FROM GroupedVideos WHERE rn = 1 ${orderClause}
         )
-        SELECT * FROM GroupedVideos WHERE rn = 1 ${orderClause}
+        SELECT v.*, 
+          COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+          COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.subscription_price, 0) as subscription_price
+        FROM PagedVideos v 
+        LEFT JOIN users u ON v.uploader_id = u.user_id
+        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
       `;
     } else {
       const hasCategory = category && category !== "all" && category !== "community";
@@ -1328,54 +1329,87 @@ app.get("/api/videos", async (req, res) => {
       query = `
         WITH GroupedVideos AS (
           SELECT v.*, 
-            COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
-            COALESCE(au.username, u.username, 'creator') as uploader_handle,
-            COALESCE(au.subscription_price, 0) as subscription_price,
             ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
             COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
           FROM videos v 
-          LEFT JOIN users u ON v.uploader_id = u.user_id
-          LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
           ${catFilter}
+        ),
+        PagedVideos AS (
+          SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC ${limitOffsetPlaceholders}
         )
-        SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC ${limitOffsetPlaceholders}
-      `;
-    }
-
-    const videosRes = await pool.query(query, queryValues);
-
-    let suggestions = [];
-    if (page === 1) {
-      const suggestQuery = `
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
           COALESCE(au.subscription_price, 0) as subscription_price
-        FROM videos v 
-        LEFT JOIN users u ON v.uploader_id = u.user_id 
+        FROM PagedVideos v 
+        LEFT JOIN users u ON v.uploader_id = u.user_id
         LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
-        WHERE ${communityCondition}
-        ORDER BY RANDOM() LIMIT 10
+        ORDER BY v.created_at DESC
       `;
-      const suggestRes = await pool.query(suggestQuery);
-      suggestions = suggestRes.rows;
     }
 
     let countQuery;
     let countValues;
+    let cacheKey;
     if (category === "trends") {
       countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v ${timeFilter}`;
       countValues = [];
+      cacheKey = `count:trends:${timeframe}:${isCommunity}`;
     } else if (category && category !== "all" && category !== "community") {
       countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v WHERE category = $1 AND ${communityCondition}`;
       countValues = [category];
+      cacheKey = `count:${category}:${isCommunity}`;
     } else {
       countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v WHERE ${communityCondition}`;
       countValues = [];
+      cacheKey = `count:all:${isCommunity}`;
     }
-    
-    const totalRes = await pool.query(countQuery, countValues);
-    const total = Number(totalRes.rows[0].count);
+
+    let countPromise;
+    const now = Date.now();
+    const cachedCount = countCache.get(cacheKey);
+    if (cachedCount && (now - cachedCount.timestamp < COUNT_CACHE_TTL)) {
+      countPromise = Promise.resolve(cachedCount.total);
+    } else {
+      countPromise = pool.query(countQuery, countValues).then(res => {
+        const total = Number(res.rows[0]?.count || 0);
+        countCache.set(cacheKey, { total, timestamp: Date.now() });
+        return total;
+      }).catch(err => {
+        console.error("Count query error:", err);
+        return 0;
+      });
+    }
+
+    let suggestPromise;
+    if (page === 1) {
+      const suggestQuery = `
+        WITH RandomVideos AS (
+          SELECT * FROM videos v
+          WHERE ${communityCondition}
+          ORDER BY RANDOM() LIMIT 10
+        )
+        SELECT v.*, 
+          COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+          COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.subscription_price, 0) as subscription_price
+        FROM RandomVideos v 
+        LEFT JOIN users u ON v.uploader_id = u.user_id 
+        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+      `;
+      suggestPromise = pool.query(suggestQuery).then(res => res.rows).catch(err => {
+        console.error("Suggest query error:", err);
+        return [];
+      });
+    } else {
+      suggestPromise = Promise.resolve([]);
+    }
+
+    const [videosRes, total, suggestions] = await Promise.all([
+      pool.query(query, queryValues),
+      countPromise,
+      suggestPromise
+    ]);
 
     res.json({
       page,
@@ -1413,24 +1447,30 @@ app.get("/api/community/videos", async (req, res) => {
     const query = `
       WITH GroupedVideos AS (
         SELECT v.*, 
-          COALESCE(au.display_name, au.username, u.username, 'Creator') as uploader_name,
-          COALESCE(au.username, u.username, 'creator') as uploader_handle,
-          COALESCE(au.subscription_price, 0) as subscription_price,
           ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
           COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
         FROM videos v 
-        LEFT JOIN users u ON v.uploader_id = u.user_id
-        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+        ${q ? `LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)` : ``}
         WHERE ${IS_COMMUNITY_SQL}
         ${searchClause}
+      ),
+      PagedVideos AS (
+        SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT $1 OFFSET $2
       )
-      SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT $1 OFFSET $2
+      SELECT v.*, 
+        COALESCE(au.display_name, au.username, u.username, 'Creator') as uploader_name,
+        COALESCE(au.username, u.username, 'creator') as uploader_handle,
+        COALESCE(au.subscription_price, 0) as subscription_price
+      FROM PagedVideos v 
+      LEFT JOIN users u ON v.uploader_id = u.user_id
+      LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+      ORDER BY v.created_at DESC
     `;
 
     const countQuery = `
       SELECT COUNT(DISTINCT CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) 
       FROM videos v 
-      LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+      ${q ? `LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)` : ``}
       WHERE ${IS_COMMUNITY_SQL}
       ${searchClause}
     `;
@@ -1519,7 +1559,7 @@ app.get("/api/search", async (req, res) => {
     const offset = (page - 1) * limit;
 
     const isCommunity = req.query.community === "true" || req.query.category === "community";
-    const communityCondition = isCommunity ? IS_COMMUNITY_SQL : `NOT ${IS_COMMUNITY_SQL}`;
+    const communityCondition = isCommunity ? "v.is_community = TRUE" : "(v.is_community IS NOT TRUE)";
 
     const searchQuery = `
       SELECT v.*, 
