@@ -400,13 +400,13 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
 
     const savedCloudflareId = r2Result.cloudflareId; // 'r2:category/internalId.ext'
 
-    // 5. Insert video record into database
+    // 5. Insert video record into database (flagged as is_community = TRUE for web creators)
     const insertRes = await pool.query(
       `INSERT INTO videos (
-         chat_id, message_id, file_id, uploader_id, category, caption, cloudflare_id, status, created_at
+         chat_id, message_id, file_id, uploader_id, category, caption, cloudflare_id, status, is_community, created_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', NOW())
-       RETURNING id, chat_id, message_id, uploader_id, category, caption, cloudflare_id, created_at, views, likes_count, comments_count`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', TRUE, NOW())
+       RETURNING id, chat_id, message_id, uploader_id, category, caption, cloudflare_id, is_community, created_at, views, likes_count, comments_count`,
       [
         "internal",
         internalId,
@@ -438,6 +438,7 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
         uploader_id: newVideo.uploader_id,
         uploader_name: creator.display_name || creator.username,
         category: newVideo.category,
+        is_community: true,
         caption: newVideo.caption,
         views: 0,
         likes_count: 0,

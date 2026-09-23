@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, Sparkles, Lock, ChevronLeft, ChevronRight, X, ArrowRight } from "lucide-react";
+import { Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, Sparkles, Lock, ChevronLeft, ChevronRight, X, ArrowRight, Users, Film, Plus } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
 import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
 import DiscoverCreatorsModal from "../components/DiscoverCreatorsModal";
+import CreatorUploadModal from "../components/CreatorUploadModal";
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
 import { renderClickableCaption } from "../components/ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
@@ -821,25 +822,52 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
 };
 
 // 🟢 EXPLORE COMPONENT
+// 🟢 EXPLORE COMPONENT
 export default function Explore({ 
-  user, // 🟢 ADDED
-  onProfileClick, // 🟢 ADDED
-  setHideFooter, // 🟢 ADDED
+  user,
+  onProfileClick,
+  setHideFooter,
   onVideoClick, 
   onCommentClick, 
   isAnyModalOpen,
   onCreatorClick,
   onOpenDiscoverCreators
 }) {
+  // 🟢 TWO TABS: "for_you" (platform content) & "community" (web creator content)
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get("explore_tab");
+    if (tabParam === "community") return "community";
+    return "for_you";
+  });
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [feed, setFeed] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+
+  // 🟢 FOR YOU FEED STATE (Platform & legacy curated drops)
+  const [forYouFeed, setForYouFeed] = useState([]);
+  const [forYouLoading, setForYouLoading] = useState(true);
+  const [forYouLoadingMore, setForYouLoadingMore] = useState(false);
+
+  // 🟢 COMMUNITY FEED STATE (Contents posted by web creators only)
+  const [communityFeed, setCommunityFeed] = useState([]);
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communityLoadingMore, setCommunityLoadingMore] = useState(false);
+  const [communityPage, setCommunityPage] = useState(1);
+  const [hasMoreCommunity, setHasMoreCommunity] = useState(true);
+  const [communityCount, setCommunityCount] = useState(0);
+
+  // 🟢 SEARCH FEED STATE
+  const [searchFeed, setSearchFeed] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchLoadingMore, setSearchLoadingMore] = useState(false);
   const [searchPage, setSearchPage] = useState(1);
   const [hasMoreSearch, setHasMoreSearch] = useState(true);
+
+  // 🟢 CREATOR & MODAL STATES
   const [featuredCreators, setFeaturedCreators] = useState([]);
   const [suggestedIndex, setSuggestedIndex] = useState(() => Math.floor(Math.random() * 4) + 2);
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const handleOpenDiscover = useCallback(() => {
     if (onOpenDiscoverCreators) {
@@ -872,6 +900,17 @@ export default function Explore({
     fetchFeaturedCreators();
   }, [fetchFeaturedCreators]);
 
+  // Sync explore_tab in URL without page reload
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (activeTab === "community") {
+      url.searchParams.set("explore_tab", "community");
+    } else {
+      url.searchParams.delete("explore_tab");
+    }
+    window.history.replaceState(window.history.state, "", url.toString());
+  }, [activeTab]);
+
   // 🟢 SCROLL UI STATES
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
   const [isUIHidden, setIsUIHidden] = useState(false);
@@ -881,23 +920,6 @@ export default function Explore({
   const isFirstMount = useRef(true);
 
   const shouldHideUI = isUIHidden && !isDesktop;
-  
-  const observer = useRef();
-  const lastElementRef = useCallback(node => {
-    if (loading || loadingMore) return;
-    if (observer.current) observer.current.disconnect();
-    
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) {
-        if (searchQuery.trim()) {
-          if (hasMoreSearch) loadSearchFeed(searchPage + 1, true);
-        } else {
-          loadRandomFeed(true);
-        }
-      }
-    });
-    if (node) observer.current.observe(node);
-  }, [loading, loadingMore, searchQuery, hasMoreSearch, searchPage]);
 
   // 🟢 Window Resize Listener
   useEffect(() => {
@@ -917,11 +939,13 @@ export default function Explore({
     };
   }, [setHideFooter]);
 
-  // 🟢 Soft Delete Event Listener
+  // 🟢 Soft Delete Event Listener across all feeds
   useEffect(() => {
     const handleVideoDeleted = (event) => {
       const deletedId = String(event.detail);
-      setFeed(prevFeed => prevFeed.filter(v => String(v.id || v.message_id) !== deletedId));
+      setForYouFeed(prev => prev.filter(v => String(v.id || v.message_id) !== deletedId));
+      setCommunityFeed(prev => prev.filter(v => String(v.id || v.message_id) !== deletedId));
+      setSearchFeed(prev => prev.filter(v => String(v.id || v.message_id) !== deletedId));
     };
 
     window.addEventListener('videoDeleted', handleVideoDeleted);
@@ -951,11 +975,12 @@ export default function Explore({
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const loadRandomFeed = async (isLoadMore = false) => {
+  // 🟢 LOAD FOR YOU FEED (Current Explore feed excluding web creator content)
+  const loadForYouFeed = useCallback(async (isLoadMore = false) => {
     if (isLoadMore) {
-      setLoadingMore(true);
+      setForYouLoadingMore(true);
     } else {
-      setLoading(true);
+      setForYouLoading(true);
       setSuggestedIndex(Math.floor(Math.random() * 4) + 2);
       fetchFeaturedCreators();
     }
@@ -994,70 +1019,183 @@ export default function Explore({
       const shuffled = Array.from(uniqueMap.values()).sort(() => 0.5 - Math.random());
       
       if (isLoadMore) {
-        setFeed(prev => {
+        setForYouFeed(prev => {
           const newMap = new Map();
           prev.forEach(v => newMap.set(v.message_id, v));
           shuffled.forEach(v => newMap.set(v.message_id, v));
           return Array.from(newMap.values());
         });
       } else {
-        setFeed(shuffled);
+        setForYouFeed(shuffled);
       }
-    } catch (err) { console.error("Failed to load explore feed", err); }
+    } catch (err) {
+      console.error("Failed to load explore for you feed", err);
+    }
     
-    setLoading(false);
-    setLoadingMore(false);
-  };
+    setForYouLoading(false);
+    setForYouLoadingMore(false);
+  }, [fetchFeaturedCreators]);
 
-  const loadSearchFeed = async (pageNum = 1, isLoadMore = false) => {
-    if (isLoadMore) setLoadingMore(true);
-    else setLoading(true);
+  // 🟢 LOAD COMMUNITY FEED (Exclusively contents posted by web creators)
+  const loadCommunityFeed = useCallback(async (pageNum = 1, isLoadMore = false, q = "") => {
+    if (isLoadMore) {
+      setCommunityLoadingMore(true);
+    } else {
+      setCommunityLoading(true);
+    }
 
     try {
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchQuery)}&limit=15&page=${pageNum}`);
+      const searchParam = q ? `&q=${encodeURIComponent(q)}` : "";
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/community/videos?page=${pageNum}&limit=12${searchParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        const safeVideos = data.videos || [];
+        setCommunityCount(Number(data.total || safeVideos.length));
+        setHasMoreCommunity(Boolean(data.hasMore));
+        setCommunityPage(pageNum);
+
+        if (isLoadMore) {
+          setCommunityFeed(prev => {
+            const newMap = new Map();
+            prev.forEach(v => newMap.set(v.message_id || v.id, v));
+            safeVideos.forEach(v => newMap.set(v.message_id || v.id, v));
+            return Array.from(newMap.values());
+          });
+        } else {
+          setCommunityFeed(safeVideos);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load community feed", err);
+    }
+
+    setCommunityLoading(false);
+    setCommunityLoadingMore(false);
+  }, []);
+
+  // 🟢 LOAD SEARCH FEED
+  const loadSearchFeed = useCallback(async (pageNum = 1, isLoadMore = false) => {
+    if (!searchQuery.trim()) return;
+    if (isLoadMore) setSearchLoadingMore(true);
+    else setSearchLoading(true);
+
+    try {
+      const communityParam = activeTab === "community" ? "&community=true" : "";
+      const res = await fetch(
+        activeTab === "community"
+          ? `${APP_CONFIG.apiUrl}/api/community/videos?q=${encodeURIComponent(searchQuery)}&limit=15&page=${pageNum}`
+          : `${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchQuery)}&limit=15&page=${pageNum}${communityParam}`
+      );
       if (res.ok) {
         const data = await res.json();
         const safeVideos = data.videos || [];
 
-        if (isLoadMore) setFeed(prev => [...prev, ...safeVideos]);
-        else setFeed(safeVideos);
+        if (isLoadMore) setSearchFeed(prev => [...prev, ...safeVideos]);
+        else setSearchFeed(safeVideos);
         
-        setHasMoreSearch(data.hasMore);
+        setHasMoreSearch(Boolean(data.hasMore));
         setSearchPage(pageNum);
       }
-    } catch (err) { console.error("Search failed", err); }
+    } catch (err) {
+      console.error("Search failed", err);
+    }
 
-    setLoading(false);
-    setLoadingMore(false);
-  };
+    setSearchLoading(false);
+    setSearchLoadingMore(false);
+  }, [searchQuery, activeTab]);
 
-  // 🟢 AUTO-SEARCH DEBOUNCE
-  // Whenever the user types in the AppHeader, wait 600ms then execute the search
+  // 🟢 INITIAL FEED LOADS
   useEffect(() => {
     if (isFirstMount.current) {
       isFirstMount.current = false;
-      loadRandomFeed(false);
+      loadForYouFeed(false);
+      loadCommunityFeed(1, false);
       return;
     }
+  }, [loadForYouFeed, loadCommunityFeed]);
+
+  // 🟢 AUTO-SEARCH DEBOUNCE
+  useEffect(() => {
+    if (isFirstMount.current) return;
 
     const delayDebounceFn = setTimeout(() => {
       setSearchPage(1);
       setHasMoreSearch(true);
       if (!searchQuery.trim()) {
-        loadRandomFeed(false);
+        setSearchFeed([]);
       } else {
         loadSearchFeed(1, false);
       }
     }, 600);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  }, [searchQuery, loadSearchFeed]);
 
+  // 🟢 TAB SWITCHING HANDLER
+  const handleTabSwitch = (tab) => {
+    if (tab === activeTab) return;
+    setActiveTab(tab);
+    if (tab === "community" && communityFeed.length === 0 && !communityLoading) {
+      loadCommunityFeed(1, false);
+    }
+    if (tab === "for_you" && forYouFeed.length === 0 && !forYouLoading) {
+      loadForYouFeed(false);
+    }
+  };
+
+  // 🟢 INFINITE SCROLL OBSERVER
+  const observer = useRef();
+  const lastElementRef = useCallback(node => {
+    const isSearching = Boolean(searchQuery.trim());
+    if (isSearching) {
+      if (searchLoading || searchLoadingMore) return;
+    } else if (activeTab === "community") {
+      if (communityLoading || communityLoadingMore) return;
+    } else {
+      if (forYouLoading || forYouLoadingMore) return;
+    }
+    
+    if (observer.current) observer.current.disconnect();
+    
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        if (isSearching) {
+          if (hasMoreSearch) loadSearchFeed(searchPage + 1, true);
+        } else if (activeTab === "community") {
+          if (hasMoreCommunity) loadCommunityFeed(communityPage + 1, true);
+        } else {
+          loadForYouFeed(true);
+        }
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [
+    searchQuery, searchLoading, searchLoadingMore, hasMoreSearch, searchPage, loadSearchFeed,
+    activeTab, communityLoading, communityLoadingMore, hasMoreCommunity, communityPage, loadCommunityFeed,
+    forYouLoading, forYouLoadingMore, loadForYouFeed
+  ]);
+
+  // Action for empty community state
+  const handleCommunityAction = () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      promptLogin("upload");
+      return;
+    }
+    if (user?.is_creator || user?.role === "creator") {
+      setShowUploadModal(true);
+    } else {
+      window.dispatchEvent(new CustomEvent("openCreatorSetup"));
+      if (onProfileClick) onProfileClick();
+    }
+  };
+
+  const isSearching = Boolean(searchQuery.trim());
 
   return (
     <div style={{ background: "var(--bg-color)", height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
       
-      {/* 🟢 APP HEADER OVERLAY */}
+      {/* 🟢 APP HEADER + TWO TABS OVERLAY */}
       <div style={{
         position: isDesktop ? "relative" : "absolute",
         top: 0, left: 0, right: 0,
@@ -1076,6 +1214,54 @@ export default function Explore({
           onProfileClick={onProfileClick} 
           onVideoClick={onVideoClick}
         />
+
+        {/* 🟢 EXPLORE TABS (FOR YOU / COMMUNITY) */}
+        {!isSearching && (
+          <div style={exploreTabsNavWrapper}>
+            <div style={exploreTabsNavInner}>
+              <button
+                type="button"
+                onClick={() => handleTabSwitch("for_you")}
+                style={exploreTabBtnStyle}
+              >
+                <span style={{
+                  fontSize: "14.5px",
+                  fontWeight: activeTab === "for_you" ? "700" : "500",
+                  color: activeTab === "for_you" ? "#ffffff" : "#71767b",
+                  letterSpacing: "0.2px",
+                  transition: "color 0.2s ease, font-weight 0.15s ease"
+                }}>
+                  For You
+                </span>
+                {activeTab === "for_you" && <div style={exploreTabActivePillStyle} />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTabSwitch("community")}
+                style={exploreTabBtnStyle}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{
+                    fontSize: "14.5px",
+                    fontWeight: activeTab === "community" ? "700" : "500",
+                    color: activeTab === "community" ? "#ffffff" : "#71767b",
+                    letterSpacing: "0.2px",
+                    transition: "color 0.2s ease, font-weight 0.15s ease"
+                  }}>
+                    Community
+                  </span>
+                  {communityCount > 0 && (
+                    <span style={communityCountPillStyle}>
+                      {communityCount}
+                    </span>
+                  )}
+                </div>
+                {activeTab === "community" && <div style={exploreTabActivePillStyle} />}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 🟢 SCROLLABLE AREA */}
@@ -1084,84 +1270,192 @@ export default function Explore({
         style={{
           flex: 1,
           overflowY: "auto",
-          // Push down to clear absolute header on mobile
-          paddingTop: isDesktop ? "0px" : "70px",
+          // Push down to clear absolute header + tabs on mobile (70px header + 46px tabs = 116px)
+          paddingTop: isDesktop ? "0px" : (isSearching ? "70px" : "116px"),
           paddingBottom: shouldHideUI ? "0px" : "70px",
-          transition: "padding-bottom 0.3s ease"
+          transition: "padding-bottom 0.3s ease, padding-top 0.2s ease"
         }}
       >
         <PullToRefresh 
           scrollRef={scrollContainerRef}
           onRefresh={async () => {
-            setSearchPage(1);
-            setHasMoreSearch(true);
-            setSuggestedIndex(Math.floor(Math.random() * 4) + 2);
-            fetchFeaturedCreators();
-            if (searchQuery.trim()) await loadSearchFeed(1, false);
-            else await loadRandomFeed(false);
+            if (isSearching) {
+              setSearchPage(1);
+              setHasMoreSearch(true);
+              await loadSearchFeed(1, false);
+            } else if (activeTab === "community") {
+              setCommunityPage(1);
+              setHasMoreCommunity(true);
+              await loadCommunityFeed(1, false);
+            } else {
+              setSuggestedIndex(Math.floor(Math.random() * 4) + 2);
+              fetchFeaturedCreators();
+              await loadForYouFeed(false);
+            }
           }}
         >
           <div style={feedWrapper}>
-            {loading ? (
-              [...Array(5)].map((_, i) => (
-                <div key={i} style={postStyle}>
-                  <div style={avatarColumnStyle}><div style={skeletonAvatar} /></div>
-                  <div style={contentColumnStyle}>
-                    <div style={skeletonTextBase} />
-                    <div style={{ ...skeletonTextBase, width: "80%", marginTop: "6px", marginBottom: "12px" }} />
-                    <div style={{ ...skeletonVideo, width: "75%" }} />
+            {/* 1. SEARCH RESULTS VIEW */}
+            {isSearching ? (
+              searchLoading ? (
+                [...Array(5)].map((_, i) => (
+                  <div key={i} style={postStyle}>
+                    <div style={avatarColumnStyle}><div style={skeletonAvatar} /></div>
+                    <div style={contentColumnStyle}>
+                      <div style={skeletonTextBase} />
+                      <div style={{ ...skeletonTextBase, width: "80%", marginTop: "6px", marginBottom: "12px" }} />
+                      <div style={{ ...skeletonVideo, width: "75%" }} />
+                    </div>
                   </div>
+                ))
+              ) : searchFeed.length === 0 ? (
+                <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
+                  No videos found for "{searchQuery}". Try a different keyword.
                 </div>
-              ))
-            ) : feed.length === 0 ? (
-               <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
-                  No videos found. Try a different search.
-               </div>
+              ) : (
+                searchFeed.map((video, idx) => (
+                  <FeedPost 
+                    key={`search-${video.message_id || video.id}-${idx}`}
+                    video={video}
+                    isLast={searchFeed.length === idx + 1}
+                    lastElementRef={lastElementRef}
+                    onVideoClick={onVideoClick}
+                    onCommentClick={onCommentClick} 
+                    isAnyModalOpen={isAnyModalOpen} 
+                    onCreatorClick={onCreatorClick}
+                    user={user}
+                  />
+                ))
+              )
+            ) : activeTab === "community" ? (
+              /* 2. COMMUNITY TAB VIEW (Web Creators Content Exclusively) */
+              communityLoading ? (
+                [...Array(5)].map((_, i) => (
+                  <div key={i} style={postStyle}>
+                    <div style={avatarColumnStyle}><div style={skeletonAvatar} /></div>
+                    <div style={contentColumnStyle}>
+                      <div style={skeletonTextBase} />
+                      <div style={{ ...skeletonTextBase, width: "80%", marginTop: "6px", marginBottom: "12px" }} />
+                      <div style={{ ...skeletonVideo, width: "75%" }} />
+                    </div>
+                  </div>
+                ))
+              ) : communityFeed.length === 0 ? (
+                <div style={communityEmptyWrapper}>
+                  <div style={communityEmptyIconBox}>
+                    <Users size={32} color="var(--primary-color)" />
+                  </div>
+                  <h3 style={communityEmptyTitle}>Creator Community</h3>
+                  <p style={communityEmptySubtitle}>
+                    Exclusive videos, drops, and stories posted directly by web creators.
+                  </p>
+                  <div style={communityNoticeCard}>
+                    <Sparkles size={20} color="#FFD700" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: "13px", color: "#ccc", lineHeight: "1.4" }}>
+                      All content published by verified web creators appears exclusively here in the Community tab.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCommunityAction}
+                    style={communityEmptyActionBtn}
+                  >
+                    {user?.is_creator || user?.role === "creator" ? (
+                      <>
+                        <Film size={16} />
+                        <span>Publish First Video</span>
+                      </>
+                    ) : user ? (
+                      <>
+                        <Sparkles size={16} />
+                        <span>Become a Web Creator</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Log In to Post</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                communityFeed.map((video, idx) => (
+                  <FeedPost 
+                    key={`comm-${video.message_id || video.id}-${idx}`}
+                    video={video}
+                    isLast={communityFeed.length === idx + 1}
+                    lastElementRef={lastElementRef}
+                    onVideoClick={onVideoClick}
+                    onCommentClick={onCommentClick} 
+                    isAnyModalOpen={isAnyModalOpen} 
+                    onCreatorClick={onCreatorClick}
+                    user={user}
+                  />
+                ))
+              )
             ) : (
-              feed.map((video, idx) => {
-                const isLast = feed.length === idx + 1;
-                const isFirstSuggestedSpot = !searchQuery.trim() && featuredCreators.length > 0 && (
-                  (idx === suggestedIndex) ||
-                  (idx === feed.length - 1 && feed.length <= suggestedIndex)
-                );
-                const isSecondSuggestedSpot = !searchQuery.trim() && featuredCreators.length > 8 && (
-                  feed.length > 15 && idx === suggestedIndex + 14
-                );
+              /* 3. FOR YOU TAB VIEW (Platform catalogue & Suggested Creators) */
+              forYouLoading ? (
+                [...Array(5)].map((_, i) => (
+                  <div key={i} style={postStyle}>
+                    <div style={avatarColumnStyle}><div style={skeletonAvatar} /></div>
+                    <div style={contentColumnStyle}>
+                      <div style={skeletonTextBase} />
+                      <div style={{ ...skeletonTextBase, width: "80%", marginTop: "6px", marginBottom: "12px" }} />
+                      <div style={{ ...skeletonVideo, width: "75%" }} />
+                    </div>
+                  </div>
+                ))
+              ) : forYouFeed.length === 0 ? (
+                <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
+                  No videos available in For You.
+                </div>
+              ) : (
+                forYouFeed.map((video, idx) => {
+                  const isLast = forYouFeed.length === idx + 1;
+                  const isFirstSuggestedSpot = featuredCreators.length > 0 && (
+                    (idx === suggestedIndex) ||
+                    (idx === forYouFeed.length - 1 && forYouFeed.length <= suggestedIndex)
+                  );
+                  const isSecondSuggestedSpot = featuredCreators.length > 8 && (
+                    forYouFeed.length > 15 && idx === suggestedIndex + 14
+                  );
 
-                return (
-                  <React.Fragment key={`${video.message_id}-${idx}`}>
-                    <FeedPost 
-                      video={video}
-                      isLast={isLast}
-                      lastElementRef={lastElementRef}
-                      onVideoClick={onVideoClick}
-                      onCommentClick={onCommentClick} 
-                      isAnyModalOpen={isAnyModalOpen} 
-                      onCreatorClick={onCreatorClick}
-                      user={user}
-                    />
-                    {isFirstSuggestedSpot && (
-                      <InstagramSuggestedCreators 
-                        creators={featuredCreators.slice(0, 12)}
+                  return (
+                    <React.Fragment key={`foryou-${video.message_id || video.id}-${idx}`}>
+                      <FeedPost 
+                        video={video}
+                        isLast={isLast}
+                        lastElementRef={lastElementRef}
+                        onVideoClick={onVideoClick}
+                        onCommentClick={onCommentClick} 
+                        isAnyModalOpen={isAnyModalOpen} 
                         onCreatorClick={onCreatorClick}
-                        onSeeAll={handleOpenDiscover}
                         user={user}
                       />
-                    )}
-                    {isSecondSuggestedSpot && (
-                      <InstagramSuggestedCreators 
-                        creators={featuredCreators.slice(12)}
-                        onCreatorClick={onCreatorClick}
-                        onSeeAll={handleOpenDiscover}
-                        user={user}
-                      />
-                    )}
-                  </React.Fragment>
-                );
-              })
+                      {isFirstSuggestedSpot && (
+                        <InstagramSuggestedCreators 
+                          creators={featuredCreators.slice(0, 12)}
+                          onCreatorClick={onCreatorClick}
+                          onSeeAll={handleOpenDiscover}
+                          user={user}
+                        />
+                      )}
+                      {isSecondSuggestedSpot && (
+                        <InstagramSuggestedCreators 
+                          creators={featuredCreators.slice(12)}
+                          onCreatorClick={onCreatorClick}
+                          onSeeAll={handleOpenDiscover}
+                          user={user}
+                        />
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )
             )}
 
-            {loadingMore && (
+            {/* Load More Spinners */}
+            {(isSearching ? searchLoadingMore : (activeTab === "community" ? communityLoadingMore : forYouLoadingMore)) && (
               <div style={{ padding: "20px", display: "flex", justifyContent: "center", color: "var(--primary-color)" }}>
                 <Loader2 className="animate-spin" size={24} />
               </div>
@@ -1169,6 +1463,41 @@ export default function Explore({
           </div>
         </PullToRefresh>
       </div>
+
+      {/* 🌟 COMMUNITY CREATOR POST FAB */}
+      {activeTab === "community" && (user?.is_creator || user?.role === "creator") && (
+        <button
+          type="button"
+          onClick={() => setShowUploadModal(true)}
+          style={communityFabStyle}
+          title="Post video to Community"
+          aria-label="Post video to Community"
+        >
+          <Plus size={22} color="#ffffff" strokeWidth={2.5} />
+          <span style={{ fontSize: "13px", fontWeight: "700", color: "#fff", marginLeft: "4px" }}>
+            Post
+          </span>
+        </button>
+      )}
+
+      {/* 🌟 CREATOR CONTENT UPLOAD MODAL */}
+      {showUploadModal && (
+        <CreatorUploadModal 
+          isOpen={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={(newVideo) => {
+            if (newVideo) {
+              setCommunityFeed(prev => [newVideo, ...prev]);
+              setCommunityCount(prev => prev + 1);
+            }
+            setActiveTab("community");
+            showToast("Video published to Community!", "success");
+            setShowUploadModal(false);
+          }}
+          defaultCategory="hotties"
+          user={user}
+        />
+      )}
 
       {/* 🌟 DISCOVER CREATORS MODAL */}
       {showDiscoverModal && (
@@ -1193,6 +1522,139 @@ export default function Explore({
 }
 
 // 🖌 STYLES 
+const exploreTabsNavWrapper = {
+  width: "100%",
+  maxWidth: "600px",
+  margin: "0 auto",
+  display: "flex",
+  borderBottom: "1px solid var(--border-color)",
+  background: "var(--bg-color)",
+  boxSizing: "border-box"
+};
+
+const exploreTabsNavInner = {
+  display: "flex",
+  width: "100%",
+  height: "46px"
+};
+
+const exploreTabBtnStyle = {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  position: "relative",
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  padding: "0 16px",
+  transition: "background 0.2s ease"
+};
+
+const exploreTabActivePillStyle = {
+  position: "absolute",
+  bottom: 0,
+  height: "3px",
+  width: "56px",
+  borderRadius: "3px 3px 0 0",
+  backgroundColor: "var(--primary-color, #1d9bf0)"
+};
+
+const communityCountPillStyle = {
+  background: "rgba(29, 155, 240, 0.15)",
+  color: "var(--primary-color, #1d9bf0)",
+  fontSize: "11px",
+  fontWeight: "700",
+  padding: "1px 6px",
+  borderRadius: "10px",
+  lineHeight: "1.3"
+};
+
+const communityEmptyWrapper = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "48px 20px",
+  textAlign: "center",
+  maxWidth: "420px",
+  margin: "0 auto"
+};
+
+const communityEmptyIconBox = {
+  width: "64px",
+  height: "64px",
+  borderRadius: "50%",
+  background: "rgba(29, 155, 240, 0.1)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  marginBottom: "16px"
+};
+
+const communityEmptyTitle = {
+  fontSize: "19px",
+  fontWeight: "800",
+  color: "#fff",
+  marginBottom: "8px"
+};
+
+const communityEmptySubtitle = {
+  fontSize: "14px",
+  color: "#71767b",
+  lineHeight: "1.5",
+  marginBottom: "20px"
+};
+
+const communityNoticeCard = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  padding: "12px 16px",
+  borderRadius: "12px",
+  background: "rgba(255, 255, 255, 0.04)",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
+  textAlign: "left",
+  marginBottom: "24px",
+  width: "100%",
+  boxSizing: "border-box"
+};
+
+const communityEmptyActionBtn = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "8px",
+  padding: "12px 24px",
+  borderRadius: "24px",
+  background: "var(--primary-color, #1d9bf0)",
+  color: "#ffffff",
+  fontSize: "14px",
+  fontWeight: "700",
+  border: "none",
+  cursor: "pointer",
+  boxShadow: "0 4px 14px rgba(29, 155, 240, 0.35)",
+  transition: "transform 0.15s ease, opacity 0.2s ease"
+};
+
+const communityFabStyle = {
+  position: "fixed",
+  bottom: "84px",
+  right: "20px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "10px 18px",
+  borderRadius: "24px",
+  background: "var(--primary-color, #1d9bf0)",
+  color: "#fff",
+  border: "none",
+  boxShadow: "0 6px 20px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(29, 155, 240, 0.4)",
+  cursor: "pointer",
+  zIndex: 990,
+  transition: "transform 0.15s ease, box-shadow 0.2s ease"
+};
+
 const feedWrapper = { maxWidth: "600px", margin: "0 auto", width: "100%", borderLeft: window.innerWidth > 600 ? "1px solid var(--border-color)" : "none", borderRight: window.innerWidth > 600 ? "1px solid var(--border-color)" : "none", minHeight: "100vh" };
 const postStyle = { padding: "16px", borderBottom: "1px solid var(--border-color)", display: "flex", flexDirection: "row", animation: "fadeIn 0.3s ease-out" };
 const avatarColumnStyle = { marginRight: "12px", flexShrink: 0 };

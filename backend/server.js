@@ -251,7 +251,11 @@ async function initDatabase() {
         )
       `);
 
-      await pool.query(`ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_uploader_id_fkey;`);
+      await pool.query(`
+        ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_uploader_id_fkey;
+        ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_community BOOLEAN DEFAULT FALSE;
+        CREATE INDEX IF NOT EXISTS idx_videos_is_community ON videos(is_community);
+      `);
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS transactions (
@@ -1137,6 +1141,26 @@ app.get('/embed/:message_id', async (req, res) => {
 });
 
 /* =====================
+   HELPER: Community Content Filter
+   Matches all contents posted by web creators (internal R2 uploads by non-managed web accounts, or flagged is_community)
+===================== */
+const IS_COMMUNITY_SQL = `(
+  v.is_community = TRUE 
+  OR (
+    v.chat_id = 'internal' 
+    AND v.cloudflare_id LIKE 'r2:%' 
+    AND EXISTS (
+      SELECT 1 FROM app_users au_comm 
+      WHERE au_comm.id = v.uploader_id 
+        AND au_comm.is_managed IS NOT TRUE 
+        AND au_comm.email NOT LIKE 'tg_%@internal.naijahomemade.com' 
+        AND au_comm.email != 'support@naijahomemade.com' 
+        AND (au_comm.telegram_user_id IS NULL OR au_comm.telegram_user_id = 0)
+    )
+  )
+)`;
+
+/* =====================
    HELPER: Base Mapper (Used by Videos, Suggestions & Groups)
 ===================== */
 const mapVideoToResponse = (v, apiBaseUrl) => {
@@ -1177,6 +1201,7 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     caption: v.caption,
     category: v.category,
     is_premium: isPremium,
+    is_community: Boolean(v.is_community),
     subscription_price: Number(v.subscription_price || 0),
     uploader_id: v.uploader_id,
     uploader_name: uploaderName,
@@ -1204,6 +1229,9 @@ app.get("/api/videos", async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category || "hotties";
     
+    const isCommunity = req.query.community === "true" || category === "community";
+    const communityCondition = isCommunity ? IS_COMMUNITY_SQL : `NOT ${IS_COMMUNITY_SQL}`;
+    
     // 🟢 NEW: Extract sort and seed parameters
     const sort = (req.query.sort || "").toLowerCase().trim();
     const isRandom = sort === "random" || req.query.random === "true";
@@ -1216,14 +1244,14 @@ app.get("/api/videos", async (req, res) => {
 
     let query;
     let queryValues;
-    let timeFilter = ""; // 🟢 Placeholder for our time constraint
+    let timeFilter = `WHERE ${communityCondition}`;
 
     if (category === "trends") {
-      // 🟢 NEW: Set the time filter based on the requested timeframe
+      // 🟢 Set the time filter based on the requested timeframe
       if (timeframe === "weekly") {
-        timeFilter = "WHERE v.created_at >= NOW() - INTERVAL '7 days'";
+        timeFilter = `WHERE v.created_at >= NOW() - INTERVAL '7 days' AND ${communityCondition}`;
       } else if (timeframe === "monthly") {
-        timeFilter = "WHERE v.created_at >= NOW() - INTERVAL '30 days'";
+        timeFilter = `WHERE v.created_at >= NOW() - INTERVAL '30 days' AND ${communityCondition}`;
       }
 
       query = `
@@ -1244,8 +1272,10 @@ app.get("/api/videos", async (req, res) => {
       queryValues = [limit, offset];
     } else if (isRandom) {
       // 🟢 Random sorting across all time (supports deterministic seed for gap-free pagination)
-      const hasCategory = category && category !== "all";
-      const catFilter = hasCategory ? "WHERE category = $1" : "";
+      const hasCategory = category && category !== "all" && category !== "community";
+      const catFilter = hasCategory 
+        ? `WHERE category = $1 AND ${communityCondition}` 
+        : `WHERE ${communityCondition}`;
       
       let orderClause;
       if (hasCategory) {
@@ -1282,8 +1312,10 @@ app.get("/api/videos", async (req, res) => {
         SELECT * FROM GroupedVideos WHERE rn = 1 ${orderClause}
       `;
     } else {
-      const hasCategory = category && category !== "all";
-      const catFilter = hasCategory ? "WHERE category = $1" : "";
+      const hasCategory = category && category !== "all" && category !== "community";
+      const catFilter = hasCategory 
+        ? `WHERE category = $1 AND ${communityCondition}` 
+        : `WHERE ${communityCondition}`;
 
       if (hasCategory) {
         queryValues = [category, limit, offset];
@@ -1322,6 +1354,7 @@ app.get("/api/videos", async (req, res) => {
         FROM videos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id 
         LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+        WHERE ${communityCondition}
         ORDER BY RANDOM() LIMIT 10
       `;
       const suggestRes = await pool.query(suggestQuery);
@@ -1333,11 +1366,11 @@ app.get("/api/videos", async (req, res) => {
     if (category === "trends") {
       countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v ${timeFilter}`;
       countValues = [];
-    } else if (category && category !== "all") {
-      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos WHERE category = $1`;
+    } else if (category && category !== "all" && category !== "community") {
+      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v WHERE category = $1 AND ${communityCondition}`;
       countValues = [category];
     } else {
-      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos`;
+      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v WHERE ${communityCondition}`;
       countValues = [];
     }
     
@@ -1354,6 +1387,74 @@ app.get("/api/videos", async (req, res) => {
   } catch (err) {
     console.error("DB Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+/* =====================
+   COMMUNITY VIDEOS ENDPOINT
+   Exclusively returns contents posted by web creators (and no one else)
+===================== */
+app.get("/api/community/videos", async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.max(1, Math.min(50, Number(req.query.limit || 12)));
+    const offset = (page - 1) * limit;
+    const q = req.query.q ? String(req.query.q).trim() : "";
+    const apiBaseUrl = process.env.API_BASE_URL;
+
+    let searchClause = "";
+    let queryValues = [limit, offset];
+    if (q) {
+      searchClause = "AND (v.caption ILIKE $3 OR au.username ILIKE $3 OR au.display_name ILIKE $3)";
+      queryValues = [limit, offset, `%${q}%`];
+    }
+
+    const query = `
+      WITH GroupedVideos AS (
+        SELECT v.*, 
+          COALESCE(au.display_name, au.username, u.username, 'Creator') as uploader_name,
+          COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.subscription_price, 0) as subscription_price,
+          ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
+          COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
+        FROM videos v 
+        LEFT JOIN users u ON v.uploader_id = u.user_id
+        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+        WHERE ${IS_COMMUNITY_SQL}
+        ${searchClause}
+      )
+      SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT $1 OFFSET $2
+    `;
+
+    const countQuery = `
+      SELECT COUNT(DISTINCT CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) 
+      FROM videos v 
+      LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+      WHERE ${IS_COMMUNITY_SQL}
+      ${searchClause}
+    `;
+
+    const [videosRes, countRes] = await Promise.all([
+      pool.query(query, queryValues),
+      pool.query(countQuery, q ? [`%${q}%`] : [])
+    ]);
+
+    const videos = videosRes.rows.map(v => mapVideoToResponse(v, apiBaseUrl));
+    const total = Number(countRes.rows[0]?.count || 0);
+    const hasMore = offset + videosRes.rows.length < total;
+
+    return res.json({
+      success: true,
+      page,
+      limit,
+      total,
+      hasMore,
+      videos
+    });
+  } catch (err) {
+    console.error("[COMMUNITY VIDEOS ERROR]", err);
+    return res.status(500).json({ error: "Failed to fetch community videos" });
   }
 });
 
@@ -1417,44 +1518,26 @@ app.get("/api/search", async (req, res) => {
     const apiBaseUrl = process.env.API_BASE_URL; 
     const offset = (page - 1) * limit;
 
+    const isCommunity = req.query.community === "true" || req.query.category === "community";
+    const communityCondition = isCommunity ? IS_COMMUNITY_SQL : `NOT ${IS_COMMUNITY_SQL}`;
+
     const searchQuery = `
-      SELECT v.*, u.username as uploader_name 
+      SELECT v.*, 
+        COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+        COALESCE(au.username, u.username, 'creator') as uploader_handle,
+        COALESCE(au.subscription_price, 0) as subscription_price
       FROM videos v 
       LEFT JOIN users u ON v.uploader_id = u.user_id 
-      WHERE v.caption ILIKE $1 OR u.username ILIKE $1 
+      LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+      WHERE ${communityCondition}
+        AND (v.caption ILIKE $1 OR u.username ILIKE $1 OR au.username ILIKE $1 OR au.display_name ILIKE $1)
       ORDER BY v.created_at DESC 
       LIMIT $2 OFFSET $3
     `;
     
     const { rows } = await pool.query(searchQuery, [`%${q}%`, limit, offset]);
 
-    const formattedVideos = rows.map(v => {
-      let thumbUrl = "";
-      
-      if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
-         const cleanId = v.cloudflare_id.split('?')[0];
-         thumbUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
-      } else {
-         const sig = signThumbnail(v.chat_id, v.message_id); 
-         thumbUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
-      }
-
-      return {
-        chat_id: v.chat_id,
-        message_id: v.message_id,
-        views: v.views,
-        caption: v.caption,
-        category: v.category,
-        uploader_id: v.uploader_id,
-        uploader_name: v.uploader_name || "Member",
-        created_at: v.created_at,
-        thumbnail_url: thumbUrl,
-        likes_count: Number(v.likes_count || 0),
-        comments_count: Number(v.comments_count || 0),
-        shares_count: Number(v.shares_count || 0),
-        saves_count: Number(v.saves_count || 0)
-      };
-    });
+    const formattedVideos = rows.map(v => mapVideoToResponse(v, apiBaseUrl));
 
     res.json({ 
       videos: formattedVideos,
