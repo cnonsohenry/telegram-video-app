@@ -797,6 +797,7 @@ export default function App() {
           <Explore 
             user={user} 
             onProfileClick={() => handleTabSwitch("profile")}
+            onNavigateTab={handleTabSwitch}
             setHideFooter={handleExploreHideFooter} 
             onVideoClick={handleOpenVideo}
             onCommentClick={setActiveCommentVideo}
