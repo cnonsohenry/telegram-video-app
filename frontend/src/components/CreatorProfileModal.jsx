@@ -334,104 +334,61 @@ export default function CreatorProfileModal({
             
             {/* MOBILE HEADER */}
             {!isDesktop ? (
-              <div style={{ padding: "16px 16px 8px 16px" }}>
-                {/* Row 1: Avatar + 3 Stat Columns */}
-                <div style={{ display: "flex", alignItems: "center", marginBottom: "14px" }}>
-                  <div style={storyGradientRingMobile}>
-                    <div style={avatarInnerCircleMobile}>
-                      <img 
-                        src={avatar} 
-                        alt={creatorData?.display_name} 
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                      />
+              <div style={{ padding: "16px 16px 10px 16px" }}>
+                {/* Top Row: Avatar on left; Display Name, Bio, Handle to the right */}
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", marginBottom: "14px" }}>
+                  <div style={avatarContainerMobile}>
+                    <div style={storyGradientRingMobile}>
+                      <div style={avatarInnerCircleMobile}>
+                        <img 
+                          src={avatar} 
+                          alt={creatorData?.display_name} 
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                        />
+                      </div>
                     </div>
-                  </div>
-
-                  <div style={{ display: "flex", flex: 1, justifyContent: "space-around", alignItems: "center", marginLeft: "12px" }}>
-                    <div style={statColStyle}>
-                      <span style={statNumberStyle}>{formatStat(postsCount)}</span>
-                      <span style={statLabelStyle}>posts</span>
-                    </div>
-                    <div style={statColStyle}>
-                      <span style={statNumberStyle}>{formatStat(followersCount)}</span>
-                      <span style={statLabelStyle}>followers</span>
-                    </div>
-                    {price > 0 && (
-                      <div style={statColStyle}>
-                        <span style={{ ...statNumberStyle, color: "#FFD700" }}>{formatStat(subscribersCount)}</span>
-                        <span style={statLabelStyle}>VIP fans</span>
+                    {creatorData?.is_verified && (
+                      <div style={verifiedBadgeStyle}>
+                        <CheckCircle size={14} color="#00aff0" fill="#00aff0" />
                       </div>
                     )}
-                    <div style={statColStyle}>
-                      <span style={statNumberStyle}>{formatStat(likesCount)}</span>
-                      <span style={statLabelStyle}>likes</span>
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                    {/* Line 1: Display Name + Category Badge */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minWidth: 0 }}>
+                      <h1 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "#fff", lineHeight: "1.25" }}>
+                        {creatorData?.display_name || creatorUsername}
+                      </h1>
+                      {creatorData?.creator_category && (
+                        <span style={categoryBadgeStyle}>
+                          {creatorData.creator_category}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Line 2: Bio directly next after display name */}
+                    {creatorData?.creator_bio && (
+                      <p style={{
+                        fontSize: "13px",
+                        color: "#c8c8c8",
+                        lineHeight: "1.4",
+                        margin: "2px 0 0 0",
+                        wordBreak: "break-word"
+                      }}>
+                        {creatorData.creator_bio}
+                      </p>
+                    )}
+
+                    {/* Line 3: Handle */}
+                    <div style={{ fontSize: "12.5px", color: "#8e8e93", marginTop: "2px" }}>
+                      @{creatorData?.username || creatorUsername}
                     </div>
                   </div>
                 </div>
 
-                {/* Row 2: Identity & Bio */}
-                <div style={{ marginBottom: "14px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <h1 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#fff" }}>
-                      {creatorData?.display_name || creatorUsername}
-                    </h1>
-                    <CheckCircle size={15} color="#0095f6" fill="#0095f6" />
-                    <span style={creatorBadgeTagStyle}>CREATOR</span>
-                  </div>
-
-                  <div style={{ fontSize: "12.5px", color: "#8e8e93", marginTop: "2px", fontWeight: "500" }}>
-                    {creatorData?.creator_category || "Digital Creator"}
-                  </div>
-
-                  {creatorData?.creator_bio && (
-                    <p style={{
-                      fontSize: "13.5px",
-                      color: "#f5f5f5",
-                      lineHeight: "1.42",
-                      margin: "8px 0 6px 0",
-                      whiteSpace: "pre-wrap"
-                    }}>
-                      {creatorData.creator_bio}
-                    </p>
-                  )}
-
-                  {/* Links & Meta */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", marginTop: "6px", fontSize: "13px" }}>
-                    {creatorData?.website && (
-                      <a 
-                        href={creatorData.website.startsWith("http://") || creatorData.website.startsWith("https://") ? creatorData.website : `https://${creatorData.website}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        style={websiteLinkStyle}
-                      >
-                        <Link2 size={13} color="#0095f6" />
-                        <span>{creatorData.website.replace(/^https?:\/\//, "")}</span>
-                      </a>
-                    )}
-                    {creatorData?.location && (
-                      <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#8e8e93" }}>
-                        <MapPin size={13} color="#8e8e93" />
-                        <span>{creatorData.location}</span>
-                      </span>
-                    )}
-                    <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#8e8e93" }}>
-                      <Calendar size={13} color="#8e8e93" />
-                      <span>Joined {new Date(creatorData?.created_at || Date.now()).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
-                    </span>
-                  </div>
-
-                  {price > 0 && (
-                    <div style={{ marginTop: "8px" }}>
-                      <span style={vipPricingBadgeStyle}>
-                        <Sparkles size={12} color="#FFD700" />
-                        <span>VIP Channel: ${price.toLocaleString()}/mo</span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Row 3: Action Buttons */}
+                {/* Action Buttons Row */}
                 <div style={mobileActionButtonsRow}>
                   {!creatorData?.is_owner && (
                     <button
@@ -459,11 +416,7 @@ export default function CreatorProfileModal({
                         border: isSubscribed ? "1px solid #fe2c55" : "none"
                       }}
                     >
-                      {isSubscribed ? (
-                        <span>VIP Subscribed ✓</span>
-                      ) : (
-                        <span>Subscribe</span>
-                      )}
+                      {isSubscribed ? "Subscribed" : "Subscribe"}
                     </button>
                   )}
 
@@ -484,11 +437,56 @@ export default function CreatorProfileModal({
                     <Share2 size={16} color="#fff" />
                   </button>
                 </div>
+
+                {/* Stats Row (TikTok style 3 columns: Posts | Followers | Likes - NO VIP fans!) */}
+                <div style={statsContainerStyle}>
+                  <div style={statColStyle}>
+                    <span style={statNumberStyle}>{formatStat(postsCount)}</span>
+                    <span style={statLabelStyle}>posts</span>
+                  </div>
+                  <div style={statDividerStyle} />
+                  <div style={statColStyle}>
+                    <span style={statNumberStyle}>{formatStat(followersCount)}</span>
+                    <span style={statLabelStyle}>followers</span>
+                  </div>
+                  <div style={statDividerStyle} />
+                  <div style={statColStyle}>
+                    <span style={statNumberStyle}>{formatStat(likesCount)}</span>
+                    <span style={statLabelStyle}>likes</span>
+                  </div>
+                </div>
+
+                {/* Links & Meta */}
+                {(creatorData?.website || creatorData?.location || creatorData?.created_at) && (
+                  <div style={metaRowStyle}>
+                    {creatorData?.website && (
+                      <a 
+                        href={creatorData.website.startsWith("http://") || creatorData.website.startsWith("https://") ? creatorData.website : `https://${creatorData.website}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={websiteLinkStyle}
+                      >
+                        <Link2 size={13} color="#00aff0" />
+                        <span>{creatorData.website.replace(/^https?:\/\//, "")}</span>
+                      </a>
+                    )}
+                    {creatorData?.location && (
+                      <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <MapPin size={13} color="#8e8e93" />
+                        <span>{creatorData.location}</span>
+                      </span>
+                    )}
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <Calendar size={13} color="#8e8e93" />
+                      <span>Joined {new Date(creatorData?.created_at || Date.now()).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               /* DESKTOP HEADER */
-              <div style={{ display: "flex", gap: "60px", alignItems: "flex-start", padding: "36px 20px 20px 20px", marginBottom: "16px" }}>
-                <div style={{ flexShrink: 0, position: "relative", paddingLeft: "15px" }}>
+              <div style={{ display: "flex", gap: "36px", alignItems: "flex-start", padding: "32px 24px 20px 24px", marginBottom: "16px" }}>
+                <div style={{ flexShrink: 0, position: "relative" }}>
                   <div style={storyGradientRingDesktop}>
                     <div style={avatarInnerCircleDesktop}>
                       <img 
@@ -499,136 +497,129 @@ export default function CreatorProfileModal({
                       />
                     </div>
                   </div>
+                  {creatorData?.is_verified && (
+                    <div style={{ ...verifiedBadgeStyle, bottom: "4px", right: "4px" }}>
+                      <CheckCircle size={18} color="#00aff0" fill="#00aff0" />
+                    </div>
+                  )}
                 </div>
 
-                <div style={{ flex: 1 }}>
-                  {/* Row 1: Username + Actions */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", marginBottom: "18px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <h2 style={{ fontSize: "20px", fontWeight: "400", color: "#fff", margin: 0 }}>
-                        {creatorData?.username || creatorUsername}
-                      </h2>
-                      <CheckCircle size={18} color="#0095f6" fill="#0095f6" />
-                      <span style={creatorBadgeTagStyle}>CREATOR</span>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      {!creatorData?.is_owner && (
-                        <button
-                          onClick={handleFollowToggle}
-                          disabled={isFollowLoading}
-                          style={{
-                            ...desktopFollowBtn,
-                            backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
-                            color: isFollowing ? "#ffffff" : "#000000",
-                            border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none"
-                          }}
-                        >
-                          {isFollowLoading ? "..." : (isFollowing ? "Following" : "Follow")}
-                        </button>
-                      )}
-
-                      {!creatorData?.is_owner && (price > 0 || isSubscribed) && (
-                        <button
-                          onClick={handleSubscribeToggle}
-                          disabled={isSubscribing}
-                          style={{
-                            ...desktopSubscribeBtn,
-                            backgroundColor: isSubscribed ? "rgba(254, 44, 85, 0.18)" : "#fe2c55",
-                            color: isSubscribed ? "#fe2c55" : "#ffffff",
-                            border: isSubscribed ? "1px solid #fe2c55" : "none"
-                          }}
-                        >
-                          {isSubscribed ? (
-                            <span>VIP Subscribed ✓</span>
-                          ) : (
-                            <span>Subscribe</span>
-                          )}
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => setShowTipModal(true)}
-                        style={desktopSecondaryBtn}
-                      >
-                        <Heart size={15} fill="#f91880" color="#f91880" />
-                        <span>Send Tip</span>
-                      </button>
-
-                      <button onClick={handleShare} style={desktopIconBtnStyle} title="Share Profile">
-                        <Share2 size={16} color="#fff" />
-                      </button>
-                    </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Line 1: Display Name + Category Badge */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
+                    <h1 style={{ fontSize: "22px", fontWeight: "700", color: "#fff", margin: 0 }}>
+                      {creatorData?.display_name || creatorUsername}
+                    </h1>
+                    {creatorData?.creator_category && (
+                      <span style={categoryBadgeStyle}>
+                        {creatorData.creator_category}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Row 2: Stats */}
-                  <div style={{ display: "flex", gap: "32px", marginBottom: "18px", fontSize: "15px" }}>
+                  {/* Line 2: Bio directly after display name */}
+                  {creatorData?.creator_bio && (
+                    <p style={{
+                      fontSize: "14px",
+                      color: "#c8c8c8",
+                      lineHeight: "1.45",
+                      margin: "4px 0 6px 0",
+                      maxWidth: "600px",
+                      wordBreak: "break-word"
+                    }}>
+                      {creatorData.creator_bio}
+                    </p>
+                  )}
+
+                  {/* Line 3: Handle */}
+                  <div style={{ fontSize: "14px", color: "#8e8e93", marginBottom: "16px" }}>
+                    @{creatorData?.username || creatorUsername}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+                    {!creatorData?.is_owner && (
+                      <button
+                        onClick={handleFollowToggle}
+                        disabled={isFollowLoading}
+                        style={{
+                          ...desktopFollowBtn,
+                          backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
+                          color: isFollowing ? "#ffffff" : "#000000",
+                          border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none"
+                        }}
+                      >
+                        {isFollowLoading ? "..." : (isFollowing ? "Following" : "Follow")}
+                      </button>
+                    )}
+
+                    {!creatorData?.is_owner && (price > 0 || isSubscribed) && (
+                      <button
+                        onClick={handleSubscribeToggle}
+                        disabled={isSubscribing}
+                        style={{
+                          ...desktopSubscribeBtn,
+                          backgroundColor: isSubscribed ? "rgba(254, 44, 85, 0.18)" : "#fe2c55",
+                          color: isSubscribed ? "#fe2c55" : "#ffffff",
+                          border: isSubscribed ? "1px solid #fe2c55" : "none"
+                        }}
+                      >
+                        {isSubscribed ? "Subscribed" : "Subscribe"}
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => setShowTipModal(true)}
+                      style={desktopSecondaryBtn}
+                    >
+                      <Heart size={15} fill="#f91880" color="#f91880" />
+                      <span>Send Tip</span>
+                    </button>
+
+                    <button onClick={handleShare} style={desktopIconBtnStyle} title="Share Profile">
+                      <Share2 size={16} color="#fff" />
+                    </button>
+                  </div>
+
+                  {/* Stats: Posts | Followers | Likes (NO VIP fans!) */}
+                  <div style={{ display: "flex", gap: "32px", marginBottom: "14px", fontSize: "15px" }}>
                     <div>
-                      <strong style={{ color: "#fff" }}>{formatStat(postsCount)}</strong>{" "}
+                      <strong style={{ color: "#fff", fontSize: "17px" }}>{formatStat(postsCount)}</strong>{" "}
                       <span style={{ color: "#8e8e93" }}>posts</span>
                     </div>
                     <div>
-                      <strong style={{ color: "#fff" }}>{formatStat(followersCount)}</strong>{" "}
+                      <strong style={{ color: "#fff", fontSize: "17px" }}>{formatStat(followersCount)}</strong>{" "}
                       <span style={{ color: "#8e8e93" }}>followers</span>
                     </div>
-                    {price > 0 && (
-                      <div>
-                        <strong style={{ color: "#FFD700" }}>{formatStat(subscribersCount)}</strong>{" "}
-                        <span style={{ color: "#8e8e93" }}>VIP subscribers</span>
-                      </div>
-                    )}
                     <div>
-                      <strong style={{ color: "#fff" }}>{formatStat(likesCount)}</strong>{" "}
+                      <strong style={{ color: "#fff", fontSize: "17px" }}>{formatStat(likesCount)}</strong>{" "}
                       <span style={{ color: "#8e8e93" }}>likes</span>
                     </div>
                   </div>
 
-                  {/* Row 3: Name, Category, Bio, Links */}
-                  <div>
-                    <div style={{ fontSize: "15px", fontWeight: "700", color: "#fff" }}>
-                      {creatorData?.display_name || creatorUsername}
-                    </div>
-
-                    <div style={{ fontSize: "13px", color: "#8e8e93", marginTop: "2px" }}>
-                      {creatorData?.creator_category || "Digital Creator"}
-                    </div>
-
-                    {creatorData?.creator_bio && (
-                      <p style={{
-                        fontSize: "14px",
-                        color: "#f5f5f5",
-                        lineHeight: "1.45",
-                        margin: "8px 0 8px 0",
-                        whiteSpace: "pre-wrap",
-                        maxWidth: "540px"
-                      }}>
-                        {creatorData.creator_bio}
-                      </p>
+                  {/* Links & Meta */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center", fontSize: "13px", color: "#8e8e93" }}>
+                    {creatorData?.website && (
+                      <a 
+                        href={creatorData.website.startsWith("http://") || creatorData.website.startsWith("https://") ? creatorData.website : `https://${creatorData.website}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={websiteLinkStyle}
+                      >
+                        <Link2 size={13} color="#0095f6" />
+                        <span>{creatorData.website.replace(/^https?:\/\//, "")}</span>
+                      </a>
                     )}
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", fontSize: "13px" }}>
-                      {creatorData?.website && (
-                        <a 
-                          href={creatorData.website.startsWith("http://") || creatorData.website.startsWith("https://") ? creatorData.website : `https://${creatorData.website}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          style={websiteLinkStyle}
-                        >
-                          <Link2 size={13} color="#0095f6" />
-                          <span>{creatorData.website.replace(/^https?:\/\//, "")}</span>
-                        </a>
-                      )}
-                      {creatorData?.location && (
-                        <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#8e8e93" }}>
-                          <MapPin size={13} color="#8e8e93" />
-                          <span>{creatorData.location}</span>
-                        </span>
-                      )}
-                      <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#8e8e93" }}>
-                        <Calendar size={13} color="#8e8e93" />
-                        <span>Joined {new Date(creatorData?.created_at || Date.now()).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+                    {creatorData?.location && (
+                      <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <MapPin size={13} color="#8e8e93" />
+                        <span>{creatorData.location}</span>
                       </span>
-                    </div>
+                    )}
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <Calendar size={13} color="#8e8e93" />
+                      <span>Joined {new Date(creatorData?.created_at || Date.now()).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -843,18 +834,23 @@ const profileInnerContainer = {
   width: "100%"
 };
 
-// Story Gradient Rings
+// Story Gradient Rings & Avatar
+const avatarContainerMobile = {
+  position: "relative",
+  flexShrink: 0
+};
+
 const storyGradientRingMobile = {
   padding: "2.5px",
   borderRadius: "50%",
-  background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
   display: "inline-block",
   flexShrink: 0
 };
 
 const avatarInnerCircleMobile = {
-  width: "78px",
-  height: "78px",
+  width: "72px",
+  height: "72px",
   borderRadius: "50%",
   border: "2.5px solid #000000",
   overflow: "hidden",
@@ -864,20 +860,70 @@ const avatarInnerCircleMobile = {
 const storyGradientRingDesktop = {
   padding: "3.5px",
   borderRadius: "50%",
-  background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
   display: "inline-block"
 };
 
 const avatarInnerCircleDesktop = {
-  width: "140px",
-  height: "140px",
+  width: "116px",
+  height: "116px",
   borderRadius: "50%",
   border: "3.5px solid #000000",
   overflow: "hidden",
   backgroundColor: "#1c1c1e"
 };
 
-// Stat Columns
+const verifiedBadgeStyle = {
+  position: "absolute",
+  bottom: "0px",
+  right: "0px",
+  backgroundColor: "#000",
+  borderRadius: "50%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "1px"
+};
+
+const categoryBadgeStyle = {
+  fontSize: "9.5px",
+  fontWeight: "600",
+  color: "#00aff0",
+  background: "rgba(0, 175, 240, 0.12)",
+  padding: "1px 6px",
+  borderRadius: "6px",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  lineHeight: "1.2"
+};
+
+// Stat Columns & Rows
+const statsContainerStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-around",
+  padding: "14px 0",
+  marginTop: "14px",
+  borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)"
+};
+
+const statDividerStyle = {
+  width: "1px",
+  height: "24px",
+  backgroundColor: "rgba(255, 255, 255, 0.1)"
+};
+
+const metaRowStyle = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "14px",
+  alignItems: "center",
+  fontSize: "12.5px",
+  color: "#8e8e93",
+  marginTop: "12px"
+};
+
 const statColStyle = {
   display: "flex",
   flexDirection: "column",
@@ -914,36 +960,23 @@ const websiteLinkStyle = {
   display: "inline-flex",
   alignItems: "center",
   gap: "5px",
-  color: "#0095f6",
+  color: "#00aff0",
   textDecoration: "none",
   fontSize: "13px",
   fontWeight: "600"
-};
-
-const vipPricingBadgeStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "5px",
-  backgroundColor: "rgba(255, 215, 0, 0.08)",
-  border: "1px solid rgba(255, 215, 0, 0.25)",
-  borderRadius: "6px",
-  padding: "3px 8px",
-  fontSize: "12px",
-  fontWeight: "700",
-  color: "#FFD700"
 };
 
 // Mobile Action Buttons
 const mobileActionButtonsRow = {
   display: "flex",
   gap: "8px",
-  marginTop: "12px"
+  marginTop: "14px"
 };
 
 const mobileFollowBtn = {
   flex: 1,
-  height: "34px",
-  borderRadius: "8px",
+  height: "36px",
+  borderRadius: "20px",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
@@ -955,8 +988,8 @@ const mobileFollowBtn = {
 
 const mobileSubscribeBtn = {
   flex: 1,
-  height: "34px",
-  borderRadius: "8px",
+  height: "36px",
+  borderRadius: "20px",
   fontSize: "13px",
   fontWeight: "700",
   border: "none",
@@ -967,12 +1000,12 @@ const mobileSubscribeBtn = {
 };
 
 const mobileSecondaryBtn = {
-  height: "34px",
+  height: "36px",
   padding: "0 16px",
   backgroundColor: "#262626",
   color: "#ffffff",
   border: "1px solid #363636",
-  borderRadius: "8px",
+  borderRadius: "20px",
   fontSize: "13px",
   fontWeight: "600",
   display: "flex",
@@ -982,22 +1015,23 @@ const mobileSecondaryBtn = {
 };
 
 const mobileIconBtn = {
-  height: "34px",
+  height: "36px",
   width: "36px",
   backgroundColor: "#262626",
   border: "1px solid #363636",
-  borderRadius: "8px",
+  borderRadius: "50%",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  cursor: "pointer"
+  cursor: "pointer",
+  flexShrink: 0
 };
 
 // Desktop Action Buttons
 const desktopFollowBtn = {
-  height: "34px",
-  padding: "0 22px",
-  borderRadius: "8px",
+  height: "36px",
+  padding: "0 24px",
+  borderRadius: "20px",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
@@ -1008,9 +1042,9 @@ const desktopFollowBtn = {
 };
 
 const desktopSubscribeBtn = {
-  height: "34px",
-  padding: "0 20px",
-  borderRadius: "8px",
+  height: "36px",
+  padding: "0 24px",
+  borderRadius: "20px",
   fontSize: "13px",
   fontWeight: "700",
   border: "none",
@@ -1018,12 +1052,12 @@ const desktopSubscribeBtn = {
 };
 
 const desktopSecondaryBtn = {
-  height: "34px",
-  padding: "0 16px",
+  height: "36px",
+  padding: "0 18px",
   backgroundColor: "#262626",
   color: "#ffffff",
   border: "1px solid #363636",
-  borderRadius: "8px",
+  borderRadius: "20px",
   fontSize: "13px",
   fontWeight: "600",
   display: "flex",
@@ -1035,9 +1069,9 @@ const desktopSecondaryBtn = {
 const desktopIconBtnStyle = {
   background: "#262626",
   border: "1px solid #363636",
-  borderRadius: "8px",
+  borderRadius: "50%",
   width: "36px",
-  height: "34px",
+  height: "36px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
