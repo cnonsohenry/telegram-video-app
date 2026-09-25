@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
-  X, ArrowLeft, Search, CheckCircle, Sparkles, UserPlus, UserCheck, 
+  X, ArrowLeft, Search, CheckCircle, Sparkles, 
   Users, Flame, Play 
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
@@ -335,15 +335,15 @@ export default function DiscoverCreatorsModal({
                 {[1, 2, 3, 4].map(i => (
                   <div key={i} style={skeletonCardStyle}>
                     {/* Top row skeleton */}
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", width: "100%" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%", height: "50px" }}>
                       <div style={skeletonAvatar} />
-                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-                        <div style={{ ...skeletonLine, width: "45%" }} />
-                        <div style={{ ...skeletonLine, width: "25%", height: "10px" }} />
-                        <div style={{ ...skeletonLine, width: "80%", height: "10px", marginTop: "2px" }} />
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px", minWidth: 0 }}>
+                        <div style={{ ...skeletonLine, width: "45%", height: "13px" }} />
+                        <div style={{ ...skeletonLine, width: "70%", height: "11px" }} />
+                        <div style={{ ...skeletonLine, width: "30%", height: "10px" }} />
                       </div>
                     </div>
-                    {/* 4 Thumbnails skeleton */}
+                    {/* 4 Thumbnails skeleton with tiny gap */}
                     <div style={thumbnailsGridStyle}>
                       {[1, 2, 3, 4].map(k => (
                         <div key={k} style={skeletonThumbnail} />
@@ -351,8 +351,8 @@ export default function DiscoverCreatorsModal({
                     </div>
                     {/* Action buttons skeleton */}
                     <div style={{ display: "flex", gap: "10px", width: "100%" }}>
-                      <div style={{ ...skeletonButton, flex: 1 }} />
-                      <div style={{ ...skeletonButton, flex: 1 }} />
+                      <div style={{ ...skeletonButton, flex: 1, borderRadius: "20px" }} />
+                      <div style={{ ...skeletonButton, flex: 1, borderRadius: "20px" }} />
                     </div>
                   </div>
                 ))}
@@ -398,7 +398,7 @@ export default function DiscoverCreatorsModal({
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.025)"; }}
                     >
-                      {/* Top Row: Avatar on left; Name, handle, category, bio to the right */}
+                      {/* Top Row: Avatar on left; Name, bio, follow count closer together without exceeding avatar pic */}
                       <div style={topRowStyle}>
                         <div style={avatarContainerStyle}>
                           <div style={avatarRingStyle}>
@@ -411,13 +411,14 @@ export default function DiscoverCreatorsModal({
                           </div>
                           {creator.is_verified && (
                             <div style={verifiedBadgeStyle}>
-                              <CheckCircle size={13} color="#00aff0" fill="#00aff0" />
+                              <CheckCircle size={12} color="#00aff0" fill="#00aff0" />
                             </div>
                           )}
                         </div>
 
                         <div style={creatorInfoStyle}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minWidth: 0 }}>
+                          {/* Line 1: Display Name + Category Pill */}
+                          <div style={nameRowStyle}>
                             <span style={displayNameStyle}>
                               {creator.display_name || uname}
                             </span>
@@ -428,7 +429,13 @@ export default function DiscoverCreatorsModal({
                             )}
                           </div>
 
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, marginTop: "2px" }}>
+                          {/* Line 2: Bio directly next after display name, 1 line with ellipsis "..." */}
+                          <div style={bioStyle} title={creator.creator_bio || ""}>
+                            {creator.creator_bio || ""}
+                          </div>
+
+                          {/* Line 3: Handle & Follow count */}
+                          <div style={followCountRowStyle}>
                             <span style={handleStyle}>
                               @{uname}
                             </span>
@@ -438,92 +445,91 @@ export default function DiscoverCreatorsModal({
                               </span>
                             )}
                           </div>
-
-                          {creator.creator_bio && (
-                            <div style={bioStyle}>
-                              {creator.creator_bio}
-                            </div>
-                          )}
                         </div>
                       </div>
 
-                      {/* Middle Row: 4 Thumbnails with NO captions randomly selected from top performing videos */}
+                      {/* Middle Row: 4 Thumbnails with NO captions, tiny gap, enclosed outer curves */}
                       {sampleVideos.length > 0 && (
                         <div style={thumbnailsGridStyle}>
-                          {sampleVideos.slice(0, 4).map((video, vIdx) => (
-                            <div 
-                              key={video.id || vIdx}
-                              style={thumbnailWrapperStyle}
-                              onClick={(e) => handleThumbnailClick(e, video)}
-                              title="Play video"
-                            >
-                              <img 
-                                src={video.thumbnail_url || "/assets/placeholder-thumb.jpg"} 
-                                alt=""
-                                loading="lazy"
-                                onError={(e) => {
-                                  e.target.onerror = null;
-                                  e.target.src = "/assets/placeholder-thumb.jpg";
+                          {sampleVideos.slice(0, 4).map((video, vIdx) => {
+                            const totalThumbs = Math.min(sampleVideos.length, 4);
+                            const isFirst = vIdx === 0;
+                            const isLast = vIdx === totalThumbs - 1;
+
+                            let thumbRadius = "0px";
+                            if (totalThumbs === 1) {
+                              thumbRadius = "8px";
+                            } else if (isFirst) {
+                              thumbRadius = "8px 0 0 8px";
+                            } else if (isLast) {
+                              thumbRadius = "0 8px 8px 0";
+                            }
+
+                            return (
+                              <div 
+                                key={video.id || vIdx}
+                                style={{
+                                  ...thumbnailWrapperStyle,
+                                  borderRadius: thumbRadius
                                 }}
-                                style={thumbnailImgStyle}
-                              />
-                              {/* Bottom gradient vignette */}
-                              <div style={thumbnailOverlayStyle} />
+                                onClick={(e) => handleThumbnailClick(e, video)}
+                                title="Play video"
+                              >
+                                <img 
+                                  src={video.thumbnail_url || "/assets/placeholder-thumb.jpg"} 
+                                  alt=""
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = "/assets/placeholder-thumb.jpg";
+                                  }}
+                                  style={thumbnailImgStyle}
+                                />
+                                {/* Bottom gradient vignette */}
+                                <div style={thumbnailOverlayStyle} />
 
-                              {/* View count at bottom-left */}
-                              <div style={viewBadgeStyle}>
-                                <Play size={9} fill="#ffffff" color="#ffffff" style={{ marginRight: "3px" }} />
-                                <span>{formatViews(video.views)}</span>
-                              </div>
-
-                              {/* Optional premium badge */}
-                              {video.is_premium && (
-                                <div style={premiumBadgeStyle}>
-                                  ★
+                                {/* View count at bottom-left */}
+                                <div style={viewBadgeStyle}>
+                                  <Play size={9} fill="#ffffff" color="#ffffff" style={{ marginRight: "3px" }} />
+                                  <span>{formatViews(video.views)}</span>
                                 </div>
-                              )}
-                            </div>
-                          ))}
+
+                                {/* Optional premium badge */}
+                                {video.is_premium && (
+                                  <div style={premiumBadgeStyle}>
+                                    ★
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
 
-                      {/* Bottom Row: Follow & Subscribe buttons */}
+                      {/* Bottom Row: Follow (white, rounded edge) & Subscribe (red, rounded edge), no icons */}
                       <div style={actionRowStyle}>
                         <button
                           onClick={(e) => handleFollowToggle(e, creator)}
                           disabled={isUpdating}
                           style={{
                             ...followBtnStyle,
-                            background: isFollowing ? "rgba(255, 255, 255, 0.12)" : "#fe2c55",
-                            color: "#ffffff",
-                            border: isFollowing ? "1px solid rgba(255, 255, 255, 0.2)" : "none"
+                            background: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
+                            color: isFollowing ? "#ffffff" : "#000000",
+                            border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none"
                           }}
                         >
-                          {isFollowing ? (
-                            <>
-                              <UserCheck size={14} style={{ marginRight: "6px" }} />
-                              Following
-                            </>
-                          ) : (
-                            <>
-                              <UserPlus size={14} style={{ marginRight: "6px" }} />
-                              Follow
-                            </>
-                          )}
+                          {isFollowing ? "Following" : "Follow"}
                         </button>
 
                         <button
                           onClick={(e) => handleSubscribeClick(e, creator)}
                           style={{
                             ...subscribeBtnStyle,
-                            background: isSubscribed 
-                              ? "rgba(0, 175, 240, 0.14)" 
-                              : "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
-                            color: isSubscribed ? "#00aff0" : "#ffffff",
-                            border: isSubscribed ? "1px solid #00aff0" : "none"
+                            background: isSubscribed ? "rgba(254, 44, 85, 0.18)" : "#fe2c55",
+                            color: isSubscribed ? "#fe2c55" : "#ffffff",
+                            border: isSubscribed ? "1px solid #fe2c55" : "none"
                           }}
                         >
-                          <Sparkles size={14} style={{ marginRight: "6px" }} />
                           {isSubscribed ? "Subscribed" : (
                             creator.subscription_price > 0 
                               ? `Subscribe $${creator.subscription_price}/mo` 
@@ -721,22 +727,22 @@ const creatorCardStyle = {
 
 const topRowStyle = {
   display: "flex",
-  alignItems: "flex-start",
+  alignItems: "center",
   width: "100%",
   boxSizing: "border-box"
 };
 
 const avatarContainerStyle = {
   position: "relative",
-  width: "48px",
-  height: "48px",
+  width: "50px",
+  height: "50px",
   flexShrink: 0,
-  marginRight: "12px"
+  marginRight: "10px"
 };
 
 const avatarRingStyle = {
-  width: "48px",
-  height: "48px",
+  width: "50px",
+  height: "50px",
   borderRadius: "50%",
   padding: "2px",
   background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
@@ -758,8 +764,8 @@ const avatarImgStyle = {
 
 const verifiedBadgeStyle = {
   position: "absolute",
-  bottom: "-2px",
-  right: "-2px",
+  bottom: "-1px",
+  right: "-1px",
   backgroundColor: "#000",
   borderRadius: "50%",
   display: "flex",
@@ -771,76 +777,96 @@ const verifiedBadgeStyle = {
 const creatorInfoStyle = {
   flex: "1 1 0%",
   minWidth: 0,
+  height: "50px",
   display: "flex",
   flexDirection: "column",
-  gap: "2px",
+  justifyContent: "center",
+  gap: "1.5px",
   overflow: "hidden"
 };
 
+const nameRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  minWidth: 0,
+  lineHeight: "1.2"
+};
+
 const displayNameStyle = {
-  fontSize: "14.5px",
+  fontSize: "14px",
   fontWeight: "700",
   color: "#ffffff",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
   minWidth: 0,
-  maxWidth: "100%",
-  display: "inline-block"
+  lineHeight: "1.2"
 };
 
-const handleStyle = {
-  fontSize: "12.5px",
+const categoryBadgeStyle = {
+  fontSize: "9.5px",
+  fontWeight: "600",
+  color: "#00aff0",
+  background: "rgba(0, 175, 240, 0.12)",
+  padding: "1px 5px",
+  borderRadius: "6px",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  lineHeight: "1.2"
+};
+
+const bioStyle = {
+  fontSize: "12px",
   color: "#8e8e93",
+  lineHeight: "1.2",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
-  minWidth: 0
+  width: "100%",
+  display: "block",
+  margin: 0
+};
+
+const followCountRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "4px",
+  minWidth: 0,
+  lineHeight: "1.2"
+};
+
+const handleStyle = {
+  fontSize: "11.5px",
+  color: "#71767b",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  minWidth: 0,
+  lineHeight: "1.2"
 };
 
 const followersCountStyle = {
   color: "#71767b",
-  fontSize: "12px",
+  fontSize: "11.5px",
   flexShrink: 0,
-  whiteSpace: "nowrap"
-};
-
-const categoryBadgeStyle = {
-  fontSize: "10px",
-  fontWeight: "600",
-  color: "#00aff0",
-  background: "rgba(0, 175, 240, 0.12)",
-  padding: "1px 6px",
-  borderRadius: "8px",
   whiteSpace: "nowrap",
-  flexShrink: 0
-};
-
-const bioStyle = {
-  fontSize: "12.5px",
-  color: "#a8a8a8",
-  marginTop: "4px",
-  lineHeight: "1.4",
-  display: "-webkit-box",
-  WebkitLineClamp: 2,
-  WebkitBoxOrient: "vertical",
-  overflow: "hidden",
-  wordBreak: "break-word",
-  overflowWrap: "anywhere"
+  lineHeight: "1.2"
 };
 
 const thumbnailsGridStyle = {
   display: "grid",
   gridTemplateColumns: "repeat(4, 1fr)",
-  gap: "7px",
+  gap: "2px",
   width: "100%",
-  boxSizing: "border-box"
+  boxSizing: "border-box",
+  borderRadius: "8px",
+  overflow: "hidden"
 };
 
 const thumbnailWrapperStyle = {
   position: "relative",
   aspectRatio: "3/4",
-  borderRadius: "8px",
   overflow: "hidden",
   backgroundColor: "#1c1c1f",
   cursor: "pointer",
@@ -899,7 +925,7 @@ const actionRowStyle = {
 const followBtnStyle = {
   flex: 1,
   height: "36px",
-  borderRadius: "8px",
+  borderRadius: "20px",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
@@ -914,7 +940,7 @@ const followBtnStyle = {
 const subscribeBtnStyle = {
   flex: 1,
   height: "36px",
-  borderRadius: "8px",
+  borderRadius: "20px",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
@@ -948,28 +974,27 @@ const skeletonCardStyle = {
 };
 
 const skeletonAvatar = {
-  width: "48px",
-  height: "48px",
+  width: "50px",
+  height: "50px",
   borderRadius: "50%",
   backgroundColor: "#242424",
   flexShrink: 0
 };
 
 const skeletonLine = {
-  height: "14px",
+  height: "12px",
   borderRadius: "6px",
   backgroundColor: "#242424"
 };
 
 const skeletonThumbnail = {
   aspectRatio: "3/4",
-  borderRadius: "8px",
   backgroundColor: "#242424",
   width: "100%"
 };
 
 const skeletonButton = {
   height: "36px",
-  borderRadius: "8px",
+  borderRadius: "20px",
   backgroundColor: "#242424"
 };
