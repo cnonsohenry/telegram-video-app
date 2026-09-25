@@ -454,6 +454,7 @@ export default function Profile({
 
   const postsCount = user?.is_creator ? (creatorStats.posts || creatorPosts.length || 0) : 0;
   const followersCount = user?.is_creator ? (creatorStats.followers !== undefined ? creatorStats.followers : (creatorStats.subscribers || 0)) : 0;
+  const likesCount = user?.is_creator ? (creatorStats.likes || 0) : (liked?.length || 0);
   const followingCount = (user?.follows && Array.isArray(user.follows)) 
     ? user.follows.length 
     : (user?.subscriptions?.length || 0);
@@ -508,23 +509,23 @@ export default function Profile({
           </div>
         )}
 
-        {/* 🌟 MATURED INSTAGRAM PROFILE HEADER */}
-        <div style={{ padding: isDesktop ? "36px 20px 10px 20px" : "14px 16px 8px 16px" }}>
+        {/* 🌟 TIKTOK / CREATOR STYLE PROFILE HEADER */}
+        <div style={{ padding: isDesktop ? "32px 20px 10px 20px" : "16px 16px 8px 16px" }}>
           
           {/* MOBILE HEADER LAYOUT */}
           {!isDesktop ? (
             <div>
-              {/* Row 1: Avatar + 3 Stat Columns */}
-              <div style={{ display: "flex", alignItems: "center", marginBottom: "14px" }}>
+              {/* Top Row: Avatar on left; Display Name, Bio, Stats to the right */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", marginBottom: "14px" }}>
                 
-                {/* Instagram Story Gradient Ring Avatar */}
+                {/* Cyan Gradient Ring Avatar + Camera Edit Badge */}
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   <div style={storyGradientRingMobile}>
                     <div style={avatarInnerCircleMobile}>
                       <img
                         src={user?.avatar_url || "/assets/default-avatar.png"}
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        alt="Avatar"
+                        alt={user?.display_name || user?.username || "Avatar"}
                         onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                       />
                     </div>
@@ -536,103 +537,188 @@ export default function Profile({
                     style={mobileAvatarEditBadge}
                     title="Change Profile Photo"
                   >
-                    <Plus size={13} color="#fff" strokeWidth={3} />
+                    <Camera size={13} color="#fff" />
                   </button>
                 </div>
 
-                {/* 3 Stats: Posts, Followers, Following */}
-                <div style={{ display: "flex", flex: 1, justifyContent: "space-around", alignItems: "center", marginLeft: "12px" }}>
-                  <div style={statColStyle}>
-                    <span style={statNumberStyle}>{formatStat(postsCount)}</span>
-                    <span style={statLabelStyle}>posts</span>
+                {/* Display Name, Bio, Inline Stats */}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                  {/* Line 1: Display Name */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                    <h1 style={{
+                      margin: 0,
+                      fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                      fontSize: "20px",
+                      fontWeight: "800",
+                      letterSpacing: "-0.3px",
+                      color: "#fff",
+                      lineHeight: "1.25"
+                    }}>
+                      {user?.display_name || user?.username || "Member"}
+                    </h1>
+                    {(user?.is_creator || user?.is_verified) && (
+                      <CheckCircle size={16} color="#0095f6" fill="#0095f6" />
+                    )}
                   </div>
-                  <div style={statColStyle}>
-                    <span style={statNumberStyle}>{formatStat(followersCount)}</span>
-                    <span style={statLabelStyle}>followers</span>
-                  </div>
-                  <div style={statColStyle}>
-                    <span style={statNumberStyle}>{formatStat(followingCount)}</span>
-                    <span style={statLabelStyle}>following</span>
+
+                  {/* Line 2: Bio directly next under display name */}
+                  {(user?.creator_bio || user?.bio || user?.is_creator) && (
+                    <p style={{
+                      fontSize: "13px",
+                      color: "#c8c8c8",
+                      lineHeight: "1.4",
+                      margin: "2px 0 0 0",
+                      wordBreak: "break-word"
+                    }}>
+                      {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
+                    </p>
+                  )}
+
+                  {/* Line 3: Post, followers, likes count */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    flexWrap: "wrap",
+                    fontSize: "12.5px",
+                    color: "#8e8e93",
+                    marginTop: "4px"
+                  }}>
+                    {user?.is_creator ? (
+                      <>
+                        <span>
+                          <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(postsCount)}</strong>{" "}
+                          <span>posts</span>
+                        </span>
+                        <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                        <span>
+                          <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
+                          <span>followers</span>
+                        </span>
+                        <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                        <span>
+                          <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                          <span>likes</span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>
+                          <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
+                          <span>following</span>
+                        </span>
+                        <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                        <span>
+                          <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                          <span>likes</span>
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Row 2: Display Name, Category, Bio, Link */}
-              <div style={{ marginBottom: "14px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontSize: "14.5px", fontWeight: "700", color: "#fff" }}>
-                    {user?.display_name || user?.username || "Member"}
-                  </span>
-                  {(user?.is_creator || user?.is_verified) && (
-                    <CheckCircle size={15} color="#0095f6" fill="#0095f6" />
-                  )}
-                  {user?.is_creator && (
-                    <span style={creatorBadgeTagStyle}>CREATOR</span>
-                  )}
-                </div>
+              {/* Action Buttons Row */}
+              <div style={mobileActionButtonsRow}>
+                <button 
+                  onClick={() => setShowEditModal(true)} 
+                  style={{
+                    ...mobileActionButton,
+                    backgroundColor: "#ffffff",
+                    color: "#000000",
+                    fontWeight: "700"
+                  }}
+                >
+                  Edit profile
+                </button>
+                <button onClick={handleShareProfile} style={mobileActionButton}>
+                  Share profile
+                </button>
+                {user?.is_creator ? (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                        setShowUploadModal(true);
+                      }}
+                      style={{ 
+                        ...mobileActionButton, 
+                        background: "linear-gradient(135deg, #00aff0, #0088cc)", 
+                        color: "#fff", 
+                        border: "none", 
+                        fontWeight: "700",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "4px",
+                        padding: "0 12px",
+                        flex: "0 0 auto"
+                      }}
+                    >
+                      <Plus size={15} color="#fff" />
+                      <span>Upload</span>
+                    </button>
+                    <button 
+                      onClick={() => setShowStudioModal(true)} 
+                      style={{ ...mobileActionButton, flex: "0 0 auto", padding: "0 12px", color: "#FFD700", background: "rgba(255, 215, 0, 0.12)", border: "1px solid rgba(255, 215, 0, 0.3)" }}
+                      title="Creator Studio"
+                    >
+                      <Sparkles size={14} color="#FFD700" />
+                    </button>
+                    <button 
+                      onClick={() => setShowPreviewModal(true)} 
+                      style={{ ...mobileActionButton, flex: "0 0 auto", padding: "0 12px" }}
+                      title="Fan View"
+                    >
+                      <Eye size={15} color="#fff" />
+                    </button>
+                  </>
+                ) : (
+                  <button 
+                    onClick={() => setShowSetupModal(true)} 
+                    style={{ ...mobileActionButton, background: "linear-gradient(135deg, #00aff0, #0088cc)", color: "#fff", border: "none", flex: "0 0 auto", padding: "0 14px", fontWeight: "700" }}
+                  >
+                    <Sparkles size={13} color="#fff" />
+                    <span>Upgrade</span>
+                  </button>
+                )}
+              </div>
 
-                {/* Creator Category in subtle Instagram gray */}
-                <div style={{ fontSize: "12.5px", color: "#8e8e93", marginTop: "2px", fontWeight: "500" }}>
-                  {user?.creator_category || (user?.is_creator ? "Digital Creator" : "Member")}
-                </div>
-
-                {/* Bio text */}
-                <p style={{
-                  fontSize: "13.5px",
-                  color: "#f5f5f5",
-                  lineHeight: "1.42",
-                  margin: "8px 0 6px 0",
-                  whiteSpace: "pre-wrap"
-                }}>
-                  {user?.creator_bio || user?.bio || (user?.is_creator ? APP_CONFIG.profileBioSubtitle : "Welcome to my profile.")}
-                </p>
-
-                {/* Website Link with link icon */}
-                {user?.website && (
-                  <div style={{ marginTop: "4px" }}>
+              {/* Website Link & Location */}
+              {(user?.website || user?.location) && (
+                <div style={metaRowStyle}>
+                  {user?.website && (
                     <a 
                       href={user.website.startsWith("http") ? user.website : `https://${user.website}`} 
                       target="_blank" 
                       rel="noopener noreferrer" 
                       style={websiteLinkStyle}
                     >
-                      <Link2 size={13} color="#0095f6" />
+                      <Link2 size={13} color="#00aff0" />
                       <span>{user.website.replace(/^https?:\/\//, "")}</span>
                     </a>
-                  </div>
-                )}
-
-                {/* Location */}
-                {user?.location && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12.5px", color: "#8e8e93", marginTop: "4px" }}>
-                    <MapPin size={13} color="#8e8e93" />
-                    <span>{user.location}</span>
-                  </div>
-                )}
-
-                {/* VIP Pricing Badge if creator */}
-                {user?.is_creator && (
-                  <div style={{ marginTop: "8px" }}>
-                    <span style={vipPricingBadgeStyle}>
-                      <Sparkles size={12} color="#FFD700" />
-                      <span>VIP Channel: {Number(user.subscription_price) > 0 ? `$${Number(user.subscription_price).toLocaleString()} / mo` : "Free Access"}</span>
-                    </span>
-                  </div>
-                )}
-              </div>
+                  )}
+                  {user?.location && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12.5px", color: "#8e8e93" }}>
+                      <MapPin size={13} color="#8e8e93" />
+                      <span>{user.location}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             /* DESKTOP HEADER LAYOUT */
-            <div style={{ display: "flex", gap: "60px", alignItems: "flex-start", marginBottom: "28px" }}>
+            <div style={{ display: "flex", gap: "36px", alignItems: "flex-start", marginBottom: "24px" }}>
               
-              {/* Desktop Avatar (Left column 150px) */}
-              <div style={{ flexShrink: 0, position: "relative", paddingLeft: "15px" }}>
+              {/* Desktop Avatar (Left column 132px) */}
+              <div style={{ flexShrink: 0, position: "relative" }}>
                 <div style={storyGradientRingDesktop}>
                   <div style={avatarInnerCircleDesktop}>
                     <img
                       src={user?.avatar_url || "/assets/default-avatar.png"}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      alt="Avatar"
+                      alt={user?.display_name || user?.username || "Avatar"}
                       onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                     />
                   </div>
@@ -642,121 +728,154 @@ export default function Profile({
                   style={desktopAvatarEditBadge}
                   title="Change Profile Photo"
                 >
-                  <Camera size={14} color="#fff" />
+                  <Camera size={15} color="#fff" />
                 </button>
               </div>
 
               {/* Desktop Details (Right column) */}
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 
-                {/* Row 1: Username + Actions + Settings */}
-                <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", marginBottom: "18px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <h2 style={{ fontSize: "20px", fontWeight: "400", color: "#fff", margin: 0 }}>
-                      {user?.username || APP_CONFIG.defaultUploader}
-                    </h2>
-                    {(user?.is_creator || user?.is_verified) && (
-                      <CheckCircle size={18} color="#0095f6" fill="#0095f6" />
-                    )}
-                    {user?.is_creator && (
-                      <span style={creatorBadgeTagStyle}>CREATOR</span>
-                    )}
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <button onClick={() => setShowEditModal(true)} style={desktopActionButton}>
-                      Edit profile
-                    </button>
-                    <button onClick={handleShareProfile} style={desktopActionButton}>
-                      Share profile
-                    </button>
-                    {user?.is_creator ? (
-                      <>
-                        <button 
-                          onClick={() => {
-                            setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
-                            setShowUploadModal(true);
-                          }}
-                          style={{ 
-                            ...desktopActionButton, 
-                            background: "linear-gradient(135deg, #00aff0, #0088cc)", 
-                            color: "#fff", 
-                            border: "none", 
-                            fontWeight: "700",
-                            boxShadow: "0 2px 10px rgba(0, 175, 240, 0.3)"
-                          }}
-                        >
-                          <Plus size={15} color="#fff" />
-                          <span>Upload Video</span>
-                        </button>
-                        <button 
-                          onClick={() => setShowStudioModal(true)} 
-                          style={{ ...desktopActionButton, background: "rgba(255, 215, 0, 0.15)", border: "1px solid rgba(255, 215, 0, 0.4)", color: "#FFD700", fontWeight: "700" }}
-                        >
-                          <Sparkles size={14} color="#FFD700" />
-                          <span>Creator Studio</span>
-                        </button>
-                        <button 
-                          onClick={() => setShowPreviewModal(true)} 
-                          style={{ ...desktopActionButton, color: "#00aff0" }}
-                        >
-                          <Eye size={14} />
-                          <span>Fan View</span>
-                        </button>
-                      </>
-                    ) : (
-                      <button 
-                        onClick={() => setShowSetupModal(true)} 
-                        style={{ ...desktopActionButton, background: "#0095f6", color: "#fff", border: "none" }}
-                      >
-                        <Sparkles size={14} color="#fff" />
-                        <span>Become Creator</span>
-                      </button>
-                    )}
-                    <button onClick={handleOpenSettings} style={desktopIconBtnStyle} title="Settings">
-                      <Settings size={18} color="#fff" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Row 2: Stats (Posts, Followers, Following) */}
-                <div style={{ display: "flex", gap: "40px", marginBottom: "18px", fontSize: "15px" }}>
-                  <div>
-                    <strong style={{ color: "#fff" }}>{formatStat(postsCount)}</strong>{" "}
-                    <span style={{ color: "#8e8e93" }}>posts</span>
-                  </div>
-                  <div>
-                    <strong style={{ color: "#fff" }}>{formatStat(followersCount)}</strong>{" "}
-                    <span style={{ color: "#8e8e93" }}>followers</span>
-                  </div>
-                  <div>
-                    <strong style={{ color: "#fff" }}>{formatStat(followingCount)}</strong>{" "}
-                    <span style={{ color: "#8e8e93" }}>following</span>
-                  </div>
-                </div>
-
-                {/* Row 3: Name, Category, Bio, Links */}
-                <div>
-                  <div style={{ fontSize: "15px", fontWeight: "700", color: "#fff" }}>
+                {/* Line 1: Display Name */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                  <h1 style={{
+                    fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                    fontSize: "28px",
+                    fontWeight: "800",
+                    letterSpacing: "-0.5px",
+                    color: "#fff",
+                    margin: 0,
+                    lineHeight: "1.15"
+                  }}>
                     {user?.display_name || user?.username || "Member"}
-                  </div>
+                  </h1>
+                  {(user?.is_creator || user?.is_verified) && (
+                    <CheckCircle size={20} color="#0095f6" fill="#0095f6" />
+                  )}
+                </div>
 
-                  <div style={{ fontSize: "13px", color: "#8e8e93", marginTop: "2px" }}>
-                    {user?.creator_category || (user?.is_creator ? "Digital Creator" : "Member")}
-                  </div>
-
+                {/* Line 2: Bio directly under display name */}
+                {(user?.creator_bio || user?.bio || user?.is_creator) && (
                   <p style={{
                     fontSize: "14px",
-                    color: "#f5f5f5",
+                    color: "#c8c8c8",
                     lineHeight: "1.45",
-                    margin: "8px 0 8px 0",
-                    whiteSpace: "pre-wrap",
-                    maxWidth: "540px"
+                    margin: "4px 0 6px 0",
+                    maxWidth: "600px",
+                    wordBreak: "break-word"
                   }}>
-                    {user?.creator_bio || user?.bio || (user?.is_creator ? APP_CONFIG.profileBioSubtitle : "Welcome to my profile.")}
+                    {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
                   </p>
+                )}
 
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", fontSize: "13.5px" }}>
+                {/* Line 3: Post, followers, likes count */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "18px",
+                  fontSize: "14px",
+                  color: "#8e8e93",
+                  marginTop: "6px",
+                  marginBottom: "16px"
+                }}>
+                  {user?.is_creator ? (
+                    <>
+                      <span>
+                        <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(postsCount)}</strong>{" "}
+                        <span>posts</span>
+                      </span>
+                      <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                      <span>
+                        <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
+                        <span>followers</span>
+                      </span>
+                      <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                      <span>
+                        <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                        <span>likes</span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
+                        <span>following</span>
+                      </span>
+                      <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                      <span>
+                        <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                        <span>likes</span>
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
+                  <button 
+                    onClick={() => setShowEditModal(true)} 
+                    style={{
+                      ...desktopActionButton,
+                      backgroundColor: "#ffffff",
+                      color: "#000000",
+                      fontWeight: "700"
+                    }}
+                  >
+                    Edit profile
+                  </button>
+                  <button onClick={handleShareProfile} style={desktopActionButton}>
+                    Share profile
+                  </button>
+                  {user?.is_creator ? (
+                    <>
+                      <button 
+                        onClick={() => {
+                          setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                          setShowUploadModal(true);
+                        }}
+                        style={{ 
+                          ...desktopActionButton, 
+                          background: "linear-gradient(135deg, #00aff0, #0088cc)", 
+                          color: "#fff", 
+                          border: "none", 
+                          fontWeight: "700",
+                          boxShadow: "0 2px 10px rgba(0, 175, 240, 0.3)"
+                        }}
+                      >
+                        <Plus size={15} color="#fff" />
+                        <span>Upload Video</span>
+                      </button>
+                      <button 
+                        onClick={() => setShowStudioModal(true)} 
+                        style={{ ...desktopActionButton, background: "rgba(255, 215, 0, 0.15)", border: "1px solid rgba(255, 215, 0, 0.4)", color: "#FFD700", fontWeight: "700" }}
+                      >
+                        <Sparkles size={14} color="#FFD700" />
+                        <span>Creator Studio</span>
+                      </button>
+                      <button 
+                        onClick={() => setShowPreviewModal(true)} 
+                        style={{ ...desktopActionButton, color: "#00aff0" }}
+                      >
+                        <Eye size={14} />
+                        <span>Fan View</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={() => setShowSetupModal(true)} 
+                      style={{ ...desktopActionButton, background: "linear-gradient(135deg, #00aff0, #0088cc)", color: "#fff", border: "none", fontWeight: "700" }}
+                    >
+                      <Sparkles size={14} color="#fff" />
+                      <span>Become Creator</span>
+                    </button>
+                  )}
+                  <button onClick={handleOpenSettings} style={desktopIconBtnStyle} title="Settings">
+                    <Settings size={18} color="#fff" />
+                  </button>
+                </div>
+
+                {/* Links & Meta */}
+                {(user?.website || user?.location) && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center", fontSize: "13px", color: "#8e8e93" }}>
                     {user?.website && (
                       <a 
                         href={user.website.startsWith("http") ? user.website : `https://${user.website}`} 
@@ -764,29 +883,23 @@ export default function Profile({
                         rel="noopener noreferrer" 
                         style={websiteLinkStyle}
                       >
-                        <Link2 size={14} color="#0095f6" />
+                        <Link2 size={14} color="#00aff0" />
                         <span>{user.website.replace(/^https?:\/\//, "")}</span>
                       </a>
                     )}
                     {user?.location && (
-                      <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#8e8e93" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                         <MapPin size={14} color="#8e8e93" />
                         <span>{user.location}</span>
                       </span>
                     )}
-                    {user?.is_creator && (
-                      <span style={vipPricingBadgeStyle}>
-                        <Sparkles size={12} color="#FFD700" />
-                        <span>VIP: {Number(user.subscription_price) > 0 ? `$${Number(user.subscription_price).toLocaleString()}/mo` : "Free"}</span>
-                      </span>
-                    )}
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* 🌟 INSTAGRAM PROFESSIONAL DASHBOARD CARD */}
+          {/* 🌟 PROFESSIONAL DASHBOARD CARD */}
           {user?.is_creator ? (
             <div 
               onClick={() => setShowStudioModal(true)} 
@@ -828,66 +941,6 @@ export default function Profile({
                 </div>
               </div>
               <ChevronRight size={18} color="#737373" />
-            </div>
-          )}
-
-          {/* 🌟 MOBILE ACTION BUTTONS ROW */}
-          {!isDesktop && (
-            <div style={mobileActionButtonsRow}>
-              <button onClick={() => setShowEditModal(true)} style={mobileActionButton}>
-                Edit profile
-              </button>
-              <button onClick={handleShareProfile} style={mobileActionButton}>
-                Share profile
-              </button>
-              {user?.is_creator ? (
-                <>
-                  <button 
-                    onClick={() => {
-                      setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
-                      setShowUploadModal(true);
-                    }}
-                    style={{ 
-                      ...mobileActionButton, 
-                      background: "linear-gradient(135deg, #00aff0, #0088cc)", 
-                      color: "#fff", 
-                      border: "none", 
-                      fontWeight: "700",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "4px",
-                      padding: "0 12px",
-                      flex: "0 0 auto"
-                    }}
-                  >
-                    <Plus size={15} color="#fff" />
-                    <span>Upload</span>
-                  </button>
-                  <button 
-                    onClick={() => setShowStudioModal(true)} 
-                    style={{ ...mobileActionButton, flex: "0 0 auto", padding: "0 12px", color: "#FFD700", background: "rgba(255, 215, 0, 0.12)", border: "1px solid rgba(255, 215, 0, 0.3)" }}
-                    title="Studio"
-                  >
-                    <Sparkles size={14} color="#FFD700" />
-                  </button>
-                  <button 
-                    onClick={() => setShowPreviewModal(true)} 
-                    style={{ ...mobileActionButton, flex: "0 0 auto", padding: "0 12px" }}
-                    title="Fan View"
-                  >
-                    <Eye size={15} color="#fff" />
-                  </button>
-                </>
-              ) : (
-                <button 
-                  onClick={() => setShowSetupModal(true)} 
-                  style={{ ...mobileActionButton, background: "#0095f6", color: "#fff", border: "none", flex: "0 0 auto", padding: "0 14px" }}
-                >
-                  <Sparkles size={13} color="#fff" />
-                  <span>Upgrade</span>
-                </button>
-              )}
             </div>
           )}
 
@@ -1097,8 +1150,8 @@ export default function Profile({
             <>
               <div style={{ 
                 display: "grid", 
-                gridTemplateColumns: isDesktop ? "repeat(5, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", 
-                gap: isDesktop ? "20px" : "10px",
+                gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))", 
+                gap: isDesktop ? "16px" : "4px",
                 alignItems: "start",
                 animation: "fadeIn 0.3s ease-out",
                 width: "100%"
@@ -1109,6 +1162,7 @@ export default function Profile({
                     video={v} 
                     priority={idx < 2}
                     onOpen={(vData, e) => handleOpenVideo(vData, e)} 
+                    showDetails={false}
                   />
                 ))}
               </div>
@@ -1324,17 +1378,17 @@ const groupTitleStyle = {
 const headerIconButton = { background: "none", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: "4px" };
 const desktopIconBtnStyle = { background: "#262626", border: "1px solid #363636", borderRadius: "8px", width: "36px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
 
-// Instagram Story Gradient Rings
+// TikTok / Creator Gradient Rings & Avatars
 const storyGradientRingMobile = {
   padding: "2.5px",
   borderRadius: "50%",
-  background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
   display: "inline-block"
 };
 
 const avatarInnerCircleMobile = {
-  width: "78px",
-  height: "78px",
+  width: "84px",
+  height: "84px",
   borderRadius: "50%",
   border: "2.5px solid #000000",
   overflow: "hidden",
@@ -1344,13 +1398,13 @@ const avatarInnerCircleMobile = {
 const storyGradientRingDesktop = {
   padding: "3.5px",
   borderRadius: "50%",
-  background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
   display: "inline-block"
 };
 
 const avatarInnerCircleDesktop = {
-  width: "142px",
-  height: "142px",
+  width: "132px",
+  height: "132px",
   borderRadius: "50%",
   border: "3.5px solid #000000",
   overflow: "hidden",
@@ -1361,10 +1415,10 @@ const mobileAvatarEditBadge = {
   position: "absolute",
   bottom: "2px",
   right: "2px",
-  width: "24px",
-  height: "24px",
+  width: "26px",
+  height: "26px",
   borderRadius: "50%",
-  backgroundColor: "#0095f6",
+  backgroundColor: "#00aff0",
   border: "2px solid #000000",
   display: "flex",
   alignItems: "center",
@@ -1375,17 +1429,18 @@ const mobileAvatarEditBadge = {
 
 const desktopAvatarEditBadge = {
   position: "absolute",
-  bottom: "8px",
-  right: "8px",
-  width: "32px",
-  height: "32px",
+  bottom: "6px",
+  right: "6px",
+  width: "34px",
+  height: "34px",
   borderRadius: "50%",
-  backgroundColor: "#262626",
-  border: "2px solid #000000",
+  backgroundColor: "#00aff0",
+  border: "2.5px solid #000000",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  cursor: "pointer"
+  cursor: "pointer",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.6)"
 };
 
 // 3 Stat Columns
@@ -1425,10 +1480,20 @@ const websiteLinkStyle = {
   display: "inline-flex",
   alignItems: "center",
   gap: "5px",
-  color: "#0095f6",
+  color: "#00aff0",
   textDecoration: "none",
   fontSize: "13.5px",
   fontWeight: "600"
+};
+
+const metaRowStyle = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "14px",
+  alignItems: "center",
+  fontSize: "12.5px",
+  color: "#8e8e93",
+  marginTop: "10px"
 };
 
 const vipPricingBadgeStyle = {
@@ -1473,37 +1538,40 @@ const professionalIconStyle = {
 const mobileActionButtonsRow = {
   display: "flex",
   gap: "8px",
-  marginBottom: "16px"
+  marginTop: "12px",
+  marginBottom: "8px"
 };
 
 const mobileActionButton = {
   flex: 1,
-  height: "34px",
+  height: "36px",
   backgroundColor: "#262626",
   color: "#ffffff",
   border: "1px solid #363636",
-  borderRadius: "8px",
+  borderRadius: "20px",
   fontSize: "13px",
-  fontWeight: "600",
+  fontWeight: "700",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   gap: "6px",
-  cursor: "pointer"
+  cursor: "pointer",
+  transition: "all 0.2s ease"
 };
 
 const desktopActionButton = {
-  height: "34px",
-  padding: "0 16px",
+  height: "36px",
+  padding: "0 20px",
   backgroundColor: "#262626",
   color: "#ffffff",
   border: "1px solid #363636",
-  borderRadius: "8px",
+  borderRadius: "20px",
   fontSize: "13px",
-  fontWeight: "600",
+  fontWeight: "700",
   display: "flex",
   alignItems: "center",
   gap: "6px",
-  cursor: "pointer"
+  cursor: "pointer",
+  transition: "all 0.2s ease"
 };
 
