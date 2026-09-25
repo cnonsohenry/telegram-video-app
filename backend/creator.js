@@ -8,7 +8,7 @@ import multer from "multer";
 import jwt from "jsonwebtoken";
 import pool from "./db.js";
 import { authenticateToken, JWT_SECRET } from "./auth.js";
-import { uploadVideoToR2, deleteMediaFromR2, R2_PUBLIC_DOMAIN } from "./r2.js";
+import { uploadVideoToR2, generatePresignedUploadUrls, deleteMediaFromR2, R2_PUBLIC_DOMAIN } from "./r2.js";
 
 const router = express.Router();
 
@@ -457,6 +457,156 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
       try { fs.unlinkSync(req.file.path); } catch (e) {}
     }
     return res.status(500).json({ error: err.message || "Failed to upload video to Cloudflare R2" });
+  }
+});
+
+/* =======================================================
+   5B. DIRECT TO R2: GET PRESIGNED UPLOAD URLS
+   POST /api/creator/presigned-url
+======================================================= */
+router.post("/presigned-url", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { filename, filetype, category, is_premium } = req.body;
+
+  try {
+    // 1. Fetch user & verify creator
+    const userRes = await pool.query(
+      `SELECT id, username, display_name, is_creator, role, subscription_price 
+       FROM app_users WHERE id = $1`,
+      [userId]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: "User account not found." });
+    }
+
+    const creator = userRes.rows[0];
+
+    // Auto-activate creator status if not set
+    if (!creator.is_creator) {
+      await pool.query(
+        `UPDATE app_users 
+         SET is_creator = TRUE, 
+             role = CASE WHEN role = 'admin' THEN 'admin' ELSE 'creator' END 
+         WHERE id = $1`,
+        [userId]
+      );
+    }
+
+    const isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
+
+    // Disallow publishing VIP Exclusive content if creator has not set a subscription price
+    if (isVip && Number(creator.subscription_price || 0) <= 0) {
+      return res.status(400).json({
+        error: "Please set your monthly VIP subscription price in Creator Studio before publishing VIP Exclusive content."
+      });
+    }
+
+    const safeCategory = isVip ? "premium" : "community";
+    const presignedData = await generatePresignedUploadUrls(safeCategory, filename || "video.mp4", isVip);
+
+    return res.json({
+      success: true,
+      ...presignedData
+    });
+  } catch (err) {
+    console.error("[PRESIGNED URL ERROR]", err);
+    return res.status(500).json({ error: err.message || "Failed to generate presigned upload URL" });
+  }
+});
+
+/* =======================================================
+   5C. DIRECT TO R2: COMPLETE & REGISTER VIDEO
+   POST /api/creator/complete-upload
+======================================================= */
+router.post("/complete-upload", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { internalId, category, is_premium, caption, r2Key, thumbKey } = req.body;
+
+  if (!internalId || !r2Key) {
+    return res.status(400).json({ error: "Missing required upload parameters (internalId, r2Key)." });
+  }
+
+  try {
+    const userRes = await pool.query(
+      `SELECT id, username, display_name, is_creator, role, subscription_price 
+       FROM app_users WHERE id = $1`,
+      [userId]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: "User account not found." });
+    }
+
+    const creator = userRes.rows[0];
+
+    // Ensure creator exists in users table
+    try {
+      await pool.query(
+        `INSERT INTO users (user_id, username, full_name)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id) DO UPDATE 
+         SET username = EXCLUDED.username, full_name = EXCLUDED.full_name`,
+        [creator.id, creator.username, creator.display_name || creator.username]
+      );
+    } catch (uErr) {
+      console.warn("[CREATOR COMPLETE] Could not sync to users table:", uErr.message);
+    }
+
+    const isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
+    const safeCategory = isVip ? "premium" : "community";
+    const sanitizedCaption = caption ? String(caption).trim().slice(0, 1000) : "";
+    const savedCloudflareId = `r2:${r2Key}`;
+
+    // Insert video record into database (flagged as is_community = TRUE for web creators)
+    const insertRes = await pool.query(
+      `INSERT INTO videos (
+         chat_id, message_id, file_id, uploader_id, category, caption, cloudflare_id, status, is_community, created_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', TRUE, NOW())
+       RETURNING id, chat_id, message_id, uploader_id, category, caption, cloudflare_id, is_community, created_at, views, likes_count, comments_count`,
+      [
+        "internal",
+        internalId,
+        "none",
+        creator.id,
+        safeCategory,
+        sanitizedCaption,
+        savedCloudflareId
+      ]
+    );
+
+    const newVideo = insertRes.rows[0];
+    const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const thumbnailUrl = formatThumbnailUrl(newVideo, apiBaseUrl);
+    const videoUrl = `${R2_PUBLIC_DOMAIN}/${r2Key}`;
+
+    return res.status(201).json({
+      success: true,
+      message: isVip ? "VIP Exclusive video published to R2!" : "Public video published to R2!",
+      video: {
+        id: newVideo.id,
+        chat_id: newVideo.chat_id,
+        message_id: newVideo.message_id,
+        uploader_id: newVideo.uploader_id,
+        uploader_name: creator.display_name || creator.username,
+        category: newVideo.category,
+        is_community: true,
+        caption: newVideo.caption,
+        views: 0,
+        likes_count: 0,
+        comments_count: 0,
+        shares_count: 0,
+        saves_count: 0,
+        thumbnail_url: thumbnailUrl,
+        video_url: videoUrl,
+        is_group: false,
+        created_at: newVideo.created_at
+      }
+    });
+  } catch (err) {
+    console.error("[CREATOR COMPLETE ERROR]", err);
+    return res.status(500).json({ error: err.message || "Failed to complete video registration" });
   }
 });
 

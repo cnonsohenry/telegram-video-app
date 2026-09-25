@@ -23,6 +23,7 @@ export default function CreatorUploadModal({
   const [uploadStatus, setUploadStatus] = useState("idle"); // 'idle' | 'uploading' | 'processing' | 'success' | 'error'
   const [errorMessage, setErrorMessage] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
+  const [thumbBlob, setThumbBlob] = useState(null);
 
   // VIP Subscription Price
   const [newPriceInput, setNewPriceInput] = useState("");
@@ -77,12 +78,69 @@ export default function CreatorUploadModal({
     };
   }, [showAudienceMenu]);
 
+  const captureVideoThumbnail = (file) => {
+    return new Promise((resolve) => {
+      try {
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.playsInline = true;
+        video.muted = true;
+        const url = URL.createObjectURL(file);
+        video.src = url;
+
+        const timer = setTimeout(() => {
+          URL.revokeObjectURL(url);
+          resolve(null);
+        }, 4000);
+
+        video.onloadeddata = () => {
+          video.currentTime = Math.min(1.0, video.duration > 0.5 ? 0.5 : 0);
+        };
+
+        video.onseeked = () => {
+          clearTimeout(timer);
+          try {
+            const canvas = document.createElement("canvas");
+            const maxDim = 640;
+            let width = video.videoWidth || 640;
+            let height = video.videoHeight || 360;
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(video, 0, 0, width, height);
+
+            canvas.toBlob((blob) => {
+              URL.revokeObjectURL(url);
+              resolve(blob);
+            }, "image/jpeg", 0.85);
+          } catch (e) {
+            URL.revokeObjectURL(url);
+            resolve(null);
+          }
+        };
+
+        video.onerror = () => {
+          clearTimeout(timer);
+          URL.revokeObjectURL(url);
+          resolve(null);
+        };
+      } catch (err) {
+        resolve(null);
+      }
+    });
+  };
+
   const handleReset = () => {
     if (videoPreviewUrl) {
       URL.revokeObjectURL(videoPreviewUrl);
     }
     setVideoFile(null);
     setVideoPreviewUrl(null);
+    setThumbBlob(null);
     setCaption("");
     setUploadProgress(0);
     setUploadStatus("idle");
@@ -110,6 +168,12 @@ export default function CreatorUploadModal({
 
     setErrorMessage("");
     setVideoFile(file);
+    setThumbBlob(null);
+
+    // Asynchronously capture thumbnail in browser
+    captureVideoThumbnail(file).then((blob) => {
+      if (blob) setThumbBlob(blob);
+    });
 
     if (videoPreviewUrl) {
       URL.revokeObjectURL(videoPreviewUrl);
@@ -188,67 +252,121 @@ export default function CreatorUploadModal({
       return;
     }
 
-    const formData = new FormData();
-    formData.append("video", videoFile);
-    formData.append("caption", caption.trim());
-    formData.append("is_premium", isVip ? "true" : "false");
-    formData.append("category", isVip ? "premium" : "community");
+    try {
+      // 1. Request presigned upload URLs directly to Cloudflare R2
+      const presignedRes = await fetch(`${APP_CONFIG.apiUrl}/api/creator/presigned-url`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          filename: videoFile.name,
+          filetype: videoFile.type || "video/mp4",
+          category: isVip ? "premium" : "community",
+          is_premium: isVip
+        })
+      });
 
-    const xhr = new XMLHttpRequest();
-    activeXhrRef.current = xhr;
+      if (!presignedRes.ok) {
+        const errData = await presignedRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to initialize cloud upload.");
+      }
 
-    xhr.upload.addEventListener("progress", (event) => {
-      if (event.lengthComputable) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        setUploadProgress(percent);
-        if (percent >= 100) {
-          setUploadStatus("processing");
+      const { videoUploadUrl, thumbUploadUrl, internalId, safeCategory, r2Key, thumbKey } = await presignedRes.json();
+
+      // 2. Upload video file DIRECTLY to Cloudflare R2 (Bypasses VPS middleman)
+      const xhr = new XMLHttpRequest();
+      activeXhrRef.current = xhr;
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          // Scale progress 0% to 92% for video bytes arriving at Cloudflare Edge
+          const percent = Math.round((event.loaded / event.total) * 92);
+          setUploadProgress(percent);
+          if (percent >= 90) {
+            setUploadStatus("processing");
+          }
+        }
+      });
+
+      await new Promise((resolve, reject) => {
+        xhr.onload = () => {
+          activeXhrRef.current = null;
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Cloud upload rejected with status ${xhr.status}.`));
+          }
+        };
+        xhr.onerror = () => {
+          activeXhrRef.current = null;
+          reject(new Error("Network error during direct cloud upload. Check your connection."));
+        };
+        xhr.onabort = () => {
+          activeXhrRef.current = null;
+          reject(new Error("Upload cancelled."));
+        };
+
+        xhr.open("PUT", videoUploadUrl);
+        xhr.setRequestHeader("Content-Type", videoFile.type || "video/mp4");
+        xhr.send(videoFile);
+      });
+
+      // 3. Upload thumbnail directly to Cloudflare R2 if available (instant ~50KB)
+      if (thumbBlob && thumbUploadUrl) {
+        try {
+          await fetch(thumbUploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": "image/jpeg" },
+            body: thumbBlob
+          });
+        } catch (tErr) {
+          console.warn("[UPLOAD] Thumbnail upload warning (non-fatal):", tErr);
         }
       }
-    });
 
-    xhr.onreadystatechange = () => {
-      if (xhr.readyState === XMLHttpRequest.DONE) {
-        activeXhrRef.current = null;
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            setUploadStatus("success");
-            setUploadProgress(100);
+      // 4. Finalize & register video in database (instant ~20ms call)
+      setUploadProgress(97);
+      const completeRes = await fetch(`${APP_CONFIG.apiUrl}/api/creator/complete-upload`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          internalId,
+          category: safeCategory,
+          is_premium: isVip,
+          caption: caption.trim(),
+          r2Key,
+          thumbKey
+        })
+      });
 
-            if (onSuccess) {
-              onSuccess(data.video);
-            }
-
-            setTimeout(() => {
-              onClose();
-              handleReset();
-            }, 1200);
-          } catch (jsonErr) {
-            setErrorMessage("Unexpected response from server.");
-            setUploadStatus("error");
-          }
-        } else {
-          try {
-            const errData = JSON.parse(xhr.responseText);
-            setErrorMessage(errData.error || "Failed to post video. Please try again.");
-          } catch (err) {
-            setErrorMessage(`Upload failed with status code ${xhr.status}.`);
-          }
-          setUploadStatus("error");
-        }
+      if (!completeRes.ok) {
+        const completeErr = await completeRes.json().catch(() => ({}));
+        throw new Error(completeErr.error || "Failed to register video.");
       }
-    };
 
-    xhr.onerror = () => {
-      activeXhrRef.current = null;
-      setErrorMessage("Network error during upload. Please check your connection.");
+      const completeData = await completeRes.json();
+      setUploadStatus("success");
+      setUploadProgress(100);
+
+      if (onSuccess) {
+        onSuccess(completeData.video);
+      }
+
+      setTimeout(() => {
+        onClose();
+        handleReset();
+      }, 1200);
+
+    } catch (err) {
+      console.error("[DIRECT R2 UPLOAD ERROR]", err);
+      setErrorMessage(err.message || "Failed to post video. Please try again.");
       setUploadStatus("error");
-    };
-
-    xhr.open("POST", `${APP_CONFIG.apiUrl}/api/creator/upload`);
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    xhr.send(formData);
+    }
   };
 
   if (!isOpen) return null;

@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import fs from "fs";
 import path from "path";
 import { promisify } from "util";
@@ -98,6 +99,51 @@ export async function uploadVideoToR2(filePath, category, internalId, originalNa
     cloudflareId: `r2:${r2Key}`,
     thumbKey,
     staticUrl: `${R2_PUBLIC_DOMAIN}/${r2Key}`
+  };
+}
+
+/**
+ * Generates presigned PUT URLs for direct browser-to-R2 upload (video and thumbnail).
+ * Completely bypasses the VPS middleman for 5x-10x faster uploads worldwide.
+ * @param {string} category - Category (e.g. 'community', 'premium')
+ * @param {string} originalName - Original filename to preserve extension
+ * @param {boolean} isPremium - Whether this is VIP exclusive content
+ * @returns {Promise<{ internalId, safeCategory, r2Key, thumbKey, videoUploadUrl, thumbUploadUrl, mimeType, staticUrl, thumbnailUrl }>}
+ */
+export async function generatePresignedUploadUrls(category = "community", originalName = "video.mp4", isPremium = false) {
+  const safeCategory = isPremium ? "premium" : (category || "community").toLowerCase().trim();
+  const extension = path.extname(originalName).replace(".", "") || "mp4";
+  const internalId = `${safeCategory}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+  const r2Key = `${safeCategory}/${internalId}.${extension}`;
+  const thumbKey = `thumbs/internal_${internalId}.jpg`;
+  const mimeType = getMimeType(extension);
+
+  // Video presigned PUT URL (valid for 2 hours)
+  const videoCommand = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: r2Key,
+    ContentType: mimeType,
+  });
+  const videoUploadUrl = await getSignedUrl(r2, videoCommand, { expiresIn: 7200 });
+
+  // Thumbnail presigned PUT URL (valid for 2 hours)
+  const thumbCommand = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: thumbKey,
+    ContentType: "image/jpeg",
+  });
+  const thumbUploadUrl = await getSignedUrl(r2, thumbCommand, { expiresIn: 7200 });
+
+  return {
+    internalId,
+    safeCategory,
+    r2Key,
+    thumbKey,
+    videoUploadUrl,
+    thumbUploadUrl,
+    mimeType,
+    staticUrl: `${R2_PUBLIC_DOMAIN}/${r2Key}`,
+    thumbnailUrl: `${R2_PUBLIC_DOMAIN}/${thumbKey}`
   };
 }
 
