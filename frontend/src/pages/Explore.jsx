@@ -615,8 +615,8 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
               <span>{likesCount > 0 ? likesCount : ''}</span>
             </div>
 
-            <div style={{ ...actionItemStyle, color: isSaved ? "var(--primary-color)" : "#71767b" }} onClick={handleSave}>
-              <Bookmark size={18} fill={isSaved ? "var(--primary-color)" : "none"} />
+            <div style={{ ...actionItemStyle, color: isSaved ? "#ffffff" : "#71767b" }} onClick={handleSave}>
+              <Bookmark size={18} fill={isSaved ? "#ffffff" : "none"} />
               <span>{savesCount > 0 ? savesCount : ''}</span>
             </div>
 
@@ -705,8 +705,7 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
   return (
     <div style={igSuggestedWrapper}>
       <div style={igSuggestedHeader}>
-        <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-          <Sparkles size={15} color="#00aff0" />
+        <div style={{ display: "flex", alignItems: "center" }}>
           <span style={igSuggestedTitle}>Discover Creators</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -720,7 +719,6 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
             title="See all creators"
           >
             <span>See All</span>
-            <ArrowRight size={13} style={{ marginLeft: "3px" }} />
           </button>
           <div style={{ display: "flex", gap: "4px" }}>
             <button 
@@ -879,8 +877,8 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
               <span style={{
                 fontSize: "10px",
                 fontWeight: "600",
-                color: "var(--primary-color, #1d9bf0)",
-                background: "rgba(29, 155, 240, 0.12)",
+                color: "#ffffff",
+                background: "rgba(255, 255, 255, 0.1)",
                 padding: "1px 6px",
                 borderRadius: "6px",
                 flexShrink: 0,
@@ -996,12 +994,12 @@ const DesktopLeftSidebar = ({
   onPostClick
 }) => {
   const categories = [
-    { id: "trends", label: "Trends", icon: Flame, badge: "Hot" },
-    { id: "knacks", label: "Knacks", icon: Play },
-    { id: "hotties", label: "Hotties", icon: Grid3X3 },
-    { id: "baddies", label: "Baddies", icon: User },
-    { id: "college", label: "College", icon: Film },
-    { id: "premium", label: "VIP Club", icon: Sparkles, badge: "VIP" }
+    { id: "trends", label: "Trends" },
+    { id: "knacks", label: "Knacks" },
+    { id: "hotties", label: "Hotties" },
+    { id: "baddies", label: "Baddies" },
+    { id: "college", label: "College" },
+    { id: "premium", label: "VIP Club", badge: "VIP" }
   ];
 
   const isLoggedIn = user && (user.id || user.email);
@@ -1017,13 +1015,13 @@ const DesktopLeftSidebar = ({
           title="NaijaHomemade"
         >
           <div style={desktopBrandLogoCircle}>
-            <Flame size={20} color="#fff" />
+            <Flame size={18} color="#000000" />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
             <span style={{ fontSize: "19px", fontWeight: "900", color: "#ffffff", letterSpacing: "-0.4px" }}>
               Naija
             </span>
-            <span style={{ fontSize: "19px", fontWeight: "900", color: "var(--primary-color, #1d9bf0)", letterSpacing: "-0.4px" }}>
+            <span style={{ fontSize: "19px", fontWeight: "900", color: "#ffffff", letterSpacing: "-0.4px", opacity: 0.85 }}>
               homemade
             </span>
           </div>
@@ -1040,7 +1038,7 @@ const DesktopLeftSidebar = ({
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
           >
             <div style={desktopNavIconBox}>
-              <Home size={22} color="#ffffff" strokeWidth={2} />
+              <Home size={20} color="#ffffff" strokeWidth={1.8} />
             </div>
             <span style={desktopNavLabelStyle}>Home</span>
           </button>
@@ -1064,12 +1062,12 @@ const DesktopLeftSidebar = ({
             }}
           >
             <div style={desktopNavIconBox}>
-              <Compass size={22} color={(!selectedCategory && activeTab === "for_you") ? "var(--primary-color, #1d9bf0)" : "#ffffff"} strokeWidth={2.4} />
+              <Compass size={20} color="#ffffff" strokeWidth={1.8} />
             </div>
             <span style={{
               ...desktopNavLabelStyle,
               fontWeight: (!selectedCategory && activeTab === "for_you") ? "800" : "600",
-              color: (!selectedCategory && activeTab === "for_you") ? "#ffffff" : "#e7e9ea"
+              color: "#ffffff"
             }}>
               Explore
             </span>
@@ -1081,7 +1079,7 @@ const DesktopLeftSidebar = ({
             onClick={() => onTabSwitch("community")}
             style={{
               ...desktopNavBtnStyle,
-              background: activeTab === "community" ? "rgba(29, 155, 240, 0.15)" : "transparent"
+              background: activeTab === "community" ? "rgba(255, 255, 255, 0.1)" : "transparent"
             }}
             onMouseEnter={(e) => {
               if (activeTab !== "community") e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
@@ -1091,13 +1089,13 @@ const DesktopLeftSidebar = ({
             }}
           >
             <div style={desktopNavIconBox}>
-              <Users size={22} color={activeTab === "community" ? "var(--primary-color, #1d9bf0)" : "#ffffff"} strokeWidth={2.2} />
+              <Users size={20} color="#ffffff" strokeWidth={1.8} />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
               <span style={{
                 ...desktopNavLabelStyle,
                 fontWeight: activeTab === "community" ? "800" : "600",
-                color: activeTab === "community" ? "var(--primary-color, #1d9bf0)" : "#e7e9ea"
+                color: "#ffffff"
               }}>
                 Community
               </span>
@@ -1118,7 +1116,7 @@ const DesktopLeftSidebar = ({
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
           >
             <div style={desktopNavIconBox}>
-              <Sparkles size={22} color="#00aff0" strokeWidth={2} />
+              <Sparkles size={20} color="#ffffff" strokeWidth={1.8} />
             </div>
             <span style={desktopNavLabelStyle}>Creators</span>
           </button>
@@ -1132,7 +1130,7 @@ const DesktopLeftSidebar = ({
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
           >
             <div style={desktopNavIconBox}>
-              <User size={22} color="#ffffff" strokeWidth={2} />
+              <User size={20} color="#ffffff" strokeWidth={1.8} />
             </div>
             <span style={desktopNavLabelStyle}>
               {user ? (user.is_creator || user.role === "creator" ? "Creator Studio" : "Profile") : "Sign In"}
@@ -1160,7 +1158,6 @@ const DesktopLeftSidebar = ({
 
           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
             {categories.map((cat) => {
-              const Icon = cat.icon;
               const isSelected = selectedCategory === cat.id;
 
               return (
@@ -1170,32 +1167,29 @@ const DesktopLeftSidebar = ({
                   onClick={() => onSelectCategory(cat.id)}
                   style={{
                     ...desktopCategoryBtnStyle,
-                    background: isSelected ? "rgba(29, 155, 240, 0.16)" : "transparent",
-                    color: isSelected ? "var(--primary-color, #1d9bf0)" : "#cfd9de",
-                    borderLeft: isSelected ? "3px solid var(--primary-color, #1d9bf0)" : "3px solid transparent"
+                    background: isSelected ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                    color: isSelected ? "#ffffff" : "#8e8e93",
+                    borderLeft: isSelected ? "3px solid #ffffff" : "3px solid transparent"
                   }}
                   onMouseEnter={(e) => {
-                    if (!isSelected) e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                    if (!isSelected) e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
                   }}
                   onMouseLeave={(e) => {
                     if (!isSelected) e.currentTarget.style.background = "transparent";
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
-                    <Icon size={16} color={isSelected ? "var(--primary-color, #1d9bf0)" : "#8b98a5"} />
-                    <span style={{ fontSize: "14px", fontWeight: isSelected ? "700" : "500" }}>
-                      {cat.label}
-                    </span>
-                  </div>
+                  <span style={{ fontSize: "14px", fontWeight: isSelected ? "700" : "500" }}>
+                    {cat.label}
+                  </span>
 
                   {cat.badge && (
                     <span style={{
                       fontSize: "10px",
-                      fontWeight: "700",
+                      fontWeight: "800",
                       padding: "2px 6px",
-                      borderRadius: "10px",
-                      background: cat.badge === "VIP" ? "rgba(255, 215, 0, 0.2)" : "rgba(249, 24, 128, 0.2)",
-                      color: cat.badge === "VIP" ? "#FFD700" : "#f91880"
+                      borderRadius: "6px",
+                      background: "rgba(255, 215, 0, 0.15)",
+                      color: "#FFD700"
                     }}>
                       {cat.badge}
                     </span>
@@ -1206,15 +1200,14 @@ const DesktopLeftSidebar = ({
           </div>
         </div>
 
-        {/* Twitter-style Large "Post Video" Button */}
+        {/* Twitter-style Large "Post" Button */}
         <button
           type="button"
           onClick={onPostClick}
           style={desktopPostBtnStyle}
           title="Post a new video"
         >
-          <Plus size={20} strokeWidth={2.6} />
-          <span>Post Video</span>
+          <span>Post</span>
         </button>
       </div>
 
@@ -1352,10 +1345,7 @@ const DesktopRightSidebar = ({
       {/* 2. Trends For You Card */}
       <div style={desktopCardStyle}>
         <div style={desktopCardHeaderStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <TrendingUp size={18} color="var(--primary-color, #1d9bf0)" />
-            <h3 style={desktopCardTitleStyle}>Trends for you</h3>
-          </div>
+          <h3 style={desktopCardTitleStyle}>Trends for you</h3>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1378,10 +1368,7 @@ const DesktopRightSidebar = ({
       {/* 3. Trending Highlights (Mini Video Cards) */}
       <div style={desktopCardStyle}>
         <div style={desktopCardHeaderStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Film size={18} color="#FFD700" />
-            <h3 style={desktopCardTitleStyle}>Highlights</h3>
-          </div>
+          <h3 style={desktopCardTitleStyle}>Highlights</h3>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1419,7 +1406,7 @@ const DesktopRightSidebar = ({
                     {v.caption || APP_CONFIG.defaultCaption}
                   </p>
                   <div style={desktopHighlightMeta}>
-                    <span style={{ color: "var(--primary-color, #1d9bf0)", fontWeight: "600" }}>
+                    <span style={{ color: "#8e8e93", fontWeight: "600" }}>
                       @{v.uploader_handle || v.uploader_name || "creator"}
                     </span>
                     <span>&middot;</span>
@@ -1440,10 +1427,7 @@ const DesktopRightSidebar = ({
       {featuredCreators.length > 0 && (
         <div style={desktopCardStyle}>
           <div style={desktopCardHeaderStyle}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Sparkles size={18} color="#00aff0" />
-              <h3 style={desktopCardTitleStyle}>Top Creators</h3>
-            </div>
+            <h3 style={desktopCardTitleStyle}>Top Creators</h3>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1503,7 +1487,6 @@ const DesktopRightSidebar = ({
               style={desktopCardShowMoreBtn}
             >
               <span>Show more</span>
-              <ArrowRight size={14} />
             </button>
           </div>
         </div>
@@ -2216,9 +2199,8 @@ export default function Explore({
                 borderBottom: "1px solid var(--border-color, #2f3336)",
                 background: "transparent"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <Users size={18} color="var(--primary-color, #1d9bf0)" />
-                  <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "var(--text-primary, #ffffff)" }}>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#ffffff" }}>
                     Creators
                   </h3>
                 </div>
@@ -2231,7 +2213,7 @@ export default function Explore({
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--primary-color, #1d9bf0)",
+                      color: "#ffffff",
                       fontSize: "13px",
                       fontWeight: "600",
                       cursor: "pointer",
@@ -2309,7 +2291,7 @@ export default function Explore({
         return (
           <div style={communityEmptyWrapper}>
             <div style={communityEmptyIconBox}>
-              <Users size={32} color="var(--primary-color, #1d9bf0)" />
+              <Users size={32} color="#ffffff" />
             </div>
             <h3 style={communityEmptyTitle}>Creator Community</h3>
             <p style={communityEmptySubtitle}>
@@ -2548,10 +2530,10 @@ export default function Explore({
                     <img 
                       src={user.avatar_url || "/assets/default-avatar.png"} 
                       alt="P" 
-                      style={{ width: "30px", height: "30px", borderRadius: "50%", border: "2px solid var(--primary-color)", objectFit: "cover" }} 
+                      style={{ width: "30px", height: "30px", borderRadius: "50%", border: "2px solid rgba(255, 255, 255, 0.2)", objectFit: "cover" }} 
                     />
                   ) : (
-                    <div style={{ background: "var(--primary-color)", color: "#fff", padding: "5px 10px", borderRadius: "18px", fontSize: "11px", fontWeight: "800" }}>
+                    <div style={{ background: "#ffffff", color: "#000000", padding: "5px 10px", borderRadius: "18px", fontSize: "11px", fontWeight: "800" }}>
                       LOGIN
                     </div>
                   )}
@@ -2588,8 +2570,8 @@ export default function Explore({
                       borderRadius: "18px",
                       fontSize: "12.5px",
                       fontWeight: searchSubTab === tab.key ? "700" : "500",
-                      background: searchSubTab === tab.key ? "var(--primary-color, #1d9bf0)" : "#16181c",
-                      color: searchSubTab === tab.key ? "#fff" : "#71767b",
+                      background: searchSubTab === tab.key ? "#ffffff" : "#16181c",
+                      color: searchSubTab === tab.key ? "#000000" : "#71767b",
                       border: `1px solid ${searchSubTab === tab.key ? "transparent" : "#2f3336"}`,
                       cursor: "pointer",
                       whiteSpace: "nowrap",
@@ -2682,7 +2664,7 @@ export default function Explore({
                 {renderTimelineContent()}
 
                 {(isSearching ? searchLoadingMore : (activeTab === "community" ? communityLoadingMore : forYouLoadingMore)) && (
-                  <div style={{ padding: "20px", display: "flex", justifyContent: "center", color: "var(--primary-color, #1d9bf0)" }}>
+                  <div style={{ padding: "20px", display: "flex", justifyContent: "center", color: "#ffffff" }}>
                     <Loader2 className="animate-spin" size={24} />
                   </div>
                 )}
@@ -2859,8 +2841,8 @@ export default function Explore({
                             borderRadius: "20px",
                             fontSize: "13px",
                             fontWeight: searchSubTab === tab.key ? "700" : "500",
-                            background: searchSubTab === tab.key ? "var(--primary-color, #1d9bf0)" : "#16181c",
-                            color: searchSubTab === tab.key ? "#fff" : "#71767b",
+                            background: searchSubTab === tab.key ? "#ffffff" : "#16181c",
+                            color: searchSubTab === tab.key ? "#000000" : "#71767b",
                             border: `1px solid ${searchSubTab === tab.key ? "transparent" : "#2f3336"}`,
                             cursor: "pointer",
                             transition: "all 0.15s ease"
@@ -2880,7 +2862,7 @@ export default function Explore({
 
                 {/* Load More Spinners */}
                 {(isSearching ? searchLoadingMore : (activeTab === "community" ? communityLoadingMore : forYouLoadingMore)) && (
-                  <div style={{ padding: "24px", display: "flex", justifyContent: "center", color: "var(--primary-color, #1d9bf0)" }}>
+                  <div style={{ padding: "24px", display: "flex", justifyContent: "center", color: "#ffffff" }}>
                     <Loader2 className="animate-spin" size={26} />
                   </div>
                 )}
@@ -2988,12 +2970,12 @@ const exploreTabActivePillStyle = {
   height: "3px",
   width: "56px",
   borderRadius: "3px 3px 0 0",
-  backgroundColor: "var(--primary-color, #1d9bf0)"
+  backgroundColor: "#ffffff"
 };
 
 const communityCountPillStyle = {
-  background: "rgba(29, 155, 240, 0.15)",
-  color: "var(--primary-color, #1d9bf0)",
+  background: "rgba(255, 255, 255, 0.12)",
+  color: "#ffffff",
   fontSize: "11px",
   fontWeight: "700",
   padding: "1px 6px",
@@ -3016,7 +2998,7 @@ const communityEmptyIconBox = {
   width: "64px",
   height: "64px",
   borderRadius: "50%",
-  background: "rgba(29, 155, 240, 0.1)",
+  background: "rgba(255, 255, 255, 0.08)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -3057,13 +3039,13 @@ const communityEmptyActionBtn = {
   gap: "8px",
   padding: "12px 24px",
   borderRadius: "24px",
-  background: "var(--primary-color, #1d9bf0)",
-  color: "#ffffff",
+  background: "#ffffff",
+  color: "#000000",
   fontSize: "14px",
   fontWeight: "700",
   border: "none",
   cursor: "pointer",
-  boxShadow: "0 4px 14px rgba(29, 155, 240, 0.35)",
+  boxShadow: "0 2px 10px rgba(255, 255, 255, 0.15)",
   transition: "transform 0.15s ease, opacity 0.2s ease"
 };
 
@@ -3076,10 +3058,10 @@ const communityFabStyle = {
   justifyContent: "center",
   padding: "10px 18px",
   borderRadius: "24px",
-  background: "var(--primary-color, #1d9bf0)",
-  color: "#fff",
+  background: "#ffffff",
+  color: "#000000",
   border: "none",
-  boxShadow: "0 6px 20px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(29, 155, 240, 0.4)",
+  boxShadow: "0 6px 20px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(255, 255, 255, 0.2)",
   cursor: "pointer",
   zIndex: 990,
   transition: "transform 0.15s ease, box-shadow 0.2s ease"
@@ -3192,7 +3174,7 @@ const desktopSectionHeaderStyle = {
 const desktopClearCategoryBtn = {
   background: "none",
   border: "none",
-  color: "var(--primary-color, #1d9bf0)",
+  color: "#71767b",
   fontSize: "11px",
   fontWeight: "700",
   cursor: "pointer",
@@ -3222,14 +3204,14 @@ const desktopPostBtnStyle = {
   width: "100%",
   height: "48px",
   borderRadius: "9999px",
-  background: "var(--primary-color, #1d9bf0)",
-  color: "#ffffff",
+  background: "#ffffff",
+  color: "#000000",
   border: "none",
   fontSize: "16px",
   fontWeight: "800",
   cursor: "pointer",
   marginTop: "18px",
-  boxShadow: "0 4px 16px rgba(29, 155, 240, 0.35)",
+  boxShadow: "0 2px 10px rgba(255, 255, 255, 0.15)",
   transition: "opacity 0.2s ease, transform 0.15s ease",
   boxSizing: "border-box"
 };
@@ -3338,9 +3320,9 @@ const categoryFilterTagStyle = {
   gap: "5px",
   padding: "3px 10px",
   borderRadius: "12px",
-  background: "rgba(29, 155, 240, 0.15)",
-  color: "var(--primary-color, #1d9bf0)",
-  border: "1px solid rgba(29, 155, 240, 0.3)",
+  background: "rgba(255, 255, 255, 0.12)",
+  color: "#ffffff",
+  border: "1px solid rgba(255, 255, 255, 0.2)",
   fontSize: "12px",
   fontWeight: "700",
   cursor: "pointer"
@@ -3386,7 +3368,7 @@ const desktopTabActivePillStyle = {
   height: "4px",
   width: "56px",
   borderRadius: "4px 4px 0 0",
-  backgroundColor: "var(--primary-color, #1d9bf0)"
+  backgroundColor: "#ffffff"
 };
 
 const desktopSearchActiveBanner = {
@@ -3394,14 +3376,14 @@ const desktopSearchActiveBanner = {
   alignItems: "center",
   justifyContent: "space-between",
   padding: "10px 16px",
-  background: "rgba(29, 155, 240, 0.08)",
-  borderTop: "1px solid rgba(29, 155, 240, 0.2)"
+  background: "rgba(255, 255, 255, 0.06)",
+  borderTop: "1px solid rgba(255, 255, 255, 0.12)"
 };
 
 const desktopSearchClearBtn = {
   background: "none",
   border: "none",
-  color: "var(--primary-color, #1d9bf0)",
+  color: "#ffffff",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer"
@@ -3610,7 +3592,7 @@ const desktopSideCreatorAvatarRing = {
   height: "42px",
   borderRadius: "50%",
   padding: "2px",
-  background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+  background: "rgba(255, 255, 255, 0.12)",
   flexShrink: 0
 };
 
@@ -3679,7 +3661,7 @@ const desktopCardShowMoreBtn = {
   padding: "14px 16px",
   background: "none",
   border: "none",
-  color: "var(--primary-color, #1d9bf0)",
+  color: "#ffffff",
   fontSize: "14px",
   fontWeight: "600",
   cursor: "pointer",
@@ -3727,7 +3709,7 @@ const videoContainerStyle = { position: "relative", borderRadius: "16px", overfl
 
 // 🟢 FIX: Let media scale naturally up to 600px tall
 const thumbnailImgStyle = { width: "100%", height: "auto", maxHeight: "600px", objectFit: "cover", display: "block" };
-const playOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.5)", border: "2px solid rgba(255,255,255,0.2)" };
+const playOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "48px", height: "48px", borderRadius: "50%", background: "rgba(0, 0, 0, 0.6)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,0.5)", border: "1.5px solid rgba(255,255,255,0.25)", backdropFilter: "blur(4px)" };
 const groupBadgeStyle = { position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.15)", zIndex: 11 };
 const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "12px", maxWidth: "425px" };
 const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", color: "#71767b", fontSize: "13px", cursor: "pointer", transition: "color 0.2s ease" };
@@ -3860,7 +3842,7 @@ const igAvatarRing = {
   height: "60px",
   borderRadius: "50%",
   padding: "2px",
-  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
+  background: "rgba(255, 255, 255, 0.15)",
   boxSizing: "border-box",
   display: "flex",
   alignItems: "center",
