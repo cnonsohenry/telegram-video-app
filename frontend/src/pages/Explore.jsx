@@ -1266,6 +1266,8 @@ const DesktopLeftSidebar = ({
 const DesktopRightSidebar = ({
   searchQuery,
   setSearchQuery,
+  onSearchSubmit,
+  onClear,
   onSelectTopic,
   highlights,
   highlightsLoading,
@@ -1327,13 +1329,18 @@ const DesktopRightSidebar = ({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && onSearchSubmit) {
+              onSearchSubmit(searchQuery);
+            }
+          }}
           placeholder="Search Explore & Creators..."
           style={desktopSearchInput}
         />
         {searchQuery && (
           <button
             type="button"
-            onClick={() => setSearchQuery("")}
+            onClick={() => onClear ? onClear() : setSearchQuery("")}
             style={desktopSearchInputClearBtn}
             title="Clear search"
           >
@@ -1538,7 +1545,10 @@ export default function Explore({
     return "for_you";
   });
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("q") || "";
+  });
 
   // 🟢 FOR YOU FEED STATE (Platform & legacy curated drops)
   const [forYouFeed, setForYouFeed] = useState([]);
@@ -1832,8 +1842,9 @@ export default function Explore({
   }, []);
 
   // 🟢 LOAD SEARCH FEED (Creators + Videos)
-  const loadSearchFeed = useCallback(async (pageNum = 1, isLoadMore = false, subTab = searchSubTab) => {
-    if (!searchQuery.trim()) return;
+  const loadSearchFeed = useCallback(async (pageNum = 1, isLoadMore = false, subTab = searchSubTab, queryOverride = null) => {
+    const term = (queryOverride !== null ? queryOverride : searchQuery).trim();
+    if (!term) return;
     if (isLoadMore) setSearchLoadingMore(true);
     else setSearchLoading(true);
 
@@ -1844,7 +1855,7 @@ export default function Explore({
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const res = await fetch(
-        `${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchQuery)}&limit=15&page=${pageNum}${communityParam}${typeParam}`,
+        `${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(term)}&limit=15&page=${pageNum}${communityParam}${typeParam}`,
         { headers }
       );
       if (res.ok) {
@@ -1883,6 +1894,107 @@ export default function Explore({
     setSearchLoading(false);
     setSearchLoadingMore(false);
   }, [searchQuery, activeTab, searchSubTab]);
+
+  // 🟢 SUBMIT SEARCH & SYNC BROWSER HISTORY
+  const handleSearchSubmit = useCallback((term) => {
+    const trimmed = (term || "").trim();
+    if (!trimmed) {
+      handleExitSearch();
+      return;
+    }
+
+    setSearchQuery(trimmed);
+    setSearchSubTab("all");
+    setSearchPage(1);
+    setHasMoreSearch(true);
+
+    const currentState = window.history.state || {};
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", "explore");
+    params.set("q", trimmed);
+    const targetUrl = `/?${params.toString()}`;
+
+    // If searchOpen was active or already in exploreSearch, replace history entry so back button returns to pre-search Explore
+    if (currentState.searchOpen || currentState.inExploreSearch) {
+      window.history.replaceState(
+        { ...currentState, searchOpen: false, inExploreSearch: true, searchQuery: trimmed },
+        document.title,
+        targetUrl
+      );
+    } else {
+      window.history.pushState(
+        { ...currentState, inExploreSearch: true, searchQuery: trimmed },
+        document.title,
+        targetUrl
+      );
+    }
+
+    loadSearchFeed(1, false, "all", trimmed);
+  }, [loadSearchFeed]);
+
+  // 🟢 EXIT SEARCH & RESTORE TIMELINE
+  const handleExitSearch = useCallback(() => {
+    setSearchQuery("");
+    setSearchFeed([]);
+    setSearchCreators([]);
+    setSearchSubTab("all");
+
+    const currentState = window.history.state || {};
+    if (currentState.inExploreSearch) {
+      window.history.back();
+    } else {
+      const params = new URLSearchParams(window.location.search);
+      params.delete("q");
+      const remaining = params.toString();
+      const targetUrl = remaining ? `/?${remaining}` : "/?tab=explore";
+      window.history.replaceState(
+        { ...currentState, inExploreSearch: false, searchQuery: "" },
+        document.title,
+        targetUrl
+      );
+    }
+  }, []);
+
+  // 🟢 INITIAL LOAD IF Q PARAM EXISTS ON MOUNT
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const initialQ = params.get("q");
+    if (initialQ && initialQ.trim()) {
+      loadSearchFeed(1, false, "all", initialQ.trim());
+    }
+  }, []);
+
+  // 🟢 SYNCHRONIZE BROWSER BACK/FORWARD BUTTONS WITH EXPLORE SEARCH
+  useEffect(() => {
+    const handleExplorePopState = (event) => {
+      const state = event.state || {};
+      const params = new URLSearchParams(window.location.search);
+      const urlQuery = params.get("q");
+
+      if (state.inExploreSearch && state.searchQuery) {
+        if (state.searchQuery !== searchQuery) {
+          setSearchQuery(state.searchQuery);
+          loadSearchFeed(1, false, "all", state.searchQuery);
+        }
+      } else if (urlQuery && urlQuery.trim()) {
+        if (urlQuery.trim() !== searchQuery) {
+          setSearchQuery(urlQuery.trim());
+          loadSearchFeed(1, false, "all", urlQuery.trim());
+        }
+      } else {
+        // Exited search via phone/browser back button!
+        if (searchQuery) {
+          setSearchQuery("");
+          setSearchFeed([]);
+          setSearchCreators([]);
+          setSearchSubTab("all");
+        }
+      }
+    };
+
+    window.addEventListener("popstate", handleExplorePopState);
+    return () => window.removeEventListener("popstate", handleExplorePopState);
+  }, [searchQuery, loadSearchFeed]);
 
   const handleSearchCreatorFollow = async (e, creator) => {
     e.stopPropagation();
@@ -1931,20 +2043,21 @@ export default function Explore({
   useEffect(() => {
     if (isFirstMount.current) return;
 
+    if (!searchQuery.trim()) {
+      setSearchFeed([]);
+      setSearchCreators([]);
+      setSearchSubTab("all");
+      return;
+    }
+
     const delayDebounceFn = setTimeout(() => {
       setSearchPage(1);
       setHasMoreSearch(true);
-      if (!searchQuery.trim()) {
-        setSearchFeed([]);
-        setSearchCreators([]);
-        setSearchSubTab("all");
-      } else {
-        loadSearchFeed(1, false, searchSubTab);
-      }
-    }, 600);
+      loadSearchFeed(1, false, searchSubTab);
+    }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, loadSearchFeed]);
+  }, [searchQuery, searchSubTab]);
 
   // 🟢 TAB SWITCHING HANDLER
   const handleTabSwitch = (tab) => {
@@ -2316,7 +2429,7 @@ export default function Explore({
       {/* 🟢 MOBILE VIEW (< 1024px) */}
       {!isDesktop && (
         <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
-          {/* Mobile AppHeader + Two Tabs Overlay */}
+          {/* Mobile AppHeader / Active Search Header + Two Tabs Overlay */}
           <div style={{
             position: "absolute",
             top: 0, left: 0, right: 0,
@@ -2325,17 +2438,126 @@ export default function Explore({
             transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)",
             opacity: shouldHideUI ? 0 : 1,
             pointerEvents: shouldHideUI ? "none" : "auto",
-            background: "var(--bg-color)"
+            background: "var(--bg-color, #0a0a0a)"
           }}>
-            <AppHeader 
-              isDesktop={false} 
-              searchTerm={searchQuery} 
-              setSearchTerm={setSearchQuery} 
-              user={user} 
-              onProfileClick={onProfileClick} 
-              onVideoClick={onVideoClick}
-              onCreatorClick={onCreatorClick}
-            />
+            {/* AppHeader is kept in tree for portal search modal */}
+            <div style={{ display: isSearching ? "none" : "block" }}>
+              <AppHeader 
+                isDesktop={false} 
+                searchTerm={searchQuery} 
+                setSearchTerm={setSearchQuery} 
+                onSearchSubmit={handleSearchSubmit}
+                user={user} 
+                onProfileClick={onProfileClick} 
+                onVideoClick={onVideoClick}
+                onCreatorClick={onCreatorClick}
+              />
+            </div>
+
+            {/* When in Active Search Mode: Show Mobile Active Search Bar Header */}
+            {isSearching && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "10px",
+                padding: "8px 14px",
+                background: "var(--bg-color, #0a0a0a)",
+                borderBottom: "1px solid #262626",
+                minHeight: "50px",
+                boxSizing: "border-box"
+              }}>
+                <button
+                  type="button"
+                  onClick={handleExitSearch}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#ffffff",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "6px",
+                    borderRadius: "50%",
+                    flexShrink: 0
+                  }}
+                  title="Back to Explore"
+                  aria-label="Back to Explore"
+                >
+                  <ArrowLeft size={22} />
+                </button>
+
+                <div
+                  onClick={() => window.dispatchEvent(new CustomEvent("openSearchModal"))}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    background: "#1c1c1e",
+                    borderRadius: "20px",
+                    padding: "6px 12px",
+                    border: "1px solid #333333",
+                    cursor: "pointer",
+                    gap: "8px"
+                  }}
+                >
+                  <Search size={16} color="#8e8e8e" style={{ flexShrink: 0 }} />
+                  <span style={{
+                    color: "#ffffff",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    flex: 1,
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }}>
+                    {searchQuery}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleExitSearch();
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#8e8e8e",
+                      cursor: "pointer",
+                      padding: "2px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0
+                    }}
+                    title="Clear search"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <button 
+                  type="button"
+                  onClick={onProfileClick} 
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}
+                >
+                  {user?.id || user?.email ? (
+                    <img 
+                      src={user.avatar_url || "/assets/default-avatar.png"} 
+                      alt="P" 
+                      style={{ width: "30px", height: "30px", borderRadius: "50%", border: "2px solid var(--primary-color)", objectFit: "cover" }} 
+                    />
+                  ) : (
+                    <div style={{ background: "var(--primary-color)", color: "#fff", padding: "5px 10px", borderRadius: "18px", fontSize: "11px", fontWeight: "800" }}>
+                      LOGIN
+                    </div>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Mobile Explore Tabs / Search Subtabs */}
             {isSearching ? (
@@ -2344,10 +2566,10 @@ export default function Explore({
                 alignItems: "center",
                 gap: "8px",
                 padding: "8px 16px",
-                background: "rgba(0, 0, 0, 0.75)",
-                backdropFilter: "blur(12px)",
+                background: "var(--bg-color, #0a0a0a)",
                 borderBottom: "1px solid #2f3336",
-                overflowX: "auto"
+                overflowX: "auto",
+                WebkitOverflowScrolling: "touch"
               }}>
                 {[
                   { key: "all", label: "Top" },
@@ -2362,15 +2584,17 @@ export default function Explore({
                       loadSearchFeed(1, false, tab.key);
                     }}
                     style={{
-                      padding: "5px 12px",
-                      borderRadius: "16px",
+                      padding: "6px 14px",
+                      borderRadius: "18px",
                       fontSize: "12.5px",
                       fontWeight: searchSubTab === tab.key ? "700" : "500",
                       background: searchSubTab === tab.key ? "var(--primary-color, #1d9bf0)" : "#16181c",
                       color: searchSubTab === tab.key ? "#fff" : "#71767b",
                       border: `1px solid ${searchSubTab === tab.key ? "transparent" : "#2f3336"}`,
                       cursor: "pointer",
-                      whiteSpace: "nowrap"
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      transition: "all 0.15s ease"
                     }}
                   >
                     {tab.label}
@@ -2431,7 +2655,7 @@ export default function Explore({
             style={{
               flex: 1,
               overflowY: "auto",
-              paddingTop: isSearching ? "70px" : "116px",
+              paddingTop: "114px",
               paddingBottom: shouldHideUI ? "0px" : "70px",
               transition: "padding-bottom 0.3s ease, padding-top 0.2s ease"
             }}
@@ -2609,7 +2833,7 @@ export default function Explore({
                       </span>
                       <button
                         type="button"
-                        onClick={() => setSearchQuery("")}
+                        onClick={handleExitSearch}
                         style={desktopSearchClearBtn}
                       >
                         Clear
@@ -2667,6 +2891,8 @@ export default function Explore({
             <DesktopRightSidebar
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
+              onSearchSubmit={handleSearchSubmit}
+              onClear={handleExitSearch}
               onSelectTopic={(catId) => handleSelectCategory(catId)}
               highlights={highlightVideos}
               highlightsLoading={highlightLoading}

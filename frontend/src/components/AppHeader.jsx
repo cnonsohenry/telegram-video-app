@@ -10,7 +10,8 @@ export default function AppHeader({
   user, onProfileClick, 
   suggestions = [],
   onVideoClick,
-  onCreatorClick
+  onCreatorClick,
+  onSearchSubmit
 }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const isLoggedIn = user && (user.id || user.email);
@@ -66,6 +67,14 @@ export default function AppHeader({
 
     window.addEventListener("popstate", handleSearchPopState);
     return () => window.removeEventListener("popstate", handleSearchPopState);
+  }, []);
+
+  useEffect(() => {
+    const handleOpenSearchModal = () => {
+      handleOpenSearch();
+    };
+    window.addEventListener("openSearchModal", handleOpenSearchModal);
+    return () => window.removeEventListener("openSearchModal", handleOpenSearchModal);
   }, []);
 
   useEffect(() => {
@@ -136,9 +145,17 @@ export default function AppHeader({
   };
 
   const handleKeywordClick = (keyword) => {
-    setSearchTerm(keyword);
-    setHasSubmittedSearch(true); 
-    saveSearchHistory(keyword);
+    const term = (keyword || "").trim();
+    if (!term) return;
+    setSearchTerm(term);
+    saveSearchHistory(term);
+    if (onSearchSubmit) {
+      isSearchOpenRef.current = false;
+      setIsSearchOpen(false);
+      onSearchSubmit(term);
+    } else {
+      setHasSubmittedSearch(true); 
+    }
   };
 
   const saveSearchHistory = (term) => {
@@ -150,9 +167,16 @@ export default function AppHeader({
   };
 
   const handleSearchSubmit = () => {
-    if (searchTerm.trim()) {
-      setHasSubmittedSearch(true);
-      saveSearchHistory(searchTerm);
+    const term = (searchTerm || "").trim();
+    if (term) {
+      saveSearchHistory(term);
+      if (onSearchSubmit) {
+        isSearchOpenRef.current = false;
+        setIsSearchOpen(false);
+        onSearchSubmit(term);
+      } else {
+        setHasSubmittedSearch(true);
+      }
     } else {
       handleCloseSearch();
     }
