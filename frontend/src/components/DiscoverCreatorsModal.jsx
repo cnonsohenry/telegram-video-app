@@ -411,22 +411,17 @@ export default function DiscoverCreatorsModal({
                           </div>
                           {creator.is_verified && (
                             <div style={verifiedBadgeStyle}>
-                              <CheckCircle size={12} color="#00aff0" fill="#00aff0" />
+                              <CheckCircle size={13} color="#00aff0" fill="#00aff0" />
                             </div>
                           )}
                         </div>
 
                         <div style={creatorInfoStyle}>
-                          {/* Line 1: Display Name + Category Pill */}
+                          {/* Line 1: Display Name */}
                           <div style={nameRowStyle}>
                             <span style={displayNameStyle}>
                               {creator.display_name || uname}
                             </span>
-                            {creator.creator_category && (
-                              <span style={categoryBadgeStyle}>
-                                {creator.creator_category}
-                              </span>
-                            )}
                           </div>
 
                           {/* Line 2: Bio directly next after display name, 1 line with ellipsis "..." */}
@@ -737,10 +732,10 @@ const avatarContainerStyle = {
 };
 
 const avatarRingStyle = {
-  width: "50px",
-  height: "50px",
+  width: "58px",
+  height: "58px",
   borderRadius: "50%",
-  padding: "2px",
+  padding: "2.5px",
   background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
   boxSizing: "border-box",
   display: "flex",
@@ -760,8 +755,8 @@ const avatarImgStyle = {
 
 const verifiedBadgeStyle = {
   position: "absolute",
-  bottom: "-1px",
-  right: "-1px",
+  bottom: "0px",
+  right: "0px",
   backgroundColor: "#000",
   borderRadius: "50%",
   display: "flex",
@@ -773,11 +768,11 @@ const verifiedBadgeStyle = {
 const creatorInfoStyle = {
   flex: "1 1 0%",
   minWidth: 0,
-  height: "50px",
+  height: "58px",
   display: "flex",
   flexDirection: "column",
   justifyContent: "center",
-  gap: "1.5px",
+  gap: "2px",
   overflow: "hidden"
 };
 
@@ -790,14 +785,16 @@ const nameRowStyle = {
 };
 
 const displayNameStyle = {
-  fontSize: "14px",
-  fontWeight: "700",
+  fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  fontSize: "16px",
+  fontWeight: "800",
+  letterSpacing: "-0.2px",
   color: "#ffffff",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
   minWidth: 0,
-  lineHeight: "1.2"
+  lineHeight: "1.25"
 };
 
 const categoryBadgeStyle = {

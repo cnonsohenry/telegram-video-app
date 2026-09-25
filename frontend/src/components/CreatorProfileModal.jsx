@@ -361,22 +361,25 @@ export default function CreatorProfileModal({
                     </div>
                     {creatorData?.is_verified && (
                       <div style={verifiedBadgeStyle}>
-                        <CheckCircle size={14} color="#00aff0" fill="#00aff0" />
+                        <CheckCircle size={16} color="#00aff0" fill="#00aff0" />
                       </div>
                     )}
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
-                    {/* Line 1: Display Name + Category Badge */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minWidth: 0 }}>
-                      <h1 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: "#fff", lineHeight: "1.25" }}>
+                    {/* Line 1: Display Name */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                      <h1 style={{
+                        margin: 0,
+                        fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                        fontSize: "20px",
+                        fontWeight: "800",
+                        letterSpacing: "-0.3px",
+                        color: "#fff",
+                        lineHeight: "1.25"
+                      }}>
                         {creatorData?.display_name || creatorUsername}
                       </h1>
-                      {creatorData?.creator_category && (
-                        <span style={categoryBadgeStyle}>
-                          {creatorData.creator_category}
-                        </span>
-                      )}
                     </div>
 
                     {/* Line 2: Bio directly next after display name */}
@@ -492,22 +495,25 @@ export default function CreatorProfileModal({
                   </div>
                   {creatorData?.is_verified && (
                     <div style={{ ...verifiedBadgeStyle, bottom: "4px", right: "4px" }}>
-                      <CheckCircle size={18} color="#00aff0" fill="#00aff0" />
+                      <CheckCircle size={20} color="#00aff0" fill="#00aff0" />
                     </div>
                   )}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* Line 1: Display Name + Category Badge */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
-                    <h1 style={{ fontSize: "22px", fontWeight: "700", color: "#fff", margin: 0 }}>
+                  {/* Line 1: Display Name */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                    <h1 style={{
+                      fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                      fontSize: "28px",
+                      fontWeight: "800",
+                      letterSpacing: "-0.5px",
+                      color: "#fff",
+                      margin: 0,
+                      lineHeight: "1.15"
+                    }}>
                       {creatorData?.display_name || creatorUsername}
                     </h1>
-                    {creatorData?.creator_category && (
-                      <span style={categoryBadgeStyle}>
-                        {creatorData.creator_category}
-                      </span>
-                    )}
                   </div>
 
                   {/* Line 2: Bio directly after display name */}
@@ -834,8 +840,8 @@ const storyGradientRingMobile = {
 };
 
 const avatarInnerCircleMobile = {
-  width: "72px",
-  height: "72px",
+  width: "84px",
+  height: "84px",
   borderRadius: "50%",
   border: "2.5px solid #000000",
   overflow: "hidden",
@@ -850,8 +856,8 @@ const storyGradientRingDesktop = {
 };
 
 const avatarInnerCircleDesktop = {
-  width: "116px",
-  height: "116px",
+  width: "132px",
+  height: "132px",
   borderRadius: "50%",
   border: "3.5px solid #000000",
   overflow: "hidden",
