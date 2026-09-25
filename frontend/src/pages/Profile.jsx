@@ -444,7 +444,80 @@ export default function Profile({
   };
 
   if (currentView === "settings") {
-    return <SettingsView onBack={handleCloseSettings} onLogout={onLogout} />;
+    return (
+      <>
+        <SettingsView 
+          user={user}
+          creatorStats={creatorStats}
+          onBack={handleCloseSettings} 
+          onLogout={onLogout}
+          onOpenEditProfile={() => setShowEditModal(true)}
+          onOpenCreatorStudio={() => setShowStudioModal(true)}
+          onOpenFanView={() => setShowPreviewModal(true)}
+          onOpenBecomeCreator={() => setShowSetupModal(true)}
+          onOpenUpload={() => {
+            setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+            setShowUploadModal(true);
+          }}
+          onShareProfile={handleShareProfile}
+          onUpdateUser={handleUpdateSuccess}
+        />
+
+        {/* 🌟 MODALS ACCESSIBLE DIRECTLY FROM SETTINGS */}
+        {showSetupModal && (
+          <CreatorSetupModal 
+            user={user}
+            onClose={() => setShowSetupModal(false)}
+            onSetupSuccess={(updatedUser) => {
+              handleUpdateSuccess(updatedUser);
+              setShowSetupModal(false);
+            }}
+          />
+        )}
+
+        {showEditModal && (
+          <EditProfileModal 
+            user={user}
+            onClose={() => setShowEditModal(false)}
+            onUpdateSuccess={(updatedUser) => {
+              handleUpdateSuccess(updatedUser);
+              setShowEditModal(false);
+            }}
+          />
+        )}
+
+        {showPreviewModal && user?.username && (
+          <CreatorProfileModal 
+            creatorUsername={user.username}
+            currentUser={user}
+            onClose={() => setShowPreviewModal(false)}
+            onVideoClick={handleOpenVideo}
+            setShowPaywall={setShowPaywall}
+          />
+        )}
+
+        {showStudioModal && (
+          <CreatorStudioModal 
+            isOpen={showStudioModal}
+            onClose={() => setShowStudioModal(false)}
+            user={user}
+            onUpdateUser={(updated) => {
+              handleUpdateSuccess(updated);
+            }}
+          />
+        )}
+
+        {showUploadModal && (
+          <CreatorUploadModal 
+            isOpen={showUploadModal}
+            onClose={() => setShowUploadModal(false)}
+            onSuccess={handleUploadSuccess}
+            defaultCategory={uploadDefaultCategory}
+            user={user}
+          />
+        )}
+      </>
+    );
   }
 
   const formatStat = (num) => {
@@ -499,9 +572,6 @@ export default function Profile({
               <ChevronDown size={14} color="#a8a8a8" style={{ marginLeft: "2px" }} />
             </div>
             <div style={{ display: "flex", gap: "14px", justifyContent: "flex-end", flex: 1, alignItems: "center" }}>
-              <button onClick={handleShareProfile} style={headerIconButton} title="Share Profile">
-                <Share2 size={20} color="#fff" />
-              </button>
               <button onClick={handleOpenSettings} style={headerIconButton} title="Settings">
                 <Settings size={21} color="#fff" />
               </button>
@@ -618,7 +688,7 @@ export default function Profile({
                 </div>
               </div>
 
-              {/* Action Buttons Row */}
+              {/* Action Buttons Row (Only Edit profile and Upload) */}
               <div style={mobileActionButtonsRow}>
                 <button 
                   onClick={() => setShowEditModal(true)} 
@@ -631,57 +701,26 @@ export default function Profile({
                 >
                   Edit profile
                 </button>
-                <button onClick={handleShareProfile} style={mobileActionButton}>
-                  Share profile
+                <button 
+                  onClick={() => {
+                    if (user?.is_creator) {
+                      setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                      setShowUploadModal(true);
+                    } else {
+                      setShowSetupModal(true);
+                    }
+                  }} 
+                  style={{
+                    ...mobileActionButton,
+                    backgroundColor: "#262626",
+                    color: "#ffffff",
+                    border: "1px solid #363636",
+                    fontWeight: "700"
+                  }}
+                >
+                  <Plus size={16} color="#fff" />
+                  <span>Upload</span>
                 </button>
-                {user?.is_creator ? (
-                  <>
-                    <button 
-                      onClick={() => {
-                        setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
-                        setShowUploadModal(true);
-                      }}
-                      style={{ 
-                        ...mobileActionButton, 
-                        background: "linear-gradient(135deg, #00aff0, #0088cc)", 
-                        color: "#fff", 
-                        border: "none", 
-                        fontWeight: "700",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "4px",
-                        padding: "0 12px",
-                        flex: "0 0 auto"
-                      }}
-                    >
-                      <Plus size={15} color="#fff" />
-                      <span>Upload</span>
-                    </button>
-                    <button 
-                      onClick={() => setShowStudioModal(true)} 
-                      style={{ ...mobileActionButton, flex: "0 0 auto", padding: "0 12px", color: "#FFD700", background: "rgba(255, 215, 0, 0.12)", border: "1px solid rgba(255, 215, 0, 0.3)" }}
-                      title="Creator Studio"
-                    >
-                      <Sparkles size={14} color="#FFD700" />
-                    </button>
-                    <button 
-                      onClick={() => setShowPreviewModal(true)} 
-                      style={{ ...mobileActionButton, flex: "0 0 auto", padding: "0 12px" }}
-                      title="Fan View"
-                    >
-                      <Eye size={15} color="#fff" />
-                    </button>
-                  </>
-                ) : (
-                  <button 
-                    onClick={() => setShowSetupModal(true)} 
-                    style={{ ...mobileActionButton, background: "linear-gradient(135deg, #00aff0, #0088cc)", color: "#fff", border: "none", flex: "0 0 auto", padding: "0 14px", fontWeight: "700" }}
-                  >
-                    <Sparkles size={13} color="#fff" />
-                    <span>Upgrade</span>
-                  </button>
-                )}
               </div>
 
               {/* Website Link & Location */}
@@ -809,8 +848,8 @@ export default function Profile({
                   )}
                 </div>
 
-                {/* Action Buttons */}
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
+                {/* Action Buttons (Only Edit profile, Upload Video, and Settings) */}
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
                   <button 
                     onClick={() => setShowEditModal(true)} 
                     style={{
@@ -822,52 +861,26 @@ export default function Profile({
                   >
                     Edit profile
                   </button>
-                  <button onClick={handleShareProfile} style={desktopActionButton}>
-                    Share profile
+                  <button 
+                    onClick={() => {
+                      if (user?.is_creator) {
+                        setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                        setShowUploadModal(true);
+                      } else {
+                        setShowSetupModal(true);
+                      }
+                    }} 
+                    style={{
+                      ...desktopActionButton,
+                      backgroundColor: "#262626",
+                      color: "#ffffff",
+                      border: "1px solid #363636",
+                      fontWeight: "700"
+                    }}
+                  >
+                    <Plus size={16} color="#fff" />
+                    <span>Upload Video</span>
                   </button>
-                  {user?.is_creator ? (
-                    <>
-                      <button 
-                        onClick={() => {
-                          setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
-                          setShowUploadModal(true);
-                        }}
-                        style={{ 
-                          ...desktopActionButton, 
-                          background: "linear-gradient(135deg, #00aff0, #0088cc)", 
-                          color: "#fff", 
-                          border: "none", 
-                          fontWeight: "700",
-                          boxShadow: "0 2px 10px rgba(0, 175, 240, 0.3)"
-                        }}
-                      >
-                        <Plus size={15} color="#fff" />
-                        <span>Upload Video</span>
-                      </button>
-                      <button 
-                        onClick={() => setShowStudioModal(true)} 
-                        style={{ ...desktopActionButton, background: "rgba(255, 215, 0, 0.15)", border: "1px solid rgba(255, 215, 0, 0.4)", color: "#FFD700", fontWeight: "700" }}
-                      >
-                        <Sparkles size={14} color="#FFD700" />
-                        <span>Creator Studio</span>
-                      </button>
-                      <button 
-                        onClick={() => setShowPreviewModal(true)} 
-                        style={{ ...desktopActionButton, color: "#00aff0" }}
-                      >
-                        <Eye size={14} />
-                        <span>Fan View</span>
-                      </button>
-                    </>
-                  ) : (
-                    <button 
-                      onClick={() => setShowSetupModal(true)} 
-                      style={{ ...desktopActionButton, background: "linear-gradient(135deg, #00aff0, #0088cc)", color: "#fff", border: "none", fontWeight: "700" }}
-                    >
-                      <Sparkles size={14} color="#fff" />
-                      <span>Become Creator</span>
-                    </button>
-                  )}
                   <button onClick={handleOpenSettings} style={desktopIconBtnStyle} title="Settings">
                     <Settings size={18} color="#fff" />
                   </button>
@@ -896,51 +909,6 @@ export default function Profile({
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          {/* 🌟 PROFESSIONAL DASHBOARD CARD */}
-          {user?.is_creator ? (
-            <div 
-              onClick={() => setShowStudioModal(true)} 
-              style={professionalCardStyle}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={professionalIconStyle}>
-                  <TrendingUp size={18} color="#0095f6" />
-                </div>
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: "13.5px", fontWeight: "700", color: "#fff" }}>
-                    Professional dashboard
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
-                    {creatorStats.subscribers > 0 
-                      ? `${creatorStats.subscribers} VIP fans · $${(creatorStats.subscribers * (Number(user.subscription_price) || 0)).toLocaleString()} projected MRR` 
-                      : "Insights, fan subscriptions & creator monetization tools"}
-                  </div>
-                </div>
-              </div>
-              <ChevronRight size={18} color="#737373" />
-            </div>
-          ) : (
-            <div 
-              onClick={() => setShowSetupModal(true)} 
-              style={professionalCardStyle}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ ...professionalIconStyle, background: "rgba(255, 215, 0, 0.12)" }}>
-                  <Sparkles size={18} color="#FFD700" />
-                </div>
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: "13.5px", fontWeight: "700", color: "#fff" }}>
-                    Professional tools
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
-                    Turn on creator mode to monetize with VIP subscriptions and fan tips
-                  </div>
-                </div>
-              </div>
-              <ChevronRight size={18} color="#737373" />
             </div>
           )}
 
