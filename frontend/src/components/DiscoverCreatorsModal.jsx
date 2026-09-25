@@ -338,6 +338,8 @@ export default function DiscoverCreatorsModal({
                         onCreatorClick(uname);
                       }
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                   >
                     {/* Left: Avatar with Story Ring */}
                     <div style={avatarContainerStyle}>
@@ -358,7 +360,7 @@ export default function DiscoverCreatorsModal({
 
                     {/* Middle: Name, Handle, Category, Bio */}
                     <div style={creatorInfoStyle}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
                         <span style={displayNameStyle}>
                           {creator.display_name || uname}
                         </span>
@@ -369,10 +371,12 @@ export default function DiscoverCreatorsModal({
                         )}
                       </div>
 
-                      <div style={handleStyle}>
-                        @{uname}
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, maxWidth: "100%", overflow: "hidden", marginTop: "2px" }}>
+                        <span style={handleStyle}>
+                          @{uname}
+                        </span>
                         {creator.followers_count > 0 && (
-                          <span style={{ color: "#71767b", marginLeft: "8px" }}>
+                          <span style={{ color: "#71767b", fontSize: "12px", flexShrink: 0, whiteSpace: "nowrap" }}>
                             · {creator.followers_count.toLocaleString()} {creator.followers_count === 1 ? "follower" : "followers"}
                           </span>
                         )}
@@ -386,7 +390,7 @@ export default function DiscoverCreatorsModal({
                     </div>
 
                     {/* Right: Instagram Follow Button */}
-                    <div style={{ marginLeft: "12px", flexShrink: 0 }}>
+                    <div style={{ marginLeft: "12px", flexShrink: 0, alignSelf: "flex-start" }}>
                       <button
                         onClick={(e) => handleFollowToggle(e, creator)}
                         disabled={isUpdating}
@@ -567,39 +571,39 @@ const categoryPillStyle = {
 const listContainerStyle = {
   flex: 1,
   overflowY: "auto",
-  padding: "12px 16px",
+  padding: "0",
   WebkitOverflowScrolling: "touch"
 };
 
 const gridOrListStyle = {
   display: "flex",
   flexDirection: "column",
-  gap: "10px"
+  gap: "0px"
 };
 
 const creatorRowStyle = {
   display: "flex",
-  alignItems: "center",
-  padding: "12px 14px",
-  borderRadius: "12px",
-  backgroundColor: "#181818",
-  border: "1px solid rgba(255, 255, 255, 0.06)",
+  alignItems: "flex-start",
+  padding: "14px 16px",
+  backgroundColor: "transparent",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
   cursor: "pointer",
-  transition: "background 0.2s ease, transform 0.15s ease",
-  boxSizing: "border-box"
+  transition: "background 0.15s ease",
+  boxSizing: "border-box",
+  width: "100%"
 };
 
 const avatarContainerStyle = {
   position: "relative",
-  width: "50px",
-  height: "50px",
+  width: "46px",
+  height: "46px",
   flexShrink: 0,
   marginRight: "12px"
 };
 
 const avatarRingStyle = {
-  width: "50px",
-  height: "50px",
+  width: "46px",
+  height: "46px",
   borderRadius: "50%",
   padding: "2px",
   background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
@@ -632,28 +636,33 @@ const verifiedBadgeStyle = {
 };
 
 const creatorInfoStyle = {
-  flex: 1,
+  flex: "1 1 0%",
   minWidth: 0,
   display: "flex",
   flexDirection: "column",
-  gap: "2px"
+  gap: "2px",
+  overflow: "hidden"
 };
 
 const displayNameStyle = {
-  fontSize: "14px",
+  fontSize: "14.5px",
   fontWeight: "700",
   color: "#ffffff",
   whiteSpace: "nowrap",
   overflow: "hidden",
-  textOverflow: "ellipsis"
+  textOverflow: "ellipsis",
+  minWidth: 0,
+  maxWidth: "100%",
+  display: "inline-block"
 };
 
 const handleStyle = {
-  fontSize: "12px",
+  fontSize: "12.5px",
   color: "#8e8e93",
   whiteSpace: "nowrap",
   overflow: "hidden",
-  textOverflow: "ellipsis"
+  textOverflow: "ellipsis",
+  minWidth: 0
 };
 
 const categoryBadgeStyle = {
@@ -663,27 +672,33 @@ const categoryBadgeStyle = {
   background: "rgba(0, 175, 240, 0.12)",
   padding: "1px 6px",
   borderRadius: "8px",
-  whiteSpace: "nowrap"
+  whiteSpace: "nowrap",
+  flexShrink: 0
 };
 
 const bioStyle = {
-  fontSize: "12px",
+  fontSize: "12.5px",
   color: "#a8a8a8",
-  marginTop: "3px",
-  whiteSpace: "nowrap",
+  marginTop: "4px",
+  lineHeight: "1.4",
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
   overflow: "hidden",
-  textOverflow: "ellipsis"
+  wordBreak: "break-word",
+  overflowWrap: "anywhere"
 };
 
 const followBtnStyle = {
-  padding: "7px 16px",
-  borderRadius: "8px",
+  padding: "6px 16px",
+  borderRadius: "20px",
   fontSize: "13px",
-  fontWeight: "600",
+  fontWeight: "700",
   cursor: "pointer",
   transition: "all 0.2s ease",
-  minWidth: "86px",
-  textAlign: "center"
+  minWidth: "84px",
+  textAlign: "center",
+  whiteSpace: "nowrap"
 };
 
 const emptyStateStyle = {
@@ -698,15 +713,17 @@ const emptyStateStyle = {
 const skeletonRowStyle = {
   display: "flex",
   alignItems: "center",
-  padding: "12px 14px",
-  borderRadius: "12px",
-  backgroundColor: "#181818",
-  gap: "12px"
+  padding: "14px 16px",
+  backgroundColor: "transparent",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+  gap: "12px",
+  boxSizing: "border-box",
+  width: "100%"
 };
 
 const skeletonAvatar = {
-  width: "50px",
-  height: "50px",
+  width: "46px",
+  height: "46px",
   borderRadius: "50%",
   backgroundColor: "#262626",
   flexShrink: 0

@@ -833,32 +833,43 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
       onClick={() => onCreatorClick && onCreatorClick(uname)}
       style={{
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "space-between",
         gap: "12px",
-        padding: "12px 14px",
-        background: "#16181c",
-        border: "1px solid #2f3336",
-        borderRadius: "14px",
+        padding: "14px 16px",
+        background: "transparent",
+        borderBottom: "1px solid var(--border-color, #2f3336)",
         cursor: "pointer",
-        transition: "all 0.15s ease"
+        transition: "background 0.15s ease",
+        boxSizing: "border-box",
+        width: "100%"
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#1d9bf0"; e.currentTarget.style.background = "#1a1d22"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#2f3336"; e.currentTarget.style.background = "#16181c"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--hover-bg, rgba(255, 255, 255, 0.03))"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
-        <div style={{ position: "relative", width: "48px", height: "48px", flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", minWidth: 0, flex: 1 }}>
+        <div style={{ position: "relative", width: "44px", height: "44px", flexShrink: 0 }}>
           <img
             src={creator.avatar_url || "/assets/default-avatar.png"}
-            alt={creator.display_name}
+            alt={creator.display_name || uname}
             onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
             style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "2px solid #1d9bf0" }}
           />
         </div>
 
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
-            <span style={{ fontWeight: "700", fontSize: "14.5px", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column" }}>
+          {/* Line 1: Name, Verified Badge, Category */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
+            <span style={{ 
+              fontWeight: "700", 
+              fontSize: "14.5px", 
+              color: "var(--text-primary, #ffffff)", 
+              whiteSpace: "nowrap", 
+              overflow: "hidden", 
+              textOverflow: "ellipsis",
+              minWidth: 0,
+              display: "inline-block"
+            }}>
               {creator.display_name || uname}
             </span>
             {creator.is_verified && (
@@ -869,42 +880,60 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
                 fontSize: "10px",
                 fontWeight: "600",
                 color: "var(--primary-color, #1d9bf0)",
-                background: "rgba(29, 155, 240, 0.1)",
-                padding: "2px 7px",
-                borderRadius: "10px",
-                marginLeft: "4px"
+                background: "rgba(29, 155, 240, 0.12)",
+                padding: "1px 6px",
+                borderRadius: "6px",
+                flexShrink: 0,
+                whiteSpace: "nowrap"
               }}>
                 {creator.creator_category}
               </span>
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px", fontSize: "12.5px", color: "#71767b" }}>
-            <span>@{uname}</span>
+          {/* Line 2: Handle & Stats */}
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "6px", 
+            marginTop: "2px", 
+            fontSize: "12.5px", 
+            color: "#71767b",
+            minWidth: 0,
+            maxWidth: "100%",
+            overflow: "hidden",
+            whiteSpace: "nowrap"
+          }}>
+            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              @{uname}
+            </span>
             {creator.followers_count > 0 && (
               <>
-                <span>•</span>
-                <span>{creator.followers_count.toLocaleString()} followers</span>
+                <span style={{ flexShrink: 0 }}>•</span>
+                <span style={{ flexShrink: 0 }}>{creator.followers_count.toLocaleString()} followers</span>
               </>
             )}
             {creator.video_count > 0 && (
               <>
-                <span>•</span>
-                <span>{creator.video_count.toLocaleString()} drops</span>
+                <span style={{ flexShrink: 0 }}>•</span>
+                <span style={{ flexShrink: 0 }}>{creator.video_count.toLocaleString()} drops</span>
               </>
             )}
           </div>
 
+          {/* Line 3: Bio */}
           {creator.creator_bio && (
             <p style={{
-              margin: "4px 0 0 0",
+              margin: "5px 0 0 0",
               fontSize: "12.5px",
-              color: "#a0a4a8",
+              color: "var(--text-secondary, #a0a4a8)",
               lineHeight: "1.4",
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
-              overflow: "hidden"
+              overflow: "hidden",
+              wordBreak: "break-word",
+              overflowWrap: "anywhere"
             }}>
               {creator.creator_bio}
             </p>
@@ -912,7 +941,7 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
         </div>
       </div>
 
-      <div style={{ flexShrink: 0 }}>
+      <div style={{ marginLeft: "12px", flexShrink: 0, alignSelf: "flex-start" }}>
         <button
           type="button"
           onClick={(e) => onFollowToggle(e, creator)}
@@ -926,7 +955,10 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
             transition: "all 0.15s ease",
             border: isFollowing ? "1px solid #536471" : "none",
             background: isFollowing ? "transparent" : "#eff3f4",
-            color: isFollowing ? "#eff3f4" : "#0f1419"
+            color: isFollowing ? "#eff3f4" : "#0f1419",
+            whiteSpace: "nowrap",
+            minWidth: "82px",
+            textAlign: "center"
           }}
           onMouseEnter={(e) => {
             if (isFollowing) {
@@ -2007,7 +2039,7 @@ export default function Explore({
           );
         }
         return (
-          <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div style={{ width: "100%" }}>
             {searchCreators.map(creator => (
               <SearchCreatorCard
                 key={creator.username}
@@ -2062,20 +2094,18 @@ export default function Explore({
       return (
         <div>
           {hasCreators && (
-            <div style={{
-              margin: "12px 16px 16px 16px",
-              background: "#16181c",
-              border: "1px solid #2f3336",
-              borderRadius: "16px",
-              padding: "16px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px"
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ borderBottom: "1px solid var(--border-color, #2f3336)" }}>
+              <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between", 
+                padding: "14px 16px 10px 16px",
+                borderBottom: "1px solid var(--border-color, #2f3336)",
+                background: "transparent"
+              }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <Users size={18} color="var(--primary-color, #1d9bf0)" />
-                  <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#fff" }}>
+                  <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "var(--text-primary, #ffffff)" }}>
                     Creators
                   </h3>
                 </div>
@@ -2100,7 +2130,7 @@ export default function Explore({
                 )}
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div>
                 {searchCreators.slice(0, 3).map(creator => (
                   <SearchCreatorCard
                     key={creator.username}
@@ -2118,7 +2148,14 @@ export default function Explore({
           {hasVideos && (
             <div>
               {hasCreators && (
-                <div style={{ padding: "8px 16px 4px 16px", fontSize: "13px", fontWeight: "700", color: "#8e8e8e", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                <div style={{ 
+                  padding: "12px 16px 8px 16px", 
+                  fontSize: "13px", 
+                  fontWeight: "700", 
+                  color: "#8e8e8e", 
+                  textTransform: "uppercase", 
+                  letterSpacing: "0.5px" 
+                }}>
                   Videos
                 </div>
               )}
