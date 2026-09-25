@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock } from "lucide-react";
+import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock, Users, CheckCircle } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -9,12 +9,14 @@ export default function AppHeader({
   isDesktop, searchTerm, setSearchTerm, 
   user, onProfileClick, 
   suggestions = [],
-  onVideoClick
+  onVideoClick,
+  onCreatorClick
 }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const isLoggedIn = user && (user.id || user.email);
 
   const [searchResults, setSearchResults] = useState([]);
+  const [searchCreators, setSearchCreators] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
   
@@ -75,6 +77,7 @@ export default function AppHeader({
   useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults([]);
+      setSearchCreators([]);
       setIsSearching(false);
       setHasMoreResults(false);
       setHasSubmittedSearch(false); 
@@ -86,11 +89,13 @@ export default function AppHeader({
 
     const delayDebounceFn = setTimeout(async () => {
       try {
-        // 🟢 THE FIX: Use dynamic API URL
-        const res = await fetch(`${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchTerm)}&page=1&limit=15`);
+        const token = localStorage.getItem("token");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch(`${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchTerm)}&page=1&limit=15`, { headers });
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data.videos || []);
+          setSearchCreators(data.creators || []);
           setHasMoreResults(data.hasMore);
         }
       } catch (err) {
@@ -164,6 +169,25 @@ export default function AppHeader({
       );
     }
     onVideoClick(video, e);
+  };
+
+  const handleCreatorClick = (creator, e) => {
+    e.stopPropagation();
+    saveSearchHistory(searchTerm);
+    isSearchOpenRef.current = false;
+    setIsSearchOpen(false);
+    if (window.history.state?.searchOpen) {
+      window.history.replaceState(
+        { ...(window.history.state || {}), searchOpen: false },
+        document.title
+      );
+    }
+    const uname = creator.username;
+    if (onCreatorClick) {
+      onCreatorClick(uname);
+    } else {
+      window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
+    }
   };
 
   const removeRecentSearch = (termToRemove, e) => {
@@ -295,14 +319,114 @@ export default function AppHeader({
                   {isSearching && searchPage === 1 ? "Searching..." : `Results for "${searchTerm}"`}
                 </h3>
 
-                {searchResults.length === 0 && !isSearching ? (
+                {searchResults.length === 0 && searchCreators.length === 0 && !isSearching ? (
                   <div style={{ textAlign: "center", padding: "40px 20px", color: "#888" }}>
                     <Search size={40} color="#333" style={{ marginBottom: "15px" }} />
                     <p style={{ margin: 0, fontSize: "16px", fontWeight: "600", color: "#ccc" }}>No results found</p>
-                    <p style={{ margin: "5px 0 0 0", fontSize: "13px" }}>Try searching for a different keyword or uploader.</p>
+                    <p style={{ margin: "5px 0 0 0", fontSize: "13px" }}>Try searching for a different creator, keyword or category.</p>
                   </div>
                 ) : (
                   <>
+                    {/* 🌟 MATCHING CREATORS SECTION */}
+                    {searchCreators.length > 0 && (
+                      <div style={{ marginBottom: "20px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Users size={16} color="var(--primary-color, #1d9bf0)" />
+                            <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#e7e9ea" }}>
+                              Creators
+                            </h4>
+                          </div>
+                          <span style={{ fontSize: "12px", color: "var(--primary-color, #1d9bf0)", fontWeight: "600" }}>
+                            {searchCreators.length} matched
+                          </span>
+                        </div>
+
+                        <div style={{
+                          display: "flex",
+                          gap: "10px",
+                          overflowX: "auto",
+                          paddingBottom: "8px",
+                          scrollbarWidth: "none"
+                        }}>
+                          {searchCreators.map(creator => (
+                            <div
+                              key={creator.username}
+                              onClick={(e) => handleCreatorClick(creator, e)}
+                              style={{
+                                minWidth: isDesktop ? "210px" : "175px",
+                                maxWidth: isDesktop ? "230px" : "190px",
+                                flexShrink: 0,
+                                background: "#16181c",
+                                border: "1px solid #2f3336",
+                                borderRadius: "14px",
+                                padding: "12px 10px",
+                                cursor: "pointer",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                textAlign: "center",
+                                transition: "all 0.15s ease"
+                              }}
+                            >
+                              <div style={{ position: "relative", width: "48px", height: "48px", marginBottom: "8px" }}>
+                                <img
+                                  src={creator.avatar_url || "/assets/default-avatar.png"}
+                                  alt={creator.display_name}
+                                  onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                  style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "2px solid #1d9bf0" }}
+                                />
+                              </div>
+
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px", maxWidth: "100%", justifyContent: "center" }}>
+                                <span style={{ fontWeight: "700", fontSize: "13.5px", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {creator.display_name || creator.username}
+                                </span>
+                                {creator.is_verified && (
+                                  <CheckCircle size={13} color="#1d9bf0" fill="#1d9bf0" stroke="#000" style={{ flexShrink: 0 }} />
+                                )}
+                              </div>
+
+                              <span style={{ color: "#71767b", fontSize: "12px", marginBottom: "6px" }}>
+                                @{creator.username}
+                              </span>
+
+                              {creator.creator_category && (
+                                <span style={{
+                                  fontSize: "10px",
+                                  fontWeight: "600",
+                                  color: "#aaa",
+                                  background: "rgba(255,255,255,0.06)",
+                                  padding: "2px 6px",
+                                  borderRadius: "4px",
+                                  marginBottom: "6px"
+                                }}>
+                                  {creator.creator_category}
+                                </span>
+                              )}
+
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "#71767b", marginTop: "auto" }}>
+                                {creator.followers_count > 0 && (
+                                  <span>{creator.followers_count.toLocaleString()} followers</span>
+                                )}
+                                {creator.followers_count > 0 && creator.video_count > 0 && <span>•</span>}
+                                {creator.video_count > 0 && (
+                                  <span>{creator.video_count.toLocaleString()} drops</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Videos Header if both creators and videos exist */}
+                    {searchCreators.length > 0 && searchResults.length > 0 && (
+                      <h4 style={{ margin: "10px 0 12px 0", fontSize: "13px", fontWeight: "700", color: "#8e8e8e", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Videos
+                      </h4>
+                    )}
+
                     {!hasSubmittedSearch ? (
                       <div style={suggestedContentGrid(isDesktop)}>
                         {searchResults.slice(0, 8).map(v => (

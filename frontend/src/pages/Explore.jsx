@@ -825,6 +825,131 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
   );
 };
 
+// 🌟 TWITTER/X STYLE CREATOR SEARCH CARD
+const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowing, isLoadingFollow }) => {
+  const uname = creator.username;
+  return (
+    <div
+      onClick={() => onCreatorClick && onCreatorClick(uname)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "12px",
+        padding: "12px 14px",
+        background: "#16181c",
+        border: "1px solid #2f3336",
+        borderRadius: "14px",
+        cursor: "pointer",
+        transition: "all 0.15s ease"
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#1d9bf0"; e.currentTarget.style.background = "#1a1d22"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#2f3336"; e.currentTarget.style.background = "#16181c"; }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
+        <div style={{ position: "relative", width: "48px", height: "48px", flexShrink: 0 }}>
+          <img
+            src={creator.avatar_url || "/assets/default-avatar.png"}
+            alt={creator.display_name}
+            onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+            style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "2px solid #1d9bf0" }}
+          />
+        </div>
+
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
+            <span style={{ fontWeight: "700", fontSize: "14.5px", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {creator.display_name || uname}
+            </span>
+            {creator.is_verified && (
+              <CheckCircle size={14} color="#1d9bf0" fill="#1d9bf0" stroke="#000" style={{ flexShrink: 0 }} />
+            )}
+            {creator.creator_category && (
+              <span style={{
+                fontSize: "10px",
+                fontWeight: "600",
+                color: "var(--primary-color, #1d9bf0)",
+                background: "rgba(29, 155, 240, 0.1)",
+                padding: "2px 7px",
+                borderRadius: "10px",
+                marginLeft: "4px"
+              }}>
+                {creator.creator_category}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px", fontSize: "12.5px", color: "#71767b" }}>
+            <span>@{uname}</span>
+            {creator.followers_count > 0 && (
+              <>
+                <span>•</span>
+                <span>{creator.followers_count.toLocaleString()} followers</span>
+              </>
+            )}
+            {creator.video_count > 0 && (
+              <>
+                <span>•</span>
+                <span>{creator.video_count.toLocaleString()} drops</span>
+              </>
+            )}
+          </div>
+
+          {creator.creator_bio && (
+            <p style={{
+              margin: "4px 0 0 0",
+              fontSize: "12.5px",
+              color: "#a0a4a8",
+              lineHeight: "1.4",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden"
+            }}>
+              {creator.creator_bio}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div style={{ flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={(e) => onFollowToggle(e, creator)}
+          disabled={isLoadingFollow}
+          style={{
+            padding: isFollowing ? "6px 14px" : "6px 16px",
+            borderRadius: "20px",
+            fontSize: "13px",
+            fontWeight: "700",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+            border: isFollowing ? "1px solid #536471" : "none",
+            background: isFollowing ? "transparent" : "#eff3f4",
+            color: isFollowing ? "#eff3f4" : "#0f1419"
+          }}
+          onMouseEnter={(e) => {
+            if (isFollowing) {
+              e.currentTarget.style.borderColor = "#f4212e";
+              e.currentTarget.style.color = "#f4212e";
+              e.currentTarget.innerText = "Unfollow";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (isFollowing) {
+              e.currentTarget.style.borderColor = "#536471";
+              e.currentTarget.style.color = "#eff3f4";
+              e.currentTarget.innerText = "Following";
+            }
+          }}
+        >
+          {isLoadingFollow ? "..." : (isFollowing ? "Following" : "Follow")}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // 🟢 DESKTOP LEFT SIDEBAR (Twitter/X Style: Menus, Categories, Post Button, User Profile)
 const DesktopLeftSidebar = ({
   user,
@@ -1396,12 +1521,16 @@ export default function Explore({
   const [hasMoreCommunity, setHasMoreCommunity] = useState(true);
   const [communityCount, setCommunityCount] = useState(0);
 
-  // 🟢 SEARCH FEED STATE
+  // 🟢 SEARCH FEED & CREATOR STATES
   const [searchFeed, setSearchFeed] = useState([]);
+  const [searchCreators, setSearchCreators] = useState([]);
+  const [searchSubTab, setSearchSubTab] = useState("all"); // "all" | "creators" | "videos"
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchLoadingMore, setSearchLoadingMore] = useState(false);
   const [searchPage, setSearchPage] = useState(1);
   const [hasMoreSearch, setHasMoreSearch] = useState(true);
+  const [searchFollowingMap, setSearchFollowingMap] = useState({});
+  const [searchFollowingLoading, setSearchFollowingLoading] = useState({});
 
   // 🟢 CREATOR & MODAL STATES
   const [featuredCreators, setFeaturedCreators] = useState([]);
@@ -1670,25 +1799,47 @@ export default function Explore({
     setCommunityLoadingMore(false);
   }, []);
 
-  // 🟢 LOAD SEARCH FEED
-  const loadSearchFeed = useCallback(async (pageNum = 1, isLoadMore = false) => {
+  // 🟢 LOAD SEARCH FEED (Creators + Videos)
+  const loadSearchFeed = useCallback(async (pageNum = 1, isLoadMore = false, subTab = searchSubTab) => {
     if (!searchQuery.trim()) return;
     if (isLoadMore) setSearchLoadingMore(true);
     else setSearchLoading(true);
 
     try {
       const communityParam = activeTab === "community" ? "&community=true" : "";
+      const typeParam = subTab === "creators" ? "&type=creators" : subTab === "videos" ? "&type=videos" : "&type=all";
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
       const res = await fetch(
-        activeTab === "community"
-          ? `${APP_CONFIG.apiUrl}/api/community/videos?q=${encodeURIComponent(searchQuery)}&limit=15&page=${pageNum}`
-          : `${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchQuery)}&limit=15&page=${pageNum}${communityParam}`
+        `${APP_CONFIG.apiUrl}/api/search?q=${encodeURIComponent(searchQuery)}&limit=15&page=${pageNum}${communityParam}${typeParam}`,
+        { headers }
       );
       if (res.ok) {
         const data = await res.json();
         const safeVideos = data.videos || [];
+        const safeCreators = data.creators || [];
 
-        if (isLoadMore) setSearchFeed(prev => [...prev, ...safeVideos]);
-        else setSearchFeed(safeVideos);
+        if (isLoadMore) {
+          if (subTab === "creators") {
+            setSearchCreators(prev => {
+              const ids = new Set(prev.map(c => c.username));
+              return [...prev, ...safeCreators.filter(c => !ids.has(c.username))];
+            });
+          } else {
+            setSearchFeed(prev => [...prev, ...safeVideos]);
+          }
+        } else {
+          setSearchFeed(safeVideos);
+          setSearchCreators(safeCreators);
+          const initialFollows = {};
+          safeCreators.forEach(c => {
+            if (c.username && c.is_following !== undefined) {
+              initialFollows[c.username] = Boolean(c.is_following);
+            }
+          });
+          setSearchFollowingMap(prev => ({ ...initialFollows, ...prev }));
+        }
         
         setHasMoreSearch(Boolean(data.hasMore));
         setSearchPage(pageNum);
@@ -1699,7 +1850,40 @@ export default function Explore({
 
     setSearchLoading(false);
     setSearchLoadingMore(false);
-  }, [searchQuery, activeTab]);
+  }, [searchQuery, activeTab, searchSubTab]);
+
+  const handleSearchCreatorFollow = async (e, creator) => {
+    e.stopPropagation();
+    const uname = creator.username;
+    const token = localStorage.getItem("token");
+    if (!token) return promptLogin("follow");
+    if (searchFollowingLoading[uname]) return;
+
+    const isCurrentlyFollowing = searchFollowingMap[uname] !== undefined
+      ? searchFollowingMap[uname]
+      : Boolean(creator.is_following);
+    const nextFollowing = !isCurrentlyFollowing;
+
+    setSearchFollowingMap(prev => ({ ...prev, [uname]: nextFollowing }));
+    setSearchFollowingLoading(prev => ({ ...prev, [uname]: true }));
+
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(uname)}/follow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to update follow");
+      setSearchFollowingMap(prev => ({ ...prev, [uname]: Boolean(data.following) }));
+      showToast(data.following ? `Following @${uname}` : `Unfollowed @${uname}`, data.following ? "success" : "error");
+      window.dispatchEvent(new CustomEvent("refreshUser"));
+    } catch (err) {
+      setSearchFollowingMap(prev => ({ ...prev, [uname]: isCurrentlyFollowing }));
+      showToast(err.message || "Failed to update follow", "error");
+    } finally {
+      setSearchFollowingLoading(prev => ({ ...prev, [uname]: false }));
+    }
+  };
 
   // 🟢 INITIAL FEED LOADS
   useEffect(() => {
@@ -1720,8 +1904,10 @@ export default function Explore({
       setHasMoreSearch(true);
       if (!searchQuery.trim()) {
         setSearchFeed([]);
+        setSearchCreators([]);
+        setSearchSubTab("all");
       } else {
-        loadSearchFeed(1, false);
+        loadSearchFeed(1, false, searchSubTab);
       }
     }, 600);
 
@@ -1805,26 +1991,154 @@ export default function Explore({
           </div>
         ));
       }
-      if (searchFeed.length === 0) {
+
+      const hasCreators = searchCreators.length > 0;
+      const hasVideos = searchFeed.length > 0;
+
+      // When subTab is "creators"
+      if (searchSubTab === "creators") {
+        if (!hasCreators) {
+          return (
+            <div style={{ padding: "60px 20px", textAlign: "center", color: "#71767b" }}>
+              <Users size={40} color="#333" style={{ marginBottom: "12px" }} />
+              <p style={{ margin: 0, fontSize: "16px", fontWeight: "600", color: "#ccc" }}>No creators found</p>
+              <p style={{ margin: "6px 0 0 0", fontSize: "13px" }}>No creators matched "{searchQuery}". Try searching for another name or handle.</p>
+            </div>
+          );
+        }
         return (
-          <div style={{ padding: "50px 20px", textAlign: "center", color: "#71767b" }}>
-            No videos found for "{searchQuery}". Try a different keyword.
+          <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+            {searchCreators.map(creator => (
+              <SearchCreatorCard
+                key={creator.username}
+                creator={creator}
+                onCreatorClick={onCreatorClick}
+                onFollowToggle={handleSearchCreatorFollow}
+                isFollowing={searchFollowingMap[creator.username] !== undefined ? searchFollowingMap[creator.username] : creator.is_following}
+                isLoadingFollow={Boolean(searchFollowingLoading[creator.username])}
+              />
+            ))}
           </div>
         );
       }
-      return searchFeed.map((video, idx) => (
-        <FeedPost 
-          key={`search-${video.message_id || video.id}-${idx}`}
-          video={video}
-          isLast={searchFeed.length === idx + 1}
-          lastElementRef={lastElementRef}
-          onVideoClick={onVideoClick}
-          onCommentClick={onCommentClick} 
-          isAnyModalOpen={isAnyModalOpen} 
-          onCreatorClick={onCreatorClick}
-          user={user}
-        />
-      ));
+
+      // When subTab is "videos"
+      if (searchSubTab === "videos") {
+        if (!hasVideos) {
+          return (
+            <div style={{ padding: "60px 20px", textAlign: "center", color: "#71767b" }}>
+              <Film size={40} color="#333" style={{ marginBottom: "12px" }} />
+              <p style={{ margin: 0, fontSize: "16px", fontWeight: "600", color: "#ccc" }}>No videos found</p>
+              <p style={{ margin: "6px 0 0 0", fontSize: "13px" }}>No videos found for "{searchQuery}". Try a different keyword.</p>
+            </div>
+          );
+        }
+        return searchFeed.map((video, idx) => (
+          <FeedPost 
+            key={`search-${video.message_id || video.id}-${idx}`}
+            video={video}
+            isLast={searchFeed.length === idx + 1}
+            lastElementRef={lastElementRef}
+            onVideoClick={onVideoClick}
+            onCommentClick={onCommentClick} 
+            isAnyModalOpen={isAnyModalOpen} 
+            onCreatorClick={onCreatorClick}
+            user={user}
+          />
+        ));
+      }
+
+      // Default subTab: "all"
+      if (!hasCreators && !hasVideos) {
+        return (
+          <div style={{ padding: "60px 20px", textAlign: "center", color: "#71767b" }}>
+            <Search size={40} color="#333" style={{ marginBottom: "12px" }} />
+            <p style={{ margin: 0, fontSize: "16px", fontWeight: "600", color: "#ccc" }}>No results found</p>
+            <p style={{ margin: "6px 0 0 0", fontSize: "13px" }}>No creators or videos found for "{searchQuery}". Try a different keyword, handle, or category.</p>
+          </div>
+        );
+      }
+
+      return (
+        <div>
+          {hasCreators && (
+            <div style={{
+              margin: "12px 16px 16px 16px",
+              background: "#16181c",
+              border: "1px solid #2f3336",
+              borderRadius: "16px",
+              padding: "16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Users size={18} color="var(--primary-color, #1d9bf0)" />
+                  <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#fff" }}>
+                    Creators
+                  </h3>
+                </div>
+                {searchCreators.length > 3 && (
+                  <button
+                    onClick={() => {
+                      setSearchSubTab("creators");
+                      loadSearchFeed(1, false, "creators");
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--primary-color, #1d9bf0)",
+                      fontSize: "13px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      padding: 0
+                    }}
+                  >
+                    View all ({searchCreators.length})
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {searchCreators.slice(0, 3).map(creator => (
+                  <SearchCreatorCard
+                    key={creator.username}
+                    creator={creator}
+                    onCreatorClick={onCreatorClick}
+                    onFollowToggle={handleSearchCreatorFollow}
+                    isFollowing={searchFollowingMap[creator.username] !== undefined ? searchFollowingMap[creator.username] : creator.is_following}
+                    isLoadingFollow={Boolean(searchFollowingLoading[creator.username])}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasVideos && (
+            <div>
+              {hasCreators && (
+                <div style={{ padding: "8px 16px 4px 16px", fontSize: "13px", fontWeight: "700", color: "#8e8e8e", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Videos
+                </div>
+              )}
+              {searchFeed.map((video, idx) => (
+                <FeedPost 
+                  key={`search-${video.message_id || video.id}-${idx}`}
+                  video={video}
+                  isLast={searchFeed.length === idx + 1}
+                  lastElementRef={lastElementRef}
+                  onVideoClick={onVideoClick}
+                  onCommentClick={onCommentClick} 
+                  isAnyModalOpen={isAnyModalOpen} 
+                  onCreatorClick={onCreatorClick}
+                  user={user}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      );
     }
 
     // 2. Community Tab View (Web creator uploads only)
@@ -1983,10 +2297,50 @@ export default function Explore({
               user={user} 
               onProfileClick={onProfileClick} 
               onVideoClick={onVideoClick}
+              onCreatorClick={onCreatorClick}
             />
 
-            {/* Mobile Explore Tabs */}
-            {!isSearching && (
+            {/* Mobile Explore Tabs / Search Subtabs */}
+            {isSearching ? (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 16px",
+                background: "rgba(0, 0, 0, 0.75)",
+                backdropFilter: "blur(12px)",
+                borderBottom: "1px solid #2f3336",
+                overflowX: "auto"
+              }}>
+                {[
+                  { key: "all", label: "Top" },
+                  { key: "creators", label: `Creators (${searchCreators.length})` },
+                  { key: "videos", label: `Videos (${searchFeed.length})` }
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => {
+                      setSearchSubTab(tab.key);
+                      loadSearchFeed(1, false, tab.key);
+                    }}
+                    style={{
+                      padding: "5px 12px",
+                      borderRadius: "16px",
+                      fontSize: "12.5px",
+                      fontWeight: searchSubTab === tab.key ? "700" : "500",
+                      background: searchSubTab === tab.key ? "var(--primary-color, #1d9bf0)" : "#16181c",
+                      color: searchSubTab === tab.key ? "#fff" : "#71767b",
+                      border: `1px solid ${searchSubTab === tab.key ? "transparent" : "#2f3336"}`,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
               <div style={exploreTabsNavWrapper}>
                 <div style={exploreTabsNavInner}>
                   <button
@@ -2206,17 +2560,55 @@ export default function Explore({
                 )}
 
                 {isSearching && (
-                  <div style={desktopSearchActiveBanner}>
-                    <span style={{ fontSize: "14px", color: "#e7e9ea" }}>
-                      Results for "<strong>{searchQuery}</strong>"
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery("")}
-                      style={desktopSearchClearBtn}
-                    >
-                      Clear
-                    </button>
+                  <div style={{
+                    padding: "14px 16px",
+                    borderBottom: "1px solid #2f3336",
+                    background: "rgba(0, 0, 0, 0.4)",
+                    backdropFilter: "blur(10px)"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                      <span style={{ fontSize: "15px", color: "#e7e9ea" }}>
+                        Results for "<strong>{searchQuery}</strong>"
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery("")}
+                        style={desktopSearchClearBtn}
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    {/* Sub-tab pills */}
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      {[
+                        { key: "all", label: "Top / All" },
+                        { key: "creators", label: `Creators (${searchCreators.length})` },
+                        { key: "videos", label: `Videos (${searchFeed.length})` }
+                      ].map(tab => (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => {
+                            setSearchSubTab(tab.key);
+                            loadSearchFeed(1, false, tab.key);
+                          }}
+                          style={{
+                            padding: "6px 14px",
+                            borderRadius: "20px",
+                            fontSize: "13px",
+                            fontWeight: searchSubTab === tab.key ? "700" : "500",
+                            background: searchSubTab === tab.key ? "var(--primary-color, #1d9bf0)" : "#16181c",
+                            color: searchSubTab === tab.key ? "#fff" : "#71767b",
+                            border: `1px solid ${searchSubTab === tab.key ? "transparent" : "#2f3336"}`,
+                            cursor: "pointer",
+                            transition: "all 0.15s ease"
+                          }}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

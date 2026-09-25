@@ -15,7 +15,7 @@ import { showToast } from "../utils/toast";
 const MAX_CACHE_SIZE = 4;
 const TREND_TIMEFRAMES = ["all_time", "monthly", "weekly"];
 
-export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall }) {
+export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall, onCreatorClick }) {
   // 🟢 Initialize category tab from URL search params (?cat=baddies, ?cat=knacks, etc.) or random default
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -592,6 +592,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           onProfileClick={onProfileClick} 
           suggestions={sidebarSuggestions} 
           onVideoClick={(v, e) => handleOpenVideo(v, e)} 
+          onCreatorClick={onCreatorClick}
         />
 
         {!isDesktop && (

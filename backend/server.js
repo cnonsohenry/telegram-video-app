@@ -1540,6 +1540,7 @@ const searchSchema = z.object({
   q: z.string().trim().max(100, "Search query is too long").optional().default(""), 
   page: z.coerce.number().int().positive().default(1), 
   limit: z.coerce.number().int().positive().max(50).default(12), 
+  type: z.enum(["all", "videos", "creators"]).optional().default("all"),
 });
 
 app.get("/api/search", async (req, res) => {
@@ -1552,36 +1553,142 @@ app.get("/api/search", async (req, res) => {
     return res.status(400).json({ error: errorMessage });
   }
 
-  const { q, page, limit } = parsed.data;
+  const { q, page, limit, type } = parsed.data;
 
   try {
     const apiBaseUrl = process.env.API_BASE_URL; 
     const offset = (page - 1) * limit;
 
-    const isCommunity = req.query.community === "true" || req.query.category === "community";
-    const communityCondition = isCommunity ? "v.is_community = TRUE" : "(v.is_community IS NOT TRUE)";
+    // Optional user token identification for is_following check
+    let currentUserId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const decoded = jwt.verify(authHeader.split(" ")[1], JWT_SECRET);
+        currentUserId = decoded.id || null;
+      } catch (e) {}
+    }
 
-    const searchQuery = `
-      SELECT v.*, 
-        COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
-        COALESCE(au.username, u.username, 'creator') as uploader_handle,
-        COALESCE(au.subscription_price, 0) as subscription_price
-      FROM videos v 
-      LEFT JOIN users u ON v.uploader_id = u.user_id 
-      LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
-      WHERE ${communityCondition}
-        AND (v.caption ILIKE $1 OR u.username ILIKE $1 OR au.username ILIKE $1 OR au.display_name ILIKE $1)
-      ORDER BY v.created_at DESC 
-      LIMIT $2 OFFSET $3
-    `;
+    const cleanQ = q.replace(/^@/, "").trim();
+    const searchParam = `%${cleanQ}%`;
+
+    let formattedCreators = [];
+    let formattedVideos = [];
+    let hasMore = false;
+
+    // 1. Search Creators if type is 'all' (page 1) or 'creators'
+    const shouldSearchCreators = (type === "creators" || (type === "all" && page === 1)) && cleanQ.length > 0;
     
-    const { rows } = await pool.query(searchQuery, [`%${q}%`, limit, offset]);
+    if (shouldSearchCreators) {
+      const creatorLimit = type === "creators" ? limit : 8;
+      const creatorOffset = type === "creators" ? offset : 0;
 
-    const formattedVideos = rows.map(v => mapVideoToResponse(v, apiBaseUrl));
+      const creatorQuery = `
+        SELECT u.id, u.username, u.display_name, 
+               COALESCE(NULLIF(u.avatar_url, ''), '/api/avatar?user_id=' || u.telegram_user_id) as avatar_url, 
+               u.banner_url, u.creator_category, 
+               u.creator_bio, u.is_verified, u.subscription_price, u.telegram_user_id,
+               COALESCE(followers.cnt, 0)::INT as followers_count,
+               COALESCE(v_count.cnt, 0)::INT as video_count,
+               CASE 
+                 WHEN $1::INTEGER IS NOT NULL AND my_follow.id IS NOT NULL THEN TRUE 
+                 ELSE FALSE 
+               END as is_following
+        FROM app_users u
+        LEFT JOIN (
+          SELECT creator_id, COUNT(*) as cnt 
+          FROM creator_follows 
+          GROUP BY creator_id
+        ) followers ON (followers.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND followers.creator_id = u.telegram_user_id))
+        LEFT JOIN (
+          SELECT uploader_id, COUNT(*) as cnt
+          FROM videos
+          GROUP BY uploader_id
+        ) v_count ON (v_count.uploader_id = u.id OR (u.telegram_user_id IS NOT NULL AND v_count.uploader_id = u.telegram_user_id))
+        LEFT JOIN creator_follows my_follow ON (
+          my_follow.follower_id = $1::INTEGER AND 
+          (my_follow.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND my_follow.creator_id = u.telegram_user_id))
+        )
+        WHERE (
+          u.is_creator = TRUE 
+          OR u.is_managed = TRUE
+          OR u.subscription_price > 0
+          OR u.role = 'creator'
+          OR u.email LIKE 'tg_%@internal.naijahomemade.com' 
+          OR (u.telegram_user_id IS NOT NULL AND (u.telegram_user_id > 10000000 OR u.telegram_user_id < 0))
+        )
+        AND (u.username ILIKE $2 OR u.display_name ILIKE $2 OR u.creator_category ILIKE $2 OR u.creator_bio ILIKE $2)
+        ORDER BY 
+          CASE WHEN LOWER(u.username) = LOWER($3) THEN 1
+               WHEN LOWER(u.username) LIKE LOWER($3) || '%' THEN 2
+               WHEN LOWER(COALESCE(u.display_name, '')) = LOWER($3) THEN 3
+               ELSE 4
+          END,
+          followers_count DESC, video_count DESC, u.id DESC
+        LIMIT $4 OFFSET $5
+      `;
+
+      const creatorRes = await pool.query(creatorQuery, [
+        currentUserId, 
+        searchParam, 
+        cleanQ, 
+        creatorLimit, 
+        creatorOffset
+      ]);
+
+      formattedCreators = creatorRes.rows.map(c => ({
+        id: c.id,
+        username: c.username,
+        display_name: c.display_name || c.username,
+        avatar_url: c.avatar_url && c.avatar_url.startsWith("/api/avatar") && apiBaseUrl 
+          ? `${apiBaseUrl}${c.avatar_url}` 
+          : (c.avatar_url || "/assets/default-avatar.png"),
+        banner_url: c.banner_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
+        creator_category: c.creator_category || "Model & Creator",
+        creator_bio: c.creator_bio || "",
+        is_verified: Boolean(c.is_verified),
+        subscription_price: Number(c.subscription_price || 0),
+        telegram_user_id: c.telegram_user_id,
+        followers_count: Number(c.followers_count || 0),
+        video_count: Number(c.video_count || 0),
+        is_following: Boolean(c.is_following)
+      }));
+    }
+
+    // 2. Search Videos if type is 'all' or 'videos'
+    if (type === "all" || type === "videos") {
+      const isCommunity = req.query.community === "true" || req.query.category === "community";
+      const communityCondition = isCommunity ? "v.is_community = TRUE" : "(v.is_community IS NOT TRUE)";
+
+      const searchQuery = `
+        SELECT v.*, 
+          COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+          COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.subscription_price, 0) as subscription_price
+        FROM videos v 
+        LEFT JOIN users u ON v.uploader_id = u.user_id 
+        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+        WHERE ${communityCondition}
+          AND (v.caption ILIKE $1 OR u.username ILIKE $1 OR au.username ILIKE $1 OR au.display_name ILIKE $1)
+        ORDER BY v.created_at DESC 
+        LIMIT $2 OFFSET $3
+      `;
+      
+      const { rows } = await pool.query(searchQuery, [searchParam, limit, offset]);
+      formattedVideos = rows.map(v => mapVideoToResponse(v, apiBaseUrl));
+    }
+
+    if (type === "creators") {
+      hasMore = formattedCreators.length === limit;
+    } else {
+      hasMore = formattedVideos.length === limit;
+    }
 
     res.json({ 
+      creators: formattedCreators,
       videos: formattedVideos,
-      hasMore: formattedVideos.length === limit 
+      hasMore,
+      type
     });
   } catch (error) {
     console.error("Search API Error:", error.message);

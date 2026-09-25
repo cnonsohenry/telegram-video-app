@@ -785,6 +785,7 @@ export default function App() {
             setHideFooter={handleHomeHideFooter} // 🟢 UPDATED
             setActiveVideo={setActiveVideo}
             setShowPaywall={setShowPaywall} 
+            onCreatorClick={handleOpenCreator}
           />
         </div>
 

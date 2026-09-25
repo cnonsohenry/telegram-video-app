@@ -1160,8 +1160,9 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
 
     const params = [currentUserId];
     if (search && search.trim()) {
-      params.push(`%${search.trim().toLowerCase()}%`);
-      query += ` AND (LOWER(u.username) LIKE $${params.length} OR LOWER(COALESCE(u.display_name, '')) LIKE $${params.length} OR LOWER(COALESCE(u.creator_category, '')) LIKE $${params.length})`;
+      const cleanSearch = search.replace(/^@/, '').trim().toLowerCase();
+      params.push(`%${cleanSearch}%`);
+      query += ` AND (LOWER(u.username) LIKE $${params.length} OR LOWER(COALESCE(u.display_name, '')) LIKE $${params.length} OR LOWER(COALESCE(u.creator_category, '')) LIKE $${params.length} OR LOWER(COALESCE(u.creator_bio, '')) LIKE $${params.length})`;
       query += ` ORDER BY followers_count DESC, u.id DESC`;
     } else {
       query += ` ORDER BY RANDOM()`;

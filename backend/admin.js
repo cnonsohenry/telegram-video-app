@@ -787,7 +787,8 @@ router.get("/search", authenticateToken, isAdmin, async (req, res) => {
     const { q } = req.query;
     if (!q) return res.json({ users: [], videos: [], transactions: [], creators: [] });
 
-    const searchParam = `%${q}%`;
+    const cleanQ = q.replace(/^@/, '').trim();
+    const searchParam = `%${cleanQ}%`;
 
     // Query all core tables simultaneously including creators
     const [usersRes, videosRes, txRes, creatorsRes] = await Promise.all([
@@ -812,7 +813,7 @@ router.get("/search", authenticateToken, isAdmin, async (req, res) => {
         SELECT id, username, email, display_name, avatar_url, creator_category, subscription_price, is_verified, is_creator, COALESCE(is_managed, false) as is_managed
         FROM app_users
         WHERE (is_creator = true OR subscription_price > 0 OR is_managed = true)
-          AND (username ILIKE $1 OR display_name ILIKE $1 OR creator_category ILIKE $1)
+          AND (username ILIKE $1 OR display_name ILIKE $1 OR creator_category ILIKE $1 OR creator_bio ILIKE $1)
         LIMIT 20
       `, [searchParam])
     ]);
