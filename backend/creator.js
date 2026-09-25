@@ -378,8 +378,8 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
       });
     }
 
-    const allowedPublicCategories = ["hotties", "amateur", "college", "trends", "shots", "general"];
-    let safeCategory = "hotties";
+    const allowedPublicCategories = ["community", "hotties", "amateur", "college", "trends", "shots", "general"];
+    let safeCategory = "community";
     if (isVip) {
       safeCategory = "premium";
     } else if (category && allowedPublicCategories.includes(String(category).toLowerCase().trim())) {

@@ -17,7 +17,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
 
   // Upload modal state
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadDefaultCategory, setUploadDefaultCategory] = useState("hotties");
+  const [uploadDefaultCategory, setUploadDefaultCategory] = useState("community");
   const [deletingMessageId, setDeletingMessageId] = useState(null);
 
   // Settings form state
@@ -170,7 +170,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <button 
             onClick={() => {
-              setUploadDefaultCategory("hotties");
+              setUploadDefaultCategory("community");
               setShowUploadModal(true);
             }} 
             style={{
@@ -566,7 +566,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                     </div>
                     <button
                       onClick={() => {
-                        setUploadDefaultCategory("hotties");
+                        setUploadDefaultCategory("community");
                         setShowUploadModal(true);
                       }}
                       style={{
@@ -597,7 +597,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                       </p>
                       <button
                         onClick={() => {
-                          setUploadDefaultCategory("hotties");
+                          setUploadDefaultCategory("community");
                           setShowUploadModal(true);
                         }}
                         style={{

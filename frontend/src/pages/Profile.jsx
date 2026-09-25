@@ -53,7 +53,7 @@ export default function Profile({
   const [deletedVideoIds, setDeletedVideoIds] = useState(new Set());
   const [showStudioModal, setShowStudioModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadDefaultCategory, setUploadDefaultCategory] = useState("hotties");
+  const [uploadDefaultCategory, setUploadDefaultCategory] = useState("community");
   
   // Creator Modals
   const [showSetupModal, setShowSetupModal] = useState(false);
@@ -456,7 +456,7 @@ export default function Profile({
           onOpenFanView={() => setShowPreviewModal(true)}
           onOpenBecomeCreator={() => setShowSetupModal(true)}
           onOpenUpload={() => {
-            setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+            setUploadDefaultCategory(activeTab === "premium" ? "premium" : "community");
             setShowUploadModal(true);
           }}
           onShareProfile={handleShareProfile}
@@ -704,7 +704,7 @@ export default function Profile({
                 <button 
                   onClick={() => {
                     if (user?.is_creator) {
-                      setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                      setUploadDefaultCategory(activeTab === "premium" ? "premium" : "community");
                       setShowUploadModal(true);
                     } else {
                       setShowSetupModal(true);
@@ -864,7 +864,7 @@ export default function Profile({
                   <button 
                     onClick={() => {
                       if (user?.is_creator) {
-                        setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                        setUploadDefaultCategory(activeTab === "premium" ? "premium" : "community");
                         setShowUploadModal(true);
                       } else {
                         setShowSetupModal(true);
@@ -1175,7 +1175,7 @@ export default function Profile({
                   {user?.is_creator && (activeTab === "videos" || activeTab === "premium") && (
                     <button
                       onClick={() => {
-                        setUploadDefaultCategory(activeTab === "premium" ? "premium" : "hotties");
+                        setUploadDefaultCategory(activeTab === "premium" ? "premium" : "community");
                         setShowUploadModal(true);
                       }}
                       style={{

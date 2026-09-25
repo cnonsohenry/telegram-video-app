@@ -2920,7 +2920,7 @@ export default function Explore({
             showToast("Video published to Community!", "success");
             setShowUploadModal(false);
           }}
-          defaultCategory="hotties"
+          defaultCategory="community"
           user={user}
         />
       )}

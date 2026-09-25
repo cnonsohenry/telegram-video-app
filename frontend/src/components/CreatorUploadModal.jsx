@@ -1,47 +1,130 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
-  ArrowLeft, X, UploadCloud, Film, Lock, Globe, Sparkles, AlertCircle, 
-  CheckCircle2, Loader2, Play, Trash2, ShieldCheck, Flame, 
-  GraduationCap, Zap, Video
+  X, Film, Lock, Globe, Sparkles, AlertCircle, 
+  CheckCircle2, Loader2, Video, ChevronDown, Check,
+  Image as ImageIcon
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { showToast } from "../utils/toast";
-
-const PUBLIC_CATEGORIES = [
-  { id: "hotties", label: "Hotties", icon: Flame, desc: "Trending & popular model drops" },
-  { id: "amateur", label: "Amateur", icon: Video, desc: "Real, raw, and authentic clips" },
-  { id: "college", label: "College", icon: GraduationCap, desc: "Campus vibes & lifestyle" },
-  { id: "trends", label: "Trends", icon: Zap, desc: "Viral challenges & reels" },
-  { id: "shots", label: "Shots", icon: Film, desc: "Vertical short-form highlights" }
-];
 
 export default function CreatorUploadModal({ 
   isOpen, 
   onClose, 
   onSuccess, 
-  defaultCategory = "hotties",
+  defaultCategory = "community",
   user 
 }) {
   const [videoFile, setVideoFile] = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
   const [caption, setCaption] = useState("");
   const [isVip, setIsVip] = useState(defaultCategory === "premium");
-  const [publicCategory, setPublicCategory] = useState(
-    defaultCategory !== "premium" ? defaultCategory : "hotties"
-  );
+  const [showAudienceMenu, setShowAudienceMenu] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState("idle"); // 'idle' | 'uploading' | 'processing' | 'success' | 'error'
   const [errorMessage, setErrorMessage] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // VIP Subscription Price Requirement
+  // VIP Subscription Price
   const [newPriceInput, setNewPriceInput] = useState("");
   const [savingPrice, setSavingPrice] = useState(false);
   const [currentSubPrice, setCurrentSubPrice] = useState(Number(user?.subscription_price || 0));
 
+  const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
+  const activeXhrRef = useRef(null);
+  const audienceMenuRef = useRef(null);
+
   useEffect(() => {
     setCurrentSubPrice(Number(user?.subscription_price || 0));
   }, [user?.subscription_price]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      setIsVip(defaultCategory === "premium");
+      setShowAudienceMenu(false);
+      setErrorMessage("");
+    } else {
+      document.body.style.overflow = "";
+      handleReset();
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, defaultCategory]);
+
+  // Clean up video object URL
+  useEffect(() => {
+    return () => {
+      if (videoPreviewUrl) {
+        URL.revokeObjectURL(videoPreviewUrl);
+      }
+    };
+  }, [videoPreviewUrl]);
+
+  // Close audience dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (audienceMenuRef.current && !audienceMenuRef.current.contains(e.target)) {
+        setShowAudienceMenu(false);
+      }
+    };
+    if (showAudienceMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showAudienceMenu]);
+
+  const handleReset = () => {
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+    }
+    setVideoFile(null);
+    setVideoPreviewUrl(null);
+    setCaption("");
+    setUploadProgress(0);
+    setUploadStatus("idle");
+    setErrorMessage("");
+    setShowAudienceMenu(false);
+    if (activeXhrRef.current) {
+      activeXhrRef.current.abort();
+      activeXhrRef.current = null;
+    }
+  };
+
+  const handleFileSelect = (file) => {
+    if (!file) return;
+
+    if (!file.type.startsWith("video/")) {
+      setErrorMessage("Please select a valid video file (MP4, MOV, WebM).");
+      return;
+    }
+
+    const maxSizeBytes = 500 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      setErrorMessage("File exceeds 500MB limit. Please choose a smaller video.");
+      return;
+    }
+
+    setErrorMessage("");
+    setVideoFile(file);
+
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setVideoPreviewUrl(previewUrl);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  };
 
   const handleSavePrice = async () => {
     const val = Math.max(1, Number(newPriceInput) || 0);
@@ -73,98 +156,24 @@ export default function CreatorUploadModal({
     }
   };
 
-  const fileInputRef = useRef(null);
-  const activeXhrRef = useRef(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      setIsVip(defaultCategory === "premium");
-      if (defaultCategory !== "premium") {
-        setPublicCategory(defaultCategory);
-      }
-    } else {
-      document.body.style.overflow = "";
-      handleReset();
+  const handleCaptionChange = (e) => {
+    const val = e.target.value.slice(0, 500);
+    setCaption(val);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.max(72, textareaRef.current.scrollHeight)}px`;
     }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, defaultCategory]);
-
-  // Clean up object URL when component unmounts or file changes
-  useEffect(() => {
-    return () => {
-      if (videoPreviewUrl) {
-        URL.revokeObjectURL(videoPreviewUrl);
-      }
-    };
-  }, [videoPreviewUrl]);
-
-  const handleReset = () => {
-    if (videoPreviewUrl) {
-      URL.revokeObjectURL(videoPreviewUrl);
-    }
-    setVideoFile(null);
-    setVideoPreviewUrl(null);
-    setCaption("");
-    setUploadProgress(0);
-    setUploadStatus("idle");
-    setErrorMessage("");
-    if (activeXhrRef.current) {
-      activeXhrRef.current.abort();
-      activeXhrRef.current = null;
-    }
-  };
-
-  const handleFileSelect = (file) => {
-    if (!file) return;
-
-    // Validate type
-    if (!file.type.startsWith("video/")) {
-      setErrorMessage("Please select a valid video file (MP4, MOV, WebM, etc.)");
-      return;
-    }
-
-    // Validate size (500MB max)
-    const maxSizeBytes = 500 * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      setErrorMessage("File size exceeds 500MB limit. Please compress or choose a smaller video.");
-      return;
-    }
-
-    setErrorMessage("");
-    setVideoFile(file);
-
-    if (videoPreviewUrl) {
-      URL.revokeObjectURL(videoPreviewUrl);
-    }
-    const previewUrl = URL.createObjectURL(file);
-    setVideoPreviewUrl(previewUrl);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
   };
 
   const handleUploadSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!videoFile) {
-      setErrorMessage("Please select a video to upload.");
+      setErrorMessage("Please choose a video to post.");
+      return;
+    }
+
+    if (isVip && currentSubPrice <= 0) {
+      setErrorMessage("Please set your monthly subscription fee before posting VIP Exclusive drops.");
       return;
     }
 
@@ -174,13 +183,7 @@ export default function CreatorUploadModal({
 
     const token = localStorage.getItem("token");
     if (!token) {
-      setErrorMessage("You must be logged in to upload videos.");
-      setUploadStatus("error");
-      return;
-    }
-
-    if (isVip && currentSubPrice <= 0) {
-      setErrorMessage("Please set your monthly VIP subscription price before publishing VIP Exclusive content.");
+      setErrorMessage("You must be logged in to post.");
       setUploadStatus("error");
       return;
     }
@@ -189,7 +192,7 @@ export default function CreatorUploadModal({
     formData.append("video", videoFile);
     formData.append("caption", caption.trim());
     formData.append("is_premium", isVip ? "true" : "false");
-    formData.append("category", isVip ? "premium" : publicCategory);
+    formData.append("category", isVip ? "premium" : "community");
 
     const xhr = new XMLHttpRequest();
     activeXhrRef.current = xhr;
@@ -217,11 +220,10 @@ export default function CreatorUploadModal({
               onSuccess(data.video);
             }
 
-            // Auto close modal after brief delay
             setTimeout(() => {
               onClose();
               handleReset();
-            }, 1600);
+            }, 1200);
           } catch (jsonErr) {
             setErrorMessage("Unexpected response from server.");
             setUploadStatus("error");
@@ -229,8 +231,8 @@ export default function CreatorUploadModal({
         } else {
           try {
             const errData = JSON.parse(xhr.responseText);
-            setErrorMessage(errData.error || "Failed to upload video. Please try again.");
-          } catch (e) {
+            setErrorMessage(errData.error || "Failed to post video. Please try again.");
+          } catch (err) {
             setErrorMessage(`Upload failed with status code ${xhr.status}.`);
           }
           setUploadStatus("error");
@@ -251,406 +253,415 @@ export default function CreatorUploadModal({
 
   if (!isOpen) return null;
 
+  const isUploading = uploadStatus === "uploading" || uploadStatus === "processing";
+  const canPost = videoFile && !isUploading && !(isVip && currentSubPrice <= 0);
+
   return (
-    <div style={fullscreenContainerStyle}>
-      {/* Instagram-style Top Navigation Bar */}
-      <div style={topNavStyle}>
-        {uploadStatus !== "uploading" && uploadStatus !== "processing" ? (
-          <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
-            <ArrowLeft size={24} color="#fff" />
+    <div style={backdropContainerStyle}>
+      <div style={modalWindowStyle}>
+        
+        {/* Top Header Bar (X Style) */}
+        <div style={headerBarStyle}>
+          <button 
+            type="button" 
+            onClick={onClose} 
+            disabled={isUploading}
+            style={closeIconButtonStyle}
+            aria-label="Close"
+          >
+            <X size={20} color="#ffffff" />
           </button>
-        ) : (
-          <div style={{ width: "36px" }} />
+
+          <div style={headerCenterTitleStyle}>
+            {isUploading ? (
+              <span style={{ fontSize: "14px", color: "#8e8e93", fontWeight: "600" }}>
+                {uploadStatus === "uploading" ? `Posting (${uploadProgress}%)...` : "Finalizing..."}
+              </span>
+            ) : null}
+          </div>
+
+          {/* X-Style Pill "Post" Button */}
+          <button
+            type="button"
+            onClick={handleUploadSubmit}
+            disabled={!canPost}
+            style={{
+              ...postPillButtonStyle,
+              backgroundColor: canPost ? "#ffffff" : "rgba(255, 255, 255, 0.2)",
+              color: canPost ? "#000000" : "rgba(255, 255, 255, 0.4)",
+              cursor: canPost ? "pointer" : "not-allowed"
+            }}
+          >
+            {isUploading ? (
+              <>
+                <Loader2 size={14} className="animate-spin" color="#000000" />
+                <span>Posting</span>
+              </>
+            ) : (
+              <span>Post</span>
+            )}
+          </button>
+        </div>
+
+        {/* Upload Progress Bar (Thin X-style line at top) */}
+        {isUploading && (
+          <div style={progressTrackStyle}>
+            <div 
+              style={{
+                ...progressBarFillStyle,
+                width: `${uploadProgress}%`,
+                backgroundColor: isVip ? "#FFD700" : "#ffffff"
+              }} 
+            />
+          </div>
         )}
 
-        <span style={topNavTitleStyle}>
-          {uploadStatus === "success" ? "Video Uploaded" : "New Post"}
-        </span>
+        {/* Error Banner */}
+        {errorMessage && (
+          <div style={errorBannerStyle}>
+            <AlertCircle size={16} color="#ff453a" style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>{errorMessage}</span>
+            <button 
+              type="button" 
+              onClick={() => setErrorMessage("")} 
+              style={{ background: "none", border: "none", color: "#888", cursor: "pointer", padding: "2px" }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
-        <div style={{ width: "36px" }} />
-      </div>
-
-      <div style={scrollAreaStyle}>
-        <div style={innerContentStyle}>
-          {/* Error notification */}
-          {errorMessage && (
-            <div style={errorBannerStyle}>
-              <AlertCircle size={18} color="#ff3b30" style={{ flexShrink: 0 }} />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-        {/* Upload State = Success */}
+        {/* Success Screen */}
         {uploadStatus === "success" ? (
-          <div style={successContainerStyle}>
-            <div style={successIconCircle}>
-              <CheckCircle2 size={48} color="#00d084" />
+          <div style={successWrapperStyle}>
+            <div style={successIconCircleStyle}>
+              <CheckCircle2 size={44} color="#ffffff" />
             </div>
-            <h3 style={{ color: "#fff", fontSize: "20px", fontWeight: "800", margin: "16px 0 6px 0" }}>
-              Video Uploaded!
+            <h3 style={{ color: "#ffffff", fontSize: "19px", fontWeight: "800", margin: "16px 0 6px 0" }}>
+              Your post was sent!
             </h3>
-            <p style={{ color: "#8e8e93", fontSize: "14px", margin: 0, textAlign: "center", maxWidth: "340px" }}>
-              Your {isVip ? "VIP Exclusive" : publicCategory} video has been uploaded to Cloudflare R2 and published to your profile.
+            <p style={{ color: "#71767b", fontSize: "13.5px", margin: 0, textAlign: "center" }}>
+              Published to {isVip ? "VIP Subscribers" : "Community"}.
             </p>
           </div>
         ) : (
-          <form onSubmit={handleUploadSubmit} style={formBodyStyle}>
-            {/* Step 1: File Dropzone / Video Preview */}
-            {!videoFile ? (
-              <div 
-                style={{
-                  ...dropzoneStyle,
-                  borderColor: isDragOver ? "var(--primary-color, #00aff0)" : "#333",
-                  backgroundColor: isDragOver ? "rgba(0, 175, 240, 0.08)" : "#161618"
-                }}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  accept="video/mp4,video/quicktime,video/webm,video/*" 
-                  style={{ display: "none" }} 
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleFileSelect(e.target.files[0]);
-                    }
-                  }}
-                />
-                <div style={uploadIconCircle}>
-                  <UploadCloud size={32} color="#00aff0" />
-                </div>
-                <div style={{ textAlign: "center", marginTop: "12px" }}>
-                  <div style={{ fontSize: "15px", fontWeight: "700", color: "#fff" }}>
-                    Select video to upload
-                  </div>
-                  <div style={{ fontSize: "12.5px", color: "#8e8e93", marginTop: "4px" }}>
-                    Or drag and drop video files here
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#636366", marginTop: "8px" }}>
-                    MP4, MOV, WebM up to 500MB • Cloudflare R2 High-Speed Storage
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div style={previewBoxStyle}>
-                <div style={videoWrapperStyle}>
-                  <video 
-                    src={videoPreviewUrl} 
-                    controls 
-                    playsInline 
-                    style={videoElementStyle}
+          /* Composer Body */
+          <div style={composerScrollAreaStyle}>
+            <div style={composerLayoutRowStyle}>
+              {/* Left: User Avatar */}
+              <div style={avatarColumnStyle}>
+                <div style={avatarCircleStyle}>
+                  <img 
+                    src={user?.avatar_url || "/assets/default-avatar.png"} 
+                    alt=""
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                   />
                 </div>
-                <div style={fileInfoRowStyle}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-                    <Film size={18} color="#00aff0" style={{ flexShrink: 0 }} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={fileNameStyle}>
-                        {videoFile.name}
-                      </div>
-                      <div style={{ fontSize: "11px", color: "#8e8e93" }}>
-                        {(videoFile.size / (1024 * 1024)).toFixed(1)} MB
-                      </div>
-                    </div>
-                  </div>
-                  {uploadStatus === "idle" && (
-                    <button 
-                      type="button" 
-                      onClick={handleReset} 
-                      style={removeFileBtnStyle}
-                      title="Remove file"
-                    >
-                      <Trash2 size={15} color="#ff3b30" />
-                      <span>Change</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Post Caption / Title */}
-            <div style={fieldGroupStyle}>
-              <label style={labelStyle}>Caption / Title</label>
-              <textarea 
-                value={caption}
-                onChange={(e) => setCaption(e.target.value.slice(0, 500))}
-                placeholder="What's this video about? Add tags or description..."
-                style={textareaStyle}
-                rows={3}
-                disabled={uploadStatus === "uploading" || uploadStatus === "processing"}
-              />
-              <div style={charCountStyle}>{caption.length} / 500</div>
-            </div>
-
-            {/* Step 3: Visibility & Audience (Public vs VIP Exclusive) */}
-            <div style={fieldGroupStyle}>
-              <label style={labelStyle}>Visibility & Audience</label>
-              <div style={visibilityGridStyle}>
-                {/* Public Option */}
-                <div 
-                  style={{
-                    ...visibilityCardStyle,
-                    borderColor: !isVip ? "var(--primary-color, #00aff0)" : "#2c2c2e",
-                    backgroundColor: !isVip ? "rgba(0, 175, 240, 0.08)" : "#18181a"
-                  }}
-                  onClick={() => {
-                    if (uploadStatus === "idle") setIsVip(false);
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-                    <div style={{
-                      ...visIconBox,
-                      backgroundColor: !isVip ? "rgba(0, 175, 240, 0.2)" : "#262628"
-                    }}>
-                      <Globe size={18} color={!isVip ? "#00aff0" : "#8e8e93"} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "14px", fontWeight: "700", color: "#fff" }}>
-                        Public Feed
-                      </div>
-                      <div style={{ fontSize: "11.5px", color: "#8e8e93", marginTop: "2px", lineHeight: "1.35" }}>
-                        Free for all viewers. Boosts your reach and follower growth.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* VIP Exclusive Option */}
-                <div 
-                  style={{
-                    ...visibilityCardStyle,
-                    borderColor: isVip ? "#FFD700" : "#2c2c2e",
-                    backgroundColor: isVip ? "rgba(255, 215, 0, 0.08)" : "#18181a"
-                  }}
-                  onClick={() => {
-                    if (uploadStatus === "idle") setIsVip(true);
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-                    <div style={{
-                      ...visIconBox,
-                      backgroundColor: isVip ? "rgba(255, 215, 0, 0.2)" : "#262628"
-                    }}>
-                      <Lock size={18} color={isVip ? "#FFD700" : "#8e8e93"} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "14px", fontWeight: "700", color: "#fff" }}>
-                          VIP Exclusive
-                        </span>
-                        <span style={vipTagStyle}>MONETIZED</span>
-                      </div>
-                      <div style={{ fontSize: "11.5px", color: "#8e8e93", marginTop: "2px", lineHeight: "1.35" }}>
-                        Locked for your VIP subscribers and paying members only.
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              {/* VIP Note if selected */}
-              {isVip ? (
-                currentSubPrice > 0 ? (
-                  <div style={vipNoticeBoxStyle}>
-                    <Sparkles size={14} color="#FFD700" style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: "12px", color: "#ffd700", lineHeight: "1.4" }}>
-                      Subscribers to your VIP pass (${currentSubPrice.toLocaleString()}/month) will get instant access. Free viewers will see a lock screen with a prompt to subscribe.
-                    </span>
-                  </div>
-                ) : (
-                  <div style={{
-                    ...vipNoticeBoxStyle,
-                    borderColor: "rgba(255, 59, 48, 0.4)",
-                    backgroundColor: "rgba(255, 59, 48, 0.08)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <AlertCircle size={16} color="#ff3b30" style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: "13px", fontWeight: "700", color: "#ff453a" }}>
-                        Subscription Fee Required
-                      </span>
-                    </div>
-                    <span style={{ fontSize: "12px", color: "#e0e0e0", lineHeight: "1.4" }}>
-                      You cannot post VIP Exclusive content until you set your monthly subscription price.
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-                      <input 
-                        type="number"
-                        min="1"
-                        max="1000"
-                        placeholder="e.g. 10"
-                        value={newPriceInput}
-                        onChange={(e) => setNewPriceInput(e.target.value)}
+              {/* Right: Composer Content */}
+              <div style={composerMainColumnStyle}>
+                
+                {/* Audience Selector Pill (Everyone / Community vs VIP) */}
+                <div style={{ position: "relative", marginBottom: "12px" }} ref={audienceMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isUploading) setShowAudienceMenu(!showAudienceMenu);
+                    }}
+                    style={{
+                      ...audiencePillStyle,
+                      borderColor: isVip ? "rgba(255, 215, 0, 0.4)" : "#333336",
+                      color: isVip ? "#FFD700" : "#ffffff"
+                    }}
+                  >
+                    {isVip ? (
+                      <>
+                        <Lock size={12} color="#FFD700" />
+                        <span>VIP Subscribers</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe size={12} color="#ffffff" />
+                        <span>Everyone</span>
+                      </>
+                    )}
+                    <ChevronDown size={12} color={isVip ? "#FFD700" : "#8e8e93"} />
+                  </button>
+
+                  {/* Audience Dropdown Popover */}
+                  {showAudienceMenu && (
+                    <div style={audienceDropdownStyle}>
+                      <div style={dropdownTitleStyle}>Choose audience</div>
+
+                      {/* Public Community Option */}
+                      <div 
                         style={{
-                          width: "90px",
-                          padding: "6px 10px",
-                          borderRadius: "6px",
-                          border: "1px solid #444",
-                          backgroundColor: "#1c1c1e",
-                          color: "#fff",
-                          fontSize: "13px",
-                          fontWeight: "700"
+                          ...dropdownOptionStyle,
+                          backgroundColor: !isVip ? "rgba(255, 255, 255, 0.06)" : "transparent"
                         }}
-                      />
-                      <span style={{ fontSize: "12px", color: "#aaa" }}>USD/month</span>
-                      <button
-                        type="button"
-                        onClick={handleSavePrice}
-                        disabled={savingPrice || !newPriceInput || Number(newPriceInput) <= 0}
-                        style={{
-                          marginLeft: "auto",
-                          padding: "6px 14px",
-                          borderRadius: "6px",
-                          border: "none",
-                          backgroundColor: "#FFD700",
-                          color: "#000",
-                          fontWeight: "800",
-                          fontSize: "12px",
-                          cursor: (savingPrice || !newPriceInput || Number(newPriceInput) <= 0) ? "not-allowed" : "pointer",
-                          opacity: (savingPrice || !newPriceInput || Number(newPriceInput) <= 0) ? 0.6 : 1
+                        onClick={() => {
+                          setIsVip(false);
+                          setShowAudienceMenu(false);
                         }}
                       >
-                        {savingPrice ? "Saving..." : "Set Price"}
-                      </button>
-                    </div>
-                  </div>
-                )
-              ) : (
-                /* Public category pills */
-                <div style={{ marginTop: "12px" }}>
-                  <span style={{ fontSize: "12px", color: "#8e8e93", display: "block", marginBottom: "8px" }}>
-                    Select Feed Category:
-                  </span>
-                  <div style={categoryChipsRow}>
-                    {PUBLIC_CATEGORIES.map(cat => {
-                      const Icon = cat.icon;
-                      const isSelected = publicCategory === cat.id;
-                      return (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => {
-                            if (uploadStatus === "idle") setPublicCategory(cat.id);
-                          }}
-                          style={{
-                            ...chipBtnStyle,
-                            backgroundColor: isSelected ? "rgba(0, 175, 240, 0.15)" : "#1e1e20",
-                            borderColor: isSelected ? "#00aff0" : "#333",
-                            color: isSelected ? "#00aff0" : "#ccc"
-                          }}
-                        >
-                          <Icon size={13} />
-                          <span>{cat.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
+                        <div style={dropdownOptionIconStyle}>
+                          <Globe size={18} color="#ffffff" />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff" }}>
+                            Everyone
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#71767b", marginTop: "2px" }}>
+                            Community feed • Free for all viewers
+                          </div>
+                        </div>
+                        {!isVip && <Check size={16} color="#ffffff" />}
+                      </div>
 
-            {/* Upload Progress Bar */}
-            {(uploadStatus === "uploading" || uploadStatus === "processing") && (
-              <div style={progressBoxStyle}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#ccc", marginBottom: "6px" }}>
-                  <span>
-                    {uploadStatus === "uploading" 
-                      ? `Uploading video... (${uploadProgress}%)` 
-                      : "Storing & finalizing on Cloudflare R2..."}
-                  </span>
-                  <span>{uploadProgress}%</span>
+                      {/* VIP Subscribers Option */}
+                      <div 
+                        style={{
+                          ...dropdownOptionStyle,
+                          backgroundColor: isVip ? "rgba(255, 215, 0, 0.08)" : "transparent"
+                        }}
+                        onClick={() => {
+                          setIsVip(true);
+                          setShowAudienceMenu(false);
+                        }}
+                      >
+                        <div style={{ ...dropdownOptionIconStyle, backgroundColor: "rgba(255, 215, 0, 0.15)" }}>
+                          <Lock size={18} color="#FFD700" />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff" }}>
+                              VIP Subscribers
+                            </span>
+                            <span style={monetizedBadgeStyle}>VIP</span>
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#71767b", marginTop: "2px" }}>
+                            Locked for paying members and subscribers
+                          </div>
+                        </div>
+                        {isVip && <Check size={16} color="#FFD700" />}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div style={progressBarTrack}>
+
+                {/* Seamless Borderless Textarea */}
+                <textarea
+                  ref={textareaRef}
+                  value={caption}
+                  onChange={handleCaptionChange}
+                  placeholder="What is happening?!"
+                  disabled={isUploading}
+                  rows={2}
+                  style={seamlessTextareaStyle}
+                />
+
+                {/* VIP Subscription Price Inline Requirement (if VIP selected) */}
+                {isVip && (
+                  <div style={vipInlineCardStyle}>
+                    {currentSubPrice > 0 ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <Sparkles size={14} color="#FFD700" style={{ flexShrink: 0 }} />
+                        <span style={{ fontSize: "12.5px", color: "#ffd700", lineHeight: "1.4" }}>
+                          Locked for your VIP subscribers (${currentSubPrice}/month). Free viewers will see a lock screen.
+                        </span>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <AlertCircle size={15} color="#ff453a" />
+                          <span style={{ fontSize: "13px", fontWeight: "700", color: "#ff453a" }}>
+                            Subscription Price Required
+                          </span>
+                        </div>
+                        <p style={{ fontSize: "12px", color: "#aaa", margin: 0 }}>
+                          Set your monthly pass fee to monetize this VIP video.
+                        </p>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                          <div style={currencyInputWrapperStyle}>
+                            <span style={{ color: "#71767b", fontSize: "14px" }}>$</span>
+                            <input 
+                              type="number"
+                              min="1"
+                              max="1000"
+                              placeholder="10"
+                              value={newPriceInput}
+                              onChange={(e) => setNewPriceInput(e.target.value)}
+                              style={priceInputStyle}
+                            />
+                            <span style={{ color: "#71767b", fontSize: "12px" }}>/mo</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleSavePrice}
+                            disabled={savingPrice || !newPriceInput || Number(newPriceInput) <= 0}
+                            style={savePriceBtnStyle}
+                          >
+                            {savingPrice ? "Saving..." : "Set Price"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Video Attachment Box */}
+                {!videoFile ? (
+                  /* Video Picker / Dropzone */
                   <div 
                     style={{
-                      ...progressBarFill,
-                      width: `${uploadProgress}%`,
-                      background: isVip 
-                        ? "linear-gradient(90deg, #FFD700, #ffae00)" 
-                        : "linear-gradient(90deg, #00aff0, var(--primary-color, #0088cc))"
-                    }} 
-                  />
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", fontSize: "11px", color: "#8e8e93" }}>
-                  <Loader2 size={13} className="animate-spin" color={isVip ? "#FFD700" : "#00aff0"} />
-                  <span>Please keep this window open while the upload completes.</span>
-                </div>
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-              {uploadStatus === "idle" && (
-                <button 
-                  type="button" 
-                  onClick={onClose} 
-                  style={cancelBtnStyle}
-                >
-                  Cancel
-                </button>
-              )}
-              <button
-                type="submit"
-                disabled={!videoFile || uploadStatus === "uploading" || uploadStatus === "processing" || (isVip && currentSubPrice <= 0)}
-                style={{
-                  ...submitBtnStyle,
-                  opacity: (!videoFile || uploadStatus === "uploading" || uploadStatus === "processing" || (isVip && currentSubPrice <= 0)) ? 0.6 : 1,
-                  background: isVip 
-                    ? "linear-gradient(135deg, #FFD700, #ffae00)" 
-                    : "linear-gradient(135deg, #00aff0, #0088cc)",
-                  color: isVip ? "#000" : "#fff"
-                }}
-              >
-                {uploadStatus === "uploading" ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Uploading ({uploadProgress}%)...</span>
-                  </>
-                ) : uploadStatus === "processing" ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Finalizing Video...</span>
-                  </>
+                      ...videoDropzoneStyle,
+                      borderColor: isDragOver ? "#ffffff" : "#222224",
+                      backgroundColor: isDragOver ? "rgba(255, 255, 255, 0.04)" : "#0c0c0e"
+                    }}
+                    onDrop={handleDrop}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); setIsDragOver(false); }}
+                    onClick={() => {
+                      if (!isUploading) fileInputRef.current?.click();
+                    }}
+                  >
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      accept="video/mp4,video/quicktime,video/webm,video/*" 
+                      style={{ display: "none" }} 
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleFileSelect(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    <div style={mediaUploadIconCircleStyle}>
+                      <Video size={24} color="#ffffff" />
+                    </div>
+                    <div style={{ textAlign: "center", marginTop: "10px" }}>
+                      <span style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff" }}>
+                        Add video
+                      </span>
+                      <p style={{ fontSize: "12px", color: "#71767b", margin: "4px 0 0 0" }}>
+                        Drag & drop or tap to browse • MP4, MOV, WebM up to 500MB
+                      </p>
+                    </div>
+                  </div>
                 ) : (
-                  <>
-                    <UploadCloud size={16} />
-                    <span>Publish {isVip ? "VIP Exclusive" : "Public"} Video</span>
-                  </>
+                  /* Video Attached Preview with floating X remove button */
+                  <div style={videoPreviewCardStyle}>
+                    <div style={videoPlayerWrapperStyle}>
+                      <video 
+                        src={videoPreviewUrl} 
+                        controls 
+                        playsInline 
+                        style={videoElementStyle}
+                      />
+                      
+                      {/* Floating circular 'X' remove button (top-right of media) */}
+                      {!isUploading && (
+                        <button 
+                          type="button" 
+                          onClick={handleReset} 
+                          style={floatingRemoveBtnStyle}
+                          title="Remove video"
+                          aria-label="Remove video"
+                        >
+                          <X size={16} color="#ffffff" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Metadata strip below video */}
+                    <div style={videoMetaStripStyle}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                        <Film size={14} color="#8e8e93" style={{ flexShrink: 0 }} />
+                        <span style={videoFileNameStyle}>
+                          {videoFile.name}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: "11.5px", color: "#71767b", flexShrink: 0, fontWeight: "600" }}>
+                        {(videoFile.size / (1024 * 1024)).toFixed(1)} MB
+                      </span>
+                    </div>
+                  </div>
                 )}
-              </button>
+
+                {/* Bottom Toolbar & Character Count */}
+                <div style={bottomToolbarStyle}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    {!videoFile && (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        style={toolbarIconBtnStyle}
+                        title="Add Video"
+                        aria-label="Add Video"
+                      >
+                        <Video size={19} color="#ffffff" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    {caption.length > 0 && (
+                      <span style={{ 
+                        fontSize: "12px", 
+                        color: caption.length > 450 ? "#ff453a" : "#71767b",
+                        fontWeight: "500"
+                      }}>
+                        {500 - caption.length}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+              </div>
             </div>
-          </form>
+          </div>
         )}
-        </div>
+
       </div>
     </div>
   );
 }
 
-// ---------------- STYLES ----------------
-const fullscreenContainerStyle = {
+// ---------------- AMOLED MONOCHROME X-STYLE ----------------
+const backdropContainerStyle = {
   position: "fixed",
   inset: 0,
   zIndex: 100000,
+  backgroundColor: "rgba(0, 0, 0, 0.85)",
+  backdropFilter: "blur(6px)",
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "center",
+  overflowY: "auto",
+  animation: "fadeIn 0.15s ease-out"
+};
+
+const modalWindowStyle = {
+  width: "100%",
+  maxWidth: "600px",
+  minHeight: "100vh",
   backgroundColor: "#000000",
   display: "flex",
   flexDirection: "column",
-  overflow: "hidden",
-  animation: "fadeIn 0.2s ease-out"
+  position: "relative",
+  boxSizing: "border-box"
 };
 
-const topNavStyle = {
-  height: "50px",
+const headerBarStyle = {
+  height: "54px",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
   padding: "0 16px",
-  borderBottom: "1px solid #1a1a1a",
+  borderBottom: "1px solid #1f1f1f",
   backgroundColor: "#000000",
   position: "sticky",
   top: 0,
@@ -658,117 +669,278 @@ const topNavStyle = {
   flexShrink: 0
 };
 
-const navBackBtnStyle = {
+const closeIconButtonStyle = {
   background: "none",
   border: "none",
-  color: "#fff",
+  color: "#ffffff",
   cursor: "pointer",
-  padding: "6px",
+  padding: "8px",
+  borderRadius: "50%",
   display: "flex",
-  alignItems: "center"
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "background-color 0.15s ease"
 };
 
-const topNavTitleStyle = {
-  fontSize: "16px",
+const headerCenterTitleStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center"
+};
+
+const postPillButtonStyle = {
+  border: "none",
+  borderRadius: "9999px",
+  padding: "7px 18px",
+  fontSize: "14px",
   fontWeight: "700",
-  color: "#fff",
-  letterSpacing: "0.2px"
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  letterSpacing: "0.2px",
+  transition: "all 0.15s ease"
 };
 
-const scrollAreaStyle = {
-  flex: 1,
-  overflowY: "auto",
-  WebkitOverflowScrolling: "touch",
+const progressTrackStyle = {
+  width: "100%",
+  height: "3px",
+  backgroundColor: "#1c1c1e",
+  position: "sticky",
+  top: "54px",
+  zIndex: 51,
+  overflow: "hidden"
+};
+
+const progressBarFillStyle = {
+  height: "100%",
+  transition: "width 0.2s ease"
+};
+
+const errorBannerStyle = {
+  margin: "12px 16px 0 16px",
+  padding: "10px 14px",
+  backgroundColor: "rgba(255, 69, 58, 0.12)",
+  border: "1px solid rgba(255, 69, 58, 0.25)",
+  borderRadius: "10px",
+  color: "#ff453a",
+  fontSize: "13px",
+  display: "flex",
+  alignItems: "center",
+  gap: "10px"
+};
+
+const successWrapperStyle = {
+  padding: "60px 24px",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  padding: "20px 16px 60px",
+  justifyContent: "center"
+};
+
+const successIconCircleStyle = {
+  width: "68px",
+  height: "68px",
+  borderRadius: "50%",
+  backgroundColor: "rgba(255, 255, 255, 0.1)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center"
+};
+
+const composerScrollAreaStyle = {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  padding: "16px 16px 40px",
   boxSizing: "border-box"
 };
 
-const innerContentStyle = {
-  width: "100%",
-  maxWidth: "540px",
+const composerLayoutRowStyle = {
+  display: "flex",
+  gap: "12px",
+  alignItems: "flex-start"
+};
+
+const avatarColumnStyle = {
+  flexShrink: 0
+};
+
+const avatarCircleStyle = {
+  width: "42px",
+  height: "42px",
+  borderRadius: "50%",
+  overflow: "hidden",
+  backgroundColor: "#161618",
+  border: "1px solid #262628"
+};
+
+const composerMainColumnStyle = {
+  flex: 1,
+  minWidth: 0,
   display: "flex",
   flexDirection: "column"
 };
 
-const headerIconStyle = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "10px",
-  backgroundColor: "rgba(0, 175, 240, 0.12)",
-  display: "flex",
+const audiencePillStyle = {
+  display: "inline-flex",
   alignItems: "center",
-  justifyContent: "center"
-};
-
-const titleStyle = {
-  margin: 0,
-  fontSize: "17px",
-  fontWeight: "800",
-  color: "#fff",
-  letterSpacing: "-0.2px"
-};
-
-const subtitleStyle = {
-  margin: "2px 0 0 0",
-  fontSize: "12px",
-  color: "#8e8e93"
-};
-
-const closeBtnStyle = {
-  background: "none",
-  border: "none",
+  gap: "6px",
+  background: "transparent",
+  border: "1px solid",
+  borderRadius: "9999px",
+  padding: "4px 12px",
+  fontSize: "13px",
+  fontWeight: "700",
   cursor: "pointer",
-  padding: "6px",
-  borderRadius: "50%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center"
+  transition: "all 0.15s ease"
 };
 
-const formBodyStyle = {
-  padding: "20px 22px",
+const audienceDropdownStyle = {
+  position: "absolute",
+  top: "36px",
+  left: 0,
+  zIndex: 100,
+  width: "280px",
+  backgroundColor: "#0d0d0f",
+  border: "1px solid #2a2a2c",
+  borderRadius: "14px",
+  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.8)",
+  padding: "8px",
   display: "flex",
   flexDirection: "column",
-  gap: "18px",
-  overflowY: "auto"
+  gap: "4px"
 };
 
-const dropzoneStyle = {
-  border: "2px dashed #333",
-  borderRadius: "14px",
-  padding: "28px 16px",
+const dropdownTitleStyle = {
+  padding: "6px 10px 4px",
+  fontSize: "12px",
+  fontWeight: "700",
+  color: "#71767b",
+  textTransform: "uppercase",
+  letterSpacing: "0.5px"
+};
+
+const dropdownOptionStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  padding: "8px 10px",
+  borderRadius: "10px",
+  cursor: "pointer",
+  transition: "background-color 0.15s ease"
+};
+
+const dropdownOptionIconStyle = {
+  width: "32px",
+  height: "32px",
+  borderRadius: "50%",
+  backgroundColor: "#1c1c1f",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0
+};
+
+const monetizedBadgeStyle = {
+  fontSize: "9px",
+  fontWeight: "800",
+  backgroundColor: "rgba(255, 215, 0, 0.2)",
+  color: "#FFD700",
+  padding: "1px 5px",
+  borderRadius: "4px"
+};
+
+const seamlessTextareaStyle = {
+  width: "100%",
+  backgroundColor: "transparent",
+  border: "none",
+  outline: "none",
+  color: "#ffffff",
+  fontSize: "18px",
+  lineHeight: "1.4",
+  resize: "none",
+  fontFamily: "inherit",
+  padding: "6px 0",
+  boxSizing: "border-box",
+  minHeight: "72px"
+};
+
+const vipInlineCardStyle = {
+  marginTop: "4px",
+  marginBottom: "12px",
+  padding: "10px 12px",
+  backgroundColor: "#121214",
+  border: "1px solid rgba(255, 215, 0, 0.25)",
+  borderRadius: "12px"
+};
+
+const currencyInputWrapperStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "4px",
+  backgroundColor: "#1c1c1e",
+  border: "1px solid #333336",
+  borderRadius: "8px",
+  padding: "4px 8px"
+};
+
+const priceInputStyle = {
+  width: "60px",
+  background: "none",
+  border: "none",
+  color: "#ffffff",
+  fontSize: "14px",
+  fontWeight: "700",
+  outline: "none"
+};
+
+const savePriceBtnStyle = {
+  padding: "6px 14px",
+  borderRadius: "8px",
+  border: "none",
+  backgroundColor: "#FFD700",
+  color: "#000000",
+  fontWeight: "800",
+  fontSize: "12.5px",
+  cursor: "pointer"
+};
+
+const videoDropzoneStyle = {
+  border: "1px dashed #333336",
+  borderRadius: "16px",
+  padding: "36px 16px",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
   cursor: "pointer",
-  transition: "all 0.2s ease"
+  transition: "all 0.15s ease",
+  marginTop: "8px"
 };
 
-const uploadIconCircle = {
-  width: "56px",
-  height: "56px",
+const mediaUploadIconCircleStyle = {
+  width: "48px",
+  height: "48px",
   borderRadius: "50%",
-  backgroundColor: "rgba(0, 175, 240, 0.12)",
+  backgroundColor: "#1c1c1f",
   display: "flex",
   alignItems: "center",
   justifyContent: "center"
 };
 
-const previewBoxStyle = {
-  borderRadius: "14px",
-  backgroundColor: "#18181a",
-  border: "1px solid #2c2c2e",
+const videoPreviewCardStyle = {
+  marginTop: "8px",
+  borderRadius: "16px",
+  backgroundColor: "#0a0a0c",
+  border: "1px solid #222224",
   overflow: "hidden"
 };
 
-const videoWrapperStyle = {
+const videoPlayerWrapperStyle = {
+  position: "relative",
   width: "100%",
-  maxHeight: "220px",
-  backgroundColor: "#000",
+  maxHeight: "360px",
+  backgroundColor: "#000000",
   display: "flex",
   alignItems: "center",
   justifyContent: "center"
@@ -776,212 +948,66 @@ const videoWrapperStyle = {
 
 const videoElementStyle = {
   width: "100%",
-  maxHeight: "220px",
+  maxHeight: "360px",
   objectFit: "contain"
 };
 
-const fileInfoRowStyle = {
-  padding: "10px 14px",
+const floatingRemoveBtnStyle = {
+  position: "absolute",
+  top: "10px",
+  right: "10px",
+  zIndex: 10,
+  width: "32px",
+  height: "32px",
+  borderRadius: "50%",
+  backgroundColor: "rgba(0, 0, 0, 0.75)",
+  backdropFilter: "blur(8px)",
+  border: "1px solid rgba(255, 255, 255, 0.2)",
+  color: "#ffffff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  transition: "transform 0.15s ease, background-color 0.15s ease"
+};
+
+const videoMetaStripStyle = {
+  padding: "8px 12px",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  borderTop: "1px solid #262628"
+  borderTop: "1px solid #1a1a1c",
+  backgroundColor: "#0d0d0f"
 };
 
-const fileNameStyle = {
-  fontSize: "13px",
+const videoFileNameStyle = {
+  fontSize: "12px",
   fontWeight: "600",
-  color: "#fff",
+  color: "#d0d0d0",
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
-  maxWidth: "240px"
+  maxWidth: "280px"
 };
 
-const removeFileBtnStyle = {
+const bottomToolbarStyle = {
   display: "flex",
   alignItems: "center",
-  gap: "4px",
+  justifyContent: "space-between",
+  marginTop: "14px",
+  paddingTop: "10px",
+  borderTop: "1px solid #18181a"
+};
+
+const toolbarIconBtnStyle = {
   background: "none",
   border: "none",
-  color: "#ff3b30",
-  fontSize: "12px",
-  fontWeight: "600",
+  color: "#ffffff",
   cursor: "pointer",
-  padding: "4px 8px",
-  borderRadius: "6px"
-};
-
-const fieldGroupStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "6px"
-};
-
-const labelStyle = {
-  fontSize: "13px",
-  fontWeight: "700",
-  color: "#e5e5ea"
-};
-
-const textareaStyle = {
-  width: "100%",
-  backgroundColor: "#18181a",
-  border: "1px solid #2e2e32",
-  borderRadius: "12px",
-  padding: "12px 14px",
-  color: "#fff",
-  fontSize: "13.5px",
-  outline: "none",
-  boxSizing: "border-box",
-  resize: "none",
-  fontFamily: "inherit"
-};
-
-const charCountStyle = {
-  fontSize: "11px",
-  color: "#666",
-  alignSelf: "flex-end"
-};
-
-const visibilityGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "10px"
-};
-
-const visibilityCardStyle = {
-  border: "1.5px solid",
-  borderRadius: "14px",
-  padding: "12px 14px",
-  cursor: "pointer",
-  transition: "all 0.15s ease"
-};
-
-const visIconBox = {
-  width: "32px",
-  height: "32px",
-  borderRadius: "8px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0
-};
-
-const vipTagStyle = {
-  fontSize: "9px",
-  fontWeight: "800",
-  backgroundColor: "rgba(255, 215, 0, 0.2)",
-  color: "#FFD700",
-  padding: "2px 6px",
-  borderRadius: "4px",
-  letterSpacing: "0.5px"
-};
-
-const vipNoticeBoxStyle = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: "8px",
-  marginTop: "10px",
-  padding: "10px 12px",
-  backgroundColor: "rgba(255, 215, 0, 0.08)",
-  border: "1px solid rgba(255, 215, 0, 0.2)",
-  borderRadius: "10px"
-};
-
-const categoryChipsRow = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: "8px"
-};
-
-const chipBtnStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
-  border: "1px solid",
-  borderRadius: "20px",
-  padding: "6px 12px",
-  fontSize: "12px",
-  fontWeight: "600",
-  cursor: "pointer",
-  transition: "all 0.15s ease"
-};
-
-const progressBoxStyle = {
-  padding: "12px 14px",
-  backgroundColor: "#18181a",
-  border: "1px solid #2c2c2e",
-  borderRadius: "12px"
-};
-
-const progressBarTrack = {
-  width: "100%",
-  height: "8px",
-  backgroundColor: "#2c2c2e",
-  borderRadius: "4px",
-  overflow: "hidden"
-};
-
-const progressBarFill = {
-  height: "100%",
-  transition: "width 0.2s ease"
-};
-
-const cancelBtnStyle = {
-  flex: "0 0 90px",
-  backgroundColor: "#222",
-  color: "#ccc",
-  border: "none",
-  borderRadius: "12px",
-  padding: "13px",
-  fontSize: "14px",
-  fontWeight: "700",
-  cursor: "pointer"
-};
-
-const submitBtnStyle = {
-  flex: 1,
-  border: "none",
-  borderRadius: "12px",
-  padding: "13px",
-  fontSize: "14px",
-  fontWeight: "800",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "8px",
-  transition: "all 0.15s ease"
-};
-
-const errorBannerStyle = {
-  margin: "12px 22px 0 22px",
-  padding: "10px 14px",
-  backgroundColor: "rgba(255, 59, 48, 0.12)",
-  border: "1px solid rgba(255, 59, 48, 0.3)",
-  borderRadius: "10px",
-  color: "#ff3b30",
-  fontSize: "13px",
-  display: "flex",
-  alignItems: "center",
-  gap: "8px"
-};
-
-const successContainerStyle = {
-  padding: "48px 24px",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center"
-};
-
-const successIconCircle = {
-  width: "72px",
-  height: "72px",
+  padding: "6px",
   borderRadius: "50%",
-  backgroundColor: "rgba(0, 208, 132, 0.12)",
   display: "flex",
   alignItems: "center",
-  justifyContent: "center"
+  justifyContent: "center",
+  transition: "opacity 0.15s ease"
 };
