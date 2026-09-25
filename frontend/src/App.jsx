@@ -920,9 +920,10 @@ export default function App() {
           isOpen={showDiscoverCreators}
           currentUser={user}
           onClose={handleCloseDiscoverCreators}
-          onCreatorClick={(uname) => {
-            handleOpenCreator(uname);
+          onCreatorClick={(uname, options) => {
+            handleOpenCreator(uname, options);
           }}
+          onVideoClick={handleOpenVideo}
         />
       )}
 

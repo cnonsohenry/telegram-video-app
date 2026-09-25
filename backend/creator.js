@@ -1179,6 +1179,105 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
       is_following: Boolean(c.is_following)
     }));
 
+    const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const creatorIds = creators.map(c => c.id).filter(Boolean);
+
+    let videosByCreator = {};
+    if (creatorIds.length > 0) {
+      try {
+        const sampleVideosRes = await pool.query(
+          `WITH creator_input AS (
+             SELECT 
+               u.id AS creator_id,
+               u.telegram_user_id,
+               LOWER(u.username) AS username
+             FROM app_users u
+             WHERE u.id = ANY($1::INT[])
+           ),
+           creator_matches AS (
+             SELECT 
+               ci.creator_id,
+               ci.telegram_user_id,
+               ci.username,
+               u.user_id AS telegram_user_mapping
+             FROM creator_input ci
+             LEFT JOIN users u ON LOWER(u.username) = ci.username
+           ),
+           creator_videos AS (
+             SELECT 
+               cm.creator_id,
+               v.id,
+               v.chat_id,
+               v.message_id,
+               v.cloudflare_id,
+               v.views,
+               v.likes_count,
+               v.category,
+               v.caption,
+               v.created_at,
+               ROW_NUMBER() OVER (
+                 PARTITION BY cm.creator_id 
+                 ORDER BY COALESCE(v.views, 0) DESC, COALESCE(v.likes_count, 0) DESC, v.id DESC
+               ) as rank
+             FROM creator_matches cm
+             JOIN videos v ON v.status = 'ready' AND (
+               v.uploader_id = cm.telegram_user_id
+               OR v.uploader_id = cm.creator_id
+               OR (cm.telegram_user_mapping IS NOT NULL AND v.uploader_id = cm.telegram_user_mapping)
+             )
+           )
+           SELECT * FROM creator_videos WHERE rank <= 12`,
+          [creatorIds]
+        );
+
+        for (const row of sampleVideosRes.rows) {
+          if (!videosByCreator[row.creator_id]) {
+            videosByCreator[row.creator_id] = [];
+          }
+          videosByCreator[row.creator_id].push(row);
+        }
+      } catch (vidErr) {
+        console.error("[FEATURED CREATORS SAMPLE VIDEOS ERROR]", vidErr);
+      }
+    }
+
+    creators = creators.map(c => {
+      const poolVideos = videosByCreator[c.id] || [];
+      // Pick up to 4 randomly from their most-performing videos
+      const shuffled = [...poolVideos].sort(() => 0.5 - Math.random());
+      const selected = shuffled.slice(0, 4);
+
+      const sample_videos = selected.map(v => ({
+        id: v.id,
+        chat_id: v.chat_id,
+        message_id: v.message_id,
+        cloudflare_id: v.cloudflare_id,
+        thumbnail_url: formatThumbnailUrl(v, apiBaseUrl),
+        views: Number(v.views || 0),
+        likes_count: Number(v.likes_count || 0),
+        category: v.category,
+        caption: v.caption || "",
+        is_premium: v.category === "premium",
+        subscription_price: Number(c.subscription_price || 0),
+        uploader_id: c.telegram_user_id || c.id,
+        uploader_name: c.display_name || c.username,
+        uploader_handle: c.username
+      }));
+
+      return {
+        ...c,
+        sample_videos
+      };
+    });
+
+    if (!search || !search.trim()) {
+      creators.sort((a, b) => {
+        const aCount = (a.sample_videos && a.sample_videos.length > 0) ? 1 : 0;
+        const bCount = (b.sample_videos && b.sample_videos.length > 0) ? 1 : 0;
+        return bCount - aCount;
+      });
+    }
+
     res.json({ creators });
   } catch (err) {
     console.error("[FEATURED CREATORS ERROR]", err);

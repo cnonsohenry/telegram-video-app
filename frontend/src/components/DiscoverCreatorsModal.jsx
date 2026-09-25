@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
   X, ArrowLeft, Search, CheckCircle, Sparkles, UserPlus, UserCheck, 
-  Users, Flame, Award, RefreshCw 
+  Users, Flame, Play 
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { showToast } from "../utils/toast";
@@ -10,7 +10,8 @@ export default function DiscoverCreatorsModal({
   isOpen, 
   onClose, 
   currentUser, 
-  onCreatorClick 
+  onCreatorClick,
+  onVideoClick
 }) {
   const [creators, setCreators] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -164,6 +165,41 @@ export default function DiscoverCreatorsModal({
     }
   };
 
+  // Subscribe button click handler
+  const handleSubscribeClick = (e, creator) => {
+    e.stopPropagation();
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.dispatchEvent(new CustomEvent("promptLogin", { detail: { action: "subscribe" } }));
+      return;
+    }
+    if (onCreatorClick) {
+      onCreatorClick(creator.username, { autoSubscribe: true });
+    } else {
+      window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+        detail: { username: creator.username, autoSubscribe: true } 
+      }));
+    }
+  };
+
+  // Thumbnail click handler
+  const handleThumbnailClick = (e, video) => {
+    e.stopPropagation();
+    if (onVideoClick) {
+      onVideoClick(video, e);
+    } else {
+      window.dispatchEvent(new CustomEvent("openFullscreenVideo", { detail: video }));
+    }
+  };
+
+  // Format view counts
+  const formatViews = (count) => {
+    const n = Number(count) || 0;
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K`;
+    return `${n}`;
+  };
+
   // Derive categories
   const categories = useMemo(() => {
     const set = new Set();
@@ -209,7 +245,7 @@ export default function DiscoverCreatorsModal({
         style={isDesktop ? desktopModalStyle : mobileModalStyle} 
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Sticky Header */}
+        {/* Fixed Header: ONLY Back button, Title and Close button */}
         <div style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <button 
@@ -220,14 +256,9 @@ export default function DiscoverCreatorsModal({
             >
               <ArrowLeft size={22} color="#ffffff" />
             </button>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <Sparkles size={16} color="#00aff0" />
-                <h2 style={titleStyle}>Discover Creators</h2>
-              </div>
-              <div style={subtitleStyle}>
-                {creators.length > 0 ? `${creators.length} authentic Telegram creators` : "Telegram creators"}
-              </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <Sparkles size={18} color="#00aff0" />
+              <h2 style={titleStyle}>Discover Creators</h2>
             </div>
           </div>
 
@@ -241,175 +272,271 @@ export default function DiscoverCreatorsModal({
           </button>
         </div>
 
-        {/* Search Input Bar */}
-        <div style={searchBarWrapper}>
-          <div style={searchBoxStyle}>
-            <Search size={16} color="#8e8e93" style={{ flexShrink: 0 }} />
-            <input 
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search creators, handles or categories..."
-              style={searchInputStyle}
-              autoFocus={false}
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery("")} 
-                style={clearSearchBtn}
-                title="Clear"
-              >
-                <X size={14} color="#8e8e93" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Category Pills Bar */}
-        {categories.length > 1 && (
-          <div style={categoryTrackStyle}>
-            {categories.map((cat) => {
-              const isActive = selectedCategory === cat;
-              let label = cat;
-              if (cat === "all") label = "All Creators";
-              else if (cat === "verified") label = "Verified";
-              else if (cat === "popular") label = "Popular";
-
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  style={{
-                    ...categoryPillStyle,
-                    background: isActive ? "#0095f6" : "#1f1f1f",
-                    color: isActive ? "#ffffff" : "#a8a8a8",
-                    borderColor: isActive ? "#0095f6" : "rgba(255, 255, 255, 0.1)"
-                  }}
-                >
-                  {cat === "verified" && <CheckCircle size={12} style={{ marginRight: "4px" }} />}
-                  {cat === "popular" && <Flame size={12} style={{ marginRight: "4px" }} />}
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Creator List */}
+        {/* Scrollable Container: holds search bar, categories, and creator cards */}
         <div style={listContainerStyle}>
-          {loading && creators.length === 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "10px 0" }}>
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} style={skeletonRowStyle}>
-                  <div style={skeletonAvatar} />
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <div style={{ ...skeletonLine, width: "45%" }} />
-                    <div style={{ ...skeletonLine, width: "30%", height: "10px" }} />
-                  </div>
-                  <div style={skeletonButton} />
-                </div>
-              ))}
+          {/* Search Input Bar (Scrolls with content) */}
+          <div style={searchBarWrapper}>
+            <div style={searchBoxStyle}>
+              <Search size={16} color="#8e8e93" style={{ flexShrink: 0 }} />
+              <input 
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search creators, handles or categories..."
+                style={searchInputStyle}
+                autoFocus={false}
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")} 
+                  style={clearSearchBtn}
+                  title="Clear"
+                >
+                  <X size={14} color="#8e8e93" />
+                </button>
+              )}
             </div>
-          ) : filteredCreators.length === 0 ? (
-            <div style={emptyStateStyle}>
-              <Users size={44} color="#555555" style={{ marginBottom: "12px" }} />
-              <div style={{ fontSize: "16px", fontWeight: "600", color: "#ffffff", marginBottom: "6px" }}>
-                No creators found
-              </div>
-              <div style={{ fontSize: "13px", color: "#8e8e93", maxWidth: "260px", textAlign: "center" }}>
-                {searchQuery ? `No Telegram creators matched "${searchQuery}"` : "No creators available in this category."}
-              </div>
-            </div>
-          ) : (
-            <div style={gridOrListStyle}>
-              {filteredCreators.map((creator) => {
-                const uname = creator.username;
-                const isFollowing = followingMap[uname] !== undefined 
-                  ? followingMap[uname] 
-                  : Boolean(creator.is_following);
-                const isUpdating = Boolean(loadingFollowMap[uname]);
+          </div>
+
+          {/* Category Pills Bar (Scrolls with content) */}
+          {categories.length > 1 && (
+            <div style={categoryTrackStyle}>
+              {categories.map((cat) => {
+                const isActive = selectedCategory === cat;
+                let label = cat;
+                if (cat === "all") label = "All Creators";
+                else if (cat === "verified") label = "Verified";
+                else if (cat === "popular") label = "Popular";
 
                 return (
-                  <div 
-                    key={uname} 
-                    style={creatorRowStyle}
-                    onClick={() => {
-                      if (onCreatorClick) {
-                        onCreatorClick(uname);
-                      }
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    style={{
+                      ...categoryPillStyle,
+                      background: isActive ? "#0095f6" : "rgba(255, 255, 255, 0.08)",
+                      color: isActive ? "#ffffff" : "#a8a8a8",
+                      borderColor: isActive ? "#0095f6" : "rgba(255, 255, 255, 0.1)"
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                   >
-                    {/* Left: Avatar with Story Ring */}
-                    <div style={avatarContainerStyle}>
-                      <div style={avatarRingStyle}>
-                        <img 
-                          src={creator.avatar_url || "/assets/default-avatar.png"} 
-                          alt={creator.display_name || uname}
-                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                          style={avatarImgStyle}
-                        />
-                      </div>
-                      {creator.is_verified && (
-                        <div style={verifiedBadgeStyle}>
-                          <CheckCircle size={13} color="#00aff0" fill="#00aff0" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Middle: Name, Handle, Category, Bio */}
-                    <div style={creatorInfoStyle}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
-                        <span style={displayNameStyle}>
-                          {creator.display_name || uname}
-                        </span>
-                        {creator.creator_category && (
-                          <span style={categoryBadgeStyle}>
-                            {creator.creator_category}
-                          </span>
-                        )}
-                      </div>
-
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, maxWidth: "100%", overflow: "hidden", marginTop: "2px" }}>
-                        <span style={handleStyle}>
-                          @{uname}
-                        </span>
-                        {creator.followers_count > 0 && (
-                          <span style={{ color: "#71767b", fontSize: "12px", flexShrink: 0, whiteSpace: "nowrap" }}>
-                            · {creator.followers_count.toLocaleString()} {creator.followers_count === 1 ? "follower" : "followers"}
-                          </span>
-                        )}
-                      </div>
-
-                      {creator.creator_bio && (
-                        <div style={bioStyle}>
-                          {creator.creator_bio}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right: Instagram Follow Button */}
-                    <div style={{ marginLeft: "12px", flexShrink: 0, alignSelf: "flex-start" }}>
-                      <button
-                        onClick={(e) => handleFollowToggle(e, creator)}
-                        disabled={isUpdating}
-                        style={{
-                          ...followBtnStyle,
-                          background: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
-                          color: isFollowing ? "#ffffff" : "#000000",
-                          border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none",
-                          fontWeight: "700"
-                        }}
-                      >
-                        {isFollowing ? "Following" : "Follow"}
-                      </button>
-                    </div>
-                  </div>
+                    {cat === "verified" && <CheckCircle size={12} style={{ marginRight: "4px" }} />}
+                    {cat === "popular" && <Flame size={12} style={{ marginRight: "4px" }} />}
+                    {label}
+                  </button>
                 );
               })}
             </div>
           )}
+
+          {/* Creator Cards Section */}
+          <div style={cardsContainerStyle}>
+            {loading && creators.length === 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} style={skeletonCardStyle}>
+                    {/* Top row skeleton */}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", width: "100%" }}>
+                      <div style={skeletonAvatar} />
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ ...skeletonLine, width: "45%" }} />
+                        <div style={{ ...skeletonLine, width: "25%", height: "10px" }} />
+                        <div style={{ ...skeletonLine, width: "80%", height: "10px", marginTop: "2px" }} />
+                      </div>
+                    </div>
+                    {/* 4 Thumbnails skeleton */}
+                    <div style={thumbnailsGridStyle}>
+                      {[1, 2, 3, 4].map(k => (
+                        <div key={k} style={skeletonThumbnail} />
+                      ))}
+                    </div>
+                    {/* Action buttons skeleton */}
+                    <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+                      <div style={{ ...skeletonButton, flex: 1 }} />
+                      <div style={{ ...skeletonButton, flex: 1 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredCreators.length === 0 ? (
+              <div style={emptyStateStyle}>
+                <Users size={44} color="#555555" style={{ marginBottom: "12px" }} />
+                <div style={{ fontSize: "16px", fontWeight: "600", color: "#ffffff", marginBottom: "6px" }}>
+                  No creators found
+                </div>
+                <div style={{ fontSize: "13px", color: "#8e8e93", maxWidth: "260px", textAlign: "center" }}>
+                  {searchQuery ? `No Telegram creators matched "${searchQuery}"` : "No creators available in this category."}
+                </div>
+              </div>
+            ) : (
+              <div style={gridOrListStyle}>
+                {filteredCreators.map((creator) => {
+                  const uname = creator.username;
+                  const isFollowing = followingMap[uname] !== undefined 
+                    ? followingMap[uname] 
+                    : Boolean(creator.is_following);
+                  const isUpdating = Boolean(loadingFollowMap[uname]);
+
+                  const isSubscribed = Boolean(
+                    creator.is_subscribed ||
+                    (currentUser?.subscriptions && currentUser.subscriptions.some(s => {
+                      const handle = String(s.creator_username || "").toLowerCase().replace(/^@/, "").trim();
+                      return handle === String(uname || "").toLowerCase();
+                    }))
+                  );
+
+                  const sampleVideos = Array.isArray(creator.sample_videos) ? creator.sample_videos : [];
+
+                  return (
+                    <div 
+                      key={uname} 
+                      style={creatorCardStyle}
+                      onClick={() => {
+                        if (onCreatorClick) {
+                          onCreatorClick(uname);
+                        }
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.025)"; }}
+                    >
+                      {/* Top Row: Avatar on left; Name, handle, category, bio to the right */}
+                      <div style={topRowStyle}>
+                        <div style={avatarContainerStyle}>
+                          <div style={avatarRingStyle}>
+                            <img 
+                              src={creator.avatar_url || "/assets/default-avatar.png"} 
+                              alt={creator.display_name || uname}
+                              onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                              style={avatarImgStyle}
+                            />
+                          </div>
+                          {creator.is_verified && (
+                            <div style={verifiedBadgeStyle}>
+                              <CheckCircle size={13} color="#00aff0" fill="#00aff0" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={creatorInfoStyle}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minWidth: 0 }}>
+                            <span style={displayNameStyle}>
+                              {creator.display_name || uname}
+                            </span>
+                            {creator.creator_category && (
+                              <span style={categoryBadgeStyle}>
+                                {creator.creator_category}
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, marginTop: "2px" }}>
+                            <span style={handleStyle}>
+                              @{uname}
+                            </span>
+                            {creator.followers_count > 0 && (
+                              <span style={followersCountStyle}>
+                                · {creator.followers_count.toLocaleString()} {creator.followers_count === 1 ? "follower" : "followers"}
+                              </span>
+                            )}
+                          </div>
+
+                          {creator.creator_bio && (
+                            <div style={bioStyle}>
+                              {creator.creator_bio}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Middle Row: 4 Thumbnails with NO captions randomly selected from top performing videos */}
+                      {sampleVideos.length > 0 && (
+                        <div style={thumbnailsGridStyle}>
+                          {sampleVideos.slice(0, 4).map((video, vIdx) => (
+                            <div 
+                              key={video.id || vIdx}
+                              style={thumbnailWrapperStyle}
+                              onClick={(e) => handleThumbnailClick(e, video)}
+                              title="Play video"
+                            >
+                              <img 
+                                src={video.thumbnail_url || "/assets/placeholder-thumb.jpg"} 
+                                alt=""
+                                loading="lazy"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = "/assets/placeholder-thumb.jpg";
+                                }}
+                                style={thumbnailImgStyle}
+                              />
+                              {/* Bottom gradient vignette */}
+                              <div style={thumbnailOverlayStyle} />
+
+                              {/* View count at bottom-left */}
+                              <div style={viewBadgeStyle}>
+                                <Play size={9} fill="#ffffff" color="#ffffff" style={{ marginRight: "3px" }} />
+                                <span>{formatViews(video.views)}</span>
+                              </div>
+
+                              {/* Optional premium badge */}
+                              {video.is_premium && (
+                                <div style={premiumBadgeStyle}>
+                                  ★
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Bottom Row: Follow & Subscribe buttons */}
+                      <div style={actionRowStyle}>
+                        <button
+                          onClick={(e) => handleFollowToggle(e, creator)}
+                          disabled={isUpdating}
+                          style={{
+                            ...followBtnStyle,
+                            background: isFollowing ? "rgba(255, 255, 255, 0.12)" : "#fe2c55",
+                            color: "#ffffff",
+                            border: isFollowing ? "1px solid rgba(255, 255, 255, 0.2)" : "none"
+                          }}
+                        >
+                          {isFollowing ? (
+                            <>
+                              <UserCheck size={14} style={{ marginRight: "6px" }} />
+                              Following
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus size={14} style={{ marginRight: "6px" }} />
+                              Follow
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={(e) => handleSubscribeClick(e, creator)}
+                          style={{
+                            ...subscribeBtnStyle,
+                            background: isSubscribed 
+                              ? "rgba(0, 175, 240, 0.14)" 
+                              : "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
+                            color: isSubscribed ? "#00aff0" : "#ffffff",
+                            border: isSubscribed ? "1px solid #00aff0" : "none"
+                          }}
+                        >
+                          <Sparkles size={14} style={{ marginRight: "6px" }} />
+                          {isSubscribed ? "Subscribed" : (
+                            creator.subscription_price > 0 
+                              ? `Subscribe $${creator.subscription_price}/mo` 
+                              : "Subscribe"
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <style>{`
@@ -477,21 +604,16 @@ const headerStyle = {
   padding: "16px 18px",
   borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
   background: "#121212",
-  flexShrink: 0
+  flexShrink: 0,
+  zIndex: 10
 };
 
 const titleStyle = {
-  fontSize: "16px",
+  fontSize: "16.5px",
   fontWeight: "700",
   color: "#ffffff",
   margin: 0,
   letterSpacing: "0.2px"
-};
-
-const subtitleStyle = {
-  fontSize: "11.5px",
-  color: "#8e8e93",
-  marginTop: "2px"
 };
 
 const iconBtnStyle = {
@@ -507,17 +629,23 @@ const iconBtnStyle = {
   transition: "background 0.2s ease"
 };
 
+const listContainerStyle = {
+  flex: 1,
+  overflowY: "auto",
+  padding: "0",
+  WebkitOverflowScrolling: "touch"
+};
+
 const searchBarWrapper = {
-  padding: "12px 16px 8px 16px",
-  flexShrink: 0,
-  background: "#121212"
+  padding: "14px 16px 8px 16px",
+  background: "transparent"
 };
 
 const searchBoxStyle = {
   display: "flex",
   alignItems: "center",
   gap: "10px",
-  backgroundColor: "#262626",
+  backgroundColor: "#1e1e1e",
   borderRadius: "10px",
   padding: "9px 14px",
   border: "1px solid rgba(255, 255, 255, 0.08)"
@@ -550,7 +678,6 @@ const categoryTrackStyle = {
   padding: "6px 16px 12px 16px",
   scrollbarWidth: "none",
   msOverflowStyle: "none",
-  flexShrink: 0,
   borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
 };
 
@@ -568,42 +695,48 @@ const categoryPillStyle = {
   flexShrink: 0
 };
 
-const listContainerStyle = {
-  flex: 1,
-  overflowY: "auto",
-  padding: "0",
-  WebkitOverflowScrolling: "touch"
+const cardsContainerStyle = {
+  padding: "14px 16px 28px 16px"
 };
 
 const gridOrListStyle = {
   display: "flex",
   flexDirection: "column",
-  gap: "0px"
+  gap: "12px"
 };
 
-const creatorRowStyle = {
+const creatorCardStyle = {
+  backgroundColor: "rgba(255, 255, 255, 0.025)",
+  border: "1px solid rgba(255, 255, 255, 0.07)",
+  borderRadius: "14px",
+  padding: "14px 14px",
   display: "flex",
-  alignItems: "flex-start",
-  padding: "14px 16px",
-  backgroundColor: "transparent",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+  flexDirection: "column",
+  gap: "12px",
   cursor: "pointer",
-  transition: "background 0.15s ease",
+  transition: "background-color 0.15s ease, border-color 0.15s ease",
   boxSizing: "border-box",
   width: "100%"
 };
 
+const topRowStyle = {
+  display: "flex",
+  alignItems: "flex-start",
+  width: "100%",
+  boxSizing: "border-box"
+};
+
 const avatarContainerStyle = {
   position: "relative",
-  width: "46px",
-  height: "46px",
+  width: "48px",
+  height: "48px",
   flexShrink: 0,
   marginRight: "12px"
 };
 
 const avatarRingStyle = {
-  width: "46px",
-  height: "46px",
+  width: "48px",
+  height: "48px",
   borderRadius: "50%",
   padding: "2px",
   background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
@@ -665,6 +798,13 @@ const handleStyle = {
   minWidth: 0
 };
 
+const followersCountStyle = {
+  color: "#71767b",
+  fontSize: "12px",
+  flexShrink: 0,
+  whiteSpace: "nowrap"
+};
+
 const categoryBadgeStyle = {
   fontSize: "10px",
   fontWeight: "600",
@@ -689,16 +829,101 @@ const bioStyle = {
   overflowWrap: "anywhere"
 };
 
+const thumbnailsGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, 1fr)",
+  gap: "7px",
+  width: "100%",
+  boxSizing: "border-box"
+};
+
+const thumbnailWrapperStyle = {
+  position: "relative",
+  aspectRatio: "3/4",
+  borderRadius: "8px",
+  overflow: "hidden",
+  backgroundColor: "#1c1c1f",
+  cursor: "pointer",
+  transition: "transform 0.15s ease, filter 0.15s ease",
+  userSelect: "none"
+};
+
+const thumbnailImgStyle = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+  display: "block"
+};
+
+const thumbnailOverlayStyle = {
+  position: "absolute",
+  inset: 0,
+  background: "linear-gradient(to top, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 55%)",
+  pointerEvents: "none"
+};
+
+const viewBadgeStyle = {
+  position: "absolute",
+  bottom: "5px",
+  left: "5px",
+  display: "flex",
+  alignItems: "center",
+  color: "#ffffff",
+  fontSize: "10px",
+  fontWeight: "600",
+  textShadow: "0 1px 3px rgba(0, 0, 0, 0.85)",
+  pointerEvents: "none"
+};
+
+const premiumBadgeStyle = {
+  position: "absolute",
+  top: "4px",
+  right: "4px",
+  backgroundColor: "rgba(255, 180, 0, 0.9)",
+  color: "#000000",
+  fontSize: "8px",
+  fontWeight: "800",
+  padding: "1px 3px",
+  borderRadius: "3px",
+  pointerEvents: "none"
+};
+
+const actionRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  width: "100%",
+  marginTop: "2px"
+};
+
 const followBtnStyle = {
-  padding: "6px 16px",
-  borderRadius: "20px",
+  flex: 1,
+  height: "36px",
+  borderRadius: "8px",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
-  transition: "all 0.2s ease",
-  minWidth: "84px",
-  textAlign: "center",
-  whiteSpace: "nowrap"
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "all 0.18s ease",
+  border: "none",
+  outline: "none"
+};
+
+const subscribeBtnStyle = {
+  flex: 1,
+  height: "36px",
+  borderRadius: "8px",
+  fontSize: "13px",
+  fontWeight: "700",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "all 0.18s ease",
+  border: "none",
+  outline: "none"
 };
 
 const emptyStateStyle = {
@@ -710,35 +935,41 @@ const emptyStateStyle = {
   textAlign: "center"
 };
 
-const skeletonRowStyle = {
+const skeletonCardStyle = {
+  backgroundColor: "rgba(255, 255, 255, 0.025)",
+  border: "1px solid rgba(255, 255, 255, 0.06)",
+  borderRadius: "14px",
+  padding: "14px 14px",
   display: "flex",
-  alignItems: "center",
-  padding: "14px 16px",
-  backgroundColor: "transparent",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+  flexDirection: "column",
   gap: "12px",
   boxSizing: "border-box",
   width: "100%"
 };
 
 const skeletonAvatar = {
-  width: "46px",
-  height: "46px",
+  width: "48px",
+  height: "48px",
   borderRadius: "50%",
-  backgroundColor: "#262626",
+  backgroundColor: "#242424",
   flexShrink: 0
 };
 
 const skeletonLine = {
   height: "14px",
   borderRadius: "6px",
-  backgroundColor: "#262626"
+  backgroundColor: "#242424"
+};
+
+const skeletonThumbnail = {
+  aspectRatio: "3/4",
+  borderRadius: "8px",
+  backgroundColor: "#242424",
+  width: "100%"
 };
 
 const skeletonButton = {
-  width: "80px",
-  height: "32px",
+  height: "36px",
   borderRadius: "8px",
-  backgroundColor: "#262626",
-  flexShrink: 0
+  backgroundColor: "#242424"
 };
