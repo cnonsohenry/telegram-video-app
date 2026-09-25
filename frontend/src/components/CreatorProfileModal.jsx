@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   ArrowLeft, CheckCircle, Share2, Heart, Lock, Grid3X3, 
-  MapPin, Calendar, Globe, Sparkles, Send, Play, Loader2, MessageCircle,
+  MapPin, Globe, Sparkles, Send, Play, Loader2, MessageCircle,
   Film, Link2, ChevronDown, Plus
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
@@ -381,9 +381,30 @@ export default function CreatorProfileModal({
                       </p>
                     )}
 
-                    {/* Line 3: Handle */}
-                    <div style={{ fontSize: "12.5px", color: "#8e8e93", marginTop: "2px" }}>
-                      @{creatorData?.username || creatorUsername}
+                    {/* Line 3: Post, followers, likes count (replaces username) */}
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      flexWrap: "wrap",
+                      fontSize: "12.5px",
+                      color: "#8e8e93",
+                      marginTop: "4px"
+                    }}>
+                      <span>
+                        <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(postsCount)}</strong>{" "}
+                        <span>posts</span>
+                      </span>
+                      <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                      <span>
+                        <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
+                        <span>followers</span>
+                      </span>
+                      <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                      <span>
+                        <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                        <span>likes</span>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -438,26 +459,8 @@ export default function CreatorProfileModal({
                   </button>
                 </div>
 
-                {/* Stats Row (TikTok style 3 columns: Posts | Followers | Likes - NO VIP fans!) */}
-                <div style={statsContainerStyle}>
-                  <div style={statColStyle}>
-                    <span style={statNumberStyle}>{formatStat(postsCount)}</span>
-                    <span style={statLabelStyle}>posts</span>
-                  </div>
-                  <div style={statDividerStyle} />
-                  <div style={statColStyle}>
-                    <span style={statNumberStyle}>{formatStat(followersCount)}</span>
-                    <span style={statLabelStyle}>followers</span>
-                  </div>
-                  <div style={statDividerStyle} />
-                  <div style={statColStyle}>
-                    <span style={statNumberStyle}>{formatStat(likesCount)}</span>
-                    <span style={statLabelStyle}>likes</span>
-                  </div>
-                </div>
-
-                {/* Links & Meta */}
-                {(creatorData?.website || creatorData?.location || creatorData?.created_at) && (
+                {/* Links & Meta (Joined date removed) */}
+                {(creatorData?.website || creatorData?.location) && (
                   <div style={metaRowStyle}>
                     {creatorData?.website && (
                       <a 
@@ -476,10 +479,6 @@ export default function CreatorProfileModal({
                         <span>{creatorData.location}</span>
                       </span>
                     )}
-                    <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <Calendar size={13} color="#8e8e93" />
-                      <span>Joined {new Date(creatorData?.created_at || Date.now()).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
-                    </span>
                   </div>
                 )}
               </div>
@@ -531,9 +530,30 @@ export default function CreatorProfileModal({
                     </p>
                   )}
 
-                  {/* Line 3: Handle */}
-                  <div style={{ fontSize: "14px", color: "#8e8e93", marginBottom: "16px" }}>
-                    @{creatorData?.username || creatorUsername}
+                  {/* Line 3: Post, followers, likes count (replaces username) */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "18px",
+                    fontSize: "14px",
+                    color: "#8e8e93",
+                    marginTop: "6px",
+                    marginBottom: "16px"
+                  }}>
+                    <span>
+                      <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(postsCount)}</strong>{" "}
+                      <span>posts</span>
+                    </span>
+                    <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                    <span>
+                      <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
+                      <span>followers</span>
+                    </span>
+                    <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                    <span>
+                      <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                      <span>likes</span>
+                    </span>
                   </div>
 
                   {/* Action Buttons */}
@@ -581,46 +601,28 @@ export default function CreatorProfileModal({
                     </button>
                   </div>
 
-                  {/* Stats: Posts | Followers | Likes (NO VIP fans!) */}
-                  <div style={{ display: "flex", gap: "32px", marginBottom: "14px", fontSize: "15px" }}>
-                    <div>
-                      <strong style={{ color: "#fff", fontSize: "17px" }}>{formatStat(postsCount)}</strong>{" "}
-                      <span style={{ color: "#8e8e93" }}>posts</span>
+                  {/* Links & Meta (Joined date removed) */}
+                  {(creatorData?.website || creatorData?.location) && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center", fontSize: "13px", color: "#8e8e93" }}>
+                      {creatorData?.website && (
+                        <a 
+                          href={creatorData.website.startsWith("http://") || creatorData.website.startsWith("https://") ? creatorData.website : `https://${creatorData.website}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          style={websiteLinkStyle}
+                        >
+                          <Link2 size={13} color="#00aff0" />
+                          <span>{creatorData.website.replace(/^https?:\/\//, "")}</span>
+                        </a>
+                      )}
+                      {creatorData?.location && (
+                        <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                          <MapPin size={13} color="#8e8e93" />
+                          <span>{creatorData.location}</span>
+                        </span>
+                      )}
                     </div>
-                    <div>
-                      <strong style={{ color: "#fff", fontSize: "17px" }}>{formatStat(followersCount)}</strong>{" "}
-                      <span style={{ color: "#8e8e93" }}>followers</span>
-                    </div>
-                    <div>
-                      <strong style={{ color: "#fff", fontSize: "17px" }}>{formatStat(likesCount)}</strong>{" "}
-                      <span style={{ color: "#8e8e93" }}>likes</span>
-                    </div>
-                  </div>
-
-                  {/* Links & Meta */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center", fontSize: "13px", color: "#8e8e93" }}>
-                    {creatorData?.website && (
-                      <a 
-                        href={creatorData.website.startsWith("http://") || creatorData.website.startsWith("https://") ? creatorData.website : `https://${creatorData.website}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        style={websiteLinkStyle}
-                      >
-                        <Link2 size={13} color="#0095f6" />
-                        <span>{creatorData.website.replace(/^https?:\/\//, "")}</span>
-                      </a>
-                    )}
-                    {creatorData?.location && (
-                      <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        <MapPin size={13} color="#8e8e93" />
-                        <span>{creatorData.location}</span>
-                      </span>
-                    )}
-                    <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <Calendar size={13} color="#8e8e93" />
-                      <span>Joined {new Date(creatorData?.created_at || Date.now()).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
-                    </span>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
