@@ -90,12 +90,12 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
         display: "flex", 
         flexDirection: "column",
         background: "transparent", 
-        borderRadius: showDetails ? "12px" : "4px",
+        borderRadius: showDetails ? "12px" : "6px",
         width: "100%", 
         cursor: "pointer", 
         position: "relative",
         transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-        transform: (isHovered && showDetails) ? "translateY(-4px)" : "translateY(0)",
+        transform: isHovered ? "translateY(-3px)" : "translateY(0)",
         zIndex: isHovered ? 10 : 1,
         textDecoration: "none", 
         color: "inherit"        
@@ -108,7 +108,7 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
         objectFit: "cover", 
         background: "#080808", 
         overflow: "hidden",
-        borderRadius: showDetails ? "12px" : "4px",
+        borderRadius: showDetails ? "12px" : "6px",
         flexShrink: 0 
       }}>
         
@@ -218,17 +218,17 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
           </div>
         )}
 
-        {showDetails && !(video.category === "premium" || video.is_premium) && (
+        {!(video.category === "premium" || video.is_premium) && (
           <div style={{
-            position: "absolute", bottom: 10, left: 10, zIndex: 10, 
-            display: "flex", alignItems: "center", gap: 6, 
-            background: "rgba(0,0,0,0.4)", 
-            padding: "5px 10px", borderRadius: "100px",
-            backdropFilter: "blur(8px)",
-            border: "1px solid rgba(255,255,255,0.08)"
+            position: "absolute", bottom: 8, left: 8, zIndex: 10, 
+            display: "flex", alignItems: "center", gap: 5, 
+            background: "rgba(0,0,0,0.55)", 
+            padding: "4px 8px", borderRadius: "100px",
+            backdropFilter: "blur(6px)",
+            border: "1px solid rgba(255,255,255,0.12)"
           }}>
             <Play size={10} fill="#fff" strokeWidth={0} />
-            <span style={{ color: "#fff", fontSize: "11px", fontWeight: "800" }}>
+            <span style={{ color: "#fff", fontSize: "11px", fontWeight: "700" }}>
               {Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}
             </span>
           </div>

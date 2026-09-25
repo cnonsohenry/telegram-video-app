@@ -312,9 +312,20 @@ export default function CreatorProfileModal({
           <span style={topNavNameStyle}>{creatorData?.username || creatorUsername}</span>
           <CheckCircle size={15} color="#0095f6" fill="#0095f6" />
         </div>
-        <button onClick={handleShare} style={navBtnStyle} title="Share Profile">
-          <Share2 size={20} color="#fff" />
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          {!creatorData?.is_owner && (
+            <button 
+              onClick={() => setShowTipModal(true)} 
+              style={navBtnStyle} 
+              title="Send Tip"
+            >
+              <Heart size={20} fill="#f91880" color="#f91880" />
+            </button>
+          )}
+          <button onClick={handleShare} style={navBtnStyle} title="Share Profile">
+            <Share2 size={20} color="#fff" />
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -440,23 +451,6 @@ export default function CreatorProfileModal({
                       {isSubscribed ? "Subscribed" : "Subscribe"}
                     </button>
                   )}
-
-                  <button
-                    onClick={() => setShowTipModal(true)}
-                    style={mobileSecondaryBtn}
-                    title="Send a Tip"
-                  >
-                    <Heart size={15} fill="#f91880" color="#f91880" />
-                    <span>Tip</span>
-                  </button>
-
-                  <button
-                    onClick={handleShare}
-                    style={mobileIconBtn}
-                    title="Share Profile"
-                  >
-                    <Share2 size={16} color="#fff" />
-                  </button>
                 </div>
 
                 {/* Links & Meta (Joined date removed) */}
@@ -587,18 +581,6 @@ export default function CreatorProfileModal({
                         {isSubscribed ? "Subscribed" : "Subscribe"}
                       </button>
                     )}
-
-                    <button
-                      onClick={() => setShowTipModal(true)}
-                      style={desktopSecondaryBtn}
-                    >
-                      <Heart size={15} fill="#f91880" color="#f91880" />
-                      <span>Send Tip</span>
-                    </button>
-
-                    <button onClick={handleShare} style={desktopIconBtnStyle} title="Share Profile">
-                      <Share2 size={16} color="#fff" />
-                    </button>
                   </div>
 
                   {/* Links & Meta (Joined date removed) */}
@@ -713,8 +695,8 @@ export default function CreatorProfileModal({
                 }}>
                   <div style={{
                     display: "grid",
-                    gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
-                    gap: isDesktop ? "20px" : "10px",
+                    gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
+                    gap: isDesktop ? "16px" : "4px",
                     alignItems: "start",
                     width: "100%",
                     animation: "fadeIn 0.3s ease-out"
@@ -725,6 +707,7 @@ export default function CreatorProfileModal({
                         video={v}
                         priority={idx < 2}
                         onOpen={(vData, e) => handleVideoCardClick(vData, e)}
+                        showDetails={false}
                       />
                     ))}
                   </div>
