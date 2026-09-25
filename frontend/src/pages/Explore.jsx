@@ -499,8 +499,8 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
                   }
                 }}
               >
-                <Lock size={14} color="#FFD700" />
-                <span>Subscribe to @{creatorHandle} to unlock all {albumVideos.length} videos</span>
+                <Lock size={14} color="#ffffff" />
+                <span>Subscribe</span>
               </button>
             )}
           </div>
@@ -575,7 +575,7 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
                       }
                     }}
                   >
-                    <span>Subscribe to @{creatorHandle}</span>
+                    <span>Subscribe</span>
                   </button>
                 </div>
               </div>
@@ -4014,8 +4014,8 @@ const vipLockCircleStyle = {
 };
 
 const vipSubscribeButtonStyle = {
-  background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
-  color: "#000",
+  background: "#fe2c55",
+  color: "#ffffff",
   border: "none",
   borderRadius: "100px",
   padding: "10px 18px",
@@ -4025,7 +4025,7 @@ const vipSubscribeButtonStyle = {
   alignItems: "center",
   gap: "8px",
   cursor: "pointer",
-  boxShadow: "0 4px 16px rgba(255, 215, 0, 0.3)",
+  boxShadow: "0 4px 16px rgba(254, 44, 85, 0.4)",
   transition: "transform 0.15s ease",
   marginTop: "4px"
 };
@@ -4136,13 +4136,14 @@ const albumSubscribeBarBtnStyle = {
   marginTop: "10px",
   padding: "10px 16px",
   borderRadius: "24px",
-  background: "rgba(255, 215, 0, 0.12)",
-  border: "1px solid rgba(255, 215, 0, 0.35)",
-  color: "#FFD700",
+  background: "#fe2c55",
+  border: "none",
+  color: "#ffffff",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
-  transition: "background 0.2s ease"
+  boxShadow: "0 4px 16px rgba(254, 44, 85, 0.35)",
+  transition: "all 0.18s ease"
 };
 
 const albumDotsContainerStyle = {

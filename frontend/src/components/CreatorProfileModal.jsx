@@ -454,14 +454,15 @@ export default function CreatorProfileModal({
                       disabled={isSubscribing}
                       style={{
                         ...mobileSubscribeBtn,
-                        backgroundColor: isSubscribed ? "#262626" : "#0095f6",
-                        color: "#ffffff"
+                        backgroundColor: isSubscribed ? "rgba(254, 44, 85, 0.18)" : "#fe2c55",
+                        color: isSubscribed ? "#fe2c55" : "#ffffff",
+                        border: isSubscribed ? "1px solid #fe2c55" : "none"
                       }}
                     >
                       {isSubscribed ? (
                         <span>VIP Subscribed ✓</span>
                       ) : (
-                        <span>Subscribe · ${price.toLocaleString()}/mo</span>
+                        <span>Subscribe</span>
                       )}
                     </button>
                   )}
@@ -533,14 +534,15 @@ export default function CreatorProfileModal({
                           disabled={isSubscribing}
                           style={{
                             ...desktopSubscribeBtn,
-                            backgroundColor: isSubscribed ? "#262626" : "#0095f6",
-                            color: "#ffffff"
+                            backgroundColor: isSubscribed ? "rgba(254, 44, 85, 0.18)" : "#fe2c55",
+                            color: isSubscribed ? "#fe2c55" : "#ffffff",
+                            border: isSubscribed ? "1px solid #fe2c55" : "none"
                           }}
                         >
                           {isSubscribed ? (
                             <span>VIP Subscribed ✓</span>
                           ) : (
-                            <span>Subscribe · ${price.toLocaleString()}/mo</span>
+                            <span>Subscribe</span>
                           )}
                         </button>
                       )}
@@ -697,7 +699,7 @@ export default function CreatorProfileModal({
                     onClick={handleSubscribeToggle}
                     style={unlockNowBtnStyle}
                   >
-                    <span>{price > 0 ? `Unlock VIP for $${price.toLocaleString()}/mo` : "Join VIP Community"}</span>
+                    <span>Subscribe</span>
                   </button>
                 </div>
               </div>
@@ -1094,7 +1096,7 @@ const lockedBannerStyle = {
 };
 
 const unlockNowBtnStyle = {
-  background: "#0095f6",
+  background: "#fe2c55",
   color: "#fff",
   border: "none",
   borderRadius: "8px",
@@ -1102,7 +1104,7 @@ const unlockNowBtnStyle = {
   fontWeight: "700",
   fontSize: "14px",
   cursor: "pointer",
-  boxShadow: "0 4px 14px rgba(0, 149, 246, 0.3)"
+  boxShadow: "0 4px 14px rgba(254, 44, 85, 0.35)"
 };
 
 const loaderCenterStyle = {

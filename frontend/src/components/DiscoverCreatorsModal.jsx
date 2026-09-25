@@ -530,11 +530,7 @@ export default function DiscoverCreatorsModal({
                             border: isSubscribed ? "1px solid #fe2c55" : "none"
                           }}
                         >
-                          {isSubscribed ? "Subscribed" : (
-                            creator.subscription_price > 0 
-                              ? `Subscribe $${creator.subscription_price}/mo` 
-                              : "Subscribe"
-                          )}
+                          {isSubscribed ? "Subscribed" : "Subscribe"}
                         </button>
                       </div>
                     </div>
