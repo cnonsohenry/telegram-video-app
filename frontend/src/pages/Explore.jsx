@@ -2,19 +2,20 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, 
   Sparkles, Lock, ChevronLeft, ChevronRight, X, ArrowRight, Users, Film, Plus,
-  Home, Compass, Flame, TrendingUp, User, Search, MoreHorizontal, Grid3X3, ArrowLeft, RefreshCw
+  Home, Compass, Flame, TrendingUp, User, Search, MoreHorizontal, Grid3X3, ArrowLeft, RefreshCw, Flag
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
 import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
 import DiscoverCreatorsModal from "../components/DiscoverCreatorsModal";
 import CreatorUploadModal from "../components/CreatorUploadModal";
+import ReportModal from "../components/ReportModal";
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
 import { renderClickableCaption } from "../components/ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
 
 // 🟢 INDIVIDUAL POST COMPONENT
-const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen, onCreatorClick, user }) => {
+const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen, onCreatorClick, onReportClick, user }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
   
@@ -325,19 +326,48 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
       </div>
 
       <div style={contentColumnStyle}>
-        <div style={postHeaderStyle}>
-          <span 
-            style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+        <div style={{ ...postHeaderStyle, justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
+            <span 
+              style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+              onClick={(e) => {
+                if (onCreatorClick) {
+                  e.stopPropagation();
+                  onCreatorClick(creatorHandle);
+                }
+              }}
+            >
+              @{creatorHandle}
+            </span>
+            <span style={timeStyle}>&middot; {new Date(video.created_at).toLocaleDateString()} &middot; {isPremium ? "VIP Exclusive" : video.category}</span>
+          </div>
+
+          <button
+            type="button"
             onClick={(e) => {
-              if (onCreatorClick) {
-                e.stopPropagation();
-                onCreatorClick(creatorHandle);
-              }
+              e.stopPropagation();
+              if (onReportClick) onReportClick(video);
             }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#71767b",
+              cursor: "pointer",
+              padding: "2px 4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "4px",
+              flexShrink: 0,
+              transition: "color 0.15s ease"
+            }}
+            title="Report video"
+            aria-label="Report video"
+            onMouseEnter={(e) => e.currentTarget.style.color = "#fe2c55"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#71767b"}
           >
-            @{creatorHandle}
-          </span>
-          <span style={timeStyle}>&middot; {new Date(video.created_at).toLocaleDateString()} &middot; {isPremium ? "VIP Exclusive" : video.category}</span>
+            <Flag size={13} />
+          </button>
         </div>
 
         <p style={captionStyle}>
@@ -623,6 +653,17 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
             <div style={actionItemStyle} onClick={handleShare}>
               <Share2 size={18} />
               <span>{sharesCount > 0 ? sharesCount : ''}</span>
+            </div>
+
+            <div 
+              style={actionItemStyle} 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onReportClick) onReportClick(video);
+              }}
+              title="Report content"
+            >
+              <Flag size={17} />
             </div>
           </div>
         )}
@@ -1562,6 +1603,8 @@ export default function Explore({
   const [suggestedIndex, setSuggestedIndex] = useState(() => Math.floor(Math.random() * 4) + 2);
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [reportedVideo, setReportedVideo] = useState(null);
+  const handleOpenReport = useCallback((v) => setReportedVideo(v), []);
 
   // 🟢 DESKTOP CATEGORY FILTER & HIGHLIGHTS STATE
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -2171,6 +2214,7 @@ export default function Explore({
             onCommentClick={onCommentClick} 
             isAnyModalOpen={isAnyModalOpen} 
             onCreatorClick={onCreatorClick}
+            onReportClick={handleOpenReport}
             user={user}
           />
         ));
@@ -2264,6 +2308,7 @@ export default function Explore({
                   onCommentClick={onCommentClick} 
                   isAnyModalOpen={isAnyModalOpen} 
                   onCreatorClick={onCreatorClick}
+                  onReportClick={handleOpenReport}
                   user={user}
                 />
               ))}
@@ -2335,6 +2380,7 @@ export default function Explore({
           onCommentClick={onCommentClick} 
           isAnyModalOpen={isAnyModalOpen} 
           onCreatorClick={onCreatorClick}
+          onReportClick={handleOpenReport}
           user={user}
         />
       ));
@@ -2380,6 +2426,7 @@ export default function Explore({
             onCommentClick={onCommentClick} 
             isAnyModalOpen={isAnyModalOpen} 
             onCreatorClick={onCreatorClick}
+            onReportClick={handleOpenReport}
             user={user}
           />
 
@@ -2917,6 +2964,15 @@ export default function Explore({
             setShowDiscoverModal(false);
             if (onCreatorClick) onCreatorClick(uname);
           }}
+        />
+      )}
+
+      {/* 🚩 REPORT VIDEO MODAL */}
+      {reportedVideo && (
+        <ReportModal
+          isOpen={Boolean(reportedVideo)}
+          video={reportedVideo}
+          onClose={() => setReportedVideo(null)}
         />
       )}
 

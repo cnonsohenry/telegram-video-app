@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import fs from "fs";
 import path from "path";
@@ -20,6 +20,15 @@ export const r2 = new S3Client({
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
   },
 });
+
+export const ALLOWED_VIDEO_EXTENSIONS = ["mp4", "mov", "webm", "m4v", "mkv"];
+export const ALLOWED_VIDEO_MIMES = [
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "video/x-m4v",
+  "video/x-matroska"
+];
 
 const getMimeType = (extension) => {
   const ext = extension.toLowerCase().replace(".", "");
@@ -50,8 +59,12 @@ export async function uploadVideoToR2(filePath, category, internalId, originalNa
     throw new Error(`Upload file not found: ${filePath}`);
   }
 
-  const safeCategory = (category || "hotties").toLowerCase().trim();
-  const extension = path.extname(originalName).replace(".", "") || "mp4";
+  const safeCategory = (category || "community").toLowerCase().trim();
+  const extension = path.extname(originalName).replace(".", "").toLowerCase() || "mp4";
+  if (!ALLOWED_VIDEO_EXTENSIONS.includes(extension)) {
+    throw new Error(`Unsupported video format: .${extension}. Allowed formats: ${ALLOWED_VIDEO_EXTENSIONS.join(", ")}`);
+  }
+
   const r2Key = `${safeCategory}/${internalId}.${extension}`;
   const mimeType = getMimeType(extension);
 
@@ -112,7 +125,11 @@ export async function uploadVideoToR2(filePath, category, internalId, originalNa
  */
 export async function generatePresignedUploadUrls(category = "community", originalName = "video.mp4", isPremium = false) {
   const safeCategory = isPremium ? "premium" : (category || "community").toLowerCase().trim();
-  const extension = path.extname(originalName).replace(".", "") || "mp4";
+  const extension = path.extname(originalName).replace(".", "").toLowerCase() || "mp4";
+  if (!ALLOWED_VIDEO_EXTENSIONS.includes(extension)) {
+    throw new Error(`Unsupported video format: .${extension}. Allowed formats: ${ALLOWED_VIDEO_EXTENSIONS.join(", ")}`);
+  }
+
   const internalId = `${safeCategory}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
   const r2Key = `${safeCategory}/${internalId}.${extension}`;
   const thumbKey = `thumbs/internal_${internalId}.jpg`;
@@ -145,6 +162,33 @@ export async function generatePresignedUploadUrls(category = "community", origin
     staticUrl: `${R2_PUBLIC_DOMAIN}/${r2Key}`,
     thumbnailUrl: `${R2_PUBLIC_DOMAIN}/${thumbKey}`
   };
+}
+
+/**
+ * Verifies that an uploaded video object exists in Cloudflare R2 and meets size requirements.
+ * Prevents phantom / ghost video records.
+ * @param {string} r2Key - Object key in R2 (e.g. 'community/video_123.mp4')
+ * @returns {Promise<{ exists: boolean, contentLength: number, contentType: string }>}
+ */
+export async function verifyR2ObjectExists(r2Key) {
+  if (!r2Key) return { exists: false, contentLength: 0, contentType: "" };
+  try {
+    const head = await r2.send(new HeadObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: r2Key,
+    }));
+    return {
+      exists: true,
+      contentLength: head.ContentLength || 0,
+      contentType: head.ContentType || "",
+    };
+  } catch (err) {
+    if (err.name === "NotFound" || err.$metadata?.httpStatusCode === 404) {
+      return { exists: false, contentLength: 0, contentType: "" };
+    }
+    console.warn(`[R2 HEAD ERROR] Could not verify ${r2Key}:`, err.message);
+    return { exists: false, contentLength: 0, contentType: "" };
+  }
 }
 
 /**

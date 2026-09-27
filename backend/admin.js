@@ -218,12 +218,22 @@ router.put("/user/:id", authenticateToken, isAdmin, async (req, res) => {
       values.push(Boolean(is_premium));
     }
 
+    if (req.body.is_banned !== undefined) {
+      updates.push(`is_banned = $${idx++}`);
+      values.push(Boolean(req.body.is_banned));
+    }
+
+    if (req.body.ban_reason !== undefined) {
+      updates.push(`ban_reason = $${idx++}`);
+      values.push(String(req.body.ban_reason));
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: "No valid fields to update" });
     }
 
     values.push(userId);
-    const query = `UPDATE app_users SET ${updates.join(", ")} WHERE id = $${idx} RETURNING id, username, email, role, is_premium`;
+    const query = `UPDATE app_users SET ${updates.join(", ")} WHERE id = $${idx} RETURNING id, username, email, role, is_premium, is_banned, ban_reason`;
     const result = await pool.query(query, values);
 
     if (result.rowCount === 0) {
@@ -839,6 +849,98 @@ router.get("/search", authenticateToken, isAdmin, async (req, res) => {
   } catch (err) {
     console.error("Global search failed:", err);
     res.status(500).json({ error: "Search failed" });
+  }
+});
+
+// 🟢 12. GET REPORTS
+router.get("/reports", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const reports = await pool.query(`
+      SELECT r.*, 
+             v.caption, v.category, v.views, v.cloudflare_id, v.chat_id, v.status as video_status,
+             u.username as uploader_username, u.display_name as uploader_display_name,
+             rep.username as reporter_username, rep.email as reporter_email
+      FROM video_reports r
+      LEFT JOIN videos v ON r.message_id = v.message_id
+      LEFT JOIN app_users u ON (v.uploader_id = u.id OR v.uploader_id = u.telegram_user_id)
+      LEFT JOIN app_users rep ON r.reporter_id = rep.id
+      ORDER BY r.created_at DESC
+      LIMIT 100
+    `);
+
+    res.json({ success: true, reports: reports.rows });
+  } catch (err) {
+    console.error("[GET REPORTS ERROR]", err);
+    res.status(500).json({ error: "Failed to fetch reports" });
+  }
+});
+
+// 🟢 13. DISMISS REPORT
+router.post("/reports/:id/dismiss", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const reportId = req.params.id;
+    await pool.query("UPDATE video_reports SET status = 'dismissed' WHERE id = $1", [reportId]);
+    res.json({ success: true, message: "Report dismissed." });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to dismiss report" });
+  }
+});
+
+// 🟢 14. ACTION REPORT: DELETE VIDEO
+router.post("/reports/:id/delete-video", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const reportId = req.params.id;
+    const rRes = await pool.query("SELECT message_id FROM video_reports WHERE id = $1", [reportId]);
+    if (rRes.rows.length === 0) return res.status(404).json({ error: "Report not found" });
+
+    const message_id = rRes.rows[0].message_id;
+
+    // Delete interactions and video
+    await pool.query("DELETE FROM likes WHERE message_id = $1", [message_id]);
+    await pool.query("DELETE FROM saves WHERE message_id = $1", [message_id]);
+    await pool.query("DELETE FROM comments WHERE message_id = $1", [message_id]);
+    await pool.query("DELETE FROM videos WHERE message_id = $1", [message_id]);
+    await pool.query("UPDATE video_reports SET status = 'actioned_deleted' WHERE message_id = $1", [message_id]);
+
+    res.json({ success: true, message: "Video deleted and reports resolved." });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete reported video" });
+  }
+});
+
+// 🟢 15. ACTION REPORT: BAN CREATOR & DELETE VIDEO
+router.post("/reports/:id/ban-creator", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const reportId = req.params.id;
+    const rRes = await pool.query(`
+      SELECT r.message_id, v.uploader_id 
+      FROM video_reports r
+      LEFT JOIN videos v ON r.message_id = v.message_id
+      WHERE r.id = $1
+    `, [reportId]);
+
+    if (rRes.rows.length === 0) return res.status(404).json({ error: "Report not found" });
+
+    const { message_id, uploader_id } = rRes.rows[0];
+
+    if (uploader_id) {
+      await pool.query(
+        "UPDATE app_users SET is_banned = TRUE, ban_reason = 'Suspended for abusive content' WHERE id = $1 OR telegram_user_id = $1",
+        [uploader_id]
+      );
+    }
+
+    if (message_id) {
+      await pool.query("DELETE FROM likes WHERE message_id = $1", [message_id]);
+      await pool.query("DELETE FROM saves WHERE message_id = $1", [message_id]);
+      await pool.query("DELETE FROM comments WHERE message_id = $1", [message_id]);
+      await pool.query("DELETE FROM videos WHERE message_id = $1", [message_id]);
+      await pool.query("UPDATE video_reports SET status = 'actioned_banned' WHERE message_id = $1", [message_id]);
+    }
+
+    res.json({ success: true, message: "Creator banned and reported video deleted." });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to ban creator" });
   }
 });
 

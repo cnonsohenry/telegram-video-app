@@ -156,7 +156,14 @@ export default function CreatorUploadModal({
     if (!file) return;
 
     if (!file.type.startsWith("video/")) {
-      setErrorMessage("Please select a valid video file (MP4, MOV, WebM).");
+      setErrorMessage("Please select a valid video file (MP4, MOV, WebM, M4V, MKV).");
+      return;
+    }
+
+    const allowedExtensions = [".mp4", ".mov", ".webm", ".m4v", ".mkv"];
+    const ext = file.name ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
+    if (ext && !allowedExtensions.includes(ext)) {
+      setErrorMessage("Unsupported file format. Please upload an MP4, MOV, WebM, M4V, or MKV video.");
       return;
     }
 
@@ -167,19 +174,58 @@ export default function CreatorUploadModal({
     }
 
     setErrorMessage("");
-    setVideoFile(file);
-    setThumbBlob(null);
 
-    // Asynchronously capture thumbnail in browser
-    captureVideoThumbnail(file).then((blob) => {
-      if (blob) setThumbBlob(blob);
-    });
+    // Read video metadata to ensure it's not corrupt or 0-seconds
+    const tempVideo = document.createElement("video");
+    tempVideo.preload = "metadata";
+    tempVideo.playsInline = true;
+    tempVideo.muted = true;
+    const testUrl = URL.createObjectURL(file);
+    tempVideo.src = testUrl;
 
-    if (videoPreviewUrl) {
-      URL.revokeObjectURL(videoPreviewUrl);
-    }
-    const previewUrl = URL.createObjectURL(file);
-    setVideoPreviewUrl(previewUrl);
+    const timer = setTimeout(() => {
+      URL.revokeObjectURL(testUrl);
+    }, 5000);
+
+    tempVideo.onloadedmetadata = () => {
+      clearTimeout(timer);
+      URL.revokeObjectURL(testUrl);
+
+      const duration = tempVideo.duration;
+      if (!duration || isNaN(duration) || duration < 2) {
+        setErrorMessage("Video is too short or corrupted (minimum duration is 2 seconds).");
+        setVideoFile(null);
+        return;
+      }
+
+      if (duration > 3600) {
+        setErrorMessage("Video exceeds maximum allowed duration of 60 minutes.");
+        setVideoFile(null);
+        return;
+      }
+
+      setErrorMessage("");
+      setVideoFile(file);
+      setThumbBlob(null);
+
+      // Asynchronously capture thumbnail in browser
+      captureVideoThumbnail(file).then((blob) => {
+        if (blob) setThumbBlob(blob);
+      });
+
+      if (videoPreviewUrl) {
+        URL.revokeObjectURL(videoPreviewUrl);
+      }
+      const previewUrl = URL.createObjectURL(file);
+      setVideoPreviewUrl(previewUrl);
+    };
+
+    tempVideo.onerror = () => {
+      clearTimeout(timer);
+      URL.revokeObjectURL(testUrl);
+      setErrorMessage("Could not read video metadata. The file may be corrupted or unplayable.");
+      setVideoFile(null);
+    };
   };
 
   const handleDrop = (e) => {

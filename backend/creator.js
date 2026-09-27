@@ -4,13 +4,76 @@
 ======================================================= */
 import express from "express";
 import fs from "fs";
+import path from "path";
 import multer from "multer";
 import jwt from "jsonwebtoken";
 import pool from "./db.js";
 import { authenticateToken, JWT_SECRET } from "./auth.js";
-import { uploadVideoToR2, generatePresignedUploadUrls, deleteMediaFromR2, R2_PUBLIC_DOMAIN } from "./r2.js";
+import { 
+  uploadVideoToR2, 
+  generatePresignedUploadUrls, 
+  deleteMediaFromR2, 
+  verifyR2ObjectExists, 
+  ALLOWED_VIDEO_EXTENSIONS, 
+  ALLOWED_VIDEO_MIMES, 
+  R2_PUBLIC_DOMAIN 
+} from "./r2.js";
 
 const router = express.Router();
+
+/**
+ * Enforces upload abuse protection:
+ * 1. Checks if creator is banned.
+ * 2. Enforces a 60-second cooldown between consecutive uploads.
+ * 3. Enforces daily 24-hour quota (5 for unverified creators, 20 for verified creators, unlimited for admin).
+ */
+async function checkCreatorUploadQuota(userId, creator) {
+  if (creator.is_banned) {
+    const err = new Error(creator.ban_reason || "Your account has been suspended from publishing content.");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  // Admins are exempt from rate limits and daily quotas
+  if (creator.role === "admin") return;
+
+  // 1. Cooldown check: 60 seconds
+  const lastVidRes = await pool.query(
+    `SELECT created_at FROM videos WHERE uploader_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [userId]
+  );
+  if (lastVidRes.rows.length > 0) {
+    const lastTime = new Date(lastVidRes.rows[0].created_at).getTime();
+    const elapsedSec = (Date.now() - lastTime) / 1000;
+    if (elapsedSec < 60) {
+      const waitSec = Math.ceil(60 - elapsedSec);
+      const err = new Error(`Please wait ${waitSec} second${waitSec === 1 ? '' : 's'} before publishing another video.`);
+      err.statusCode = 429;
+      throw err;
+    }
+  }
+
+  // 2. 24-hour daily quota
+  const dailyRes = await pool.query(
+    `SELECT COUNT(*) as cnt FROM videos 
+     WHERE uploader_id = $1 
+       AND created_at > NOW() - INTERVAL '24 hours'`,
+    [userId]
+  );
+  const dailyCount = parseInt(dailyRes.rows[0]?.cnt || "0", 10);
+  const dailyLimit = creator.is_verified ? 20 : 5;
+
+  if (dailyCount >= dailyLimit) {
+    const err = new Error(
+      `Daily upload limit reached (${dailyCount}/${dailyLimit} videos in 24 hours). ` +
+      (creator.is_verified 
+        ? "Please wait until tomorrow to post more videos." 
+        : "Request creator verification in settings to increase your daily limit to 20 videos.")
+    );
+    err.statusCode = 429;
+    throw err;
+  }
+}
 
 // Automatically strip leading @ from :username param across all creator routes
 router.param("username", (req, res, next, val) => {
@@ -331,7 +394,8 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
   try {
     // 1. Fetch user & ensure creator access
     const userRes = await pool.query(
-      `SELECT id, username, display_name, is_creator, role, is_verified, subscription_price 
+      `SELECT id, username, display_name, is_creator, role, is_verified, subscription_price,
+              COALESCE(is_banned, FALSE) as is_banned, ban_reason
        FROM app_users WHERE id = $1`,
       [userId]
     );
@@ -342,6 +406,18 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
     }
 
     const creator = userRes.rows[0];
+
+    // Enforce account status, cooldown & 24h upload quota
+    await checkCreatorUploadQuota(userId, creator);
+
+    // Validate video file extension
+    const ext = path.extname(videoFile.originalname || "").toLowerCase().replace(".", "");
+    if (!ALLOWED_VIDEO_EXTENSIONS.includes(ext)) {
+      if (fs.existsSync(videoFile.path)) fs.unlinkSync(videoFile.path);
+      return res.status(400).json({ 
+        error: `Unsupported video format: .${ext || "unknown"}. Allowed formats: ${ALLOWED_VIDEO_EXTENSIONS.join(", ").toUpperCase()}` 
+      });
+    }
 
     // If user is not yet marked as creator, automatically activate creator status
     if (!creator.is_creator) {
@@ -456,7 +532,7 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
     if (req.file && fs.existsSync(req.file.path)) {
       try { fs.unlinkSync(req.file.path); } catch (e) {}
     }
-    return res.status(500).json({ error: err.message || "Failed to upload video to Cloudflare R2" });
+    return res.status(err.statusCode || 500).json({ error: err.message || "Failed to upload video to Cloudflare R2" });
   }
 });
 
@@ -471,7 +547,8 @@ router.post("/presigned-url", authenticateToken, async (req, res) => {
   try {
     // 1. Fetch user & verify creator
     const userRes = await pool.query(
-      `SELECT id, username, display_name, is_creator, role, subscription_price 
+      `SELECT id, username, display_name, is_creator, role, is_verified, subscription_price,
+              COALESCE(is_banned, FALSE) as is_banned, ban_reason
        FROM app_users WHERE id = $1`,
       [userId]
     );
@@ -481,6 +558,20 @@ router.post("/presigned-url", authenticateToken, async (req, res) => {
     }
 
     const creator = userRes.rows[0];
+
+    // Enforce account status, cooldown & 24h upload quota
+    await checkCreatorUploadQuota(userId, creator);
+
+    // Validate video file extension & MIME
+    const ext = path.extname(filename || "").toLowerCase().replace(".", "");
+    if (!ext || !ALLOWED_VIDEO_EXTENSIONS.includes(ext)) {
+      return res.status(400).json({ 
+        error: `Invalid file format: .${ext || "unknown"}. Allowed video formats: ${ALLOWED_VIDEO_EXTENSIONS.join(", ").toUpperCase()}` 
+      });
+    }
+    if (filetype && !ALLOWED_VIDEO_MIMES.includes(filetype.toLowerCase()) && !filetype.toLowerCase().startsWith("video/")) {
+      return res.status(400).json({ error: "Invalid video MIME type." });
+    }
 
     // Auto-activate creator status if not set
     if (!creator.is_creator) {
@@ -511,7 +602,7 @@ router.post("/presigned-url", authenticateToken, async (req, res) => {
     });
   } catch (err) {
     console.error("[PRESIGNED URL ERROR]", err);
-    return res.status(500).json({ error: err.message || "Failed to generate presigned upload URL" });
+    return res.status(err.statusCode || 500).json({ error: err.message || "Failed to generate presigned upload URL" });
   }
 });
 
@@ -529,7 +620,8 @@ router.post("/complete-upload", authenticateToken, async (req, res) => {
 
   try {
     const userRes = await pool.query(
-      `SELECT id, username, display_name, is_creator, role, subscription_price 
+      `SELECT id, username, display_name, is_creator, role, is_verified, subscription_price,
+              COALESCE(is_banned, FALSE) as is_banned, ban_reason
        FROM app_users WHERE id = $1`,
       [userId]
     );
@@ -539,6 +631,30 @@ router.post("/complete-upload", authenticateToken, async (req, res) => {
     }
 
     const creator = userRes.rows[0];
+
+    if (creator.is_banned) {
+      return res.status(403).json({ error: creator.ban_reason || "Your account has been suspended from publishing content." });
+    }
+
+    // 1. Verify that r2Key extension is allowed
+    const r2Ext = path.extname(r2Key).toLowerCase().replace(".", "");
+    if (!ALLOWED_VIDEO_EXTENSIONS.includes(r2Ext)) {
+      return res.status(400).json({ error: "Invalid video file extension in cloud key." });
+    }
+
+    // 2. Verify that uploaded video object actually exists in Cloudflare R2 and has valid size
+    const r2Check = await verifyR2ObjectExists(r2Key);
+    if (!r2Check.exists) {
+      return res.status(400).json({ 
+        error: "Uploaded video file could not be verified in cloud storage. Please try uploading again." 
+      });
+    }
+    if (r2Check.contentLength < 1024) {
+      return res.status(400).json({ error: "Uploaded video file is empty or corrupted (under 1KB)." });
+    }
+    if (r2Check.contentLength > 500 * 1024 * 1024) {
+      return res.status(400).json({ error: "Uploaded video file exceeds the maximum allowed 500MB limit." });
+    }
 
     // Ensure creator exists in users table
     try {

@@ -254,7 +254,25 @@ async function initDatabase() {
       await pool.query(`
         ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_uploader_id_fkey;
         ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_community BOOLEAN DEFAULT FALSE;
+        ALTER TABLE videos ADD COLUMN IF NOT EXISTS flags_count INT DEFAULT 0;
         CREATE INDEX IF NOT EXISTS idx_videos_is_community ON videos(is_community);
+
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS ban_reason TEXT;
+
+        CREATE TABLE IF NOT EXISTS video_reports (
+          id SERIAL PRIMARY KEY,
+          message_id TEXT NOT NULL,
+          reporter_id BIGINT,
+          reporter_ip TEXT,
+          reason VARCHAR(100) NOT NULL,
+          details TEXT,
+          status VARCHAR(20) DEFAULT 'pending',
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(message_id, reporter_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_video_reports_message_id ON video_reports(message_id);
+        CREATE INDEX IF NOT EXISTS idx_video_reports_status ON video_reports(status);
       `);
 
       await pool.query(`
@@ -1144,7 +1162,7 @@ app.get('/embed/:message_id', async (req, res) => {
    HELPER: Community Content Filter
    Matches all contents posted by web creators (flagged is_community)
 ===================== */
-const IS_COMMUNITY_SQL = `(v.is_community = TRUE)`;
+const IS_COMMUNITY_SQL = `(v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND (au.is_banned IS NOT TRUE OR au.is_banned IS NULL))`;
 
 /* =====================
    HELPER: Base Mapper (Used by Videos, Suggestions & Groups)
@@ -1222,7 +1240,7 @@ app.get("/api/videos", async (req, res) => {
     const category = req.query.category || "hotties";
     
     const isCommunity = req.query.community === "true" || category === "community";
-    const communityCondition = isCommunity ? "v.is_community = TRUE" : "(v.is_community IS NOT TRUE)";
+    const communityCondition = isCommunity ? "v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND (au.is_banned IS NOT TRUE OR au.is_banned IS NULL)" : "(v.is_community IS NOT TRUE)";
     
     // 🟢 NEW: Extract sort and seed parameters
     const sort = (req.query.sort || "").toLowerCase().trim();
@@ -1658,7 +1676,7 @@ app.get("/api/search", async (req, res) => {
     // 2. Search Videos if type is 'all' or 'videos'
     if (type === "all" || type === "videos") {
       const isCommunity = req.query.community === "true" || req.query.category === "community";
-      const communityCondition = isCommunity ? "v.is_community = TRUE" : "(v.is_community IS NOT TRUE)";
+      const communityCondition = isCommunity ? "v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND (au.is_banned IS NOT TRUE OR au.is_banned IS NULL)" : "(v.is_community IS NOT TRUE)";
 
       const searchQuery = `
         SELECT v.*, 
@@ -1938,6 +1956,74 @@ app.get("/api/comments/:message_id", async (req, res) => {
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch comments" });
+  }
+});
+
+// 🟢 REPORT A VIDEO FOR ABUSE / COPYRIGHT / ILLEGAL CONTENT
+app.post("/api/videos/:message_id/report", async (req, res) => {
+  try {
+    const { message_id } = req.params;
+    const { reason, details } = req.body;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: "Please select a reason for reporting." });
+    }
+
+    // Extract user id if logged in
+    let reporterId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const decoded = jwt.verify(authHeader.split(" ")[1], JWT_SECRET);
+        reporterId = decoded.id;
+      } catch (e) {}
+    }
+
+    const reporterIp = req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "";
+    const cleanReason = String(reason).trim().slice(0, 100);
+    const cleanDetails = details ? String(details).trim().slice(0, 500) : "";
+
+    // Verify video exists
+    const vidCheck = await pool.query("SELECT id, message_id FROM videos WHERE message_id = $1 LIMIT 1", [message_id]);
+    if (vidCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Video not found." });
+    }
+
+    // Insert report (prevent duplicate reporting by same user)
+    const reportRes = await pool.query(
+      `INSERT INTO video_reports (message_id, reporter_id, reporter_ip, reason, details, status)
+       VALUES ($1, $2, $3, $4, $5, 'pending')
+       ON CONFLICT (message_id, reporter_id) DO NOTHING
+       RETURNING id`,
+      [message_id, reporterId, String(reporterIp).slice(0, 50), cleanReason, cleanDetails]
+    );
+
+    // If already reported by this user, return graceful message
+    if (reportRes.rowCount === 0 && reporterId) {
+      return res.json({ success: true, message: "You have already submitted a report for this video." });
+    }
+
+    // Increment flags_count on videos table
+    const updateRes = await pool.query(
+      `UPDATE videos 
+       SET flags_count = COALESCE(flags_count, 0) + 1,
+           status = CASE WHEN COALESCE(flags_count, 0) + 1 >= 5 THEN 'flagged' ELSE status END
+       WHERE message_id = $1 
+       RETURNING flags_count, status`,
+      [message_id]
+    );
+
+    if (updateRes.rows.length > 0 && updateRes.rows[0].flags_count >= 5) {
+      console.warn(`⚠️ [AUTO-MODERATION] Video ${message_id} reached ${updateRes.rows[0].flags_count} flags and was automatically hidden.`);
+    }
+
+    return res.json({ 
+      success: true, 
+      message: "Thank you. Your report has been submitted for moderation review." 
+    });
+  } catch (err) {
+    console.error("[REPORT VIDEO ERROR]", err);
+    return res.status(500).json({ error: "Failed to submit report. Please try again." });
   }
 });
 
