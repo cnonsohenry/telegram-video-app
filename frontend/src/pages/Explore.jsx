@@ -56,6 +56,16 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
     }
   }, [isAlbum, video.media_group_id]);
 
+  useEffect(() => {
+    const handleCommentAdded = (e) => {
+      if (e.detail && String(e.detail.message_id) === String(video.message_id)) {
+        setCommentsCount(prev => prev + 1);
+      }
+    };
+    window.addEventListener("commentAdded", handleCommentAdded);
+    return () => window.removeEventListener("commentAdded", handleCommentAdded);
+  }, [video.message_id]);
+
   const handleCarouselScroll = (e) => {
     const track = e.currentTarget;
     if (track && track.children) {
@@ -294,7 +304,6 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
     const token = localStorage.getItem("token");
     if (!token) return promptLogin("comment");
     
-    setCommentsCount(prev => prev + 1); 
     onCommentClick(video);
   };
 

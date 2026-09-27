@@ -49,8 +49,9 @@ export default function CommentSectionModal({ video, onClose }) {
         if (data.success) {
           setComments([data.comment, ...comments]);
           setNewComment("");
-          // Note: We deliberately DO NOT blur the input here. 
-          // This allows users to type multiple comments rapidly without the keyboard dropping!
+          window.dispatchEvent(new CustomEvent("commentAdded", { 
+            detail: { message_id: video.message_id, comment: data.comment } 
+          }));
         }
       }
     } catch (err) {
@@ -67,10 +68,15 @@ export default function CommentSectionModal({ video, onClose }) {
         {/* 🟢 THE MODAL: Native flex column. The browser will shove this up natively when typing. */}
         <div style={commentBottomSheetStyle} onClick={e => e.stopPropagation()}>
 
+          {/* Drag Handle */}
+          <div style={dragHandleWrapper}>
+            <div style={dragHandlePill} />
+          </div>
+
           {/* Header */}
           <div style={commentHeaderWrapperStyle}>
             <h3 style={commentHeaderTitleStyle}>{comments.length} Comments</h3>
-            <button onClick={onClose} style={closeBottomSheetBtnStyle}>
+            <button onClick={onClose} style={closeBottomSheetBtnStyle} aria-label="Close comments">
               <X size={20} color="#fff" />
             </button>
           </div>
@@ -143,33 +149,56 @@ export default function CommentSectionModal({ video, onClose }) {
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 
 const commentBackdropStyle = {
-  position: "fixed", inset: 0, zIndex: 1000025,
-  background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+  position: "fixed", inset: 0, zIndex: 1000050,
+  background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
   display: "flex", flexDirection: "column", justifyContent: "flex-end",
+  alignItems: "center",
   animation: "fadeIn 0.2s ease"
+};
+
+const dragHandleWrapper = {
+  width: "100%",
+  display: "flex",
+  justifyContent: "center",
+  paddingTop: "8px",
+  paddingBottom: "4px",
+  cursor: "grab",
+  flexShrink: 0
+};
+
+const dragHandlePill = {
+  width: "36px",
+  height: "4px",
+  borderRadius: "2px",
+  backgroundColor: "#3e4144"
 };
 
 const commentBottomSheetStyle = {
   width: "100%", 
+  maxWidth: "600px",
   height: "75dvh", // Uses dynamic viewport height so it sizes correctly on mobile
-  background: "#1c1c1e", 
+  background: "#000000", 
+  borderTop: "1px solid #2f3336",
+  borderLeft: "1px solid #2f3336",
+  borderRight: "1px solid #2f3336",
   borderRadius: "24px 24px 0 0",
   display: "flex", 
   flexDirection: "column", 
   overflow: "hidden",
-  animation: "slideUpModal 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-  boxShadow: "0 -10px 40px rgba(0,0,0,0.5)"
+  animation: "slideUpModal 0.28s cubic-bezier(0.16, 1, 0.3, 1)",
+  boxShadow: "0 -10px 40px rgba(0,0,0,0.8)"
 };
 
 const commentHeaderWrapperStyle = {
   display: "flex", alignItems: "center", justifyContent: "space-between",
-  padding: "20px", borderBottom: "1px solid #333", flexShrink: 0
+  padding: "12px 20px 16px 20px", borderBottom: "1px solid #2f3336", flexShrink: 0
 };
 
 const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, color: "#fff" };
 
 const closeBottomSheetBtnStyle = {
-  background: "#333", border: "none", borderRadius: "50%",
+  background: "rgba(255, 255, 255, 0.1)", border: "none", borderRadius: "50%",
   width: "32px", height: "32px",
   display: "flex", alignItems: "center", justifyContent: "center",
   cursor: "pointer", transition: "background 0.2s", flexShrink: 0
@@ -185,7 +214,7 @@ const commentItemStyle = { display: "flex", gap: "12px" };
 
 const commentAvatarStyle = {
   width: "36px", height: "36px", borderRadius: "50%",
-  objectFit: "cover", flexShrink: 0
+  objectFit: "cover", flexShrink: 0, border: "1px solid rgba(255, 255, 255, 0.15)"
 };
 
 const commentContentWrapper = { display: "flex", flexDirection: "column" };
@@ -195,29 +224,29 @@ const commentUsernameStyle = { fontSize: "13px", fontWeight: 700, color: "#aaa" 
 const commentDateStyle = { fontWeight: 400, color: "#666", marginLeft: "6px" };
 
 const commentText = {
-  fontSize: "15px", color: "#fff",
+  fontSize: "14.5px", color: "#e7e9ea",
   margin: "4px 0 0 0", lineHeight: "1.4", wordBreak: "break-word"
 };
 
 // 🟢 COMPOSER (Now natively embedded in the flex column)
 const composerFormStyle = {
-  background: "#1c1c1e",
-  padding: "15px 20px",
-  paddingBottom: "max(15px, env(safe-area-inset-bottom))",
+  background: "#000000",
+  padding: "14px 18px",
+  paddingBottom: "max(14px, env(safe-area-inset-bottom))",
   display: "flex", gap: "10px", alignItems: "center",
-  borderTop: "1px solid #2a2a2c",
+  borderTop: "1px solid #2f3336",
   flexShrink: 0 // Ensures the input box is never crushed by the comment list
 };
 
 const composerInputStyle = {
-  flex: 1, background: "#2c2c2e", border: "none",
-  borderRadius: "20px", padding: "12px 20px",
+  flex: 1, background: "#16181c", border: "1px solid #2f3336",
+  borderRadius: "20px", padding: "12px 18px",
   color: "#fff", fontSize: "15px", outline: "none"
 };
 
 const commentSendBtnStyle = {
   background: "var(--primary-color)", border: "none",
-  width: "42px", height: "42px", borderRadius: "50%",
+  width: "40px", height: "40px", borderRadius: "50%",
   display: "flex", alignItems: "center", justifyContent: "center",
   color: "#fff", cursor: "pointer",
   transition: "opacity 0.2s ease", flexShrink: 0

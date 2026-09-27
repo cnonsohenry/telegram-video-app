@@ -46,6 +46,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const [isRotated, setIsRotated] = useState(false);
   const [showControls, setShowControls] = useState(true); 
   const [isDragging, setIsDragging] = useState(false); 
+  const isDraggingRef = useRef(false);
   const [isMuted, setIsMuted] = useState(false); 
   
   // Action States
@@ -86,6 +87,45 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const [savesCount, setSavesCount] = useState(Number(video.saves_count || 0));
   const [commentsCount, setCommentsCount] = useState(Number(video.comments_count || 0));
   const [sharesCount, setSharesCount] = useState(Number(video.shares_count || 0));
+
+  // 🟢 Update comment counter when a comment is added via CommentSectionModal
+  useEffect(() => {
+    const handleCommentAdded = (e) => {
+      if (e.detail && String(e.detail.message_id) === String(video.message_id)) {
+        setCommentsCount(prev => prev + 1);
+      }
+    };
+    window.addEventListener("commentAdded", handleCommentAdded);
+    return () => window.removeEventListener("commentAdded", handleCommentAdded);
+  }, [video.message_id]);
+
+  // 🟢 Keyboard controls: Space to toggle play, ArrowRight to fast-forward 5s, ArrowLeft to rewind 5s
+  useEffect(() => {
+    const handlePlayerKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(e.target?.tagName) || isEditingMode) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (videoRef.current) {
+          const maxDur = duration || videoRef.current.duration || 0;
+          const next = Math.min((videoRef.current.currentTime || 0) + 5, maxDur);
+          videoRef.current.currentTime = next;
+          setCurrentTime(next);
+        }
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (videoRef.current) {
+          const prev = Math.max((videoRef.current.currentTime || 0) - 5, 0);
+          videoRef.current.currentTime = prev;
+          setCurrentTime(prev);
+        }
+      } else if (e.key === " " || e.key === "Spacebar") {
+        e.preventDefault();
+        handleTogglePlay();
+      }
+    };
+    window.addEventListener("keydown", handlePlayerKeyDown);
+    return () => window.removeEventListener("keydown", handlePlayerKeyDown);
+  }, [duration, isEditingMode, isPlaying]);
 
   // Creator & Follow States
   const creatorHandle = getVideoCreatorHandle(video);
@@ -413,9 +453,38 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   }, [video.video_url, video.message_id, adState]);
 
   const handleTimeUpdate = () => {
-    if (videoRef.current && !isDragging) {
+    if (videoRef.current && !isDraggingRef.current) {
       setCurrentTime(videoRef.current.currentTime);
-      setDuration(videoRef.current.duration || 0);
+      if (videoRef.current.duration && Number.isFinite(videoRef.current.duration) && videoRef.current.duration !== duration) {
+        setDuration(videoRef.current.duration);
+      }
+    }
+  };
+
+  const handleSeekStart = (e) => {
+    e.stopPropagation();
+    isDraggingRef.current = true;
+    setIsDragging(true);
+  };
+
+  const handleSeekChange = (e) => {
+    e.stopPropagation();
+    const newTime = parseFloat(e.target.value);
+    if (!Number.isNaN(newTime)) {
+      setCurrentTime(newTime);
+      if (videoRef.current && Number.isFinite(newTime)) {
+        videoRef.current.currentTime = newTime;
+      }
+    }
+  };
+
+  const handleSeekEnd = (e) => {
+    e.stopPropagation();
+    isDraggingRef.current = false;
+    setIsDragging(false);
+    const newTime = parseFloat(e.target.value);
+    if (!Number.isNaN(newTime) && videoRef.current && Number.isFinite(newTime)) {
+      videoRef.current.currentTime = newTime;
     }
   };
 
@@ -535,7 +604,6 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     if (!token) return promptLogin("comment");
     
     if (onCommentClick) {
-        setCommentsCount(prev => prev + 1); 
         onCommentClick(video);
     }
   };
@@ -1052,6 +1120,11 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onDragStart={(e) => e.preventDefault()}
             onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={() => {
+              if (videoRef.current && Number.isFinite(videoRef.current.duration)) {
+                setDuration(videoRef.current.duration);
+              }
+            }}
             onWaiting={() => setIsLoading(true)}
             onCanPlay={() => setIsLoading(false)}
             onPlay={() => setIsPlaying(true)}
@@ -1073,7 +1146,12 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
             <>
               <div style={{ ...bottomGradientStyle, opacity: showControls ? 1 : 0 }} />
 
-              <div style={{ ...bottomUIWrapper, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
+              <div 
+                style={{ ...bottomUIWrapper, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}
+                onClick={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
                 
                 {/* Top Row: Floating Controls (Transparent) */}
                 <div style={floatingControlsRow}>
@@ -1165,7 +1243,12 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 </div>
 
                 {/* Bottom Row: Play/Pause firmly docked next to Progress Bar in single sleek row */}
-                <div style={controlBarContainer}>
+                <div 
+                  style={controlBarContainer}
+                  onClick={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
                    <button 
                      onClick={handleTogglePlay} 
                      style={playPauseBtnStyle}
@@ -1180,28 +1263,36 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                      )}
                    </button>
 
-                   <div style={progressContainerStyle}>
+                   <div 
+                     style={progressContainerStyle}
+                     onClick={(e) => e.stopPropagation()}
+                     onTouchStart={(e) => e.stopPropagation()}
+                     onPointerDown={(e) => e.stopPropagation()}
+                   >
+                     {/* Visual Background Track (4px sleek bar) */}
+                     <div style={visualTrackStyle}>
+                       {/* Played Progress Fill */}
+                       <div style={{ ...progressFillStyle, width: `${progressPercent}%` }} />
+                     </div>
+
+                     {/* Interactive Scrubbing Slider Overlay (36px comfortable touch zone) */}
                      <input 
-                       type="range" min="0" max={duration || 100} step="0.1"
+                       type="range" 
+                       min="0" 
+                       max={duration > 0 ? duration : 100} 
+                       step="0.05"
                        value={currentTime || 0} 
-                       onMouseDown={(e) => { e.stopPropagation(); setIsDragging(true); }}
-                       onTouchStart={(e) => { e.stopPropagation(); setIsDragging(true); }}
-                       onChange={(e) => { e.stopPropagation(); setCurrentTime(parseFloat(e.target.value)); }}
-                       onMouseUp={(e) => {
-                         e.stopPropagation();
-                         setIsDragging(false);
-                         if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
-                       }}
-                       onTouchEnd={(e) => {
-                         e.stopPropagation();
-                         setIsDragging(false);
-                         if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value);
-                       }}
-                       className="sleek-range"
-                       style={{
-                         ...rangeInputBaseStyle,
-                         background: `linear-gradient(to right, #ffffff ${progressPercent}%, rgba(255,255,255,0.28) ${progressPercent}%)`
-                       }}
+                       aria-label="Video scrubber"
+                       className="sleek-range-overlay"
+                       onMouseDown={handleSeekStart}
+                       onTouchStart={handleSeekStart}
+                       onPointerDown={handleSeekStart}
+                       onChange={handleSeekChange}
+                       onInput={handleSeekChange}
+                       onMouseUp={handleSeekEnd}
+                       onTouchEnd={handleSeekEnd}
+                       onPointerUp={handleSeekEnd}
+                       style={rangeOverlayStyle}
                      />
                    </div>
 
@@ -1319,46 +1410,66 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .spin-animation { animation: spin 1s linear infinite; }
         
-        /* Sleek transparent range scrubber */
-        .sleek-range {
+        /* Sleek transparent range scrubber overlay */
+        .sleek-range-overlay {
+          position: absolute;
+          left: 0;
+          right: 0;
           width: 100%;
-          cursor: pointer;
-          height: 4px;
-          border-radius: 9999px;
+          height: 36px;
+          background: transparent;
           appearance: none;
           -webkit-appearance: none;
           outline: none;
-          transition: height 0.15s ease;
+          cursor: pointer;
+          touch-action: none;
+          z-index: 2;
+          margin: 0;
+          padding: 0;
         }
-        .sleek-range:hover {
-          height: 6px;
+        .sleek-range-overlay::-webkit-slider-runnable-track {
+          background: transparent;
+          border: none;
+          height: 36px;
+          cursor: pointer;
         }
-        .sleek-range::-webkit-slider-thumb {
+        .sleek-range-overlay::-webkit-slider-thumb {
           appearance: none;
           -webkit-appearance: none;
-          width: 12px;
-          height: 12px;
-          background: #ffffff;
+          width: 14px;
+          height: 14px;
           border-radius: 50%;
-          box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+          background: #ffffff;
+          box-shadow: 0 1px 6px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.15);
+          cursor: grab;
+          margin-top: 11px;
           transition: transform 0.15s ease;
         }
-        .sleek-range:hover::-webkit-slider-thumb,
-        .sleek-range:active::-webkit-slider-thumb {
+        .sleek-range-overlay:hover::-webkit-slider-thumb,
+        .sleek-range-overlay:active::-webkit-slider-thumb {
           transform: scale(1.35);
+          cursor: grabbing;
         }
-        .sleek-range::-moz-range-thumb {
-          width: 12px;
-          height: 12px;
-          background: #ffffff;
-          border-radius: 50%;
+        .sleek-range-overlay::-moz-range-track {
+          background: transparent;
           border: none;
-          box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+          height: 36px;
+          cursor: pointer;
+        }
+        .sleek-range-overlay::-moz-range-thumb {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #ffffff;
+          border: none;
+          box-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+          cursor: grab;
           transition: transform 0.15s ease;
         }
-        .sleek-range:hover::-moz-range-thumb,
-        .sleek-range:active::-moz-range-thumb {
+        .sleek-range-overlay:hover::-moz-range-thumb,
+        .sleek-range-overlay:active::-moz-range-thumb {
           transform: scale(1.35);
+          cursor: grabbing;
         }
 
         /* Heart burst animation for double-tap */
@@ -1467,8 +1578,45 @@ const captionStyle = { fontSize: "14px", color: "#e7e9ea", lineHeight: "1.4", wo
 
 const controlBarContainer = { display: "flex", alignItems: "center", gap: "12px", width: "100%", marginBottom: "14px", padding: "0 4px" };
 const playPauseBtnStyle = { background: "transparent", border: "none", cursor: "pointer", padding: "4px", width: "36px", height: "36px", minWidth: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.7))", transition: "transform 0.15s ease" };
-const progressContainerStyle = { display: "flex", alignItems: "center", flex: 1, height: "24px" };
-const rangeInputBaseStyle = { width: "100%", cursor: "pointer" };
+const progressContainerStyle = {
+  position: "relative",
+  display: "flex",
+  alignItems: "center",
+  flex: 1,
+  height: "36px",
+  cursor: "pointer",
+  touchAction: "none"
+};
+const visualTrackStyle = {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  height: "4px",
+  borderRadius: "9999px",
+  backgroundColor: "rgba(255, 255, 255, 0.28)",
+  pointerEvents: "none",
+  overflow: "hidden"
+};
+const progressFillStyle = {
+  height: "100%",
+  backgroundColor: "#ffffff",
+  borderRadius: "9999px"
+};
+const rangeOverlayStyle = {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  width: "100%",
+  height: "36px",
+  background: "transparent",
+  appearance: "none",
+  WebkitAppearance: "none",
+  outline: "none",
+  cursor: "pointer",
+  touchAction: "none",
+  margin: 0,
+  padding: 0
+};
 const timeDisplayStyle = { display: "flex", alignItems: "center", fontSize: "12px", fontWeight: "600", fontVariantNumeric: "tabular-nums", color: "#ffffff", whiteSpace: "nowrap", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", flexShrink: 0 };
 
 // 🟢 RESTORED: Engagement Bar Styles

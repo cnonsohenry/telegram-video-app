@@ -201,7 +201,7 @@ const modalBackdrop = {
   flexDirection: "column",
   justifyContent: "flex-end",
   alignItems: "center",
-  zIndex: 1000030,
+  zIndex: 1000060,
   animation: "reportBackdropFade 0.2s ease"
 };
 
