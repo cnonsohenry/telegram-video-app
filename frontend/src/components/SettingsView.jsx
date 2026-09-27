@@ -550,19 +550,43 @@ export default function SettingsView({
         </ModalSheet>
       )}
 
-      {/* 🌟 LOGOUT DIALOG */}
+      {/* 🌟 LOGOUT BOTTOM SHEET (Slides up from the bottom like X) */}
       {showLogoutConfirm && (
         <div style={modalOverlayStyle} onClick={() => setShowLogoutConfirm(false)}>
-          <div style={dialogBoxStyle} onClick={(e) => e.stopPropagation()}>
-            <h3 style={dialogTitleStyle}>Log out?</h3>
-            <p style={dialogSubStyle}>You will need to sign back in to access your profile and VIP passes.</p>
-            <div style={dialogActionColumn}>
-              <button style={dialogLogoutBtn} onClick={onLogout}>Log out</button>
-              <button style={dialogCancelBtn} onClick={() => setShowLogoutConfirm(false)}>Cancel</button>
+          <div style={logoutSheetStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={dragHandleWrapper}>
+              <div style={dragHandlePill} />
+            </div>
+            <h3 style={logoutSheetTitle}>Log out of @{user?.username || "your account"}?</h3>
+            <p style={logoutSheetSub}>You can always log back in at any time. Your profile and VIP passes are safely preserved.</p>
+            <div style={logoutSheetActionCol}>
+              <button 
+                style={logoutSheetConfirmBtn} 
+                onClick={onLogout}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = "0.9"}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+              >
+                Log out
+              </button>
+              <button 
+                style={logoutSheetCancelBtn} 
+                onClick={() => setShowLogoutConfirm(false)}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.12)"}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)"}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes slideUpSheet {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -612,9 +636,12 @@ const DetailRow = ({ label, value, onCopy }) => (
 const ModalSheet = ({ title, onClose, children }) => (
   <div style={modalOverlayStyle} onClick={onClose}>
     <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+      <div style={dragHandleWrapper}>
+        <div style={dragHandlePill} />
+      </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", borderBottom: "1px solid #222", paddingBottom: "10px" }}>
         <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#fff", margin: 0 }}>{title}</h3>
-        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "#8e8e93" }}>
+        <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer", padding: "6px", color: "#8e8e93", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <X size={18} />
         </button>
       </div>
@@ -753,28 +780,48 @@ const dividerStyle = {
 
 const modalOverlayStyle = {
   position: "fixed",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: "rgba(0,0,0,0.8)",
-  backdropFilter: "blur(6px)",
+  inset: 0,
+  backgroundColor: "rgba(0, 0, 0, 0.72)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
   display: "flex",
+  flexDirection: "column",
+  justifyContent: "flex-end",
   alignItems: "center",
-  justifyContent: "center",
   zIndex: 100000,
-  padding: "16px"
+  animation: "fadeIn 0.2s ease"
 };
 
 const modalContentStyle = {
   width: "100%",
-  maxWidth: "420px",
-  backgroundColor: "#161618",
-  borderRadius: "16px",
-  padding: "18px",
-  border: "1px solid #282828",
-  maxHeight: "80vh",
-  overflowY: "auto"
+  maxWidth: "480px",
+  backgroundColor: "#000000",
+  borderTop: "1px solid #2f3336",
+  borderLeft: "1px solid #2f3336",
+  borderRight: "1px solid #2f3336",
+  borderRadius: "24px 24px 0 0",
+  padding: "10px 18px max(24px, env(safe-area-inset-bottom, 24px))",
+  boxSizing: "border-box",
+  maxHeight: "85vh",
+  overflowY: "auto",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+  animation: "slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
+};
+
+const dragHandleWrapper = {
+  width: "100%",
+  display: "flex",
+  justifyContent: "center",
+  paddingTop: "2px",
+  paddingBottom: "10px",
+  cursor: "grab"
+};
+
+const dragHandlePill = {
+  width: "36px",
+  height: "4px",
+  borderRadius: "2px",
+  backgroundColor: "#3e4144"
 };
 
 const modalToggleRow = {
@@ -818,55 +865,65 @@ const cryptoChip = {
   fontWeight: "500"
 };
 
-const dialogBoxStyle = {
+const logoutSheetStyle = {
   width: "100%",
-  maxWidth: "320px",
-  backgroundColor: "#18181a",
-  borderRadius: "16px",
-  padding: "20px",
+  maxWidth: "460px",
+  backgroundColor: "#000000",
+  borderTop: "1px solid #2f3336",
+  borderLeft: "1px solid #2f3336",
+  borderRight: "1px solid #2f3336",
+  borderRadius: "24px 24px 0 0",
+  padding: "10px 18px max(24px, env(safe-area-inset-bottom, 24px))",
   textAlign: "center",
-  border: "1px solid #2a2a2a"
+  boxSizing: "border-box",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+  animation: "slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
 };
 
-const dialogTitleStyle = {
-  fontSize: "16px",
-  fontWeight: "700",
-  marginBottom: "6px",
-  color: "#fff"
+const logoutSheetTitle = {
+  fontSize: "19px",
+  fontWeight: "800",
+  marginBottom: "8px",
+  color: "#ffffff",
+  letterSpacing: "-0.3px"
 };
 
-const dialogSubStyle = {
-  fontSize: "13px",
-  color: "#8e8e93",
+const logoutSheetSub = {
+  fontSize: "13.5px",
+  color: "#71767b",
   marginBottom: "20px",
-  lineHeight: "1.4"
+  lineHeight: "1.45",
+  padding: "0 10px"
 };
 
-const dialogActionColumn = {
+const logoutSheetActionCol = {
   display: "flex",
-  gap: "8px"
+  flexDirection: "column",
+  gap: "10px"
 };
 
-const dialogLogoutBtn = {
-  flex: 1,
-  padding: "10px",
-  borderRadius: "10px",
+const logoutSheetConfirmBtn = {
+  width: "100%",
+  padding: "14px",
+  borderRadius: "9999px",
   border: "none",
-  backgroundColor: "#fe2c55",
-  color: "#fff",
-  fontWeight: "700",
-  fontSize: "13.5px",
-  cursor: "pointer"
+  backgroundColor: "#f4212e",
+  color: "#ffffff",
+  fontWeight: "800",
+  fontSize: "15px",
+  cursor: "pointer",
+  transition: "opacity 0.15s ease"
 };
 
-const dialogCancelBtn = {
-  flex: 1,
-  padding: "10px",
-  borderRadius: "10px",
-  border: "1px solid #333",
-  backgroundColor: "transparent",
-  color: "#fff",
-  fontWeight: "600",
-  fontSize: "13.5px",
-  cursor: "pointer"
+const logoutSheetCancelBtn = {
+  width: "100%",
+  padding: "13px",
+  borderRadius: "9999px",
+  border: "1px solid rgba(255, 255, 255, 0.14)",
+  backgroundColor: "rgba(255, 255, 255, 0.06)",
+  color: "#ffffff",
+  fontWeight: "700",
+  fontSize: "15px",
+  cursor: "pointer",
+  transition: "background-color 0.15s ease"
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, 
   Sparkles, Lock, ChevronLeft, ChevronRight, X, ArrowRight, Users, Film, Plus,
-  Home, Compass, Flame, TrendingUp, User, Search, MoreHorizontal, Grid3X3, ArrowLeft, RefreshCw, Flag
+  Home, Compass, Flame, TrendingUp, User, Search, MoreHorizontal, MoreVertical, Grid3X3, ArrowLeft, RefreshCw, Flag
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
@@ -10,12 +10,13 @@ import AppHeader from "../components/AppHeader"; // 🟢 IMPORT APPHEADER
 import DiscoverCreatorsModal from "../components/DiscoverCreatorsModal";
 import CreatorUploadModal from "../components/CreatorUploadModal";
 import ReportModal from "../components/ReportModal";
+import PostOptionsModal from "../components/PostOptionsModal";
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
 import { renderClickableCaption } from "../components/ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
 
 // 🟢 INDIVIDUAL POST COMPONENT
-const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen, onCreatorClick, onReportClick, user }) => {
+const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick, isAnyModalOpen, onCreatorClick, onReportClick, onOptionsClick, user }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
   
@@ -346,27 +347,35 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              if (onReportClick) onReportClick(video);
+              if (onOptionsClick) onOptionsClick(video);
             }}
             style={{
               background: "none",
               border: "none",
               color: "#71767b",
               cursor: "pointer",
-              padding: "2px 4px",
+              padding: "4px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              borderRadius: "4px",
+              borderRadius: "50%",
               flexShrink: 0,
-              transition: "color 0.15s ease"
+              width: "28px",
+              height: "28px",
+              transition: "background-color 0.15s ease, color 0.15s ease"
             }}
-            title="Report video"
-            aria-label="Report video"
-            onMouseEnter={(e) => e.currentTarget.style.color = "#fe2c55"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "#71767b"}
+            title="More"
+            aria-label="More options"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(239, 243, 244, 0.1)";
+              e.currentTarget.style.color = "#ffffff";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.color = "#71767b";
+            }}
           >
-            <Flag size={13} />
+            <MoreVertical size={16} />
           </button>
         </div>
 
@@ -653,17 +662,6 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
             <div style={actionItemStyle} onClick={handleShare}>
               <Share2 size={18} />
               <span>{sharesCount > 0 ? sharesCount : ''}</span>
-            </div>
-
-            <div 
-              style={actionItemStyle} 
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onReportClick) onReportClick(video);
-              }}
-              title="Report content"
-            >
-              <Flag size={17} />
             </div>
           </div>
         )}
@@ -1605,6 +1603,45 @@ export default function Explore({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [reportedVideo, setReportedVideo] = useState(null);
   const handleOpenReport = useCallback((v) => setReportedVideo(v), []);
+  const [optionsVideo, setOptionsVideo] = useState(null);
+  const handleOpenOptions = useCallback((v) => setOptionsVideo(v), []);
+
+  const handleNotInterested = useCallback((v) => {
+    if (!v) return;
+    const videoId = v.message_id || v.id;
+    setForYouFeed(prev => prev.filter(item => (item.message_id || item.id) !== videoId));
+    setCommunityFeed(prev => prev.filter(item => (item.message_id || item.id) !== videoId));
+    setSearchFeed(prev => prev.filter(item => (item.message_id || item.id) !== videoId));
+  }, []);
+
+  const handleDeletePost = useCallback(async (v) => {
+    if (!v) return;
+    const videoId = v.message_id || v.id;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/video/${encodeURIComponent(videoId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        handleNotInterested(v);
+        showToast("Post deleted successfully", "info");
+      } else {
+        const adminRes = await fetch(`${APP_CONFIG.apiUrl}/api/admin/video/${encodeURIComponent(videoId)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (adminRes.ok) {
+          handleNotInterested(v);
+          showToast("Post deleted successfully", "info");
+        } else {
+          showToast("Failed to delete post", "error");
+        }
+      }
+    } catch (e) {
+      showToast("Error deleting post", "error");
+    }
+  }, [handleNotInterested]);
 
   // 🟢 DESKTOP CATEGORY FILTER & HIGHLIGHTS STATE
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -2215,6 +2252,7 @@ export default function Explore({
             isAnyModalOpen={isAnyModalOpen} 
             onCreatorClick={onCreatorClick}
             onReportClick={handleOpenReport}
+            onOptionsClick={handleOpenOptions}
             user={user}
           />
         ));
@@ -2309,6 +2347,7 @@ export default function Explore({
                   isAnyModalOpen={isAnyModalOpen} 
                   onCreatorClick={onCreatorClick}
                   onReportClick={handleOpenReport}
+                  onOptionsClick={handleOpenOptions}
                   user={user}
                 />
               ))}
@@ -2381,6 +2420,7 @@ export default function Explore({
           isAnyModalOpen={isAnyModalOpen} 
           onCreatorClick={onCreatorClick}
           onReportClick={handleOpenReport}
+          onOptionsClick={handleOpenOptions}
           user={user}
         />
       ));
@@ -2427,6 +2467,7 @@ export default function Explore({
             isAnyModalOpen={isAnyModalOpen} 
             onCreatorClick={onCreatorClick}
             onReportClick={handleOpenReport}
+            onOptionsClick={handleOpenOptions}
             user={user}
           />
 
@@ -2964,6 +3005,26 @@ export default function Explore({
             setShowDiscoverModal(false);
             if (onCreatorClick) onCreatorClick(uname);
           }}
+        />
+      )}
+
+      {/* 🌟 POST OPTIONS MODAL (X-Style Bottom Sheet) */}
+      {optionsVideo && (
+        <PostOptionsModal
+          isOpen={Boolean(optionsVideo)}
+          video={optionsVideo}
+          currentUser={user}
+          isFollowing={Boolean(optionsVideo && (searchFollowingMap[optionsVideo.creator_username || optionsVideo.uploader_name] !== undefined ? searchFollowingMap[optionsVideo.creator_username || optionsVideo.uploader_name] : optionsVideo.is_following))}
+          onClose={() => setOptionsVideo(null)}
+          onReport={(v) => {
+            setOptionsVideo(null);
+            setReportedVideo(v);
+          }}
+          onNotInterested={handleNotInterested}
+          onFollowToggle={(uname) => {
+            handleSearchCreatorFollow(uname);
+          }}
+          onDelete={handleDeletePost}
         />
       )}
 

@@ -53,6 +53,15 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
           iconBg: "rgba(255, 215, 0, 0.15)",
           iconBorder: "rgba(255, 215, 0, 0.3)"
         };
+      case "upload":
+        return {
+          title: "Publish on Naija Homemade",
+          subtitle: "Sign in or set up your creator profile to upload videos directly to the Community feed.",
+          icon: Lock,
+          iconColor: "#00aff0",
+          iconBg: "rgba(0, 175, 240, 0.15)",
+          iconBorder: "rgba(0, 175, 240, 0.3)"
+        };
       default:
         return {
           title: "Account Required",
@@ -74,6 +83,11 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
         style={cardStyle} 
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Top Drag Handle Indicator */}
+        <div style={dragHandleWrapper}>
+          <div style={dragHandlePill} />
+        </div>
+
         <button 
           onClick={onClose}
           style={closeBtnStyle}
@@ -87,7 +101,7 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
           backgroundColor: config.iconBg,
           borderColor: config.iconBorder
         }}>
-          <Icon size={28} color={config.iconColor} />
+          <Icon size={26} color={config.iconColor} />
         </div>
 
         <div style={titleStyle}>
@@ -132,9 +146,13 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
       </div>
 
       <style>{`
-        @keyframes loginModalFadeIn {
-          0% { opacity: 0; transform: translateY(20px) scale(0.96); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
+        @keyframes loginSheetSlideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        @keyframes loginBackdropFade {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
     </div>
@@ -144,43 +162,61 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
 const overlayStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 9999995,
-  backgroundColor: "rgba(0, 0, 0, 0.75)",
-  backdropFilter: "blur(10px)",
-  WebkitBackdropFilter: "blur(10px)",
+  zIndex: 1000030,
+  backgroundColor: "rgba(0, 0, 0, 0.72)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
   display: "flex",
+  flexDirection: "column",
+  justifyContent: "flex-end",
   alignItems: "center",
-  justifyContent: "center",
-  padding: "16px",
-  boxSizing: "border-box"
+  animation: "loginBackdropFade 0.2s ease"
 };
 
 const cardStyle = {
   width: "100%",
-  maxWidth: "380px",
-  background: "#161618",
-  border: "1px solid #2c2c2e",
-  borderRadius: "22px",
-  padding: "24px 20px 20px",
+  maxWidth: "480px",
+  backgroundColor: "#000000",
+  borderTop: "1px solid #2f3336",
+  borderLeft: "1px solid #2f3336",
+  borderRight: "1px solid #2f3336",
+  borderRadius: "24px 24px 0 0",
+  padding: "10px 20px max(24px, env(safe-area-inset-bottom, 24px))",
   boxSizing: "border-box",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
   textAlign: "center",
   position: "relative",
-  boxShadow: "0 20px 60px rgba(0, 0, 0, 0.8), 0 0 1px 1px rgba(255, 255, 255, 0.05)",
-  animation: "loginModalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)"
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+  animation: "loginSheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
+};
+
+const dragHandleWrapper = {
+  width: "100%",
+  display: "flex",
+  justifyContent: "center",
+  paddingTop: "2px",
+  paddingBottom: "12px",
+  cursor: "grab"
+};
+
+const dragHandlePill = {
+  width: "36px",
+  height: "4px",
+  borderRadius: "2px",
+  backgroundColor: "#3e4144"
 };
 
 const closeBtnStyle = {
   position: "absolute",
-  top: "14px",
-  right: "14px",
-  background: "#222",
+  top: "16px",
+  right: "16px",
+  background: "rgba(255, 255, 255, 0.08)",
   border: "none",
   borderRadius: "50%",
-  width: "30px",
-  height: "30px",
+  width: "32px",
+  height: "32px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -189,30 +225,31 @@ const closeBtnStyle = {
 };
 
 const iconContainerStyle = {
-  width: "60px",
-  height: "60px",
+  width: "56px",
+  height: "56px",
   borderRadius: "18px",
   border: "1px solid",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  marginBottom: "16px"
+  marginBottom: "14px",
+  marginTop: "4px"
 };
 
 const titleStyle = {
   fontSize: "19px",
   fontWeight: "800",
-  color: "#fff",
+  color: "#ffffff",
   letterSpacing: "-0.3px",
   marginBottom: "8px"
 };
 
 const subtitleStyle = {
-  fontSize: "13px",
+  fontSize: "13.5px",
   color: "#8e8e93",
   lineHeight: "1.45",
   marginBottom: "16px",
-  padding: "0 8px"
+  padding: "0 10px"
 };
 
 const perksRowStyle = {
@@ -222,15 +259,15 @@ const perksRowStyle = {
 };
 
 const perkPillStyle = {
-  background: "#222226",
-  border: "1px solid #2e2e32",
+  background: "#16181c",
+  border: "1px solid #2f3336",
   borderRadius: "100px",
-  padding: "4px 10px",
-  fontSize: "11px",
-  color: "#ccc",
+  padding: "5px 12px",
+  fontSize: "11.5px",
+  color: "#e7e9ea",
   display: "flex",
   alignItems: "center",
-  gap: "5px",
+  gap: "6px",
   fontWeight: "600"
 };
 
@@ -243,30 +280,30 @@ const actionsContainerStyle = {
 
 const primaryBtnStyle = {
   width: "100%",
-  padding: "13px",
-  borderRadius: "12px",
+  padding: "14px",
+  borderRadius: "9999px",
   border: "none",
-  background: "var(--primary-color, #00aff0)",
-  color: "#fff",
-  fontSize: "14px",
-  fontWeight: "700",
+  background: "#ffffff",
+  color: "#000000",
+  fontSize: "15px",
+  fontWeight: "800",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   gap: "8px",
-  boxShadow: "0 4px 14px rgba(0, 175, 240, 0.35)",
+  boxShadow: "0 4px 16px rgba(255, 255, 255, 0.15)",
   transition: "0.2s"
 };
 
 const secondaryBtnStyle = {
   width: "100%",
-  padding: "11px",
-  borderRadius: "12px",
-  border: "none",
-  background: "transparent",
-  color: "#888",
-  fontSize: "13px",
+  padding: "13px",
+  borderRadius: "9999px",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
+  background: "rgba(255, 255, 255, 0.04)",
+  color: "#8e8e93",
+  fontSize: "14px",
   fontWeight: "600",
   cursor: "pointer",
   transition: "0.2s"

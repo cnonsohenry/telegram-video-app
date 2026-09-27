@@ -3,7 +3,7 @@ import {
   X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, 
   Share2, Download, Check, Heart, MessageCircle, Bookmark, 
   Volume2, VolumeX, MoreVertical, Edit2, Trash2, RotateCw,
-  UserPlus, SkipForward, ExternalLink, Eye
+  UserPlus, SkipForward, ExternalLink, Eye, Flag, Link2
 } from "lucide-react";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG & AD UTILITIES
@@ -13,6 +13,7 @@ import { shouldPlayVastAd, recordVastAdPlayed, getVastConfig } from "../utils/ad
 import { fetchVastAd, sendVastBeacons } from "../utils/vastParser";
 import { renderClickableCaption } from "./ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
+import ReportModal from "./ReportModal";
 
 export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick, onCreatorClick }) {
   const videoRef = useRef(null);
@@ -51,6 +52,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const [copied, setCopied] = useState(false); 
   const [isDownloading, setIsDownloading] = useState(false); 
   const [showMenu, setShowMenu] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [canModify, setCanModify] = useState(false); 
 
   // Edit States
@@ -675,41 +677,102 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
         </button>
       )}
 
-      {/* Dropdown Menu */}
+      {/* 🌟 FULLSCREEN PLAYER ACTION SHEET (Slides up from the bottom like X) */}
       {showMenu && (
         <div 
-          style={{ position: "absolute", inset: 0, zIndex: 10007 }} 
+          style={playerMenuOverlay} 
           onClick={(e) => { e.stopPropagation(); setShowMenu(false); }}
         >
-          <div style={{ ...dropdownMenuStyle, right: isDesktop ? "90px" : "20px" }} onClick={(e) => e.stopPropagation()}>
-            
-            {canModify && (
-              <>
-                <button style={dropdownItemStyle} onClick={handleEditCaption}>
-                  <Edit2 size={16} /> Edit Caption
-                </button>
-                <button style={{ ...dropdownItemStyle, color: '#ef4444' }} onClick={handleDeleteVideo}>
-                  <Trash2 size={16} /> Delete Video
-                </button>
-                <div style={dropdownDividerStyle} />
-              </>
-            )}
-            
-            {/* 🟢 Re-Wired Dropdown Actions (Hidden for premium videos) */}
-            {!isPremium && (
-              <>
-                <button style={dropdownItemStyle} onClick={handleShare}>
-                  {copied ? <Check size={16} color="#4ade80" /> : <Share2 size={16} />} 
-                  {copied ? "Copied!" : "Share"}
-                </button>
-                <button style={dropdownItemStyle} onClick={handleDownload}>
-                  {isDownloading ? <Loader2 size={16} className="spin-animation" /> : <Download size={16} />} 
-                  Download
-                </button>
-              </>
-            )}
+          <div style={playerMenuSheet} onClick={(e) => e.stopPropagation()}>
+            <div style={dragHandleWrapper}>
+              <div style={dragHandlePill} />
+            </div>
+
+            <div style={playerMenuList}>
+              {canModify && (
+                <>
+                  <button 
+                    style={playerMenuItem} 
+                    onClick={handleEditCaption}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                  >
+                    <Edit2 size={20} color="#e7e9ea" /> 
+                    <span>Edit Caption</span>
+                  </button>
+                  <button 
+                    style={{ ...playerMenuItem, color: '#f4212e' }} 
+                    onClick={handleDeleteVideo}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(244, 33, 46, 0.1)"}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                  >
+                    <Trash2 size={20} color="#f4212e" /> 
+                    <span>Delete Video</span>
+                  </button>
+                </>
+              )}
+              
+              {!isPremium && (
+                <>
+                  <button 
+                    style={playerMenuItem} 
+                    onClick={handleShare}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                  >
+                    {copied ? <Check size={20} color="#4ade80" /> : <Share2 size={20} color="#e7e9ea" />} 
+                    <span>{copied ? "Copied Link!" : "Share / Copy Link"}</span>
+                  </button>
+                  <button 
+                    style={playerMenuItem} 
+                    onClick={handleDownload}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                  >
+                    {isDownloading ? <Loader2 size={20} className="spin-animation" color="#e7e9ea" /> : <Download size={20} color="#e7e9ea" />} 
+                    <span>Download Video</span>
+                  </button>
+                </>
+              )}
+
+              {/* Report Video Option */}
+              <button 
+                style={{ ...playerMenuItem, color: '#f4212e' }} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  setShowReport(true);
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(244, 33, 46, 0.1)"}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+              >
+                <Flag size={20} color="#f4212e" />
+                <span>Report Video</span>
+              </button>
+            </div>
+
+            <div style={{ paddingTop: "6px" }}>
+              <button 
+                type="button" 
+                style={playerCancelBtn} 
+                onClick={(e) => { e.stopPropagation(); setShowMenu(false); }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)"}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* 🚩 REPORT MODAL */}
+      {showReport && (
+        <ReportModal 
+          isOpen={showReport}
+          video={video}
+          onClose={() => setShowReport(false)}
+        />
       )}
 
       <div style={stageStyle} onClick={(e) => e.stopPropagation()}>
@@ -1150,6 +1213,10 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
         .x-range { width: 100%; cursor: pointer; height: 6px; border-radius: 3px; appearance: none; outline: none; }
         .x-range::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
         .x-range::-moz-range-thumb { width: 16px; height: 16px; background: #fff; border-radius: 50%; border: none; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        @keyframes playerSheetSlideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
       `}</style>
     </div>
   );
@@ -1275,3 +1342,85 @@ const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "6px", 
 const formLabelStyle = { fontSize: "13px", color: "#8e8e93", fontWeight: "600" };
 const formInputStyle = { background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", padding: "12px", borderRadius: "8px", color: "#fff", fontSize: "14px", outline: "none" };
 const saveBtnStyle = { width: "100%", background: "var(--primary-color)", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "700", fontSize: "15px", cursor: "pointer", marginTop: "10px" };
+
+const playerMenuOverlay = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 100020,
+  backgroundColor: "rgba(0, 0, 0, 0.72)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "flex-end",
+  alignItems: "center"
+};
+
+const playerMenuSheet = {
+  width: "100%",
+  maxWidth: "460px",
+  backgroundColor: "#000000",
+  borderTop: "1px solid #2f3336",
+  borderLeft: "1px solid #2f3336",
+  borderRight: "1px solid #2f3336",
+  borderRadius: "24px 24px 0 0",
+  padding: "10px 16px max(24px, env(safe-area-inset-bottom, 24px))",
+  boxSizing: "border-box",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+  display: "flex",
+  flexDirection: "column",
+  animation: "playerSheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
+};
+
+const dragHandleWrapper = {
+  width: "100%",
+  display: "flex",
+  justifyContent: "center",
+  paddingTop: "2px",
+  paddingBottom: "10px",
+  cursor: "grab"
+};
+
+const dragHandlePill = {
+  width: "36px",
+  height: "4px",
+  borderRadius: "2px",
+  backgroundColor: "#3e4144"
+};
+
+const playerMenuList = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "4px",
+  marginBottom: "12px"
+};
+
+const playerMenuItem = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  gap: "14px",
+  padding: "13px 12px",
+  borderRadius: "12px",
+  color: "#ffffff",
+  fontSize: "15px",
+  fontWeight: "600",
+  textAlign: "left",
+  transition: "background-color 0.15s ease"
+};
+
+const playerCancelBtn = {
+  width: "100%",
+  padding: "14px",
+  borderRadius: "9999px",
+  backgroundColor: "rgba(255, 255, 255, 0.08)",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
+  color: "#ffffff",
+  fontSize: "15px",
+  fontWeight: "700",
+  cursor: "pointer",
+  transition: "background-color 0.15s ease"
+};

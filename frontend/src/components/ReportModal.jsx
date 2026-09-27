@@ -63,11 +63,16 @@ export default function ReportModal({ isOpen, onClose, video }) {
   return (
     <div style={modalBackdrop} onClick={onClose}>
       <div style={modalBox} onClick={(e) => e.stopPropagation()}>
+        {/* Top Drag Handle Indicator */}
+        <div style={dragHandleWrapper}>
+          <div style={dragHandlePill} />
+        </div>
+
         {/* Header */}
         <div style={modalHeader}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Flag size={18} color="#fe2c55" />
-            <h3 style={modalTitle}>Report Video</h3>
+            <Flag size={18} color="#f4212e" />
+            <h3 style={modalTitle}>Report Post</h3>
           </div>
           <button 
             type="button" 
@@ -105,7 +110,7 @@ export default function ReportModal({ isOpen, onClose, video }) {
                     style={{
                       ...reasonOption,
                       border: isSelected ? "1px solid #ffffff" : "1px solid rgba(255, 255, 255, 0.08)",
-                      background: isSelected ? "rgba(255, 255, 255, 0.06)" : "rgba(255, 255, 255, 0.02)"
+                      background: isSelected ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.02)"
                     }}
                   >
                     <input
@@ -171,34 +176,65 @@ export default function ReportModal({ isOpen, onClose, video }) {
           </form>
         )}
       </div>
+
+      <style>{`
+        @keyframes reportSheetSlideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        @keyframes reportBackdropFade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
 
 const modalBackdrop = {
   position: "fixed",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  background: "rgba(0, 0, 0, 0.75)",
-  backdropFilter: "blur(6px)",
+  inset: 0,
+  background: "rgba(0, 0, 0, 0.72)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
   display: "flex",
+  flexDirection: "column",
+  justifyContent: "flex-end",
   alignItems: "center",
-  justifyContent: "center",
-  zIndex: 99999,
-  padding: "16px"
+  zIndex: 1000030,
+  animation: "reportBackdropFade 0.2s ease"
 };
 
 const modalBox = {
   background: "#000000",
-  border: "1px solid rgba(255, 255, 255, 0.15)",
-  borderRadius: "16px",
+  borderTop: "1px solid #2f3336",
+  borderLeft: "1px solid #2f3336",
+  borderRight: "1px solid #2f3336",
+  borderRadius: "24px 24px 0 0",
   width: "100%",
-  maxWidth: "460px",
-  padding: "20px",
-  boxShadow: "0 10px 40px rgba(0, 0, 0, 0.8)",
-  boxSizing: "border-box"
+  maxWidth: "480px",
+  padding: "10px 18px max(24px, env(safe-area-inset-bottom, 24px))",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+  boxSizing: "border-box",
+  maxHeight: "88vh",
+  overflowY: "auto",
+  animation: "reportSheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
+};
+
+const dragHandleWrapper = {
+  width: "100%",
+  display: "flex",
+  justifyContent: "center",
+  paddingTop: "2px",
+  paddingBottom: "10px",
+  cursor: "grab"
+};
+
+const dragHandlePill = {
+  width: "36px",
+  height: "4px",
+  borderRadius: "2px",
+  backgroundColor: "#3e4144"
 };
 
 const modalHeader = {
@@ -218,11 +254,11 @@ const modalTitle = {
 };
 
 const closeBtn = {
-  background: "none",
+  background: "rgba(255, 255, 255, 0.08)",
   border: "none",
   color: "#71767b",
   cursor: "pointer",
-  padding: "4px",
+  padding: "6px",
   borderRadius: "50%",
   display: "flex",
   alignItems: "center",
@@ -264,16 +300,16 @@ const actionRow = {
   display: "flex",
   justifyContent: "flex-end",
   gap: "10px",
-  marginTop: "4px"
+  marginTop: "6px"
 };
 
 const cancelBtn = {
   background: "transparent",
   border: "1px solid rgba(255, 255, 255, 0.15)",
   color: "#ffffff",
-  padding: "9px 18px",
+  padding: "11px 20px",
   borderRadius: "9999px",
-  fontSize: "13.5px",
+  fontSize: "14px",
   fontWeight: "600",
   cursor: "pointer"
 };
@@ -285,10 +321,10 @@ const submitBtn = {
   background: "#ffffff",
   border: "none",
   color: "#000000",
-  padding: "9px 20px",
+  padding: "11px 24px",
   borderRadius: "9999px",
-  fontSize: "13.5px",
-  fontWeight: "700",
+  fontSize: "14px",
+  fontWeight: "800",
   cursor: "pointer"
 };
 
