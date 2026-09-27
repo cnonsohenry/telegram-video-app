@@ -47,6 +47,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   const [showControls, setShowControls] = useState(true); 
   const [isDragging, setIsDragging] = useState(false); 
   const isDraggingRef = useRef(false);
+  const progressBarRef = useRef(null);
   const [isMuted, setIsMuted] = useState(false); 
   
   // Action States
@@ -461,30 +462,66 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     }
   };
 
-  const handleSeekStart = (e) => {
+  const handlePointerDown = (e) => {
     e.stopPropagation();
+    if (!progressBarRef.current) return;
+
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (err) {}
+
     isDraggingRef.current = true;
     setIsDragging(true);
-  };
 
-  const handleSeekChange = (e) => {
-    e.stopPropagation();
-    const newTime = parseFloat(e.target.value);
-    if (!Number.isNaN(newTime)) {
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const total = duration > 0 ? duration : (videoRef.current?.duration || 0);
+    const newTime = pos * total;
+
+    if (Number.isFinite(newTime)) {
       setCurrentTime(newTime);
-      if (videoRef.current && Number.isFinite(newTime)) {
+      if (videoRef.current) {
         videoRef.current.currentTime = newTime;
       }
     }
   };
 
-  const handleSeekEnd = (e) => {
+  const handlePointerMove = (e) => {
+    if (!isDraggingRef.current || !progressBarRef.current) return;
     e.stopPropagation();
+
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const total = duration > 0 ? duration : (videoRef.current?.duration || 0);
+    const newTime = pos * total;
+
+    if (Number.isFinite(newTime)) {
+      setCurrentTime(newTime);
+      if (videoRef.current) {
+        videoRef.current.currentTime = newTime;
+      }
+    }
+  };
+
+  const handlePointerUp = (e) => {
+    if (!isDraggingRef.current) return;
+    e.stopPropagation();
+
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (err) {}
+
     isDraggingRef.current = false;
     setIsDragging(false);
-    const newTime = parseFloat(e.target.value);
-    if (!Number.isNaN(newTime) && videoRef.current && Number.isFinite(newTime)) {
-      videoRef.current.currentTime = newTime;
+
+    if (progressBarRef.current) {
+      const rect = progressBarRef.current.getBoundingClientRect();
+      const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const total = duration > 0 ? duration : (videoRef.current?.duration || 0);
+      const newTime = pos * total;
+      if (Number.isFinite(newTime) && videoRef.current) {
+        videoRef.current.currentTime = newTime;
+      }
     }
   };
 
@@ -1264,10 +1301,19 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                    </button>
 
                    <div 
+                     ref={progressBarRef}
                      style={progressContainerStyle}
+                     onPointerDown={handlePointerDown}
+                     onPointerMove={handlePointerMove}
+                     onPointerUp={handlePointerUp}
+                     onPointerCancel={handlePointerUp}
                      onClick={(e) => e.stopPropagation()}
-                     onTouchStart={(e) => e.stopPropagation()}
-                     onPointerDown={(e) => e.stopPropagation()}
+                     role="slider"
+                     tabIndex={0}
+                     aria-label="Video progress slider"
+                     aria-valuemin={0}
+                     aria-valuemax={duration || 100}
+                     aria-valuenow={currentTime || 0}
                    >
                      {/* Visual Background Track (4px sleek bar) */}
                      <div style={visualTrackStyle}>
@@ -1275,24 +1321,13 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                        <div style={{ ...progressFillStyle, width: `${progressPercent}%` }} />
                      </div>
 
-                     {/* Interactive Scrubbing Slider Overlay (36px comfortable touch zone) */}
-                     <input 
-                       type="range" 
-                       min="0" 
-                       max={duration > 0 ? duration : 100} 
-                       step="0.05"
-                       value={currentTime || 0} 
-                       aria-label="Video scrubber"
-                       className="sleek-range-overlay"
-                       onMouseDown={handleSeekStart}
-                       onTouchStart={handleSeekStart}
-                       onPointerDown={handleSeekStart}
-                       onChange={handleSeekChange}
-                       onInput={handleSeekChange}
-                       onMouseUp={handleSeekEnd}
-                       onTouchEnd={handleSeekEnd}
-                       onPointerUp={handleSeekEnd}
-                       style={rangeOverlayStyle}
+                     {/* Interactive Scrubbing Thumb */}
+                     <div 
+                       style={{
+                         ...scrubberThumbStyle,
+                         left: `${progressPercent}%`,
+                         transform: `translate(-50%, -50%) scale(${isDragging ? 1.35 : 1})`
+                       }} 
                      />
                    </div>
 
@@ -1409,68 +1444,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       <style>{`
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .spin-animation { animation: spin 1s linear infinite; }
-        
-        /* Sleek transparent range scrubber overlay */
-        .sleek-range-overlay {
-          position: absolute;
-          left: 0;
-          right: 0;
-          width: 100%;
-          height: 36px;
-          background: transparent;
-          appearance: none;
-          -webkit-appearance: none;
-          outline: none;
-          cursor: pointer;
-          touch-action: none;
-          z-index: 2;
-          margin: 0;
-          padding: 0;
-        }
-        .sleek-range-overlay::-webkit-slider-runnable-track {
-          background: transparent;
-          border: none;
-          height: 36px;
-          cursor: pointer;
-        }
-        .sleek-range-overlay::-webkit-slider-thumb {
-          appearance: none;
-          -webkit-appearance: none;
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          background: #ffffff;
-          box-shadow: 0 1px 6px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.15);
-          cursor: grab;
-          margin-top: 11px;
-          transition: transform 0.15s ease;
-        }
-        .sleek-range-overlay:hover::-webkit-slider-thumb,
-        .sleek-range-overlay:active::-webkit-slider-thumb {
-          transform: scale(1.35);
-          cursor: grabbing;
-        }
-        .sleek-range-overlay::-moz-range-track {
-          background: transparent;
-          border: none;
-          height: 36px;
-          cursor: pointer;
-        }
-        .sleek-range-overlay::-moz-range-thumb {
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          background: #ffffff;
-          border: none;
-          box-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
-          cursor: grab;
-          transition: transform 0.15s ease;
-        }
-        .sleek-range-overlay:hover::-moz-range-thumb,
-        .sleek-range-overlay:active::-moz-range-thumb {
-          transform: scale(1.35);
-          cursor: grabbing;
-        }
+
 
         /* Heart burst animation for double-tap */
         @keyframes heartBurst {
@@ -1585,7 +1559,9 @@ const progressContainerStyle = {
   flex: 1,
   height: "36px",
   cursor: "pointer",
-  touchAction: "none"
+  touchAction: "none",
+  userSelect: "none",
+  WebkitUserSelect: "none"
 };
 const visualTrackStyle = {
   position: "absolute",
@@ -1600,22 +1576,20 @@ const visualTrackStyle = {
 const progressFillStyle = {
   height: "100%",
   backgroundColor: "#ffffff",
-  borderRadius: "9999px"
+  borderRadius: "9999px",
+  pointerEvents: "none"
 };
-const rangeOverlayStyle = {
+const scrubberThumbStyle = {
   position: "absolute",
-  left: 0,
-  right: 0,
-  width: "100%",
-  height: "36px",
-  background: "transparent",
-  appearance: "none",
-  WebkitAppearance: "none",
-  outline: "none",
-  cursor: "pointer",
-  touchAction: "none",
-  margin: 0,
-  padding: 0
+  top: "50%",
+  width: "14px",
+  height: "14px",
+  borderRadius: "50%",
+  backgroundColor: "#ffffff",
+  boxShadow: "0 1px 6px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.2)",
+  pointerEvents: "none",
+  transition: "transform 0.15s ease",
+  cursor: "grab"
 };
 const timeDisplayStyle = { display: "flex", alignItems: "center", fontSize: "12px", fontWeight: "600", fontVariantNumeric: "tabular-nums", color: "#ffffff", whiteSpace: "nowrap", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", flexShrink: 0 };
 

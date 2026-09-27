@@ -5,6 +5,7 @@ import { renderClickableCaption } from "./ClickableCaption";
 
 export default function CommentSectionModal({ video, onClose }) {
   const [comments, setComments] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   const listRef = useRef(null);
@@ -16,18 +17,30 @@ export default function CommentSectionModal({ video, onClose }) {
     return () => { document.body.style.overflow = originalOverflow; };
   }, []);
 
-  // 🟢 Fetch comments
+  // 🟢 Fetch comments with instant response and loading feedback
   useEffect(() => {
+    if (!video?.message_id) return;
+    let isMounted = true;
+    setIsLoading(true);
     fetch(`${APP_CONFIG.apiUrl}/api/comments/${video.message_id}`)
       .then(res => res.ok ? res.json() : [])
-      .then(data => setComments(data))
-      .catch(err => console.error("Failed to load comments", err));
-  }, [video]);
+      .then(data => {
+        if (isMounted) {
+          setComments(Array.isArray(data) ? data : []);
+          setIsLoading(false);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load comments", err);
+        if (isMounted) setIsLoading(false);
+      });
+    return () => { isMounted = false; };
+  }, [video?.message_id]);
 
   // 🟢 Scroll to bottom when a new comment is added
   useEffect(() => {
     if (listRef.current) {
-      listRef.current.scrollTop = 0; // Assuming we want newest at the top, or you can scroll to bottom
+      listRef.current.scrollTop = 0;
     }
   }, [comments.length]);
 
@@ -75,7 +88,9 @@ export default function CommentSectionModal({ video, onClose }) {
 
           {/* Header */}
           <div style={commentHeaderWrapperStyle}>
-            <h3 style={commentHeaderTitleStyle}>{comments.length} Comments</h3>
+            <h3 style={commentHeaderTitleStyle}>
+              {comments.length > 0 ? comments.length : (video.comments_count || 0)} Comments
+            </h3>
             <button onClick={onClose} style={closeBottomSheetBtnStyle} aria-label="Close comments">
               <X size={20} color="#fff" />
             </button>
@@ -83,7 +98,19 @@ export default function CommentSectionModal({ video, onClose }) {
 
           {/* Comment List */}
           <div style={commentsListStyle} className="custom-scrollbar" ref={listRef}>
-            {comments.length === 0 ? (
+            {isLoading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "10px 0" }}>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start", opacity: 0.6 }}>
+                    <div style={{ width: "36px", height: "36px", borderRadius: "50%", backgroundColor: "#262626", animation: "pulse 1.5s infinite" }} />
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <div style={{ width: "90px", height: "12px", borderRadius: "4px", backgroundColor: "#262626", animation: "pulse 1.5s infinite" }} />
+                      <div style={{ width: "75%", height: "14px", borderRadius: "4px", backgroundColor: "#222222", animation: "pulse 1.5s infinite" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : comments.length === 0 ? (
               <p style={{ textAlign: "center", color: "#888", marginTop: "30px" }}>
                 No comments yet. Be the first to reply!
               </p>
@@ -136,6 +163,7 @@ export default function CommentSectionModal({ video, onClose }) {
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUpModal { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.75; } }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }

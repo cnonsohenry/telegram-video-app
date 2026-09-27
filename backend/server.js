@@ -322,6 +322,9 @@ async function initDatabase() {
         )
       `);
 
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_comments_message_id_created_at ON comments (message_id, created_at DESC)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments (user_id)`);
+
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS likes_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS comments_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS shares_count BIGINT DEFAULT 0`);
@@ -1949,9 +1952,10 @@ app.get("/api/comments/:message_id", async (req, res) => {
     const { rows } = await pool.query(`
       SELECT c.id, c.content, c.created_at, u.username, u.avatar_url 
       FROM comments c
-      JOIN app_users u ON c.user_id = u.id
+      LEFT JOIN app_users u ON c.user_id = u.id
       WHERE c.message_id = $1
       ORDER BY c.created_at DESC
+      LIMIT 100
     `, [message_id]);
     res.json(rows);
   } catch (err) {
