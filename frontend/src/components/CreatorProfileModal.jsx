@@ -73,7 +73,12 @@ export default function CreatorProfileModal({
           setVideoPage(1);
 
           if (autoOpenSubscribe && !isSub && !data.creator.is_owner) {
-            setShowSubscribeModal(true);
+            const token = localStorage.getItem("token");
+            if (!token) {
+              promptLogin("subscribe");
+            } else {
+              setShowSubscribeModal(true);
+            }
           }
         }
       } catch (err) {
@@ -92,7 +97,12 @@ export default function CreatorProfileModal({
 
   useEffect(() => {
     if (autoOpenSubscribe && !isSubscribed && creatorData && !creatorData.is_owner && Number(creatorData.subscription_price || 0) > 0) {
-      setShowSubscribeModal(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        promptLogin("subscribe");
+      } else {
+        setShowSubscribeModal(true);
+      }
     }
   }, [autoOpenSubscribe, isSubscribed, creatorData]);
 

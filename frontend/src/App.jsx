@@ -4,7 +4,6 @@ import Explore from "./pages/Explore";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./components/AdminDashboard"; 
 import AuthForm from "./components/AuthForm";
-import PitchView from "./components/PitchView";
 import FullscreenPlayer from "./components/FullscreenPlayer"; 
 import PaywallModal from "./components/PaywallModal"; 
 import LegalPages from "./pages/LegalPages"; 
@@ -19,7 +18,7 @@ import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 import { APP_CONFIG } from "./config";
 import { isUserSubscribedToCreator, getVideoCreatorHandle, isUserAdExempt } from "./utils/subscription";
 import { triggerSmartlinkIfEligible, syncVipAdFreeState } from "./utils/adManager";
-import { showToast } from "./utils/toast";
+import { showToast, promptLogin } from "./utils/toast";
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
@@ -42,7 +41,6 @@ export default function App() {
   });
 
   const [isFooterVisible, setIsFooterVisible] = useState(true);
-  const [hasSeenPitch, setHasSeenPitch] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); 
   const [showPaywall, setShowPaywall] = useState(false);
   // 🟢 Initialize activeLegalPage from URL query param (?legal=about, ?legal=terms, etc.)
@@ -449,11 +447,13 @@ export default function App() {
     window.addEventListener("openDiscoverCreators", handleOpenDiscoverCreators);
     window.addEventListener("refreshUser", refreshUser);
     window.addEventListener("openLoginPrompt", handleOpenLoginPrompt);
+    window.addEventListener("promptLogin", handleOpenLoginPrompt);
     return () => {
       window.removeEventListener("openCreatorProfile", handleOpenCreatorEvent);
       window.removeEventListener("openDiscoverCreators", handleOpenDiscoverCreators);
       window.removeEventListener("refreshUser", refreshUser);
       window.removeEventListener("openLoginPrompt", handleOpenLoginPrompt);
+      window.removeEventListener("promptLogin", handleOpenLoginPrompt);
     };
   }, [handleOpenCreator, handleOpenDiscoverCreators, refreshUser]);
 
@@ -510,7 +510,13 @@ export default function App() {
   }, []);
 
   const isLoggedIn = !!token;
-  const needsPitch = !isLoggedIn && activeTab === "profile" && !hasSeenPitch;
+
+  useEffect(() => {
+    if (showPaywall && !isLoggedIn) {
+      setShowPaywall(false);
+      promptLogin("subscribe");
+    }
+  }, [showPaywall, isLoggedIn]);
 
   useEffect(() => {
     document.title = `${APP_CONFIG.appNamePrefix}${APP_CONFIG.appNameSuffix}`;
@@ -522,7 +528,7 @@ export default function App() {
   }, [user]);
 
   const isVipExempt = isUserAdExempt(user);
-  const isAdFreeZone = isVipExempt || needsPitch || activeTab === "profile" || activeTab === "admin" || showPaywall || !!activeLegalPage || !!viewingCreator || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo;
+  const isAdFreeZone = isVipExempt || activeTab === "profile" || activeTab === "admin" || (showPaywall && isLoggedIn) || !!activeLegalPage || !!viewingCreator || (!!activeVideo && !isSharedVideoView) || !!activeCommentVideo;
   
   useAdZapper(isAdFreeZone);
 
@@ -618,6 +624,11 @@ export default function App() {
             if (isPremium) {
               const hasAccess = isUserSubscribedToCreator(user, videoData);
               if (!hasAccess) {
+                const token = localStorage.getItem("token");
+                if (!token) {
+                  promptLogin("subscribe");
+                  return;
+                }
                 const creatorHandle = getVideoCreatorHandle(videoData);
                 window.dispatchEvent(new CustomEvent("openCreatorProfile", {
                   detail: { username: creatorHandle, autoSubscribe: true }
@@ -690,7 +701,6 @@ export default function App() {
 
     if (window.location.pathname === "/login") {
       handleTabSwitch("profile", true); 
-      setHasSeenPitch(true);   
       window.history.replaceState({ tab: "profile" }, document.title, "/"); 
     }
   }, [token, user, applyTheme, handleTabSwitch]);
@@ -706,6 +716,11 @@ export default function App() {
         const hasFee = creatorPrice === null ? true : creatorPrice > 0;
         const hasAccess = Boolean(video.is_subscribed || !hasFee || isUserSubscribedToCreator(user, video));
         if (!hasAccess) {
+          const token = localStorage.getItem("token");
+          if (!token) {
+            promptLogin("subscribe");
+            return;
+          }
           const creatorHandle = getVideoCreatorHandle(video);
           handleOpenCreator(creatorHandle, { autoSubscribe: true });
           return;
@@ -749,10 +764,6 @@ export default function App() {
       showToast(`🚨 Playback Error: ${e.message}`, "error"); 
     }
   };
-
-  if (needsPitch) {
-    return <PitchView onComplete={() => setHasSeenPitch(true)} />;
-  }
 
   return (
     <div style={{ 
@@ -882,7 +893,7 @@ export default function App() {
         </nav>
       )}
 
-      {showPaywall && (
+      {showPaywall && isLoggedIn && (
         <PaywallModal user={user} onClose={handleClosePaywall} />
       )}
 
@@ -951,6 +962,9 @@ export default function App() {
         onLogin={() => {
           setLoginPromptAction(null);
           if (activeVideo) setActiveVideo(null);
+          setViewingCreator(null);
+          setShowDiscoverCreators(false);
+          setShowPaywall(false);
           handleTabSwitch("profile");
         }} 
       />

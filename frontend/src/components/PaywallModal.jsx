@@ -3,7 +3,7 @@ import { X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, ArrowLeft, Copy, Q
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
-import { showToast } from "../utils/toast";
+import { showToast, promptLogin } from "../utils/toast";
 
 export default function PaywallModal({ onClose, user }) {
   const [selectedMethod, setSelectedMethod] = useState(null); 
@@ -19,16 +19,29 @@ export default function PaywallModal({ onClose, user }) {
   const [copiedField, setCopiedField] = useState(null); 
   
   const [cryptoPaidClicked, setCryptoPaidClicked] = useState(false);
-  const [showAuthAlert, setShowAuthAlert] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!user || !user.id || !token) {
+      promptLogin("subscribe");
+      onClose();
+    }
+  }, [user, onClose]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
 
+  if (!user || !user.id || !localStorage.getItem("token")) {
+    return null;
+  }
+
   const handleMethodSelect = (method) => {
-    if (!user || !user.id) {
-      setShowAuthAlert(true); 
+    const token = localStorage.getItem("token");
+    if (!user || !user.id || !token) {
+      promptLogin("subscribe");
+      onClose();
       return;
     }
     setSelectedMethod(method);
@@ -169,10 +182,6 @@ export default function PaywallModal({ onClose, user }) {
   };
 
   const resetState = () => {
-    if (showAuthAlert) {
-      setShowAuthAlert(false);
-      return;
-    }
     setSelectedMethod(null); 
     setSelectedPackage(null);
     setCryptoPaymentDetails(null);
@@ -185,7 +194,7 @@ export default function PaywallModal({ onClose, user }) {
       <div style={topNavStyle}>
         <button 
           onClick={() => {
-            if (!verifying && verifyStatus !== "success" && (selectedMethod || showAuthAlert)) {
+            if (!verifying && verifyStatus !== "success" && selectedMethod) {
               resetState();
             } else if (!verifying) {
               onClose();
@@ -206,41 +215,7 @@ export default function PaywallModal({ onClose, user }) {
 
       <div style={scrollAreaStyle}>
         <div style={innerContentStyle}>
-
-          {showAuthAlert && (
-            <div style={{ ...centerFlexStyle, textAlign: "center", animation: "fadeInUp 0.3s ease-out" }}>
-              <div style={headerStyle}>
-                <div style={{...iconWrapperStyle, background: "rgba(255, 59, 48, 0.1)"}}>
-                  <UserX size={32} color="#ff3b30" />
-                </div>
-                <h2 style={titleStyle}>Login Required</h2>
-                <p style={{...subStyle, fontSize: "15px", marginTop: "10px", color: "#ddd"}}>
-                  You need to be logged in to subscribe to Premium.
-                </p>
-              </div>
-
-              <div style={{...actionColumnStyle, marginTop: "20px"}}>
-                <button 
-                  onClick={() => {
-                    onClose();
-                    window.location.href = "/login";
-                  }} 
-                  style={{...payButtonStyle, background: "var(--primary-color)"}}
-                >
-                  Continue to Login
-                </button>
-
-                <button 
-                  onClick={() => setShowAuthAlert(false)} 
-                  style={{...payButtonStyle, background: "transparent", border: "1px solid #333"}}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-          
-          {!showAuthAlert && !selectedMethod && (
+          {!selectedMethod && (
             <div style={centerFlexStyle}>
               <div style={headerStyle}>
                 <div style={iconWrapperStyle}>

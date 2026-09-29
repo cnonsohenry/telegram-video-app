@@ -4,6 +4,7 @@ import {
   Loader2, Sparkles, ArrowLeft, Lock, Star, MessageCircle, AlertCircle
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
+import { promptLogin } from "../utils/toast";
 
 export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuccess }) {
   const [selectedCoin, setSelectedCoin] = useState(null);
@@ -17,11 +18,23 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
   const rawPrice = Number(creator?.subscription_price || 0);
   const priceUsd = rawPrice > 0 ? Math.max(2, rawPrice) : 10;
 
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      promptLogin("subscribe");
+      onClose();
+    }
+  }, [onClose]);
+
   // Prevent background scroll while modal is open
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
+
+  if (!localStorage.getItem("token")) {
+    return null;
+  }
 
   // Polling for blockchain confirmation
   useEffect(() => {

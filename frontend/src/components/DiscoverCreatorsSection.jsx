@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Sparkles, ChevronLeft, ChevronRight, X, CheckCircle, ArrowRight } from "lucide-react";
 import { APP_CONFIG } from "../config";
-import { showToast } from "../utils/toast";
+import { showToast, promptLogin } from "../utils/toast";
 
 export default function DiscoverCreatorsSection({ 
   creators: initialCreators, 
@@ -62,7 +62,7 @@ export default function DiscoverCreatorsSection({
     e.stopPropagation();
     const token = localStorage.getItem("token");
     if (!token) {
-      window.dispatchEvent(new CustomEvent("promptLogin", { detail: { action: "follow" } }));
+      promptLogin("follow");
       return;
     }
 

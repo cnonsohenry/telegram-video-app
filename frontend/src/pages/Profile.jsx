@@ -18,7 +18,7 @@ import { useVideos } from "../hooks/useVideos";
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
-import { showToast } from "../utils/toast";
+import { showToast, promptLogin } from "../utils/toast";
 
 export default function Profile({ 
   user, 
@@ -392,6 +392,11 @@ export default function Profile({
     if (video.category === "premium" || activeTab === "premium" || video.is_premium) {
       const hasAccess = isUserSubscribedToCreator(user, video);
       if (!hasAccess) {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          promptLogin("subscribe");
+          return;
+        }
         const creatorHandle = getVideoCreatorHandle(video);
         window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
           detail: { username: creatorHandle, autoSubscribe: true } 

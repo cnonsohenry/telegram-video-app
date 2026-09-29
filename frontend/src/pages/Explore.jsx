@@ -436,6 +436,11 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!isUnlocked) {
+                      const token = localStorage.getItem("token");
+                      if (!token) {
+                        promptLogin("subscribe");
+                        return;
+                      }
                       if (onCreatorClick) {
                         onCreatorClick(creatorHandle, { autoSubscribe: true });
                       } else {
@@ -538,6 +543,11 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
                 style={albumSubscribeBarBtnStyle}
                 onClick={(e) => {
                   e.stopPropagation();
+                  const token = localStorage.getItem("token");
+                  if (!token) {
+                    promptLogin("subscribe");
+                    return;
+                  }
                   if (onCreatorClick) {
                     onCreatorClick(creatorHandle, { autoSubscribe: true });
                   } else {
@@ -559,6 +569,11 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
             style={{ ...videoContainerStyle, width: isPortrait ? "75%" : "100%" }} 
             onClick={() => {
               if (!isUnlocked) {
+                const token = localStorage.getItem("token");
+                if (!token) {
+                  promptLogin("subscribe");
+                  return;
+                }
                 if (onCreatorClick) {
                   onCreatorClick(creatorHandle, { autoSubscribe: true });
                 } else {
@@ -614,6 +629,11 @@ const FeedPost = ({ video, isLast, lastElementRef, onVideoClick, onCommentClick,
                     style={vipSubscribeButtonStyle}
                     onClick={(e) => {
                       e.stopPropagation();
+                      const token = localStorage.getItem("token");
+                      if (!token) {
+                        promptLogin("subscribe");
+                        return;
+                      }
                       if (onCreatorClick) {
                         onCreatorClick(creatorHandle, { autoSubscribe: true });
                       } else {
@@ -1434,7 +1454,15 @@ const DesktopRightSidebar = ({
             highlights.slice(0, 4).map((v, i) => (
               <div
                 key={`hl-${v.message_id || v.id}-${i}`}
-                onClick={() => onVideoClick(v)}
+                onClick={() => {
+                  const isPrem = v.category === "premium" || v.is_premium;
+                  const isUnl = !isPrem || isUserSubscribedToCreator(user, v);
+                  if (!isUnl && !localStorage.getItem("token")) {
+                    promptLogin("subscribe");
+                    return;
+                  }
+                  onVideoClick(v);
+                }}
                 style={desktopHighlightCardStyle}
                 onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"}
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}

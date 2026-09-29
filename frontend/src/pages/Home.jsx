@@ -10,7 +10,7 @@ import { triggerSmartlinkIfEligible } from "../utils/adManager";
 import LegalFooter from "../components/LegalFooter";
 import { APP_CONFIG } from "../config"; 
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription"; 
-import { showToast } from "../utils/toast"; 
+import { showToast, promptLogin } from "../utils/toast"; 
 
 const MAX_CACHE_SIZE = 4;
 const TREND_TIMEFRAMES = ["all_time", "monthly", "weekly"];
@@ -401,6 +401,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     if (video.category === "premium" || video.is_premium) {
       const hasAccess = isUserSubscribedToCreator(user, video);
       if (!hasAccess) {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          promptLogin("subscribe");
+          return;
+        }
         const creatorHandle = getVideoCreatorHandle(video);
         window.dispatchEvent(new CustomEvent("openCreatorProfile", {
           detail: { username: creatorHandle, autoSubscribe: true }
