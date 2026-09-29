@@ -1202,6 +1202,7 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
   }
 
   return {
+    id: v.id,
     chat_id: v.chat_id,
     message_id: v.message_id,
     views: v.views,
@@ -1243,7 +1244,9 @@ app.get("/api/videos", async (req, res) => {
     const category = req.query.category || "hotties";
     
     const isCommunity = req.query.community === "true" || category === "community";
-    const communityCondition = isCommunity ? "v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND (au.is_banned IS NOT TRUE OR au.is_banned IS NULL)" : "(v.is_community IS NOT TRUE)";
+    const communityCondition = isCommunity 
+      ? "(v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au WHERE (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id) AND au.is_banned = TRUE))" 
+      : "(v.is_community IS NOT TRUE)";
     
     // 🟢 NEW: Extract sort and seed parameters
     const sort = (req.query.sort || "").toLowerCase().trim();
@@ -1459,10 +1462,14 @@ app.get("/api/community/videos", async (req, res) => {
     const apiBaseUrl = process.env.API_BASE_URL;
 
     let searchClause = "";
+    let searchClauseCount = "";
     let queryValues = [limit, offset];
+    let countValues = [];
     if (q) {
       searchClause = "AND (v.caption ILIKE $3 OR au.username ILIKE $3 OR au.display_name ILIKE $3)";
+      searchClauseCount = "AND (v.caption ILIKE $1 OR au.username ILIKE $1 OR au.display_name ILIKE $1)";
       queryValues = [limit, offset, `%${q}%`];
+      countValues = [`%${q}%`];
     }
 
     const query = `
@@ -1471,7 +1478,7 @@ app.get("/api/community/videos", async (req, res) => {
           ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
           COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
         FROM videos v 
-        ${q ? `LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)` : ``}
+        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
         WHERE ${IS_COMMUNITY_SQL}
         ${searchClause}
       ),
@@ -1491,14 +1498,14 @@ app.get("/api/community/videos", async (req, res) => {
     const countQuery = `
       SELECT COUNT(DISTINCT CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) 
       FROM videos v 
-      ${q ? `LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)` : ``}
+      LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
       WHERE ${IS_COMMUNITY_SQL}
-      ${searchClause}
+      ${searchClauseCount}
     `;
 
     const [videosRes, countRes] = await Promise.all([
       pool.query(query, queryValues),
-      pool.query(countQuery, q ? [`%${q}%`] : [])
+      pool.query(countQuery, countValues)
     ]);
 
     const videos = videosRes.rows.map(v => mapVideoToResponse(v, apiBaseUrl));
