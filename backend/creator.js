@@ -1390,11 +1390,37 @@ router.post("/:username/tip", authenticateToken, async (req, res) => {
    7. GET FEATURED CREATORS (AUTHENTIC TELEGRAM CREATORS ONLY)
    GET /api/creator/featured/list
 ======================================================= */
+// 🟢 In-memory cache for featured creators list (90s TTL)
+let cachedFeaturedCreators = null;
+let cachedFeaturedTime = 0;
+const FEATURED_CACHE_TTL = 90 * 1000;
+
 router.get("/featured/list", optionalAuth, async (req, res) => {
   try {
     const currentUserId = req.user?.id || null;
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 24, 1), 150);
     const search = req.query.q || req.query.search || null;
+
+    // Fast-path: In-memory cache for default discover list (no search query)
+    if (!search && cachedFeaturedCreators && (Date.now() - cachedFeaturedTime < FEATURED_CACHE_TTL)) {
+      let myFollows = new Set();
+      if (currentUserId) {
+        try {
+          const followRes = await pool.query(
+            "SELECT creator_id FROM creator_follows WHERE follower_id = $1",
+            [currentUserId]
+          );
+          myFollows = new Set(followRes.rows.map(r => String(r.creator_id)));
+        } catch (fErr) {}
+      }
+
+      const result = cachedFeaturedCreators.slice(0, limit).map(c => ({
+        ...c,
+        is_following: currentUserId ? Boolean(myFollows.has(String(c.id)) || (c.telegram_user_id && myFollows.has(String(c.telegram_user_id)))) : false
+      }));
+
+      return res.json({ creators: result });
+    }
 
     // Return exclusively genuine Telegram creators with randomized dynamic rotation
     // Strictly filter out any web user accounts
@@ -1542,6 +1568,9 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
         const bCount = (b.sample_videos && b.sample_videos.length > 0) ? 1 : 0;
         return bCount - aCount;
       });
+      // Store in memory cache for subsequent requests
+      cachedFeaturedCreators = creators;
+      cachedFeaturedTime = Date.now();
     }
 
     res.json({ creators });

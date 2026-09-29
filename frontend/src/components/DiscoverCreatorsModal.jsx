@@ -6,6 +6,9 @@ import {
 import { APP_CONFIG } from "../config";
 import { showToast, promptLogin } from "../utils/toast";
 
+// 🟢 Fast in-memory cache for instant Discover modal display
+let memoryCachedCreators = null;
+
 export default function DiscoverCreatorsModal({ 
   isOpen, 
   onClose, 
@@ -13,14 +16,39 @@ export default function DiscoverCreatorsModal({
   onCreatorClick,
   onVideoClick
 }) {
-  const [creators, setCreators] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [creators, setCreators] = useState(() => {
+    if (memoryCachedCreators && memoryCachedCreators.length > 0) {
+      return memoryCachedCreators;
+    }
+    try {
+      const saved = sessionStorage.getItem("cached_discover_creators");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryCachedCreators = parsed;
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  const [loading, setLoading] = useState(() => {
+    if (memoryCachedCreators && memoryCachedCreators.length > 0) return false;
+    try {
+      const saved = sessionStorage.getItem("cached_discover_creators");
+      if (saved && JSON.parse(saved).length > 0) return false;
+    } catch (e) {}
+    return true;
+  });
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [followingMap, setFollowingMap] = useState({});
   const [loadingFollowMap, setLoadingFollowMap] = useState({});
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 768);
   const historyPushedRef = useRef(false);
+  const isFirstSearchRef = useRef(true);
 
   // Resize listener
   useEffect(() => {
@@ -64,8 +92,10 @@ export default function DiscoverCreatorsModal({
   }, [onClose]);
 
   // Fetch creators list
-  const fetchCreators = useCallback(async (query = "") => {
-    setLoading(true);
+  const fetchCreators = useCallback(async (query = "", isBackground = false) => {
+    if (!isBackground) {
+      setLoading(true);
+    }
     try {
       const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -84,6 +114,12 @@ export default function DiscoverCreatorsModal({
             return !email.includes("@gmail.com") && !email.includes("@yahoo.com") && !email.includes("@hotmail.com");
           });
           setCreators(tgOnly);
+          if (!query.trim()) {
+            memoryCachedCreators = tgOnly;
+            try {
+              sessionStorage.setItem("cached_discover_creators", JSON.stringify(tgOnly.slice(0, 50)));
+            } catch (e) {}
+          }
 
           // Seed following map
           const initialFollows = {};
@@ -104,19 +140,20 @@ export default function DiscoverCreatorsModal({
 
   useEffect(() => {
     if (isOpen) {
-      fetchCreators();
+      const hasCached = Boolean(memoryCachedCreators && memoryCachedCreators.length > 0);
+      fetchCreators("", hasCached);
     }
   }, [isOpen, fetchCreators]);
 
-  // Search debounce
+  // Search debounce - only triggers when search query actually changes
   useEffect(() => {
     if (!isOpen) return;
+    if (isFirstSearchRef.current) {
+      isFirstSearchRef.current = false;
+      return;
+    }
     const timer = setTimeout(() => {
-      if (searchQuery.trim().length > 1) {
-        fetchCreators(searchQuery.trim());
-      } else if (searchQuery.trim().length === 0) {
-        fetchCreators();
-      }
+      fetchCreators(searchQuery.trim());
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery, isOpen, fetchCreators]);
@@ -395,8 +432,6 @@ export default function DiscoverCreatorsModal({
                           onCreatorClick(uname);
                         }
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.025)"; }}
                     >
                       {/* Top Row: Avatar on left; Name, bio, follow count closer together without exceeding avatar pic */}
                       <div style={topRowStyle}>
@@ -569,7 +604,7 @@ const backdropStyle = {
 
 const desktopModalStyle = {
   width: "100%",
-  maxWidth: "620px",
+  maxWidth: "680px",
   height: "85vh",
   maxHeight: "820px",
   backgroundColor: "#121212",
@@ -693,25 +728,26 @@ const categoryPillStyle = {
 };
 
 const cardsContainerStyle = {
-  padding: "14px 16px 28px 16px"
+  padding: "4px 16px 36px 16px"
 };
 
 const gridOrListStyle = {
   display: "flex",
   flexDirection: "column",
-  gap: "12px"
+  gap: "0px"
 };
 
 const creatorCardStyle = {
-  backgroundColor: "rgba(255, 255, 255, 0.025)",
-  border: "1px solid rgba(255, 255, 255, 0.07)",
-  borderRadius: "14px",
-  padding: "14px 14px",
+  backgroundColor: "transparent",
+  border: "none",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+  borderRadius: "0",
+  padding: "16px 0 20px 0",
   display: "flex",
   flexDirection: "column",
   gap: "12px",
   cursor: "pointer",
-  transition: "background-color 0.15s ease, border-color 0.15s ease",
+  transition: "opacity 0.15s ease",
   boxSizing: "border-box",
   width: "100%"
 };
@@ -850,7 +886,7 @@ const followersCountStyle = {
 const thumbnailsGridStyle = {
   display: "grid",
   gridTemplateColumns: "repeat(4, 1fr)",
-  gap: "2px",
+  gap: "3px",
   width: "100%",
   boxSizing: "border-box",
   borderRadius: "8px",
@@ -955,10 +991,11 @@ const emptyStateStyle = {
 };
 
 const skeletonCardStyle = {
-  backgroundColor: "rgba(255, 255, 255, 0.025)",
-  border: "1px solid rgba(255, 255, 255, 0.06)",
-  borderRadius: "14px",
-  padding: "14px 14px",
+  backgroundColor: "transparent",
+  border: "none",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+  borderRadius: "0",
+  padding: "16px 0 20px 0",
   display: "flex",
   flexDirection: "column",
   gap: "12px",
