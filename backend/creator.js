@@ -802,7 +802,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
     // 1. Search in app_users
     let creatorQuery = await pool.query(
       `SELECT id, username, avatar_url, role, is_premium,
-              is_creator, is_managed, telegram_user_id, display_name, creator_bio, banner_url, creator_category, 
+              is_creator, is_managed, telegram_user_id, source_channel, display_name, creator_bio, banner_url, creator_category, 
               subscription_price, social_links, is_verified, location, website, created_at
        FROM app_users 
        WHERE LOWER(username) = LOWER($1) 
