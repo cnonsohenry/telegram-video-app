@@ -6,6 +6,7 @@ import express from "express";
 import { authenticateToken } from "./auth.js"; 
 import pool from "./db.js";
 import { deleteMediaFromR2 } from "./r2.js";
+import { syncTelegramCreatorProfile } from "./telegramCreatorSync.js";
 
 const router = express.Router();
 
@@ -450,6 +451,22 @@ export async function syncTelegramCreators(poolInstance) {
       console.warn("[SYNC TELEGRAM CREATORS] VIP migration notice:", mErr.message);
     }
 
+    // Automatically fetch profile pic and bio from Telegram for managed creators
+    try {
+      const managedRes = await db.query(
+        "SELECT * FROM app_users WHERE is_creator = TRUE AND (is_managed = TRUE OR telegram_user_id IS NOT NULL)"
+      );
+      for (const mc of managedRes.rows) {
+        try {
+          await syncTelegramCreatorProfile(mc, db);
+        } catch (sErr) {
+          console.warn(`[SYNC TELEGRAM CREATORS] Warning syncing ${mc.username}:`, sErr.message);
+        }
+      }
+    } catch (syncErr) {
+      console.warn("[SYNC TELEGRAM CREATORS] Profile pic/bio sync notice:", syncErr.message);
+    }
+
     console.log(`[SYNC TELEGRAM CREATORS] Successfully synced/verified ${count} Telegram creator(s).`);
     return { success: true, count };
   } catch (err) {
@@ -579,7 +596,10 @@ router.get("/creators", authenticateToken, isAdmin, async (req, res) => {
         u.username, 
         u.email, 
         COALESCE(u.display_name, u.username) as display_name, 
-        u.avatar_url, 
+        CASE 
+          WHEN u.avatar_url IS NOT NULL AND u.avatar_url != '' AND u.avatar_url NOT LIKE '%default-avatar%' THEN u.avatar_url 
+          ELSE '/api/avatar?user_id=' || COALESCE(u.telegram_user_id, u.id) 
+        END as avatar_url, 
         u.banner_url, 
         u.creator_bio, 
         COALESCE(u.creator_category, 'Creator') as creator_category, 
@@ -588,6 +608,7 @@ router.get("/creators", authenticateToken, isAdmin, async (req, res) => {
         COALESCE(u.is_creator, false) as is_creator, 
         COALESCE(u.is_managed, false) as is_managed,
         u.telegram_user_id,
+        u.source_channel,
         u.created_at,
         (
           SELECT COUNT(*) 
@@ -774,6 +795,16 @@ router.put("/creator/:id", authenticateToken, isAdmin, async (req, res) => {
       }
     }
 
+    if (req.body.source_channel !== undefined) {
+      updates.push(`source_channel = $${idx++}`);
+      values.push(req.body.source_channel ? String(req.body.source_channel).trim() : null);
+    }
+
+    if (req.body.telegram_user_id !== undefined) {
+      updates.push(`telegram_user_id = $${idx++}`);
+      values.push(req.body.telegram_user_id ? Number(req.body.telegram_user_id) : null);
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: "No fields provided to update" });
     }
@@ -784,7 +815,7 @@ router.put("/creator/:id", authenticateToken, isAdmin, async (req, res) => {
       SET ${updates.join(", ")} 
       WHERE id = $${idx} 
       RETURNING id, username, email, display_name, avatar_url, banner_url, 
-                creator_bio, creator_category, subscription_price, is_verified, is_creator, is_managed, telegram_user_id
+                creator_bio, creator_category, subscription_price, is_verified, is_creator, is_managed, telegram_user_id, source_channel
     `;
 
     const result = await pool.query(query, values);
@@ -792,10 +823,40 @@ router.put("/creator/:id", authenticateToken, isAdmin, async (req, res) => {
       return res.status(404).json({ error: "Creator not found" });
     }
 
-    res.json({ success: true, creator: result.rows[0] });
+    let creator = result.rows[0];
+    if (req.body.fetch_telegram === true) {
+      try {
+        creator = await syncTelegramCreatorProfile(creator, pool);
+      } catch (fErr) {
+        console.warn("[ADMIN UPDATE CREATOR] Fetch telegram notice:", fErr.message);
+      }
+    }
+
+    res.json({ success: true, creator });
   } catch (err) {
     console.error("[ADMIN UPDATE CREATOR ERROR]", err);
     res.status(500).json({ error: "Failed to update creator" });
+  }
+});
+
+// 🟢 11B. SYNC SINGLE TELEGRAM CREATOR (Fetch Profile Pic & Bio from Channel)
+router.post("/creator/:id/sync-telegram", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const creatorId = req.params.id;
+    const { source_channel } = req.body;
+    const existing = await pool.query("SELECT * FROM app_users WHERE id = $1", [creatorId]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: "Creator not found" });
+    }
+    const creator = existing.rows[0];
+    if (source_channel !== undefined) {
+      creator.source_channel = source_channel ? String(source_channel).trim() : null;
+    }
+    const updated = await syncTelegramCreatorProfile(creator, pool);
+    res.json({ success: true, creator: updated });
+  } catch (err) {
+    console.error("[ADMIN SYNC SINGLE CREATOR ERROR]", err);
+    res.status(500).json({ error: err.message || "Failed to sync creator from Telegram" });
   }
 });
 

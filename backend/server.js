@@ -27,6 +27,7 @@ import adminRoutes, { syncTelegramCreators, migrateLegacyVipToCreator } from "./
 import authRoutes, { authenticateToken, JWT_SECRET } from "./auth.js";
 import creatorRoutes from "./creator.js";
 import pool from "./db.js";
+import { fetchTelegramChat } from "./telegramCreatorSync.js";
 import multer from "multer";
 import { uploadDirectToStream } from "./controllers/upload_premium.js";
 import { verifyPayment } from "./controllers/payment.js";
@@ -1613,7 +1614,10 @@ app.get("/api/search", async (req, res) => {
 
       const creatorQuery = `
         SELECT u.id, u.username, u.display_name, 
-               COALESCE(NULLIF(u.avatar_url, ''), '/api/avatar?user_id=' || u.telegram_user_id) as avatar_url, 
+               CASE 
+                 WHEN u.avatar_url IS NOT NULL AND u.avatar_url != '' AND u.avatar_url NOT LIKE '%default-avatar%' THEN u.avatar_url 
+                 ELSE '/api/avatar?user_id=' || COALESCE(u.telegram_user_id, u.id) 
+               END as avatar_url, 
                u.banner_url, u.creator_category, 
                u.creator_bio, u.is_verified, u.subscription_price, u.telegram_user_id,
                COALESCE(followers.cnt, 0)::INT as followers_count,
@@ -2133,43 +2137,82 @@ app.get("/api/thumb", (req, res) => {
 ======================================================= */
 app.get("/api/avatar", async (req, res) => {
   try {
-    const { user_id } = req.query;
+    const rawId = req.query.user_id || req.query.username || req.query.channel;
     
     // Prevent bad requests from breaking the image
-    if (!user_id || user_id === 'undefined' || user_id === 'null') {
+    if (!rawId || rawId === 'undefined' || rawId === 'null') {
       return res.redirect('/assets/default-avatar.png');
     }
 
+    const cleanStr = String(rawId).trim();
+    const numericId = /^-?\d+$/.test(cleanStr) ? Number(cleanStr) : null;
+
     // Check if user exists in app_users and has a custom avatar_url
+    let userRow = null;
     try {
       const userRes = await pool.query(
-        "SELECT avatar_url FROM app_users WHERE id = $1::BIGINT OR telegram_user_id = $1::BIGINT LIMIT 1",
-        [user_id]
+        `SELECT id, username, telegram_user_id, source_channel, avatar_url, creator_bio, display_name 
+         FROM app_users 
+         WHERE ${numericId !== null ? "(id = $1::BIGINT OR telegram_user_id = $1::BIGINT) OR" : ""} 
+               (username IS NOT NULL AND LOWER(username) = LOWER($2)) 
+         LIMIT 1`,
+        numericId !== null ? [numericId, cleanStr] : [cleanStr]
       );
-      if (userRes.rows.length > 0 && userRes.rows[0].avatar_url && !userRes.rows[0].avatar_url.includes('/api/avatar')) {
-        return res.redirect(userRes.rows[0].avatar_url);
+      if (userRes.rows.length > 0) {
+        userRow = userRes.rows[0];
+        if (userRow.avatar_url && 
+            !userRow.avatar_url.includes('/api/avatar') && 
+            !userRow.avatar_url.includes('default-avatar')) {
+          return res.redirect(userRow.avatar_url);
+        }
       }
     } catch (dbErr) {
       // Ignore DB error and proceed to Telegram photo lookup
     }
 
-    const numericId = Number(user_id);
-    let fileId = null;
+    // Determine candidate identifiers to query on Telegram
+    const candidates = [];
+    if (userRow?.source_channel) candidates.push(userRow.source_channel);
+    if (userRow?.telegram_user_id) candidates.push(String(userRow.telegram_user_id));
+    if (numericId !== null) candidates.push(String(numericId));
+    if (userRow?.username && !userRow.username.startsWith("tg_")) candidates.push(`@${userRow.username}`);
+    if (cleanStr.startsWith("@") || cleanStr.startsWith("http")) candidates.push(cleanStr);
+    else if (numericId === null) candidates.push(`@${cleanStr}`);
 
-    if (numericId < 0) {
-      // Telegram Channel or Supergroup photo lookup via getChat
-      const chatRes = await axios.get(`${TELEGRAM_API}/getChat`, {
-        params: { chat_id: user_id }
-      });
-      fileId = chatRes.data?.result?.photo?.big_file_id || chatRes.data?.result?.photo?.small_file_id;
-    } else {
-      // Telegram User profile photos lookup
-      const photosRes = await axios.get(`${TELEGRAM_API}/getUserProfilePhotos`, {
-        params: { user_id, limit: 1 }
-      });
-      const photos = photosRes.data?.result?.photos;
-      if (photos && photos.length > 0) {
-        fileId = photos[0][photos[0].length - 1]?.file_id || photos[0][0]?.file_id;
+    let fileId = null;
+    let foundChatData = null;
+
+    for (const target of candidates) {
+      const chatRes = await fetchTelegramChat(target);
+      if (chatRes.ok && chatRes.data) {
+        foundChatData = chatRes.data;
+        if (chatRes.data.photo) {
+          fileId = chatRes.data.photo.big_file_id || chatRes.data.photo.small_file_id;
+          break;
+        }
+      }
+    }
+
+    // If channel photo not found, and we have a positive user ID, try getUserProfilePhotos
+    const targetUserId = userRow?.telegram_user_id || (numericId && numericId > 0 ? numericId : null);
+    if (!fileId && targetUserId && Number(targetUserId) > 0) {
+      try {
+        const photosRes = await axios.get(`${TELEGRAM_API}/getUserProfilePhotos`, {
+          params: { user_id: targetUserId, limit: 1 },
+          timeout: 5000
+        });
+        const photos = photosRes.data?.result?.photos;
+        if (photos && photos.length > 0) {
+          fileId = photos[0][photos[0].length - 1]?.file_id || photos[0][0]?.file_id;
+        }
+      } catch (e) {}
+    }
+
+    // If bio was returned from getChat and userRow has generic/empty bio, update in background
+    if (userRow && foundChatData) {
+      const newBio = foundChatData.description || foundChatData.bio;
+      if (newBio && (!userRow.creator_bio || userRow.creator_bio.startsWith("Official creator channel") || userRow.creator_bio.startsWith("Official Telegram channel"))) {
+        pool.query("UPDATE app_users SET creator_bio = $1 WHERE id = $2", [newBio.trim().slice(0, 500), userRow.id]).catch(() => {});
       }
     }
 
@@ -2177,8 +2220,8 @@ app.get("/api/avatar", async (req, res) => {
       return res.redirect('/assets/default-avatar.png');
     }
 
-    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId } });
-    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
+    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId }, timeout: 8000 });
+    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer", timeout: 10000 });
     
     res.set({
       "Content-Type": "image/jpeg",

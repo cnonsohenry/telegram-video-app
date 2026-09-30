@@ -36,6 +36,7 @@ export default function AdminDashboard({ user, onLogout }) {
   const [creatorFilter, setCreatorFilter] = useState("all");
   const [creatorCategoryFilter, setCreatorCategoryFilter] = useState("all");
   const [syncingTelegram, setSyncingTelegram] = useState(false);
+  const [syncingSingleCreator, setSyncingSingleCreator] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [videosList, setVideosList] = useState([]);
 
@@ -223,6 +224,8 @@ export default function AdminDashboard({ user, onLogout }) {
         body: JSON.stringify({
           display_name: editingCreator.display_name,
           username: editingCreator.username,
+          source_channel: editingCreator.source_channel,
+          telegram_user_id: editingCreator.telegram_user_id,
           creator_category: editingCreator.creator_category,
           subscription_price: Number(editingCreator.subscription_price),
           creator_bio: editingCreator.creator_bio,
@@ -243,6 +246,38 @@ export default function AdminDashboard({ user, onLogout }) {
       }
     } catch (err) {
       showToast("Failed to update creator: " + err.message, "error");
+    }
+  };
+
+  const handleFetchTelegramProfile = async () => {
+    if (!editingCreator || !editingCreator.id) return;
+    setSyncingSingleCreator(true);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creator/${editingCreator.id}/sync-telegram`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({
+          source_channel: editingCreator.source_channel
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.creator) {
+        setEditingCreator(prev => ({
+          ...prev,
+          ...data.creator
+        }));
+        setCreatorsList(prev => prev.map(c => c.id === editingCreator.id ? { ...c, ...data.creator } : c));
+        showToast("Fetched creator profile & bio from Telegram!", "success");
+      } else {
+        showToast(data.error || "Failed to fetch from Telegram", "error");
+      }
+    } catch (err) {
+      showToast("Error syncing from Telegram: " + err.message, "error");
+    } finally {
+      setSyncingSingleCreator(false);
     }
   };
 
@@ -1121,7 +1156,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
       {editingCreator && (
         <div style={modalOverlayStyle}>
-          <form onSubmit={handleSaveCreatorEdit} style={modalBoxStyle}>
+          <form onSubmit={handleSaveCreatorEdit} style={{ ...modalBoxStyle, maxHeight: "90vh", overflowY: "auto" }}>
             <div style={modalHeaderStyle}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <Sparkles size={18} color="#FFD700" />
@@ -1162,6 +1197,43 @@ export default function AdminDashboard({ user, onLogout }) {
                 <option value="true">🤖 Telegram Funnel / Managed Creator</option>
                 <option value="false">🌐 Registered Web Creator</option>
               </select>
+            </div>
+
+            <div style={inputGroupStyle}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Telegram Channel / Handle</label>
+                <button
+                  type="button"
+                  disabled={syncingSingleCreator}
+                  onClick={handleFetchTelegramProfile}
+                  style={{
+                    background: "rgba(0, 136, 204, 0.2)",
+                    border: "1px solid #0088cc",
+                    color: "#38bdf8",
+                    borderRadius: "6px",
+                    padding: "4px 8px",
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    cursor: syncingSingleCreator ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                >
+                  <RefreshCw size={12} className={syncingSingleCreator ? "animate-spin" : ""} />
+                  {syncingSingleCreator ? "Fetching..." : "Fetch from Telegram"}
+                </button>
+              </div>
+              <input 
+                type="text" 
+                value={editingCreator.source_channel || ""} 
+                onChange={e => setEditingCreator({ ...editingCreator, source_channel: e.target.value })} 
+                placeholder="@channel_name or https://t.me/channel_name"
+                style={formInputStyle} 
+              />
+              <span style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
+                Enter the channel handle or link, then click "Fetch from Telegram" to auto-load avatar and bio.
+              </span>
             </div>
 
             <div style={inputGroupStyle}>
@@ -1218,14 +1290,24 @@ export default function AdminDashboard({ user, onLogout }) {
             </div>
 
             <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Avatar Image URL</label>
-              <input 
-                type="text" 
-                value={editingCreator.avatar_url || ""} 
-                onChange={e => setEditingCreator({ ...editingCreator, avatar_url: e.target.value })} 
-                placeholder="https://... or /api/avatar?user_id=..."
-                style={formInputStyle} 
-              />
+              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Avatar Image</label>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                {editingCreator.avatar_url && (
+                  <img 
+                    src={editingCreator.avatar_url.startsWith("http") ? editingCreator.avatar_url : `${APP_CONFIG.apiUrl}${editingCreator.avatar_url}`} 
+                    alt="Avatar Preview" 
+                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                    style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", border: "1px solid #444", flexShrink: 0 }}
+                  />
+                )}
+                <input 
+                  type="text" 
+                  value={editingCreator.avatar_url || ""} 
+                  onChange={e => setEditingCreator({ ...editingCreator, avatar_url: e.target.value })} 
+                  placeholder="https://... or /api/avatar?user_id=..."
+                  style={{ ...formInputStyle, flex: 1 }} 
+                />
+              </div>
             </div>
 
             <div style={inputGroupStyle}>

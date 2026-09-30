@@ -18,6 +18,7 @@ import {
   ALLOWED_VIDEO_MIMES, 
   R2_PUBLIC_DOMAIN 
 } from "./r2.js";
+import { syncTelegramCreatorProfile } from "./telegramCreatorSync.js";
 
 const router = express.Router();
 
@@ -926,6 +927,23 @@ router.get("/:username", optionalAuth, async (req, res) => {
       }
     }
 
+    // 🟢 AUTO-SYNC TELEGRAM CREATOR: Automatically grab profile pic and bio from Telegram channel/profile
+    if (creator && (creator.is_managed || creator.telegram_user_id)) {
+      const isPlaceholderBio = !creator.creator_bio || 
+        creator.creator_bio.startsWith("Official creator channel") || 
+        creator.creator_bio.startsWith("Official Telegram channel") || 
+        creator.creator_bio.startsWith("Welcome to my official creator hub");
+      const isPlaceholderAvatar = !creator.avatar_url || creator.avatar_url.includes("default-avatar");
+
+      if (isPlaceholderBio || isPlaceholderAvatar) {
+        try {
+          creator = await syncTelegramCreatorProfile(creator, pool);
+        } catch (syncErr) {
+          console.warn("[CREATOR PROFILE] Telegram sync notice:", syncErr.message);
+        }
+      }
+    }
+
     // Default values
     if (!creator.display_name) creator.display_name = creator.username;
     if (!creator.banner_url) creator.banner_url = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80";
@@ -1495,7 +1513,10 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
     // Return exclusively genuine Telegram creators with randomized dynamic rotation
     // Strictly filter out any web user accounts
     let query = `SELECT u.id, u.username, u.display_name, 
-              COALESCE(NULLIF(u.avatar_url, ''), '/api/avatar?user_id=' || u.telegram_user_id) as avatar_url, 
+              CASE 
+                WHEN u.avatar_url IS NOT NULL AND u.avatar_url != '' AND u.avatar_url NOT LIKE '%default-avatar%' THEN u.avatar_url 
+                ELSE '/api/avatar?user_id=' || COALESCE(u.telegram_user_id, u.id) 
+              END as avatar_url, 
               u.banner_url, u.creator_category, 
               u.creator_bio, u.is_verified, u.subscription_price, u.telegram_user_id,
               COALESCE(followers.cnt, 0)::INT as followers_count,
