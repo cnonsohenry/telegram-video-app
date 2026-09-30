@@ -190,6 +190,13 @@ export default function Profile({
   const [creatorPostsPage, setCreatorPostsPage] = useState(1);
   const [hasMoreCreatorPosts, setHasMoreCreatorPosts] = useState(true);
 
+  // Creator's VIP Exclusive posts state
+  const [creatorPremiumPosts, setCreatorPremiumPosts] = useState([]);
+  const [creatorPremiumLoading, setCreatorPremiumLoading] = useState(false);
+  const [creatorPremiumPage, setCreatorPremiumPage] = useState(1);
+  const [hasMoreCreatorPremiumPosts, setHasMoreCreatorPremiumPosts] = useState(true);
+  const [hasLoadedPremiumOnce, setHasLoadedPremiumOnce] = useState(false);
+
   const fetchCreatorPosts = useCallback(async (targetPage, isNew) => {
     if (!user?.username || !user?.is_creator) return;
     setCreatorPostsLoading(true);
@@ -213,6 +220,30 @@ export default function Profile({
     }
   }, [user?.username, user?.is_creator, fetchLimit]);
 
+  const fetchCreatorPremiumPosts = useCallback(async (targetPage, isNew) => {
+    if (!user?.username || !user?.is_creator) return;
+    setCreatorPremiumLoading(true);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(user.username)}/videos?tab=premium&page=${targetPage}&limit=${fetchLimit}`);
+      const data = await res.json();
+      if (data?.videos) {
+        setCreatorPremiumPosts(prev => {
+          const combined = isNew ? data.videos : [...prev, ...data.videos];
+          const map = new Map();
+          combined.forEach(v => map.set(`${v.chat_id}:${v.message_id}`, v));
+          return Array.from(map.values());
+        });
+        setHasMoreCreatorPremiumPosts(Boolean(data.hasMore));
+        setCreatorPremiumPage(targetPage + 1);
+        setHasLoadedPremiumOnce(true);
+      }
+    } catch (e) {
+      console.error("Failed to load creator VIP posts", e);
+    } finally {
+      setCreatorPremiumLoading(false);
+    }
+  }, [user?.username, user?.is_creator, fetchLimit]);
+
   useEffect(() => {
     if (user?.is_creator && user?.username) {
       setCreatorPostsPage(1);
@@ -220,9 +251,20 @@ export default function Profile({
     }
   }, [user?.is_creator, user?.username, fetchCreatorPosts]);
 
+  useEffect(() => {
+    if (user?.is_creator && user?.username && activeTab === "premium" && !hasLoadedPremiumOnce && !creatorPremiumLoading) {
+      setCreatorPremiumPage(1);
+      fetchCreatorPremiumPosts(1, true);
+    }
+  }, [user?.is_creator, user?.username, activeTab, hasLoadedPremiumOnce, creatorPremiumLoading, fetchCreatorPremiumPosts]);
+
   const handleUploadSuccess = (newVideo) => {
     if (!newVideo) return;
     setCreatorPosts(prev => [newVideo, ...prev]);
+    const isVip = String(newVideo.category || "").toLowerCase().trim() === "premium" || Boolean(newVideo.is_premium);
+    if (isVip) {
+      setCreatorPremiumPosts(prev => [newVideo, ...prev]);
+    }
     setCreatorStats(prev => ({
       ...prev,
       posts: (prev.posts || 0) + 1
@@ -247,11 +289,11 @@ export default function Profile({
       };
     } else if (activeTab === "premium") {
       // Creator sees their own VIP Exclusive / Premium uploaded content
-      rawVideosToDisplay = creatorPosts.filter(v => v.category === "premium");
-      loading = creatorPostsLoading;
+      rawVideosToDisplay = creatorPremiumPosts;
+      loading = creatorPremiumLoading;
       loadMore = () => {
-        if (!creatorPostsLoading && hasMoreCreatorPosts) {
-          fetchCreatorPosts(creatorPostsPage, false);
+        if (!creatorPremiumLoading && hasMoreCreatorPremiumPosts) {
+          fetchCreatorPremiumPosts(creatorPremiumPage, false);
         }
       };
     } else if (activeTab === "likes") {
@@ -389,7 +431,8 @@ export default function Profile({
       return;
     }
 
-    if (video.category === "premium" || activeTab === "premium" || video.is_premium) {
+    const isPremium = String(video.category || "").toLowerCase().trim() === "premium" || activeTab === "premium" || Boolean(video.is_premium);
+    if (isPremium) {
       const hasAccess = isUserSubscribedToCreator(user, video);
       if (!hasAccess) {
         const token = localStorage.getItem("token");
@@ -458,7 +501,11 @@ export default function Profile({
           onLogout={onLogout}
           onOpenEditProfile={() => setShowEditModal(true)}
           onOpenCreatorStudio={() => setShowStudioModal(true)}
-          onOpenFanView={() => setShowPreviewModal(true)}
+          onOpenFanView={() => {
+            if (user?.username) {
+              window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: user.username }));
+            }
+          }}
           onOpenBecomeCreator={() => setShowSetupModal(true)}
           onOpenUpload={() => {
             setUploadDefaultCategory(activeTab === "premium" ? "premium" : "community");

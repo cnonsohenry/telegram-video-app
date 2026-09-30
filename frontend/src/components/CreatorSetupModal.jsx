@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ArrowLeft, X, Sparkles, CheckCircle, ShieldCheck, DollarSign, Camera, Globe, Loader2 } from "lucide-react";
 import { APP_CONFIG } from "../config";
+import useModalHistory from "../hooks/useModalHistory";
 
 const BANNER_PRESETS = [
   { label: "Luxury Noir", url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80" },
@@ -19,6 +20,7 @@ const CATEGORIES = [
 ];
 
 export default function CreatorSetupModal({ user, onClose, onSetupSuccess }) {
+  const handleSafeClose = useModalHistory(true, onClose, "creatorSetup");
   const [displayName, setDisplayName] = useState(user?.display_name || user?.username || "");
   const [category, setCategory] = useState(user?.creator_category || "Model & Glamour");
   const [bio, setBio] = useState(user?.creator_bio || "Welcome to my official VIP hub. Subscribe for daily exclusive shots and uncensored content 🔥");
@@ -80,7 +82,7 @@ export default function CreatorSetupModal({ user, onClose, onSetupSuccess }) {
       if (onSetupSuccess) {
         onSetupSuccess(data.user);
       }
-      onClose();
+      handleSafeClose();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -92,7 +94,7 @@ export default function CreatorSetupModal({ user, onClose, onSetupSuccess }) {
     <div style={fullscreenContainerStyle}>
       {/* Instagram Top Navigation Bar */}
       <div style={topNavStyle}>
-        <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
+        <button onClick={handleSafeClose} style={navBackBtnStyle} aria-label="Back">
           <ArrowLeft size={24} color="#fff" />
         </button>
 

@@ -943,6 +943,20 @@ router.get("/:username", optionalAuth, async (req, res) => {
       }
     } catch (e) {}
 
+    const isNaijaHomemade = 
+      String(creator.username || "").toLowerCase() === "naijahomemade" ||
+      String(username || "").toLowerCase() === "naijahomemade" ||
+      String(creator.telegram_user_id) === "1881815190" ||
+      String(creator.id) === "458";
+
+    if (isNaijaHomemade && !creator.telegram_user_id) {
+      creator.telegram_user_id = 1881815190;
+    }
+
+    const legacyCondition = isNaijaHomemade 
+      ? "OR (LOWER(v.category) = 'premium' AND (v.uploader_id = 1881815190 OR v.uploader_id = 458 OR v.uploader_id IS NULL OR v.uploader_id = 0 OR (v.chat_id != 'internal' AND (v.cloudflare_id IS NULL OR NOT v.cloudflare_id LIKE 'r2:%'))))"
+      : "";
+
     // Video & views stats
     const statsRes = await pool.query(
       `SELECT 
@@ -951,12 +965,15 @@ router.get("/:username", optionalAuth, async (req, res) => {
          COALESCE(SUM(v.likes_count), 0) as likes_count
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
-       WHERE LOWER(COALESCE(u.username, '')) = LOWER($1) 
-          OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
-          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
-          OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
-          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
-          OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)`,
+       WHERE (
+            LOWER(COALESCE(u.username, '')) = LOWER($1) 
+         OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+         OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+         OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
+         OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
+         OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)
+         ${legacyCondition}
+       )`,
       [creator.username, username, String(creator.id || '0'), creator.telegram_user_id || null]
     );
 
@@ -981,10 +998,21 @@ router.get("/:username", optionalAuth, async (req, res) => {
     let isSubscribed = false;
     let isOwner = false;
 
-    if (req.user && creator.id && Number(creator.id) !== 0) {
-      if (Number(req.user.id) === Number(creator.id)) {
+    if (req.user) {
+      const isReqUserOwner = Boolean(
+        (creator.id && Number(req.user.id) === Number(creator.id)) ||
+        (creator.telegram_user_id && req.user.telegram_user_id && String(req.user.telegram_user_id) === String(creator.telegram_user_id)) ||
+        (creator.username && req.user.username && creator.username.toLowerCase() === req.user.username.toLowerCase())
+      );
+
+      if (isReqUserOwner) {
         isOwner = true;
-      } else {
+        isSubscribed = true;
+      } else if (req.user.role === "admin") {
+        isSubscribed = true;
+      } else if (req.user.is_premium && isNaijaHomemade) {
+        isSubscribed = true;
+      } else if (creator.id && Number(creator.id) !== 0) {
         try {
           const [checkFollow, checkSub] = await Promise.all([
             pool.query(
@@ -1002,7 +1030,15 @@ router.get("/:username", optionalAuth, async (req, res) => {
       }
     }
 
-    // 5. Fetch First 12 Videos
+    // 5. Fetch First 12 Videos (tab-aware)
+    const tab = (req.query.tab || req.query.category || "").toLowerCase().trim();
+    let tabFilter = "";
+    if (tab === "premium") {
+      tabFilter = "AND LOWER(v.category) = 'premium'";
+    } else if (tab === "reels") {
+      tabFilter = "AND (v.media_group_id IS NULL OR v.media_group_id = 'none')";
+    }
+
     const videosRes = await pool.query(
       `WITH GroupedVideos AS (
         SELECT v.*,
@@ -1011,12 +1047,15 @@ router.get("/:username", optionalAuth, async (req, res) => {
           COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
         FROM videos v
         LEFT JOIN users u ON v.uploader_id = u.user_id
-        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1) 
-           OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
-           OR LOWER(COALESCE(u.username, '')) = LOWER($2)
-           OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
-           OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
-           OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)
+        WHERE (
+             LOWER(COALESCE(u.username, '')) = LOWER($1) 
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
+          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
+          OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)
+          ${legacyCondition}
+        ) ${tabFilter}
       )
       SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT 12`,
       [creator.username, username, String(creator.id || '0'), creator.telegram_user_id || null]
@@ -1032,7 +1071,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       uploader_name: v.uploader_name || creator.username,
       uploader_handle: creator.username || username,
       subscription_price: creatorSubPrice,
-      is_premium: v.category === "premium",
+      is_premium: String(v.category || "").toLowerCase().trim() === "premium",
       category: v.category,
       caption: v.caption,
       views: Number(v.views || 0),
@@ -1075,6 +1114,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
 ======================================================= */
 router.get("/:username/videos", async (req, res) => {
   const { username } = req.params;
+  const tab = (req.query.tab || req.query.category || "").toLowerCase().trim();
   const page = Math.max(1, Number(req.query.page || 1));
   const limit = Math.max(1, Math.min(50, Number(req.query.limit || 12)));
   const offset = (page - 1) * limit;
@@ -1104,6 +1144,30 @@ router.get("/:username/videos", async (req, res) => {
       creatorSubPrice = 15;
     }
 
+    const isNaijaHomemade = 
+      String(username || "").toLowerCase() === "naijahomemade" ||
+      String(creatorUsername || "").toLowerCase() === "naijahomemade" ||
+      String(creatorTgId) === "1881815190" ||
+      String(creatorId) === "458";
+
+    if (isNaijaHomemade && !creatorTgId) {
+      creatorTgId = 1881815190;
+    }
+
+    const legacyCondition = isNaijaHomemade 
+      ? "OR (LOWER(v.category) = 'premium' AND (v.uploader_id = 1881815190 OR v.uploader_id = 458 OR v.uploader_id IS NULL OR v.uploader_id = 0 OR (v.chat_id != 'internal' AND (v.cloudflare_id IS NULL OR NOT v.cloudflare_id LIKE 'r2:%'))))"
+      : "";
+
+    let tabFilter = "";
+    let tabFilterCount = "";
+    if (tab === "premium") {
+      tabFilter = "AND LOWER(v.category) = 'premium'";
+      tabFilterCount = "AND LOWER(v.category) = 'premium'";
+    } else if (tab === "reels") {
+      tabFilter = "AND (v.media_group_id IS NULL OR v.media_group_id = 'none')";
+      tabFilterCount = "AND (media_group_id IS NULL OR media_group_id = 'none')";
+    }
+
     const videosRes = await pool.query(
       `WITH GroupedVideos AS (
         SELECT v.*,
@@ -1112,12 +1176,15 @@ router.get("/:username/videos", async (req, res) => {
           COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
         FROM videos v
         LEFT JOIN users u ON v.uploader_id = u.user_id
-        WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
-           OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
-           OR LOWER(COALESCE(u.username, '')) = LOWER($2)
-           OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
-           OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
-           OR ($6::BIGINT IS NOT NULL AND v.uploader_id = $6::BIGINT)
+        WHERE (
+             LOWER(COALESCE(u.username, '')) = LOWER($1)
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+          OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
+          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
+          OR ($6::BIGINT IS NOT NULL AND v.uploader_id = $6::BIGINT)
+          ${legacyCondition}
+        ) ${tabFilter}
       )
       SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT $4 OFFSET $5`,
       [username, creatorUsername, String(creatorId || '0'), limit, offset, creatorTgId]
@@ -1127,12 +1194,15 @@ router.get("/:username/videos", async (req, res) => {
       `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END)
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
-       WHERE LOWER(COALESCE(u.username, '')) = LOWER($1)
-          OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
-          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
-          OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
-          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
-          OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)`,
+       WHERE (
+            LOWER(COALESCE(u.username, '')) = LOWER($1)
+         OR LOWER(COALESCE(u.full_name, '')) = LOWER($1)
+         OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+         OR LOWER(COALESCE(u.full_name, '')) = LOWER($2)
+         OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
+         OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)
+         ${legacyCondition}
+       ) ${tabFilterCount}`,
       [username, creatorUsername, String(creatorId || '0'), creatorTgId]
     );
 
@@ -1147,7 +1217,7 @@ router.get("/:username/videos", async (req, res) => {
       uploader_name: v.uploader_name || username,
       uploader_handle: creatorUsername,
       subscription_price: creatorSubPrice,
-      is_premium: v.category === "premium",
+      is_premium: String(v.category || "").toLowerCase().trim() === "premium",
       category: v.category,
       caption: v.caption,
       views: Number(v.views || 0),
@@ -1549,7 +1619,7 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
         likes_count: Number(v.likes_count || 0),
         category: v.category,
         caption: v.caption || "",
-        is_premium: v.category === "premium",
+        is_premium: String(v.category || "").toLowerCase().trim() === "premium",
         subscription_price: Number(c.subscription_price || 0),
         uploader_id: c.telegram_user_id || c.id,
         uploader_name: c.display_name || c.username,

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { showToast } from "../utils/toast";
+import useModalHistory from "../hooks/useModalHistory";
 
 export default function CreatorUploadModal({ 
   isOpen, 
@@ -14,6 +15,7 @@ export default function CreatorUploadModal({
   defaultCategory = "community",
   user 
 }) {
+  const handleSafeClose = useModalHistory(isOpen, onClose, "creatorUpload");
   const [videoFile, setVideoFile] = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
   const [caption, setCaption] = useState("");
@@ -404,7 +406,7 @@ export default function CreatorUploadModal({
       }
 
       setTimeout(() => {
-        onClose();
+        handleSafeClose();
         handleReset();
       }, 1200);
 
@@ -428,7 +430,7 @@ export default function CreatorUploadModal({
         <div style={headerBarStyle}>
           <button 
             type="button" 
-            onClick={onClose} 
+            onClick={handleSafeClose} 
             disabled={isUploading}
             style={closeIconButtonStyle}
             aria-label="Close"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { 
   ArrowLeft, CheckCircle, Share2, Heart, Lock, Grid3X3, 
   MapPin, Globe, Sparkles, Send, Play, Loader2, MessageCircle,
@@ -32,9 +32,31 @@ export default function CreatorProfileModal({
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
-  const [videoPage, setVideoPage] = useState(1);
-  const [hasMoreVideos, setHasMoreVideos] = useState(false);
-  const [loadingMoreVideos, setLoadingMoreVideos] = useState(false);
+  const [tabVideos, setTabVideos] = useState({
+    posts: [],
+    reels: [],
+    premium: []
+  });
+  const [tabPages, setTabPages] = useState({
+    posts: 1,
+    reels: 1,
+    premium: 1
+  });
+  const [tabHasMore, setTabHasMore] = useState({
+    posts: false,
+    reels: false,
+    premium: false
+  });
+  const [tabLoading, setTabLoading] = useState({
+    posts: false,
+    reels: false,
+    premium: false
+  });
+  const [loadedTabs, setLoadedTabs] = useState({
+    posts: true,
+    reels: false,
+    premium: false
+  });
 
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
 
@@ -43,6 +65,41 @@ export default function CreatorProfileModal({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  const fetchTabVideos = useCallback(async (targetTab, targetPage = 1, isAppend = false) => {
+    setTabLoading(prev => ({ ...prev, [targetTab]: true }));
+    try {
+      const cleanUsername = String(creatorUsername || "").replace(/^@/, "").trim();
+      const token = localStorage.getItem("token");
+      const headers = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const res = await fetch(
+        `${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUsername)}/videos?tab=${targetTab}&page=${targetPage}&limit=12`,
+        { headers }
+      );
+      const data = await res.json();
+      if (data?.videos) {
+        setTabVideos(prev => {
+          const prevList = isAppend ? (prev[targetTab] || []) : [];
+          const map = new Map();
+          prevList.forEach(v => map.set(`${v.chat_id}:${v.message_id}`, v));
+          data.videos.forEach(v => map.set(`${v.chat_id}:${v.message_id}`, v));
+          return {
+            ...prev,
+            [targetTab]: Array.from(map.values())
+          };
+        });
+        setTabPages(prev => ({ ...prev, [targetTab]: targetPage }));
+        setTabHasMore(prev => ({ ...prev, [targetTab]: Boolean(data.hasMore) }));
+        setLoadedTabs(prev => ({ ...prev, [targetTab]: true }));
+      }
+    } catch (err) {
+      console.error(`Failed to load ${targetTab} videos`, err);
+    } finally {
+      setTabLoading(prev => ({ ...prev, [targetTab]: false }));
+    }
+  }, [creatorUsername]);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,15 +119,31 @@ export default function CreatorProfileModal({
         const data = await res.json();
         if (isMounted) {
           setCreatorData(data.creator);
-          setVideos(data.videos || []);
+          const initialVideos = data.videos || [];
+          setVideos(initialVideos);
+          setTabVideos(prev => ({
+            ...prev,
+            posts: initialVideos
+          }));
           const isSub = Boolean(data.creator.is_subscribed);
           const isFoll = Boolean(data.creator.is_following);
           setIsSubscribed(isSub);
           setIsFollowing(isFoll);
           setSubscribersCount(Number(data.creator.stats?.subscribers || 0));
           setFollowersCount(Number(data.creator.stats?.followers || 0));
-          setHasMoreVideos(Boolean(data.videos && data.videos.length >= 12));
-          setVideoPage(1);
+          setTabHasMore(prev => ({
+            ...prev,
+            posts: Boolean(initialVideos.length >= 12)
+          }));
+          setTabPages(prev => ({
+            ...prev,
+            posts: 1
+          }));
+          setLoadedTabs({
+            posts: true,
+            reels: false,
+            premium: false
+          });
 
           if (autoOpenSubscribe && !isSub && !data.creator.is_owner) {
             const token = localStorage.getItem("token");
@@ -96,6 +169,17 @@ export default function CreatorProfileModal({
   }, [creatorUsername]);
 
   useEffect(() => {
+    if (!creatorData) return;
+    if (activeTab === "premium" && !loadedTabs.premium && !tabLoading.premium) {
+      fetchTabVideos("premium", 1, false);
+    } else if (activeTab === "reels" && !loadedTabs.reels && !tabLoading.reels) {
+      fetchTabVideos("reels", 1, false);
+    } else if (activeTab === "posts" && !loadedTabs.posts && !tabLoading.posts) {
+      fetchTabVideos("posts", 1, false);
+    }
+  }, [activeTab, creatorData, loadedTabs, tabLoading, fetchTabVideos]);
+
+  useEffect(() => {
     if (autoOpenSubscribe && !isSubscribed && creatorData && !creatorData.is_owner && Number(creatorData.subscription_price || 0) > 0) {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -106,31 +190,12 @@ export default function CreatorProfileModal({
     }
   }, [autoOpenSubscribe, isSubscribed, creatorData]);
 
-  const handleLoadMoreVideos = async () => {
-    if (loadingMoreVideos || !hasMoreVideos) return;
-    setLoadingMoreVideos(true);
-    const nextPage = videoPage + 1;
-    try {
-      const cleanUsername = String(creatorUsername || "").replace(/^@/, "").trim();
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUsername)}/videos?page=${nextPage}&limit=12`);
-      const data = await res.json();
-      if (data?.videos && data.videos.length > 0) {
-        setVideos(prev => {
-          const map = new Map();
-          prev.forEach(v => map.set(`${v.chat_id}:${v.message_id}`, v));
-          data.videos.forEach(v => map.set(`${v.chat_id}:${v.message_id}`, v));
-          return Array.from(map.values());
-        });
-        setVideoPage(nextPage);
-        setHasMoreVideos(Boolean(data.hasMore));
-      } else {
-        setHasMoreVideos(false);
-      }
-    } catch (err) {
-      console.error("Failed to load more videos", err);
-    } finally {
-      setLoadingMoreVideos(false);
-    }
+  const handleLoadMoreVideos = () => {
+    const curLoading = tabLoading[activeTab];
+    const curHasMore = tabHasMore[activeTab];
+    if (curLoading || !curHasMore) return;
+    const nextPage = (tabPages[activeTab] || 1) + 1;
+    fetchTabVideos(activeTab, nextPage, true);
   };
 
   const handleFollowToggle = async () => {
@@ -268,28 +333,27 @@ export default function CreatorProfileModal({
 
   const avatar = creatorData?.avatar_url || "/assets/default-avatar.png";
   const price = Number(creatorData?.subscription_price || 0);
-  const postsCount = creatorData?.stats?.posts || videos.length || 0;
+  const cleanUname = String(creatorData?.username || creatorUsername || "").toLowerCase().replace(/^@/, "").trim();
+  const isOwner = Boolean(
+    creatorData?.is_owner || 
+    (currentUser && (
+      (currentUser.username && currentUser.username.toLowerCase().replace(/^@/, "").trim() === cleanUname) ||
+      (currentUser.id && creatorData?.id && String(currentUser.id) === String(creatorData.id))
+    ))
+  );
+  const hasUniversalAccess = currentUser?.role === "admin" || (currentUser?.is_premium && cleanUname === "naijahomemade");
+  const hasAccess = price <= 0 || isSubscribed || isOwner || hasUniversalAccess;
+
+  const postsCount = creatorData?.stats?.posts || (tabVideos.posts.length > 0 ? tabVideos.posts.length : videos.length) || 0;
   const likesCount = creatorData?.stats?.likes || 0;
 
-  const displayedVideos = activeTab === "reels" 
-    ? videos.filter(v => !v.is_group) 
-    : activeTab === "premium"
-    ? videos.filter(v => v.category === "premium" || v.is_premium)
-    : videos;
+  const displayedVideos = tabVideos[activeTab] || [];
+  const loadingMoreVideos = Boolean(tabLoading[activeTab]);
+  const hasMoreVideos = Boolean(tabHasMore[activeTab]);
 
   const handleVideoCardClick = (vData, e) => {
-    const isPremiumVideo = vData.category === "premium" || Boolean(vData.is_premium);
+    const isPremiumVideo = String(vData.category || "").toLowerCase().trim() === "premium" || Boolean(vData.is_premium);
     const creatorPrice = Number(creatorData?.subscription_price || 0);
-    const isOwner = Boolean(
-      creatorData?.is_owner || 
-      (currentUser && (
-        (currentUser.username && currentUser.username.toLowerCase().replace(/^@/, "").trim() === (creatorData?.username || creatorUsername || "").toLowerCase().replace(/^@/, "").trim()) ||
-        (currentUser.id && creatorData?.id && String(currentUser.id) === String(creatorData.id))
-      ))
-    );
-    // If the creator did not set any subscription fee (creatorPrice <= 0), it is free to play!
-    const hasFee = creatorPrice > 0;
-    const hasAccess = !hasFee || isSubscribed || isOwner || currentUser?.role === "admin";
 
     if (isPremiumVideo && !hasAccess) {
       const token = localStorage.getItem("token");
@@ -674,7 +738,7 @@ export default function CreatorProfileModal({
             </div>
 
             {/* 🌟 3-COLUMN INSTAGRAM SQUARE MEDIA GRID */}
-            {activeTab === "premium" && !isSubscribed && !creatorData?.is_owner && price > 0 ? (
+            {activeTab === "premium" && !hasAccess && price > 0 ? (
               <div style={premiumTabContainerStyle}>
                 <div style={lockedBannerStyle}>
                   <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: "rgba(255, 215, 0, 0.12)", border: "1px solid rgba(255, 215, 0, 0.3)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px" }}>
@@ -695,13 +759,26 @@ export default function CreatorProfileModal({
                 </div>
               </div>
             ) : (
-              displayedVideos.length === 0 ? (
+              loadingMoreVideos && displayedVideos.length === 0 ? (
+                <div style={{ ...loaderCenterStyle, padding: "80px 20px" }}>
+                  <Loader2 size={32} className="animate-spin" color="#FFD700" />
+                  <span style={{ marginTop: "12px", color: "#8e8e93", fontSize: "14px" }}>
+                    {activeTab === "premium" ? "Loading VIP exclusive drops..." : "Loading posts..."}
+                  </span>
+                </div>
+              ) : displayedVideos.length === 0 ? (
                 <div style={emptyVideosStyle}>
                   <div style={{ width: "56px", height: "56px", borderRadius: "50%", border: "2px solid #333", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "12px" }}>
-                    <Grid3X3 size={26} color="#555" />
+                    {activeTab === "premium" ? <Lock size={26} color="#FFD700" /> : <Grid3X3 size={26} color="#555" />}
                   </div>
-                  <span style={{ color: "#fff", fontWeight: "700", fontSize: "15px" }}>No Posts Yet</span>
-                  <span style={{ marginTop: "4px", color: "#8e8e93", fontSize: "13px" }}>When @{creatorUsername} uploads posts or reels, they will appear here.</span>
+                  <span style={{ color: "#fff", fontWeight: "700", fontSize: "15px" }}>
+                    {activeTab === "premium" ? "No VIP Exclusive Drops Yet" : "No Posts Yet"}
+                  </span>
+                  <span style={{ marginTop: "4px", color: "#8e8e93", fontSize: "13px" }}>
+                    {activeTab === "premium" 
+                      ? `When @${creatorUsername} publishes VIP exclusive drops, they will appear here.`
+                      : `When @${creatorUsername} uploads posts or reels, they will appear here.`}
+                  </span>
                 </div>
               ) : (
                 <div style={{ 
@@ -748,7 +825,7 @@ export default function CreatorProfileModal({
                         }}
                       >
                         {loadingMoreVideos && <Loader2 size={16} className="animate-spin" />}
-                        <span>{loadingMoreVideos ? "Loading more..." : "Load More Posts"}</span>
+                        <span>{loadingMoreVideos ? "Loading more..." : (activeTab === "premium" ? "Load More VIP Drops" : "Load More Posts")}</span>
                       </button>
                     </div>
                   )}

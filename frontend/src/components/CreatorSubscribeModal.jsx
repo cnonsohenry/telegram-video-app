@@ -5,8 +5,10 @@ import {
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { promptLogin } from "../utils/toast";
+import useModalHistory from "../hooks/useModalHistory";
 
 export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuccess }) {
+  const handleSafeClose = useModalHistory(true, onClose, "creatorSubscribe");
   const [selectedCoin, setSelectedCoin] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [cryptoDetails, setCryptoDetails] = useState(null);
@@ -121,7 +123,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
               setSelectedCoin(null);
               setError("");
             } else {
-              onClose();
+              handleSafeClose();
             }
           }} 
           style={navBackBtnStyle}
@@ -168,7 +170,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                   </div>
                 </div>
               </div>
-              <button onClick={onClose} style={doneBtnStyle}>
+              <button onClick={handleSafeClose} style={doneBtnStyle}>
                 Start Watching VIP Content
               </button>
             </div>

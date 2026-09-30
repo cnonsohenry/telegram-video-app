@@ -4,6 +4,7 @@ import {
   Loader2, Sparkles, ArrowLeft, ShieldCheck, DollarSign
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
+import useModalHistory from "../hooks/useModalHistory";
 
 const TIP_PRESETS = [
   { amountUsd: 3, label: "$3" },
@@ -14,6 +15,7 @@ const TIP_PRESETS = [
 ];
 
 export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
+  const handleSafeClose = useModalHistory(true, onClose, "creatorTip");
   const [selectedPreset, setSelectedPreset] = useState(TIP_PRESETS[1]); // Default $5
   const [customAmount, setCustomAmount] = useState("");
   const [message, setMessage] = useState("");
@@ -123,7 +125,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
               setError("");
               setHasSentPayment(false);
             } else {
-              onClose();
+              handleSafeClose();
             }
           }} 
           style={navBackBtnStyle}
@@ -170,7 +172,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                   </div>
                 </div>
               </div>
-              <button onClick={onClose} style={doneBtnStyle}>
+              <button onClick={handleSafeClose} style={doneBtnStyle}>
                 Done
               </button>
             </div>

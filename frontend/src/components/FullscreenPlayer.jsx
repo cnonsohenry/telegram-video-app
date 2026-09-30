@@ -14,6 +14,7 @@ import { fetchVastAd, sendVastBeacons } from "../utils/vastParser";
 import { renderClickableCaption } from "./ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
 import ReportModal from "./ReportModal";
+import useModalHistory from "../hooks/useModalHistory";
 
 export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick, onCreatorClick }) {
   const videoRef = useRef(null);
@@ -66,6 +67,10 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     caption: video.caption || "", 
     category: video.category || "hotties" 
   });
+
+  // 🟢 Back Button integration for overlays
+  const handleCloseMenu = useModalHistory(showMenu, () => setShowMenu(false), "playerMenu");
+  const handleCloseEditMode = useModalHistory(isEditingMode, () => setIsEditingMode(false), "playerEdit");
 
   const [isLiked, setIsLiked] = useState(false);
   const isPremium = video?.category === "premium" || video?.is_premium === true;
@@ -677,8 +682,8 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
 
   // ADMIN / UPLOADER HANDLERS
   const handleEditCaption = (e) => {
-    e.stopPropagation();
-    setShowMenu(false);
+    e?.stopPropagation();
+    handleCloseMenu();
     setIsEditingMode(true);
   };
 
@@ -697,7 +702,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       if (res.ok) {
         video.caption = editForm.caption;
         video.category = editForm.category;
-        setIsEditingMode(false);
+        handleCloseEditMode();
         showToast("Video details updated!", "success");
       } else {
         showToast("Failed to save changes. Make sure you have the right permissions.", "error");
@@ -709,8 +714,8 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   };
 
   const handleDeleteVideo = async (e) => {
-    e.stopPropagation();
-    setShowMenu(false);
+    e?.stopPropagation();
+    handleCloseMenu();
     
     if(window.confirm("Are you sure you want to delete this video? This cannot be undone.")) {
       try {
@@ -823,7 +828,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       {showMenu && (
         <div 
           style={playerMenuOverlay} 
-          onClick={(e) => { e.stopPropagation(); setShowMenu(false); }}
+          onClick={(e) => { e.stopPropagation(); handleCloseMenu(); }}
         >
           <div style={playerMenuSheet} onClick={(e) => e.stopPropagation()}>
             <div style={dragHandleWrapper}>
@@ -882,6 +887,11 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 style={{ ...playerMenuItem, color: '#f4212e' }} 
                 onClick={(e) => {
                   e.stopPropagation();
+                  const currentState = window.history.state || {};
+                  const newState = { ...currentState };
+                  delete newState.playerMenu;
+                  newState.reportModal = true;
+                  window.history.replaceState(newState, document.title);
                   setShowMenu(false);
                   setShowReport(true);
                 }}
@@ -897,7 +907,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
               <button 
                 type="button" 
                 style={playerCancelBtn} 
-                onClick={(e) => { e.stopPropagation(); setShowMenu(false); }}
+                onClick={(e) => { e.stopPropagation(); handleCloseMenu(); }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
               >
@@ -1396,7 +1406,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
           <div style={editTopNavStyle}>
             <button 
               type="button" 
-              onClick={() => setIsEditingMode(false)}
+              onClick={handleCloseEditMode}
               style={editNavBackBtnStyle}
               aria-label="Back"
             >

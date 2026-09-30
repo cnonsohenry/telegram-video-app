@@ -3,6 +3,7 @@ import {
   Flag, Frown, UserPlus, UserMinus, Link2, Share2, Trash2, X 
 } from "lucide-react";
 import { showToast, copyToClipboard } from "../utils/toast";
+import useModalHistory from "../hooks/useModalHistory";
 
 export default function PostOptionsModal({
   isOpen,
@@ -15,6 +16,8 @@ export default function PostOptionsModal({
   onFollowToggle,
   onDelete
 }) {
+  const handleSafeClose = useModalHistory(isOpen && Boolean(video), onClose, "postOptions");
+
   if (!isOpen || !video) return null;
 
   const creatorHandle = video.creator_username || video.creator?.username || video.uploader_name || "creator";
@@ -28,7 +31,7 @@ export default function PostOptionsModal({
     const videoId = video.message_id || video.id;
     const shareUrl = `${window.location.origin}/v/${videoId}`;
     await copyToClipboard(shareUrl, "Link copied to clipboard!");
-    onClose();
+    handleSafeClose();
   };
 
   const handleShare = async () => {
@@ -43,7 +46,7 @@ export default function PostOptionsModal({
     if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
       try {
         await navigator.share(shareData);
-        onClose();
+        handleSafeClose();
         return;
       } catch (err) {
         if (err.name !== "AbortError") {
@@ -58,26 +61,31 @@ export default function PostOptionsModal({
   const handleNotInterested = () => {
     if (onNotInterested) onNotInterested(video);
     showToast("Got it. We'll show fewer posts like this.", "info");
-    onClose();
+    handleSafeClose();
   };
 
   const handleFollow = () => {
     if (onFollowToggle) onFollowToggle(creatorHandle);
-    onClose();
+    handleSafeClose();
   };
 
   const handleReportClick = () => {
-    onClose();
+    const currentState = window.history.state || {};
+    const newState = { ...currentState };
+    delete newState.postOptions;
+    newState.reportModal = true;
+    window.history.replaceState(newState, document.title);
     if (onReport) onReport(video);
+    if (onClose) onClose();
   };
 
   const handleDeleteClick = () => {
     if (onDelete) onDelete(video);
-    onClose();
+    handleSafeClose();
   };
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
+    <div style={overlayStyle} onClick={handleSafeClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
         {/* Top Drag Handle Indicator */}
         <div style={dragHandleWrapper}>
@@ -198,7 +206,7 @@ export default function PostOptionsModal({
           <button 
             type="button" 
             style={cancelBtnStyle} 
-            onClick={onClose}
+            onClick={handleSafeClose}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)"}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
           >

@@ -2,8 +2,10 @@ import React, { useState } from "react";
 import { X, Flag, AlertTriangle, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { showToast } from "../utils/toast";
+import useModalHistory from "../hooks/useModalHistory";
 
 export default function ReportModal({ isOpen, onClose, video }) {
+  const handleSafeClose = useModalHistory(isOpen && Boolean(video), onClose, "reportModal");
   const [reason, setReason] = useState("inappropriate");
   const [details, setDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -51,7 +53,7 @@ export default function ReportModal({ isOpen, onClose, video }) {
         setSubmitted(false);
         setDetails("");
         setReason("inappropriate");
-        onClose();
+        handleSafeClose();
       }, 1500);
     } catch (err) {
       showToast(err.message || "Failed to submit report. Please try again.", "error");
@@ -61,7 +63,7 @@ export default function ReportModal({ isOpen, onClose, video }) {
   };
 
   return (
-    <div style={modalBackdrop} onClick={onClose}>
+    <div style={modalBackdrop} onClick={handleSafeClose}>
       <div style={modalBox} onClick={(e) => e.stopPropagation()}>
         {/* Top Drag Handle Indicator */}
         <div style={dragHandleWrapper}>
@@ -76,7 +78,7 @@ export default function ReportModal({ isOpen, onClose, video }) {
           </div>
           <button 
             type="button" 
-            onClick={onClose} 
+            onClick={handleSafeClose} 
             style={closeBtn}
             aria-label="Close report modal"
           >
@@ -152,7 +154,7 @@ export default function ReportModal({ isOpen, onClose, video }) {
             <div style={actionRow}>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleSafeClose}
                 style={cancelBtn}
                 disabled={submitting}
               >

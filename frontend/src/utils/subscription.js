@@ -11,7 +11,7 @@
 export const isUserSubscribedToCreator = (user, video) => {
   if (!video) return false;
 
-  const isPremium = video.category === "premium" || video.is_premium === true;
+  const isPremium = String(video.category || "").toLowerCase().trim() === "premium" || video.is_premium === true;
   if (!isPremium) {
     return true;
   }

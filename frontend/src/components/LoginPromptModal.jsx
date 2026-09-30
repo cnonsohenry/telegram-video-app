@@ -1,9 +1,11 @@
-import React from "react";
 import { 
   X, Heart, MessageCircle, Bookmark, UserPlus, Crown, Lock, ArrowRight, Sparkles 
 } from "lucide-react";
+import useModalHistory from "../hooks/useModalHistory";
 
 export default function LoginPromptModal({ isOpen, action = "continue", onClose, onLogin }) {
+  const handleSafeClose = useModalHistory(isOpen, onClose, "loginPrompt");
+
   if (!isOpen) return null;
 
   const getActionConfig = (act) => {
@@ -78,7 +80,7 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
   const Icon = config.icon;
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
+    <div style={overlayStyle} onClick={handleSafeClose}>
       <div 
         style={cardStyle} 
         onClick={(e) => e.stopPropagation()}
@@ -89,7 +91,7 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
         </div>
 
         <button 
-          onClick={onClose}
+          onClick={handleSafeClose}
           style={closeBtnStyle}
           aria-label="Close"
         >
@@ -126,7 +128,7 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
           <button 
             type="button" 
             onClick={() => {
-              onClose();
+              handleSafeClose();
               if (onLogin) onLogin();
             }}
             style={primaryBtnStyle}
@@ -137,7 +139,7 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
 
           <button 
             type="button" 
-            onClick={onClose}
+            onClick={handleSafeClose}
             style={secondaryBtnStyle}
           >
             Maybe Later

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ArrowLeft, X, Camera, Image, Check, Loader2, Globe, MapPin } from "lucide-react";
 import { APP_CONFIG } from "../config";
+import useModalHistory from "../hooks/useModalHistory";
 
 const BANNER_PRESETS = [
   { label: "Luxury Noir", url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80" },
@@ -10,6 +11,7 @@ const BANNER_PRESETS = [
 ];
 
 export default function EditProfileModal({ user, onClose, onUpdateSuccess }) {
+  const handleSafeClose = useModalHistory(true, onClose, "editProfile");
   const [displayName, setDisplayName] = useState(user?.display_name || user?.username || "");
   const [bio, setBio] = useState(user?.creator_bio || "");
   const [category, setCategory] = useState(user?.creator_category || "Model & Creator");
@@ -68,7 +70,7 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess }) {
       if (onUpdateSuccess) {
         onUpdateSuccess(data.user);
       }
-      onClose();
+      handleSafeClose();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -80,7 +82,7 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess }) {
     <div style={fullscreenContainerStyle}>
       {/* Instagram Top Navigation Bar */}
       <div style={topNavStyle}>
-        <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
+        <button onClick={handleSafeClose} style={navBackBtnStyle} aria-label="Back">
           <ArrowLeft size={24} color="#fff" />
         </button>
 

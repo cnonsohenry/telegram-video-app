@@ -509,16 +509,24 @@ export async function migrateLegacyVipToCreator(poolInstance) {
       );
     }
 
+    // 1b. Ensure Telegram user 1881815190 exists in users table so JOINs succeed
+    await db.query(
+      `INSERT INTO users (user_id, username, full_name)
+       VALUES (1881815190, 'naijahomemade', 'Naija Homemade Series')
+       ON CONFLICT (user_id) DO UPDATE 
+       SET username = 'naijahomemade', full_name = 'Naija Homemade Series'`
+    );
+
     // 2. Move legacy Telegram VIP videos to @naijahomemade (Telegram ID 1881815190)
     // CRITICAL: NEVER overwrite web creator uploads (chat_id = 'internal' or cloudflare_id starting with 'r2:')
     // and NEVER overwrite videos that already have a valid uploader assigned!
     const vidsUpdateRes = await db.query(
       `UPDATE videos 
        SET uploader_id = '1881815190' 
-       WHERE category = 'premium' 
+       WHERE LOWER(category) = 'premium' 
          AND (chat_id IS NULL OR chat_id != 'internal')
          AND (cloudflare_id IS NULL OR NOT cloudflare_id LIKE 'r2:%')
-         AND (uploader_id IS NULL OR uploader_id = 0)`
+         AND (uploader_id IS NULL OR uploader_id = 0 OR uploader_id = 458)`
     );
     const videosMoved = vidsUpdateRes.rowCount || 0;
     console.log(`[MIGRATE VIP] Reassigned ${videosMoved} unassigned legacy premium videos to @naijahomemade (1881815190).`);

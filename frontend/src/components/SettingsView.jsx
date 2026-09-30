@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import LegalFooter from "./LegalFooter";
 import { showToast } from "../utils/toast";
+import useModalHistory from "../hooks/useModalHistory";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -27,6 +28,10 @@ export default function SettingsView({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [activeModal, setActiveModal] = useState(null); // 'account' | 'privacy' | 'subscriptions' | 'crypto' | 'guidelines'
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
+
+  // 🟢 Back Button integration for modals in Settings
+  const handleCloseLogoutConfirm = useModalHistory(showLogoutConfirm, () => setShowLogoutConfirm(false), "logoutConfirm");
+  const handleCloseActiveModal = useModalHistory(Boolean(activeModal), () => setActiveModal(null), "settingsModal");
 
   // Preference Toggles (persisted in localStorage)
   const [autoplayVideos, setAutoplayVideos] = useState(localStorage.getItem("autoplay_videos") !== "false");
@@ -426,7 +431,7 @@ export default function SettingsView({
 
       {/* 🌟 ACCOUNT DETAILS MODAL */}
       {activeModal === "account" && (
-        <ModalSheet title="Account Details" onClose={() => setActiveModal(null)}>
+        <ModalSheet title="Account Details" onClose={handleCloseActiveModal}>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             <DetailRow label="Username" value={`@${user?.username || "user"}`} onCopy={() => handleCopyText(user?.username || "", "Username")} />
             <DetailRow label="Display Name" value={user?.display_name || user?.username || "Member"} />
@@ -440,7 +445,7 @@ export default function SettingsView({
 
       {/* 🌟 PRIVACY MODAL */}
       {activeModal === "privacy" && (
-        <ModalSheet title="Privacy" onClose={() => setActiveModal(null)}>
+        <ModalSheet title="Privacy" onClose={handleCloseActiveModal}>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div style={modalToggleRow}>
               <div>
@@ -471,7 +476,7 @@ export default function SettingsView({
 
       {/* 🌟 VIP SUBSCRIPTIONS MODAL */}
       {activeModal === "subscriptions" && (
-        <ModalSheet title="VIP Subscriptions" onClose={() => setActiveModal(null)}>
+        <ModalSheet title="VIP Subscriptions" onClose={handleCloseActiveModal}>
           {subscriptionsList.length === 0 ? (
             <div style={{ textAlign: "center", padding: "36px 16px", color: "#8e8e93" }}>
               <div style={{ fontSize: "14px", fontWeight: "600", color: "#fff" }}>No Active Subscriptions</div>
@@ -499,7 +504,7 @@ export default function SettingsView({
                   </div>
                   <button 
                     onClick={() => {
-                      setActiveModal(null);
+                      handleCloseActiveModal();
                       onBack();
                       window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: { username: sub.creator_username } }));
                     }}
@@ -516,7 +521,7 @@ export default function SettingsView({
 
       {/* 🌟 CRYPTO INFO MODAL */}
       {activeModal === "crypto" && (
-        <ModalSheet title="Payment Methods" onClose={() => setActiveModal(null)}>
+        <ModalSheet title="Payment Methods" onClose={handleCloseActiveModal}>
           <div style={{ fontSize: "13.5px", color: "#c8c8c8", lineHeight: "1.5" }}>
             <p style={{ margin: "0 0 12px 0" }}>
               VIP passes and tips are settled on-chain via <strong>NOWPayments</strong> with automated instant access.
@@ -535,7 +540,7 @@ export default function SettingsView({
 
       {/* 🌟 GUIDELINES MODAL */}
       {activeModal === "guidelines" && (
-        <ModalSheet title="Community Guidelines" onClose={() => setActiveModal(null)}>
+        <ModalSheet title="Community Guidelines" onClose={handleCloseActiveModal}>
           <div style={{ fontSize: "13px", color: "#c8c8c8", lineHeight: "1.55" }}>
             <p style={{ margin: "0 0 10px 0" }}>
               <strong>1. Age:</strong> All participants must be 18 years or older.
@@ -552,7 +557,7 @@ export default function SettingsView({
 
       {/* 🌟 LOGOUT BOTTOM SHEET (Slides up from the bottom like X) */}
       {showLogoutConfirm && (
-        <div style={modalOverlayStyle} onClick={() => setShowLogoutConfirm(false)}>
+        <div style={modalOverlayStyle} onClick={handleCloseLogoutConfirm}>
           <div style={logoutSheetStyle} onClick={(e) => e.stopPropagation()}>
             <div style={dragHandleWrapper}>
               <div style={dragHandlePill} />
@@ -570,7 +575,7 @@ export default function SettingsView({
               </button>
               <button 
                 style={logoutSheetCancelBtn} 
-                onClick={() => setShowLogoutConfirm(false)}
+                onClick={handleCloseLogoutConfirm}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.12)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)"}
               >

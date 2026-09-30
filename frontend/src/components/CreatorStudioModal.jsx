@@ -8,8 +8,10 @@ import {
 import { APP_CONFIG } from "../config";
 import CreatorUploadModal from "./CreatorUploadModal";
 import { showToast } from "../utils/toast";
+import useModalHistory from "../hooks/useModalHistory";
 
 export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser }) {
+  const handleSafeClose = useModalHistory(isOpen, onClose, "creatorStudio");
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -152,7 +154,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
       {/* Top Navbar */}
       <div style={topNavStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
+          <button onClick={handleSafeClose} style={navBackBtnStyle} aria-label="Back">
             <ArrowLeft size={24} color="#fff" />
           </button>
           <div style={studioLogoBadgeStyle}>
@@ -187,7 +189,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
           </button>
           <button 
             onClick={() => {
-              onClose();
+              handleSafeClose();
               window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: creator.username }));
             }} 
             style={previewBtnStyle}
