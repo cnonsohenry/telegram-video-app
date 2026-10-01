@@ -128,7 +128,7 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
           <button 
             type="button" 
             onClick={() => {
-              handleSafeClose();
+              if (onClose) onClose();
               if (onLogin) onLogin();
             }}
             style={primaryBtnStyle}
@@ -164,7 +164,7 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
 const overlayStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 1000030,
+  zIndex: 1000045,
   backgroundColor: "rgba(0, 0, 0, 0.72)",
   backdropFilter: "blur(8px)",
   WebkitBackdropFilter: "blur(8px)",

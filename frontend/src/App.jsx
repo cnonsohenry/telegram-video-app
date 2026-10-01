@@ -58,6 +58,7 @@ export default function App() {
   const [creatorAutoSubscribe, setCreatorAutoSubscribe] = useState(false);
   const [isCreatorOverVideo, setIsCreatorOverVideo] = useState(false);
   const [loginPromptAction, setLoginPromptAction] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [showDiscoverCreators, setShowDiscoverCreators] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("page") === "discover-creators" || params.get("discover") === "creators";
@@ -103,6 +104,8 @@ export default function App() {
       delete stateData.paywall;
       delete stateData.searchOpen;
       delete stateData.albumOpen;
+      delete stateData.creatorProfile;
+      delete stateData.discoverCreators;
 
       if (tabName === "home") {
         const cat = stateData.cat || new URLSearchParams(window.location.search).get("cat");
@@ -442,18 +445,23 @@ export default function App() {
     const handleOpenLoginPrompt = (e) => {
       setLoginPromptAction(e.detail?.action || "continue");
     };
+    const handleOpenAuthModal = () => {
+      setShowAuthModal(true);
+    };
 
     window.addEventListener("openCreatorProfile", handleOpenCreatorEvent);
     window.addEventListener("openDiscoverCreators", handleOpenDiscoverCreators);
     window.addEventListener("refreshUser", refreshUser);
     window.addEventListener("openLoginPrompt", handleOpenLoginPrompt);
     window.addEventListener("promptLogin", handleOpenLoginPrompt);
+    window.addEventListener("openAuthModal", handleOpenAuthModal);
     return () => {
       window.removeEventListener("openCreatorProfile", handleOpenCreatorEvent);
       window.removeEventListener("openDiscoverCreators", handleOpenDiscoverCreators);
       window.removeEventListener("refreshUser", refreshUser);
       window.removeEventListener("openLoginPrompt", handleOpenLoginPrompt);
       window.removeEventListener("promptLogin", handleOpenLoginPrompt);
+      window.removeEventListener("openAuthModal", handleOpenAuthModal);
     };
   }, [handleOpenCreator, handleOpenDiscoverCreators, refreshUser]);
 
@@ -961,13 +969,22 @@ export default function App() {
         onClose={() => setLoginPromptAction(null)} 
         onLogin={() => {
           setLoginPromptAction(null);
-          if (activeVideo) setActiveVideo(null);
-          setViewingCreator(null);
-          setShowDiscoverCreators(false);
-          setShowPaywall(false);
-          handleTabSwitch("profile");
+          setShowAuthModal(true);
         }} 
       />
+
+      {/* 🟢 TOP-LEVEL AUTH MODAL (ALWAYS ON TOP OF PLAYERS AND MODALS) */}
+      {showAuthModal && !isLoggedIn && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000050 }}>
+          <AuthForm 
+            onLoginSuccess={(u, t) => {
+              onLoginSuccess(u, t);
+              setShowAuthModal(false);
+            }} 
+            onClose={() => setShowAuthModal(false)} 
+          />
+        </div>
+      )}
       
     </div>
   );

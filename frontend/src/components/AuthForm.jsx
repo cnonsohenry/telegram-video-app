@@ -529,7 +529,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
 }
 
 // 🖌 STYLES
-const loginContainerStyle = { height: "100dvh", background: "var(--bg-color)", display: "flex", flexDirection: "column", overflow: "hidden", position: "fixed", width: "100%", zIndex: 100000, top: 0, left: 0 };
+const loginContainerStyle = { height: "100dvh", background: "var(--bg-color)", display: "flex", flexDirection: "column", overflow: "hidden", position: "fixed", width: "100%", zIndex: 1000050, top: 0, left: 0 };
 const topBarStyle = { width: "100%", height: "60px", display: "flex", alignItems: "center", padding: "0 20px", position: "absolute", top: "env(safe-area-inset-top)", left: 0, zIndex: 10 };
 const closeButtonStyle = { background: "rgba(255,255,255,0.1)", border: "none", width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
 

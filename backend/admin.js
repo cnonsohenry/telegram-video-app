@@ -852,11 +852,18 @@ router.post("/creator/:id/sync-telegram", authenticateToken, isAdmin, async (req
     if (source_channel !== undefined) {
       creator.source_channel = source_channel ? String(source_channel).trim() : null;
     }
-    const updated = await syncTelegramCreatorProfile(creator, pool);
-    res.json({ success: true, creator: updated });
+
+    if (!creator.source_channel && !creator.telegram_user_id) {
+      return res.status(400).json({ 
+        error: "Please enter a Telegram channel handle or link (e.g. @channel_name or https://t.me/channel_name) first." 
+      });
+    }
+
+    const updated = await syncTelegramCreatorProfile(creator, pool, { throwOnError: true });
+    res.json({ success: true, creator: updated, notice: updated.notice || null });
   } catch (err) {
     console.error("[ADMIN SYNC SINGLE CREATOR ERROR]", err);
-    res.status(500).json({ error: err.message || "Failed to sync creator from Telegram" });
+    res.status(400).json({ error: err.message || "Failed to sync creator from Telegram" });
   }
 });
 

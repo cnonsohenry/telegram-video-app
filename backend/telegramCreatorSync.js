@@ -18,7 +18,7 @@ const TELEGRAM_FILE_API = `https://api.telegram.org/file/bot${BOT_TOKEN}`;
  */
 export function normalizeTelegramChatId(input) {
   if (!input) return null;
-  const str = String(input).trim();
+  let str = String(input).trim();
   if (!str) return null;
 
   // Numeric ID
@@ -34,12 +34,17 @@ export function normalizeTelegramChatId(input) {
     }
   }
 
-  // Plain handle
+  // Strip leading @ if present
   if (str.startsWith("@")) {
-    return str;
+    str = str.slice(1).trim();
   }
 
-  return `@${str}`;
+  // Check if valid Telegram username (letters, numbers, underscores)
+  if (/^[a-zA-Z0-9_]{3,32}$/.test(str)) {
+    return `@${str}`;
+  }
+
+  return null;
 }
 
 /**
@@ -50,7 +55,7 @@ export function normalizeTelegramChatId(input) {
 export async function fetchTelegramChat(identifier) {
   if (!BOT_TOKEN) return { ok: false, error: "Bot token not configured" };
   const target = normalizeTelegramChatId(identifier);
-  if (!target) return { ok: false, error: "Invalid Telegram identifier" };
+  if (!target) return { ok: false, error: `Invalid Telegram handle format "${identifier}". Handles must contain only letters, numbers, and underscores (e.g. @channel_name).` };
 
   try {
     const res = await axios.get(`${TELEGRAM_API}/getChat`, {
@@ -111,9 +116,10 @@ export async function downloadAndUploadTelegramPhoto(fileId, targetKey) {
  * Updates app_users in PostgreSQL.
  * @param {object} creator - app_users creator row or object
  * @param {object} [poolInstance] - PostgreSQL pool instance
+ * @param {object} [options] - Options like { throwOnError: boolean }
  * @returns {Promise<object>} updated creator object
  */
-export async function syncTelegramCreatorProfile(creator, poolInstance) {
+export async function syncTelegramCreatorProfile(creator, poolInstance, options = {}) {
   const db = poolInstance || pool;
   if (!creator) return creator;
 
@@ -124,9 +130,26 @@ export async function syncTelegramCreatorProfile(creator, poolInstance) {
 
   // Build candidate list of Telegram chat identifiers
   const candidates = [];
-  if (sourceChannel) candidates.push(sourceChannel);
-  if (tgUserId) candidates.push(String(tgUserId));
-  if (username && !username.startsWith("tg_")) candidates.push(`@${username}`);
+  if (sourceChannel) {
+    const norm = normalizeTelegramChatId(sourceChannel);
+    if (!norm) {
+      if (options.throwOnError) {
+        throw new Error(`Invalid Telegram handle format "${sourceChannel}". Channel handles cannot contain spaces or emojis. Please use a valid public handle (e.g. @channel_name or https://t.me/channel_name).`);
+      }
+    } else {
+      candidates.push(norm);
+    }
+  }
+
+  if (tgUserId) {
+    const normTg = normalizeTelegramChatId(tgUserId);
+    if (normTg && !candidates.includes(normTg)) candidates.push(normTg);
+  }
+
+  if (username && !username.startsWith("tg_")) {
+    const normUname = normalizeTelegramChatId(username);
+    if (normUname && !candidates.includes(normUname)) candidates.push(normUname);
+  }
 
   // Also check if any videos have a t.me link for this creator
   try {
@@ -148,8 +171,16 @@ export async function syncTelegramCreatorProfile(creator, poolInstance) {
     }
   } catch (e) {}
 
+  if (candidates.length === 0) {
+    if (options.throwOnError) {
+      throw new Error("No valid Telegram channel handle found. Please enter the channel username (e.g. @channel_name or https://t.me/channel_name) in the field above.");
+    }
+    return creator;
+  }
+
   let chatData = null;
   let successfulTarget = null;
+  let lastError = null;
 
   for (const candidate of candidates) {
     const result = await fetchTelegramChat(candidate);
@@ -157,6 +188,8 @@ export async function syncTelegramCreatorProfile(creator, poolInstance) {
       chatData = result.data;
       successfulTarget = candidate;
       break;
+    } else if (result.error) {
+      lastError = result.error;
     }
   }
 
@@ -176,6 +209,12 @@ export async function syncTelegramCreatorProfile(creator, poolInstance) {
   }
 
   if (!chatData && !photoFileId) {
+    if (options.throwOnError) {
+      const attempted = candidates.join(", ");
+      let hint = `Telegram could not find channel (${attempted}): ${lastError || "chat not found"}.`;
+      hint += ` Please verify the channel is public (e.g. @channel_name). If it is a private channel, make sure @Mini_video_app_bot is added as an administrator.`;
+      throw new Error(hint);
+    }
     return creator;
   }
 
@@ -228,6 +267,10 @@ export async function syncTelegramCreatorProfile(creator, poolInstance) {
     updates.push(`source_channel = $${paramIdx++}`);
     values.push(successfulTarget);
     creator.source_channel = successfulTarget;
+  }
+
+  if (!photoFileId && !rawBio && chatData?.title) {
+    creator.notice = `Found channel "${chatData.title}", but it does not have a profile picture or bio set on Telegram.`;
   }
 
   if (updates.length > 0 && creatorId) {

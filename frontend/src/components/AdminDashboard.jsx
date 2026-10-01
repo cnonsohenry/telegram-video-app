@@ -251,6 +251,12 @@ export default function AdminDashboard({ user, onLogout }) {
 
   const handleFetchTelegramProfile = async () => {
     if (!editingCreator || !editingCreator.id) return;
+    const channelInput = (editingCreator.source_channel || "").trim();
+    if (!channelInput && !editingCreator.telegram_user_id) {
+      showToast("Please enter a Telegram channel handle (e.g. @channel_name or https://t.me/channel_name) first.", "error", 4000);
+      return;
+    }
+
     setSyncingSingleCreator(true);
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creator/${editingCreator.id}/sync-telegram`, {
@@ -260,7 +266,7 @@ export default function AdminDashboard({ user, onLogout }) {
           Authorization: `Bearer ${localStorage.getItem("token")}`
         },
         body: JSON.stringify({
-          source_channel: editingCreator.source_channel
+          source_channel: channelInput
         })
       });
       const data = await res.json();
@@ -270,12 +276,16 @@ export default function AdminDashboard({ user, onLogout }) {
           ...data.creator
         }));
         setCreatorsList(prev => prev.map(c => c.id === editingCreator.id ? { ...c, ...data.creator } : c));
-        showToast("Fetched creator profile & bio from Telegram!", "success");
+        if (data.notice) {
+          showToast(data.notice, "info", 5000);
+        } else {
+          showToast("Fetched creator profile & bio from Telegram!", "success");
+        }
       } else {
-        showToast(data.error || "Failed to fetch from Telegram", "error");
+        showToast(data.error || "Failed to fetch from Telegram", "error", 6000);
       }
     } catch (err) {
-      showToast("Error syncing from Telegram: " + err.message, "error");
+      showToast("Error syncing from Telegram: " + err.message, "error", 6000);
     } finally {
       setSyncingSingleCreator(false);
     }
@@ -1231,8 +1241,8 @@ export default function AdminDashboard({ user, onLogout }) {
                 placeholder="@channel_name or https://t.me/channel_name"
                 style={formInputStyle} 
               />
-              <span style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
-                Enter the channel handle or link, then click "Fetch from Telegram" to auto-load avatar and bio.
+              <span style={{ fontSize: "11px", color: "#888", marginTop: "3px", lineHeight: "1.4" }}>
+                Enter the public channel handle (e.g. @channel_name or https://t.me/channel_name). If private, add bot @Mini_video_app_bot as channel admin.
               </span>
             </div>
 
