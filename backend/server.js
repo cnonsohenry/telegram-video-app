@@ -335,12 +335,10 @@ async function initDatabase() {
       
       console.log("✅ Database initialized (Admins, App_Users, Videos, Transactions & Interactions)");
 
-      // Auto-sync Telegram uploaders as managed creators in app_users
-      try {
-        await syncTelegramCreators(pool);
-      } catch (sErr) {
+      // Auto-sync Telegram uploaders as managed creators in app_users in background
+      syncTelegramCreators(pool).catch((sErr) => {
         console.warn("⚠️ [STARTUP] Telegram creators sync notice:", sErr.message);
-      }
+      });
       break;
     } catch (err) {
       retries--;
