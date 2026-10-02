@@ -21,7 +21,7 @@ import { fileURLToPath } from "url";
 
 // Import Prerender
 import prerender from "prerender-node";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; 
 import adminRoutes, { syncTelegramCreators, migrateLegacyVipToCreator } from "./admin.js";
 import authRoutes, { authenticateToken, JWT_SECRET } from "./auth.js";
@@ -824,7 +824,8 @@ app.get("/api/video", async (req, res) => {
     }
 
     const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { 
-      params: { file_id: video.file_id } 
+      params: { file_id: video.file_id },
+      timeout: 5000
     });
 
     if (!tgRes.data?.result?.file_path) {
@@ -2067,6 +2068,10 @@ const FALLBACK_THUMB_SVG = Buffer.from(
   </svg>`
 );
 
+// 🟢 In-memory caches to eliminate redundant network & DB roundtrips under high concurrency
+const existingR2Thumbs = new Set();
+const avatarUrlCache = new Map(); // identifier -> { targetUrl, expiresAt }
+
 app.get("/api/thumbnail", async (req, res) => {
   const { chat_id, message_id } = req.query;
   // If invalid request, return clean dark SVG fallback
@@ -2076,33 +2081,48 @@ app.get("/api/thumbnail", async (req, res) => {
   }
   
   const fileName = `thumbs/${chat_id}_${message_id}.jpg`;
+  const r2PublicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://bucket.naijahomemade.com';
+
+  // 🟢 1. Fast-Path: If already verified in R2, redirect to Cloudflare R2 CDN instantly (< 1ms)
+  if (existingR2Thumbs.has(fileName)) {
+    res.set({
+      "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
+      "Access-Control-Allow-Origin": "*"
+    });
+    return res.redirect(301, `${r2PublicDomain}/${fileName}`);
+  }
 
   try {
-    // 1. Try serving from R2 using transformToByteArray (prevents .pipe() crash)
+    // 2. Check if already in R2 via fast HeadObjectCommand
     try {
-      const r2Object = await r2.send(new GetObjectCommand({
+      await r2.send(new HeadObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
         Key: fileName
       }));
-      
-      const byteArray = await r2Object.Body.transformToByteArray();
+      existingR2Thumbs.add(fileName);
       res.set({
-        "Content-Type": "image/jpeg",
-        "Cache-Control": "public, max-age=31536000, immutable", 
+        "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
         "Access-Control-Allow-Origin": "*"
       });
-      return res.send(Buffer.from(byteArray));
+      return res.redirect(301, `${r2PublicDomain}/${fileName}`);
     } catch (r2Err) {
       // Not in R2 yet, fall through to Telegram DB fetch
     }
 
-    // 2. Fetch from Telegram DB
-    const dbRes = await pool.query("SELECT thumb_file_id, cloudflare_id FROM videos WHERE chat_id=$1 AND message_id=$2", [chat_id, message_id]);
+    // 3. Fetch from Telegram DB
+    const dbRes = await pool.query(
+      "SELECT thumb_file_id, cloudflare_id FROM videos WHERE chat_id=$1 AND message_id=$2 LIMIT 1", 
+      [chat_id, message_id]
+    );
     
-    // If video is hosted on Cloudflare, redirect to high-res Cloudflare thumbnail
+    // If video is hosted on Cloudflare Stream, redirect to high-res Cloudflare thumbnail
     if (dbRes.rows[0]?.cloudflare_id && dbRes.rows[0].cloudflare_id !== "none" && !dbRes.rows[0].cloudflare_id.startsWith("r2:")) {
       const cleanId = dbRes.rows[0].cloudflare_id.split('?')[0];
-      return res.redirect(`https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`);
+      res.set({
+        "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
+        "Access-Control-Allow-Origin": "*"
+      });
+      return res.redirect(301, `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`);
     }
 
     if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) {
@@ -2110,28 +2130,37 @@ app.get("/api/thumbnail", async (req, res) => {
       return res.send(FALLBACK_THUMB_SVG);
     }
 
-    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: dbRes.rows[0].thumb_file_id } });
-    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer" });
+    // 4. Strict 5-second timeout on Telegram getFile and download to eliminate 504 timeouts
+    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { 
+      params: { file_id: dbRes.rows[0].thumb_file_id },
+      timeout: 5000 
+    });
+    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { 
+      responseType: "arraybuffer",
+      timeout: 6000 
+    });
     const buffer = Buffer.from(imageRes.data);
 
-    // 3. Upload to R2 in the background for future requests
+    // 5. Upload to R2 in the background for all subsequent requests
     r2.send(new PutObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
       Key: fileName,
       Body: buffer,
       ContentType: "image/jpeg"
-    })).catch(e => console.error("R2 Background Upload Failed:", e.message));
+    }))
+    .then(() => existingR2Thumbs.add(fileName))
+    .catch(e => console.error("R2 Background Upload Failed:", e.message));
 
     res.set({
       "Content-Type": "image/jpeg",
-      "Cache-Control": "public, max-age=604800, immutable",
+      "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
       "Access-Control-Allow-Origin": "*"
     });
     return res.send(buffer);
 
   } catch (err) {
-    // Failsafe: return clean SVG placeholder so image never breaks or displays broken alt text
-    res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*" });
+    // Failsafe: return clean SVG placeholder with short cache so it retries without hanging
+    res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" });
     return res.send(FALLBACK_THUMB_SVG);
   }
 });
@@ -2147,7 +2176,7 @@ app.get("/api/thumb", (req, res) => {
 });
 
 /* =======================================================
-   🟢 BULLETPROOF AVATAR ROUTE 
+   🟢 BULLETPROOF AVATAR ROUTE (Cached & Timeout-Protected)
 ======================================================= */
 app.get("/api/avatar", async (req, res) => {
   try {
@@ -2159,6 +2188,13 @@ app.get("/api/avatar", async (req, res) => {
     }
 
     const cleanStr = String(rawId).trim();
+
+    // 🟢 1. Fast-Path: In-memory cache hit (1 hour TTL)
+    const cached = avatarUrlCache.get(cleanStr);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.redirect(cached.targetUrl);
+    }
+
     const numericId = /^-?\d+$/.test(cleanStr) ? Number(cleanStr) : null;
 
     // Check if user exists in app_users and has a custom avatar_url
@@ -2177,6 +2213,7 @@ app.get("/api/avatar", async (req, res) => {
         if (userRow.avatar_url && 
             !userRow.avatar_url.includes('/api/avatar') && 
             !userRow.avatar_url.includes('default-avatar')) {
+          avatarUrlCache.set(cleanStr, { targetUrl: userRow.avatar_url, expiresAt: Date.now() + 3600000 });
           return res.redirect(userRow.avatar_url);
         }
       }
@@ -2213,7 +2250,7 @@ app.get("/api/avatar", async (req, res) => {
       try {
         const photosRes = await axios.get(`${TELEGRAM_API}/getUserProfilePhotos`, {
           params: { user_id: targetUserId, limit: 1 },
-          timeout: 5000
+          timeout: 4000
         });
         const photos = photosRes.data?.result?.photos;
         if (photos && photos.length > 0) {
@@ -2231,15 +2268,16 @@ app.get("/api/avatar", async (req, res) => {
     }
 
     if (!fileId) {
+      avatarUrlCache.set(cleanStr, { targetUrl: '/assets/default-avatar.png', expiresAt: Date.now() + 300000 });
       return res.redirect('/assets/default-avatar.png');
     }
 
-    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId }, timeout: 8000 });
-    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer", timeout: 10000 });
+    const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId }, timeout: 5000 });
+    const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer", timeout: 6000 });
     
     res.set({
       "Content-Type": "image/jpeg",
-      "Cache-Control": "public, max-age=86400", 
+      "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable", 
       "Access-Control-Allow-Origin": "*"
     });
     return res.send(Buffer.from(imageRes.data));

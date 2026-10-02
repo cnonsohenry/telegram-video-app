@@ -60,7 +60,7 @@ export async function fetchTelegramChat(identifier) {
   try {
     const res = await axios.get(`${TELEGRAM_API}/getChat`, {
       params: { chat_id: target },
-      timeout: 8000
+      timeout: 4000
     });
 
     if (res.data?.ok && res.data.result) {
