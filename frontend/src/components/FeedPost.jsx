@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   Heart, MessageCircle, Share2, Eye, Play, Lock, 
-  ChevronLeft, ChevronRight, MoreVertical 
+  ChevronLeft, ChevronRight, MoreVertical, Bookmark 
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
