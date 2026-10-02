@@ -832,23 +832,25 @@ router.get("/:username", optionalAuth, async (req, res) => {
         const displayName = tgUser.full_name || tgUser.username || username;
 
         try {
+          const randPrice = Math.floor(Math.random() * (35 - 15 + 1)) + 15;
           const insertRes = await pool.query(
             `INSERT INTO app_users (
                username, display_name, email, is_creator, is_managed, 
                telegram_user_id, creator_category, subscription_price, is_verified, 
                banner_url, creator_bio, avatar_url
-             ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15, TRUE, 
+             ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', $5, TRUE, 
                'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
                'Official creator channel. Catch all exclusive drops and daily previews here.',
-               $5
+               $6
              )
              ON CONFLICT (telegram_user_id) DO UPDATE 
              SET is_creator = TRUE, is_managed = TRUE
              RETURNING id, username, avatar_url, role, is_premium, is_creator, is_managed, telegram_user_id, display_name, creator_bio, banner_url, creator_category, subscription_price, social_links, is_verified, location, website, created_at`,
-            [safeUname, displayName, `tg_${tgUser.user_id}@internal.naijahomemade.com`, tgUser.user_id, `/api/avatar?user_id=${tgUser.user_id}`]
+            [safeUname, displayName, `tg_${tgUser.user_id}@internal.naijahomemade.com`, tgUser.user_id, randPrice, `/api/avatar?user_id=${tgUser.user_id}`]
           );
           creator = insertRes.rows[0];
         } catch (uErr) {
+          const randPrice = Math.floor(Math.random() * (35 - 15 + 1)) + 15;
           creator = {
             id: tgUser.user_id,
             username: safeUname,
@@ -857,7 +859,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
             banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
             creator_bio: "Official creator channel. Catch all exclusive drops and daily previews here.",
             creator_category: "Featured Creator",
-            subscription_price: 15,
+            subscription_price: randPrice,
             social_links: tgUser.username ? { telegram: `https://t.me/${tgUser.username}` } : {},
             is_creator: true,
             is_managed: true,
@@ -886,23 +888,25 @@ router.get("/:username", optionalAuth, async (req, res) => {
           const safeUname = uCheck.rows.length > 0 ? `${cleanUname}_${String(rawId).slice(-4)}` : cleanUname;
 
           try {
+            const randPrice = Math.floor(Math.random() * (35 - 15 + 1)) + 15;
             const insertRes = await pool.query(
               `INSERT INTO app_users (
                  username, display_name, email, is_creator, is_managed, 
                  telegram_user_id, creator_category, subscription_price, is_verified, 
                  banner_url, creator_bio, avatar_url
-               ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', 15, TRUE, 
+               ) VALUES ($1, $2, $3, TRUE, TRUE, $4, 'Creator', $5, TRUE, 
                  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
                  'Official creator channel. Follow for exclusive content and daily drops.',
-                 $5
+                 $6
                )
                ON CONFLICT (telegram_user_id) DO UPDATE 
                SET is_creator = TRUE, is_managed = TRUE
                RETURNING id, username, avatar_url, role, is_premium, is_creator, is_managed, telegram_user_id, display_name, creator_bio, banner_url, creator_category, subscription_price, social_links, is_verified, location, website, created_at`,
-              [safeUname, row.uploader_name || username, `tg_${rawId}@internal.naijahomemade.com`, rawId, row.uploader_id ? `/api/avatar?user_id=${row.uploader_id}` : "/assets/default-avatar.png"]
+              [safeUname, row.uploader_name || username, `tg_${rawId}@internal.naijahomemade.com`, rawId, randPrice, row.uploader_id ? `/api/avatar?user_id=${row.uploader_id}` : "/assets/default-avatar.png"]
             );
             creator = insertRes.rows[0];
           } catch (vErr) {
+            const randPrice = Math.floor(Math.random() * (35 - 15 + 1)) + 15;
             creator = {
               id: row.uploader_id || 0,
               username: username,
@@ -911,7 +915,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
               banner_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80",
               creator_bio: "Welcome to my official creator hub. Follow for exclusive content and daily drops.",
               creator_category: "Creator",
-              subscription_price: 15,
+              subscription_price: randPrice,
               social_links: {},
               is_creator: true,
               is_managed: true,

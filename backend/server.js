@@ -421,7 +421,8 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       upload_target,
       creator_username,
       creator_display_name,
-      creator_name 
+      creator_name,
+      subscription_price 
     } = req.body; 
     const videoFile = req.file;
 
@@ -494,6 +495,12 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
         "SELECT id, username FROM app_users WHERE telegram_user_id = $1 OR (username IS NOT NULL AND LOWER(username) = LOWER($2))",
         [finalUploaderId, targetUsername]
       );
+      // Determine randomized subscription price between $15 and $35
+      const parsedSubPrice = Number(subscription_price || req.query.subscription_price);
+      const subPrice = (!isNaN(parsedSubPrice) && parsedSubPrice >= 15 && parsedSubPrice <= 35)
+        ? parsedSubPrice
+        : Math.floor(Math.random() * (35 - 15 + 1)) + 15;
+
       if (existingTg.rows.length === 0) {
         const uCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [targetUsername]);
         const safeUname = uCheck.rows.length > 0 ? `${targetUsername}_${cleanIdStr.slice(-4)}` : targetUsername;
@@ -502,19 +509,28 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
              username, display_name, email, is_creator, is_managed, 
              telegram_user_id, creator_category, subscription_price, is_verified, 
              banner_url, creator_bio, avatar_url
-           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, $5, 15, TRUE, 
+           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, $5, $6, TRUE, 
              'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
              'Official creator channel. Catch all exclusive drops and daily previews here.',
-             $6
+             $7
            )
            ON CONFLICT (telegram_user_id) DO UPDATE 
-           SET is_creator = TRUE, is_managed = TRUE`,
-          [safeUname, targetDisplayName, `tg_${cleanIdStr}@internal.naijahomemade.com`, finalUploaderId, safeCategory, `/api/avatar?user_id=${finalUploaderId}`]
+           SET is_creator = TRUE, is_managed = TRUE,
+               subscription_price = COALESCE(app_users.subscription_price, EXCLUDED.subscription_price)`,
+          [safeUname, targetDisplayName, `tg_${cleanIdStr}@internal.naijahomemade.com`, finalUploaderId, safeCategory, subPrice, `/api/avatar?user_id=${finalUploaderId}`]
         );
       } else {
         await pool.query(
-          "UPDATE app_users SET is_creator = TRUE, is_managed = TRUE, telegram_user_id = COALESCE(telegram_user_id, $1) WHERE id = $2",
-          [finalUploaderId, existingTg.rows[0].id]
+          `UPDATE app_users 
+           SET is_creator = TRUE, is_managed = TRUE, 
+               telegram_user_id = COALESCE(telegram_user_id, $1),
+               subscription_price = CASE 
+                 WHEN subscription_price IS NULL OR subscription_price = 0 OR subscription_price = 15 
+                 THEN $2 
+                 ELSE subscription_price 
+               END
+           WHERE id = $3`,
+          [finalUploaderId, subPrice, existingTg.rows[0].id]
         );
       }
     } catch (mErr) {
