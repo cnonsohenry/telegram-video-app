@@ -607,6 +607,16 @@ export default function App() {
   }, [applyTheme]);
 
   useEffect(() => {
+    const handleCustomCommentModal = (e) => {
+      if (e.detail?.video) {
+        setActiveCommentVideo(e.detail.video);
+      }
+    };
+    window.addEventListener("openCommentModal", handleCustomCommentModal);
+    return () => window.removeEventListener("openCommentModal", handleCustomCommentModal);
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     let sharedVideoId = params.get("v");
 
@@ -843,6 +853,7 @@ export default function App() {
               onUpdateUser={(updated) => setUser(prev => ({ ...prev, ...updated }))}
               onCreatorClick={handleOpenCreator}
               onOpenDiscoverCreators={handleOpenDiscoverCreators}
+              onCommentClick={setActiveCommentVideo}
             />
           ) : (
             <AuthForm 
@@ -956,6 +967,7 @@ export default function App() {
           onVideoClick={handleOpenVideo} 
           setShowPaywall={setShowPaywall} 
           onSubscriptionUpdated={refreshUser}
+          onCommentClick={setActiveCommentVideo}
         />
       )}
 

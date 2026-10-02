@@ -6,6 +6,9 @@ import {
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import VideoCard from "./VideoCard";
+import FeedPost from "./FeedPost";
+import PostOptionsModal from "./PostOptionsModal";
+import ReportModal from "./ReportModal";
 import CreatorTipModal from "./CreatorTipModal";
 import CreatorSubscribeModal from "./CreatorSubscribeModal";
 import { promptLogin, showToast } from "../utils/toast";
@@ -17,7 +20,8 @@ export default function CreatorProfileModal({
   onVideoClick, 
   autoOpenSubscribe = false,
   setShowPaywall,
-  onSubscriptionUpdated
+  onSubscriptionUpdated,
+  onCommentClick
 }) {
   const [creatorData, setCreatorData] = useState(null);
   const [videos, setVideos] = useState([]);
@@ -32,6 +36,9 @@ export default function CreatorProfileModal({
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [optionsVideo, setOptionsVideo] = useState(null);
+  const [reportedVideo, setReportedVideo] = useState(null);
+  const isAnyModalOpen = Boolean(showTipModal || showSubscribeModal || optionsVideo || reportedVideo);
   const [tabVideos, setTabVideos] = useState({
     posts: [],
     reels: [],
@@ -782,28 +789,64 @@ export default function CreatorProfileModal({
                 </div>
               ) : (
                 <div style={{ 
-                  padding: isDesktop ? "20px 20px 30px 20px" : "14px 12px 24px 12px",
+                  padding: activeTab === "posts" ? (isDesktop ? "16px 0 30px 0" : "0 0 24px 0") : (isDesktop ? "20px 20px 30px 20px" : "14px 12px 24px 12px"),
                   width: "100%",
                   boxSizing: "border-box"
                 }}>
-                  <div style={{
-                    display: "grid",
-                    gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
-                    gap: isDesktop ? "16px" : "4px",
-                    alignItems: "start",
-                    width: "100%",
-                    animation: "fadeIn 0.3s ease-out"
-                  }}>
-                    {displayedVideos.map((v, idx) => (
-                      <VideoCard 
-                        key={`${v.chat_id}:${v.message_id}`}
-                        video={v}
-                        priority={idx < 2}
-                        onOpen={(vData, e) => handleVideoCardClick(vData, e)}
-                        showDetails={false}
-                      />
-                    ))}
-                  </div>
+                  {activeTab === "posts" ? (
+                    <div style={{
+                      maxWidth: "600px",
+                      margin: "0 auto",
+                      width: "100%",
+                      borderLeft: isDesktop ? "1px solid var(--border-color, #262626)" : "none",
+                      borderRight: isDesktop ? "1px solid var(--border-color, #262626)" : "none",
+                      animation: "fadeIn 0.3s ease-out"
+                    }}>
+                      {displayedVideos.map((v, idx) => (
+                        <FeedPost 
+                          key={`${v.chat_id || ''}:${v.message_id || v.id || idx}`}
+                          video={v}
+                          isLast={idx === displayedVideos.length - 1}
+                          onVideoClick={(vData) => handleVideoCardClick(vData)}
+                          onCommentClick={(vData) => {
+                            if (onCommentClick) {
+                              onCommentClick(vData);
+                            } else {
+                              window.dispatchEvent(new CustomEvent("openCommentModal", { detail: { video: vData } }));
+                            }
+                          }}
+                          isAnyModalOpen={isAnyModalOpen}
+                          onCreatorClick={(handle, opts) => {
+                            if (opts?.autoSubscribe) {
+                              setShowSubscribeModal(true);
+                            }
+                          }}
+                          onReportClick={(vData) => setReportedVideo(vData)}
+                          onOptionsClick={(vData) => setOptionsVideo(vData)}
+                          user={currentUser}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
+                      gap: isDesktop ? "16px" : "4px",
+                      alignItems: "start",
+                      width: "100%",
+                      animation: "fadeIn 0.3s ease-out"
+                    }}>
+                      {displayedVideos.map((v, idx) => (
+                        <VideoCard 
+                          key={`${v.chat_id}:${v.message_id}`}
+                          video={v}
+                          priority={idx < 2}
+                          onOpen={(vData, e) => handleVideoCardClick(vData, e)}
+                          showDetails={false}
+                        />
+                      ))}
+                    </div>
+                  )}
 
                   {hasMoreVideos && (
                     <div style={{ display: "flex", justifyContent: "center", marginTop: "24px", marginBottom: "20px" }}>
@@ -859,6 +902,39 @@ export default function CreatorProfileModal({
             if (onSubscriptionUpdated) onSubscriptionUpdated();
             window.dispatchEvent(new CustomEvent("refreshUser"));
           }}
+        />
+      )}
+
+      {/* 🌟 POST OPTIONS MODAL (X-Style Bottom Sheet) */}
+      {optionsVideo && (
+        <PostOptionsModal
+          isOpen={Boolean(optionsVideo)}
+          video={optionsVideo}
+          currentUser={currentUser}
+          isFollowing={isFollowing}
+          onClose={() => setOptionsVideo(null)}
+          onReport={(v) => {
+            setOptionsVideo(null);
+            setReportedVideo(v || optionsVideo);
+          }}
+          onNotInterested={() => setOptionsVideo(null)}
+          onFollowToggle={handleFollowToggle}
+          onDelete={(id) => {
+            setTabVideos(prev => ({
+              ...prev,
+              posts: (prev.posts || []).filter(item => String(item.message_id || item.id) !== String(id))
+            }));
+            setOptionsVideo(null);
+          }}
+        />
+      )}
+
+      {/* 🚩 REPORT VIDEO MODAL */}
+      {reportedVideo && (
+        <ReportModal
+          isOpen={Boolean(reportedVideo)}
+          video={reportedVideo}
+          onClose={() => setReportedVideo(null)}
         />
       )}
 

@@ -13,6 +13,9 @@ import CreatorStudioModal from "../components/CreatorStudioModal";
 import CreatorUploadModal from "../components/CreatorUploadModal";
 import DiscoverCreatorsSection from "../components/DiscoverCreatorsSection";
 import DiscoverCreatorsModal from "../components/DiscoverCreatorsModal";
+import FeedPost from "../components/FeedPost";
+import PostOptionsModal from "../components/PostOptionsModal";
+import ReportModal from "../components/ReportModal";
 import { useVideos } from "../hooks/useVideos";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
@@ -28,7 +31,8 @@ export default function Profile({
   setShowPaywall, 
   onUpdateUser,
   onCreatorClick,
-  onOpenDiscoverCreators
+  onOpenDiscoverCreators,
+  onCommentClick
 }) {
   const [activeTab, setActiveTab] = useState(user?.is_creator ? "videos" : "likes");
   const [currentView, setCurrentView] = useState("profile");
@@ -59,6 +63,20 @@ export default function Profile({
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [optionsVideo, setOptionsVideo] = useState(null);
+  const [reportedVideo, setReportedVideo] = useState(null);
+
+  const isAnyModalOpen = Boolean(
+    showSetupModal || 
+    showEditModal || 
+    showPreviewModal || 
+    showStudioModal || 
+    showUploadModal || 
+    showDiscoverModal || 
+    optionsVideo || 
+    reportedVideo || 
+    currentView !== "profile"
+  );
   
   // Live creator stats
   const [creatorStats, setCreatorStats] = useState({
@@ -1168,24 +1186,56 @@ export default function Profile({
             </div>
           ) : (
             <>
-              <div style={{ 
-                display: "grid", 
-                gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))", 
-                gap: isDesktop ? "16px" : "4px",
-                alignItems: "start",
-                animation: "fadeIn 0.3s ease-out",
-                width: "100%"
-              }}>
-                {videosToDisplay.map((v, idx) => (
-                  <VideoCard 
-                    key={`${v.chat_id}:${v.message_id}`} 
-                    video={v} 
-                    priority={idx < 2}
-                    onOpen={(vData, e) => handleOpenVideo(vData, e)} 
-                    showDetails={false}
-                  />
-                ))}
-              </div>
+              {activeTab === "videos" && !activeGroup ? (
+                <div style={{ 
+                  maxWidth: "600px", 
+                  margin: "0 auto", 
+                  width: "100%",
+                  borderLeft: isDesktop ? "1px solid var(--border-color, #262626)" : "none",
+                  borderRight: isDesktop ? "1px solid var(--border-color, #262626)" : "none",
+                  animation: "fadeIn 0.3s ease-out"
+                }}>
+                  {videosToDisplay.map((v, idx) => (
+                    <FeedPost 
+                      key={`${v.chat_id || ''}:${v.message_id || v.id || idx}`} 
+                      video={v} 
+                      isLast={idx === videosToDisplay.length - 1} 
+                      onVideoClick={(vData) => handleOpenVideo(vData)} 
+                      onCommentClick={(vData) => {
+                        if (onCommentClick) {
+                          onCommentClick(vData);
+                        } else {
+                          window.dispatchEvent(new CustomEvent("openCommentModal", { detail: { video: vData } }));
+                        }
+                      }} 
+                      isAnyModalOpen={isAnyModalOpen} 
+                      onCreatorClick={onCreatorClick} 
+                      onReportClick={(vData) => setReportedVideo(vData)} 
+                      onOptionsClick={(vData) => setOptionsVideo(vData)} 
+                      user={user} 
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div style={{ 
+                  display: "grid", 
+                  gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))", 
+                  gap: isDesktop ? "16px" : "4px",
+                  alignItems: "start",
+                  animation: "fadeIn 0.3s ease-out",
+                  width: "100%"
+                }}>
+                  {videosToDisplay.map((v, idx) => (
+                    <VideoCard 
+                      key={`${v.chat_id}:${v.message_id}`} 
+                      video={v} 
+                      priority={idx < 2}
+                      onOpen={(vData, e) => handleOpenVideo(vData, e)} 
+                      showDetails={false}
+                    />
+                  ))}
+                </div>
+              )}
               
               {loading && !activeGroup && (
                 <div style={loaderStyle}>Loading posts...</div>
@@ -1334,6 +1384,37 @@ export default function Profile({
               window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
             }
           }}
+        />
+      )}
+
+      {/* 🌟 POST OPTIONS MODAL (X-Style Bottom Sheet) */}
+      {optionsVideo && (
+        <PostOptionsModal
+          isOpen={Boolean(optionsVideo)}
+          video={optionsVideo}
+          currentUser={user}
+          isFollowing={false}
+          onClose={() => setOptionsVideo(null)}
+          onReport={(v) => {
+            setOptionsVideo(null);
+            setReportedVideo(v || optionsVideo);
+          }}
+          onNotInterested={() => setOptionsVideo(null)}
+          onDelete={(id) => {
+            if (id) {
+              setDeletedVideoIds(prev => new Set([...prev, String(id)]));
+            }
+            setOptionsVideo(null);
+          }}
+        />
+      )}
+
+      {/* 🚩 REPORT VIDEO MODAL */}
+      {reportedVideo && (
+        <ReportModal
+          isOpen={Boolean(reportedVideo)}
+          video={reportedVideo}
+          onClose={() => setReportedVideo(null)}
         />
       )}
     </div>
