@@ -33,12 +33,12 @@ export const APP_CONFIG = {
   // 🟢 6. Categories & Navigation Tabs
   categories: ["knacks", "hotties", "baddies", "amateurs", "trends", "premium"],
   tabs: [
-    { icon: <Play size={22} />, label: "KNACKS" },
-    { icon: <Grid3X3 size={22} />, label: "HOTTIES" },
-    { icon: <UserIcon size={22} />, label: "BADDIES" },
-    { icon: <Video size={22} />, label: "AMATEURS" },
-    { icon: <Flame size={22} />, label: "TRENDS" },
-    { icon: <Sparkles size={22} />, label: "VIP" }
+    { icon: <Play size={22} />, label: "Knacks" },
+    { icon: <Grid3X3 size={22} />, label: "Hotties" },
+    { icon: <UserIcon size={22} />, label: "Baddies" },
+    { icon: <Video size={22} />, label: "Amateurs" },
+    { icon: <Flame size={22} />, label: "Trends" },
+    { icon: <Sparkles size={22} />, label: "Vip" }
   ],
 
   // 🟢 NEW: Paywall & Monetization Config

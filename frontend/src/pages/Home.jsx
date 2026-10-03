@@ -124,37 +124,43 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
   };
 
+  // 🟢 Capitalize only the first letter (e.g. "Baddies", "Amateurs")
+  const formatCategoryLabel = (label) => {
+    if (!label) return "";
+    return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+  };
+
   // 🟢 TikTok-Style Dynamic Tab Blending Effect:
-  // Active tab is prominent, while unactive tabs at extreme ends smoothly blend into the background
+  // Active tab is prominent, adjacent tabs visible, while unactive tabs at extreme ends smoothly blend into the background
   const getTabStyle = (index) => {
     const dist = Math.abs(index - activeTab);
     let opacity = 1;
     let scale = 1;
     let color = "#ffffff";
-    let fontWeight = "800";
+    let fontWeight = "700";
     let textShadow = "none";
 
     if (dist === 0) {
       opacity = 1;
       scale = 1;
       color = "#ffffff";
-      fontWeight = "800";
-      textShadow = "0 0 12px rgba(255, 255, 255, 0.4)";
+      fontWeight = "700";
+      textShadow = "0 0 10px rgba(255, 255, 255, 0.4)";
     } else if (dist === 1) {
-      opacity = 0.65;
-      scale = 0.95;
-      color = "rgba(255, 255, 255, 0.7)";
+      opacity = 0.72;
+      scale = 0.96;
+      color = "rgba(255, 255, 255, 0.75)";
       fontWeight = "600";
     } else if (dist === 2) {
-      opacity = 0.35;
-      scale = 0.90;
-      color = "rgba(255, 255, 255, 0.4)";
+      opacity = 0.45;
+      scale = 0.92;
+      color = "rgba(255, 255, 255, 0.5)";
       fontWeight = "500";
     } else {
       // 3 or more steps away (extreme end blends into the dark background)
       opacity = Math.max(0.08, 0.22 - (dist - 2) * 0.07);
       scale = 0.86;
-      color = "rgba(255, 255, 255, 0.18)";
+      color = "rgba(255, 255, 255, 0.2)";
       fontWeight = "500";
     }
 
@@ -164,8 +170,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       color,
       fontWeight,
       textShadow,
-      letterSpacing: "0.4px",
-      fontSize: "14px",
+      letterSpacing: "0.15px",
+      fontSize: "13.5px",
       transition: "opacity 0.28s cubic-bezier(0.25, 1, 0.5, 1), transform 0.28s cubic-bezier(0.25, 1, 0.5, 1), color 0.25s ease, font-weight 0.2s ease, text-shadow 0.25s ease",
       display: "inline-block"
     };
@@ -718,7 +724,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                   style={tabButtonStyle}
                 >
                   <span style={getTabStyle(index)}>
-                    {tab.label}
+                    {formatCategoryLabel(tab.label)}
                   </span>
                 </button>
               ))}
@@ -753,7 +759,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                      {tab.icon} 
-                     {isSidebarHovered && <span style={sidebarLabelStyle}>{tab.label}</span>}
+                     {isSidebarHovered && <span style={sidebarLabelStyle}>{formatCategoryLabel(tab.label)}</span>}
                   </div>
                 </button>
               ))}
@@ -921,10 +927,10 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 // 🖌 STYLES
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "12px", animation: "pulse 1.5s infinite" };
 const mobileNavWrapper = { position: "relative", width: "100%", background: "var(--bg-color)", borderBottom: "1px solid var(--border-color)", zIndex: 1000 };
-const mobileNavStyle = { display: "flex", alignItems: "center", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth", position: "relative", padding: "0 18px", maskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 24px, rgba(0,0,0,1) calc(100% - 24px), transparent 100%)", WebkitMaskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 24px, rgba(0,0,0,1) calc(100% - 24px), transparent 100%)" };
-const tabButtonStyle = { flexShrink: 0, padding: "13px 18px 12px 18px", background: "none", border: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent", outline: "none" };
+const mobileNavStyle = { display: "flex", alignItems: "center", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth", position: "relative", padding: "0 8px", maskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 12px, rgba(0,0,0,1) calc(100% - 12px), transparent 100%)", WebkitMaskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 12px, rgba(0,0,0,1) calc(100% - 12px), transparent 100%)" };
+const tabButtonStyle = { flexShrink: 0, padding: "12px 9px 11px 9px", background: "none", border: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent", outline: "none" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, display: "flex", justifyContent: "center", transition: "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), width 0.3s cubic-bezier(0.25, 1, 0.5, 1)", pointerEvents: "none", zIndex: 2 };
-const indicatorPillStyle = { width: "28px", height: "3px", borderRadius: "3px", background: "var(--primary-color)" };
+const indicatorPillStyle = { width: "22px", height: "3px", borderRadius: "3px", background: "var(--primary-color)" };
 const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", padding: "20px 0" };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };

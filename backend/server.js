@@ -1262,7 +1262,9 @@ app.get("/api/videos", async (req, res) => {
     const isCommunity = req.query.community === "true" || category === "community";
     const communityCondition = isCommunity 
       ? "(v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au WHERE (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id) AND au.is_banned = TRUE))" 
-      : "(v.is_community IS NOT TRUE)";
+      : (category === "amateurs" || category === "amateur")
+        ? "((v.is_community IS NOT TRUE) OR (v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au WHERE (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id) AND au.is_banned = TRUE)))"
+        : "(v.is_community IS NOT TRUE)";
     
     // 🟢 NEW: Extract sort and seed parameters
     const sort = (req.query.sort || "").toLowerCase().trim();
