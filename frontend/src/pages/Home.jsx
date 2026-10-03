@@ -120,21 +120,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     }
   };
 
-  // Nav container mask: only mask the single extreme end scrolling away
+  // Nav container mask: clean and open without cutting off edge tabs
   const getNavMaskStyle = () => {
-    if (scrollBlendSide === "right") {
-      // Right end is scrolling away from the screen; left end is solid and unmasked
-      return {
-        maskImage: "linear-gradient(90deg, #000 0%, #000 calc(100% - 20px), transparent 100%)",
-        WebkitMaskImage: "linear-gradient(90deg, #000 0%, #000 calc(100% - 20px), transparent 100%)"
-      };
-    } else if (scrollBlendSide === "left") {
-      // Left end is scrolling away from the screen; right end is solid and unmasked
-      return {
-        maskImage: "linear-gradient(90deg, transparent 0%, #000 20px, #000 100%)",
-        WebkitMaskImage: "linear-gradient(90deg, transparent 0%, #000 20px, #000 100%)"
-      };
-    }
     return {};
   };
 
@@ -171,8 +158,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   };
 
   // 🟢 TikTok-Style Dynamic Tab Blending Effect:
-  // ONLY one extreme end scrolling away from the screen blends into the background;
-  // the other end remains visible and never blends simultaneously.
+  // ONLY one extreme end scrolling away gently blends;
+  // maintains high readability (minimum 0.38 opacity) so the row never goes dark.
   const getTabStyle = (index) => {
     const isCurrent = index === activeTab;
     const blendSide = scrollBlendSide; // "right" or "left"
@@ -191,66 +178,65 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       };
     }
 
-    let opacity = 0.72;
-    let scale = 0.96;
-    let color = "rgba(255, 255, 255, 0.75)";
+    let opacity = 0.75;
+    let scale = 0.97;
     let fontWeight = "600";
 
     if (blendSide === "right") {
       // User is towards the left:
-      // Left side tabs (index < activeTab) are on-screen and NEVER blend into the background.
+      // Left side tabs (index < activeTab) are on-screen and fully visible.
       if (index < activeTab) {
         opacity = 0.75;
-        scale = 0.96;
-        color = "rgba(255, 255, 255, 0.75)";
+        scale = 0.97;
         fontWeight = "600";
       } else {
         // Right side is scrolling away from the screen:
         const rightDist = index - activeTab;
         if (rightDist === 1) {
-          opacity = 0.72;
-          scale = 0.96;
-          color = "rgba(255, 255, 255, 0.75)";
+          opacity = 0.75;
+          scale = 0.97;
           fontWeight = "600";
         } else if (rightDist === 2) {
-          opacity = 0.48;
+          opacity = 0.62;
+          scale = 0.95;
+          fontWeight = "500";
+        } else if (rightDist === 3) {
+          opacity = 0.50;
           scale = 0.92;
-          color = "rgba(255, 255, 255, 0.52)";
           fontWeight = "500";
         } else {
-          // 3 or more steps away: extreme end blends into the dark background
-          opacity = Math.max(0.08, 0.25 - (rightDist - 2) * 0.08);
-          scale = 0.86;
-          color = "rgba(255, 255, 255, 0.20)";
+          // 4 or more steps away: gently softly blended into dark background, but remains readable
+          opacity = 0.38;
+          scale = 0.90;
           fontWeight = "500";
         }
       }
     } else {
       // User is towards the right (blendSide === "left"):
-      // Right side tabs (index > activeTab) are on-screen and NEVER blend into the background.
+      // Right side tabs (index > activeTab) are on-screen and fully visible.
       if (index > activeTab) {
         opacity = 0.75;
-        scale = 0.96;
-        color = "rgba(255, 255, 255, 0.75)";
+        scale = 0.97;
         fontWeight = "600";
       } else {
         // Left side is scrolling away from the screen:
         const leftDist = activeTab - index;
         if (leftDist === 1) {
-          opacity = 0.72;
-          scale = 0.96;
-          color = "rgba(255, 255, 255, 0.75)";
+          opacity = 0.75;
+          scale = 0.97;
           fontWeight = "600";
         } else if (leftDist === 2) {
-          opacity = 0.48;
+          opacity = 0.62;
+          scale = 0.95;
+          fontWeight = "500";
+        } else if (leftDist === 3) {
+          opacity = 0.50;
           scale = 0.92;
-          color = "rgba(255, 255, 255, 0.52)";
           fontWeight = "500";
         } else {
-          // 3 or more steps away: extreme end blends into the dark background
-          opacity = Math.max(0.08, 0.25 - (leftDist - 2) * 0.08);
-          scale = 0.86;
-          color = "rgba(255, 255, 255, 0.20)";
+          // 4 or more steps away: gently softly blended into dark background, but remains readable
+          opacity = 0.38;
+          scale = 0.90;
           fontWeight = "500";
         }
       }
@@ -259,7 +245,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return {
       opacity,
       transform: `scale(${scale})`,
-      color,
+      color: "#ffffff",
       fontWeight,
       textShadow: "none",
       letterSpacing: "0.15px",
