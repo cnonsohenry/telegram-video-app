@@ -143,33 +143,47 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
   const [usernameStatus, setUsernameStatus] = useState(null); 
   const debounceTimerRef = useRef(null);
   const isSucceeded = useRef(false);
+  const googleSignInRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
+    let timer = null;
 
     const initGoogle = () => {
-      if (!window.google || !isMounted || isSucceeded.current) return;
+      if (!isMounted || isSucceeded.current) return;
+      if (!window.google?.accounts?.id) {
+        // If Google SDK script is still loading, retry
+        timer = setTimeout(initGoogle, 200);
+        return;
+      }
 
-      google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        callback: handleGoogleResponse,
-        use_fedcm_for_prompt: true,
-      });
+      try {
+        google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          callback: handleGoogleResponse,
+          use_fedcm_for_prompt: true,
+        });
 
-      const container = document.getElementById("googleSignInDiv");
-      if (container) {
-        google.accounts.id.renderButton(
-          container,
-          { theme: "outline", size: "large", shape: "pill", width: "310" }
-        );
+        const container = googleSignInRef.current || document.getElementById("googleSignInDiv");
+        if (container) {
+          container.innerHTML = "";
+          google.accounts.id.renderButton(
+            container,
+            { theme: "outline", size: "large", shape: "pill", width: "310" }
+          );
+        }
+      } catch (err) {
+        console.warn("Google Sign-In initialization warning:", err);
       }
     };
 
-    const timer = setTimeout(initGoogle, 500);
+    if (authTab === "member") {
+      timer = setTimeout(initGoogle, 100);
+    }
 
     return () => {
       isMounted = false;
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
     };
   }, [authTab, isRegistering]);
 
@@ -453,7 +467,11 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
                 <div style={line} />
               </div>
               
-              <div id="googleSignInDiv" style={{ width: "100%", display: "flex", justifyContent: "center", minHeight: "45px", marginBottom: "20px" }}></div>
+              <div 
+                ref={googleSignInRef}
+                id="googleSignInDiv" 
+                style={{ width: "100%", display: "flex", justifyContent: "center", minHeight: "45px", marginBottom: "20px" }}
+              ></div>
             </>
           )}
           

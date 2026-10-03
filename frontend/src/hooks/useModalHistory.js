@@ -61,6 +61,16 @@ export function useModalHistory(isOpen, onClose, modalKey = "modal") {
     }
   }, [modalKey]);
 
+  handleSafeClose.transition = (nextModalKey) => {
+    if (historyPushedRef.current && window.history.state?.[modalKey]) {
+      historyPushedRef.current = false;
+      const currentState = { ...(window.history.state || {}) };
+      delete currentState[modalKey];
+      currentState[nextModalKey] = true;
+      window.history.replaceState(currentState, document.title);
+    }
+  };
+
   return handleSafeClose;
 }
 

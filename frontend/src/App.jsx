@@ -59,6 +59,26 @@ export default function App() {
   const [isCreatorOverVideo, setIsCreatorOverVideo] = useState(false);
   const [loginPromptAction, setLoginPromptAction] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const showAuthModalRef = useRef(false);
+
+  useEffect(() => {
+    showAuthModalRef.current = showAuthModal;
+    if (showAuthModal && !window.history.state?.authModal) {
+      window.history.pushState(
+        { ...(window.history.state || {}), authModal: true },
+        document.title
+      );
+    }
+  }, [showAuthModal]);
+
+  const handleCloseAuthModal = useCallback(() => {
+    if (showAuthModalRef.current && window.history.state?.authModal) {
+      showAuthModalRef.current = false;
+      window.history.back();
+    }
+    setShowAuthModal(false);
+  }, []);
+
   const [showDiscoverCreators, setShowDiscoverCreators] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("page") === "discover-creators" || params.get("discover") === "creators";
@@ -106,6 +126,8 @@ export default function App() {
       delete stateData.albumOpen;
       delete stateData.creatorProfile;
       delete stateData.discoverCreators;
+      delete stateData.authModal;
+      delete stateData.loginPrompt;
 
       if (tabName === "home") {
         const cat = stateData.cat || new URLSearchParams(window.location.search).get("cat");
@@ -230,6 +252,13 @@ export default function App() {
   useEffect(() => {
     const handlePopState = (event) => {
       const state = event.state || {};
+
+      // 0. If auth modal was open and state no longer has authModal, close auth modal
+      if (showAuthModalRef.current && !state.authModal) {
+        showAuthModalRef.current = false;
+        setShowAuthModal(false);
+        return;
+      }
 
       // 1. If comments modal was open and state no longer has commentModal, close comments
       if (activeCommentVideoRef.current && !state.commentModal) {
@@ -856,10 +885,12 @@ export default function App() {
               onCommentClick={setActiveCommentVideo}
             />
           ) : (
-            <AuthForm 
-              onLoginSuccess={onLoginSuccess} 
-              onClose={() => handleTabSwitch("home")} 
-            />
+            (activeTab === "profile" && !showAuthModal) ? (
+              <AuthForm 
+                onLoginSuccess={onLoginSuccess} 
+                onClose={() => handleTabSwitch("home")} 
+              />
+            ) : null
           )}
         </div>
       </main>
@@ -991,9 +1022,9 @@ export default function App() {
           <AuthForm 
             onLoginSuccess={(u, t) => {
               onLoginSuccess(u, t);
-              setShowAuthModal(false);
+              handleCloseAuthModal();
             }} 
-            onClose={() => setShowAuthModal(false)} 
+            onClose={handleCloseAuthModal} 
           />
         </div>
       )}

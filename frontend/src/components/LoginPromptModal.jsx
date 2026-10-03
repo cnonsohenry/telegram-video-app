@@ -128,6 +128,9 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
           <button 
             type="button" 
             onClick={() => {
+              if (typeof handleSafeClose?.transition === "function") {
+                handleSafeClose.transition("authModal");
+              }
               if (onClose) onClose();
               if (onLogin) onLogin();
             }}
