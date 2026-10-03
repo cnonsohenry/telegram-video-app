@@ -1311,7 +1311,7 @@ app.get("/api/videos", async (req, res) => {
       // 🟢 Random sorting across all time (supports deterministic seed for gap-free pagination)
       const hasCategory = category && category !== "all" && category !== "community";
       const catFilter = hasCategory 
-        ? `WHERE category = $1 AND ${communityCondition}` 
+        ? `WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND ${communityCondition}` 
         : `WHERE ${communityCondition}`;
       
       let orderClause;
@@ -1355,7 +1355,7 @@ app.get("/api/videos", async (req, res) => {
     } else {
       const hasCategory = category && category !== "all" && category !== "community";
       const catFilter = hasCategory 
-        ? `WHERE category = $1 AND ${communityCondition}` 
+        ? `WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND ${communityCondition}` 
         : `WHERE ${communityCondition}`;
 
       if (hasCategory) {
@@ -1396,7 +1396,7 @@ app.get("/api/videos", async (req, res) => {
       countValues = [];
       cacheKey = `count:trends:${timeframe}:${isCommunity}`;
     } else if (category && category !== "all" && category !== "community") {
-      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v WHERE category = $1 AND ${communityCondition}`;
+      countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND ${communityCondition}`;
       countValues = [category];
       cacheKey = `count:${category}:${isCommunity}`;
     } else {

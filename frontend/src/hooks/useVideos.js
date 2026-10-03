@@ -47,8 +47,8 @@ export function useVideos(currentCategory, limit = 12) {
         // 🟢 THE FIX: Swap the hardcoded domain for your dynamic config URL
         url = `${APP_CONFIG.apiUrl}/api/videos?page=${targetPage}&limit=${limit}&category=${currentCategory}`;
         
-        // 🟢 THE FIX: Dynamically check if this is your "Trending" category (usually the 4th tab)
-        if (currentCategory === APP_CONFIG.categories[3] || currentCategory === "trends") {
+        // 🟢 Check if this is the "trends" category
+        if (currentCategory === "trends" || currentCategory.startsWith("trends")) {
           url += `&sort=trending`;
         } else if (currentCategory === "premium") {
           url += `&sort=random&seed=${sessionSeed.current}`;

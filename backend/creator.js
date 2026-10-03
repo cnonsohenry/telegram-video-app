@@ -455,7 +455,7 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
       });
     }
 
-    const allowedPublicCategories = ["community", "hotties", "amateur", "college", "trends", "shots", "general"];
+    const allowedPublicCategories = ["community", "hotties", "amateur", "amateurs", "knacks", "baddies", "college", "trends", "shots", "general"];
     let safeCategory = "community";
     if (isVip) {
       safeCategory = "premium";

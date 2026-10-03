@@ -384,6 +384,7 @@ const DesktopLeftSidebar = ({
     { id: "knacks", label: "Knacks" },
     { id: "hotties", label: "Hotties" },
     { id: "baddies", label: "Baddies" },
+    { id: "amateurs", label: "Amateurs" },
     { id: "college", label: "College" },
     { id: "premium", label: "VIP Club", badge: "VIP" }
   ];

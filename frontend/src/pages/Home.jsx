@@ -64,11 +64,112 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const shouldHideUI = isUIHidden && !isDesktop;
   const fetchLimit = isDesktop ? 15 : 12;
   
-  const categoryForFetch = activeTab === 3 
+  const categoryForFetch = currentCategory === "trends" 
     ? `${currentCategory}&timeframe=${trendsTimeframe}` 
     : currentCategory;
 
   const { videos, sidebarSuggestions, loading, loadMore } = useVideos(categoryForFetch, fetchLimit);
+
+  // 🟢 Slidable Category Tabs & TikTok-Style Sliding Indicator
+  const tabsNavRef = useRef(null);
+  const tabRefs = useRef([]);
+  const [indicatorStyleState, setIndicatorStyleState] = useState({ left: 0, width: 36 });
+
+  // Center active tab and update sliding indicator
+  useEffect(() => {
+    const updateIndicatorAndScroll = () => {
+      const activeEl = tabRefs.current[activeTab];
+      if (activeEl && tabsNavRef.current) {
+        const nav = tabsNavRef.current;
+        setIndicatorStyleState({
+          left: activeEl.offsetLeft,
+          width: activeEl.offsetWidth
+        });
+        const targetScroll = activeEl.offsetLeft - (nav.clientWidth / 2) + (activeEl.clientWidth / 2);
+        nav.scrollTo({
+          left: targetScroll,
+          behavior: "smooth"
+        });
+      }
+    };
+
+    updateIndicatorAndScroll();
+    const rafId = requestAnimationFrame(updateIndicatorAndScroll);
+    return () => cancelAnimationFrame(rafId);
+  }, [activeTab, windowWidth]);
+
+  // 🟢 TikTok-Style Touch Gesture Swipe Detection (Horizontal swipe across feed)
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (activeGroup) return; // Don't swipe tabs if viewing an album group
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const deltaX = touchEndX - touchStartX.current;
+    const deltaY = touchEndY - touchStartY.current;
+
+    // Intentional horizontal swipe detection (>65px and dominant over vertical)
+    if (Math.abs(deltaX) > 65 && Math.abs(deltaX) > Math.abs(deltaY) * 1.6) {
+      if (deltaX < 0 && activeTab < APP_CONFIG.tabs.length - 1) {
+        handleTabClick(activeTab + 1);
+      } else if (deltaX > 0 && activeTab > 0) {
+        handleTabClick(activeTab - 1);
+      }
+    }
+  };
+
+  // 🟢 TikTok-Style Dynamic Tab Blending Effect:
+  // Active tab is prominent, while unactive tabs at extreme ends smoothly blend into the background
+  const getTabStyle = (index) => {
+    const dist = Math.abs(index - activeTab);
+    let opacity = 1;
+    let scale = 1;
+    let color = "#ffffff";
+    let fontWeight = "800";
+    let textShadow = "none";
+
+    if (dist === 0) {
+      opacity = 1;
+      scale = 1;
+      color = "#ffffff";
+      fontWeight = "800";
+      textShadow = "0 0 12px rgba(255, 255, 255, 0.4)";
+    } else if (dist === 1) {
+      opacity = 0.65;
+      scale = 0.95;
+      color = "rgba(255, 255, 255, 0.7)";
+      fontWeight = "600";
+    } else if (dist === 2) {
+      opacity = 0.35;
+      scale = 0.90;
+      color = "rgba(255, 255, 255, 0.4)";
+      fontWeight = "500";
+    } else {
+      // 3 or more steps away (extreme end blends into the dark background)
+      opacity = Math.max(0.08, 0.22 - (dist - 2) * 0.07);
+      scale = 0.86;
+      color = "rgba(255, 255, 255, 0.18)";
+      fontWeight = "500";
+    }
+
+    return {
+      opacity,
+      transform: `scale(${scale})`,
+      color,
+      fontWeight,
+      textShadow,
+      letterSpacing: "0.4px",
+      fontSize: "14px",
+      transition: "opacity 0.28s cubic-bezier(0.25, 1, 0.5, 1), transform 0.28s cubic-bezier(0.25, 1, 0.5, 1), color 0.25s ease, font-weight 0.2s ease, text-shadow 0.25s ease",
+      display: "inline-block"
+    };
+  };
 
   // 🟢 THE FIX: Track stale videos when changing categories to prevent bleeding old content into new tabs
   const lastCategoryRef = useRef(categoryForFetch);
@@ -135,7 +236,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     } 
     // 🟢 Prevent displaying videos until we are 100% sure they belong to the new fetch
     else if (!loading && videos.length > 0 && isVideosFresh) {
-       const isCorrectCategory = currentCategory === "trends" || videos[0].category === currentCategory;
+       const isCorrectCategory = currentCategory === "trends" 
+         || videos[0].category === currentCategory 
+         || (currentCategory === "amateurs" && (videos[0].category === "amateurs" || videos[0].category === "amateur"));
        if (isCorrectCategory) {
           baseList = videos;
        }
@@ -601,40 +704,35 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         />
 
         {!isDesktop && (
-          <nav style={{ ...mobileNavStyle, position: "relative" }}>
-            {APP_CONFIG.tabs.map((tab, index) => (
-              <button 
-                key={index} 
-                onClick={() => handleTabClick(index)} 
+          <div style={mobileNavWrapper}>
+            <nav 
+              ref={tabsNavRef}
+              className="slidable-category-tabs"
+              style={mobileNavStyle}
+            >
+              {APP_CONFIG.tabs.map((tab, index) => (
+                <button 
+                  key={index} 
+                  ref={el => tabRefs.current[index] = el}
+                  onClick={() => handleTabClick(index)} 
+                  style={tabButtonStyle}
+                >
+                  <span style={getTabStyle(index)}>
+                    {tab.label}
+                  </span>
+                </button>
+              ))}
+              <div 
                 style={{ 
-                  flex: 1, 
-                  padding: "13px 0 11px 0", 
-                  background: "none", 
-                  border: "none", 
-                  color: activeTab === index ? "#ffffff" : "#71767b", 
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
-                  position: "relative",
-                  cursor: "pointer",
-                  WebkitTapHighlightColor: "transparent",
-                  transition: "color 0.2s ease"
+                  ...indicatorStyle, 
+                  transform: `translateX(${indicatorStyleState.left}px)`, 
+                  width: `${indicatorStyleState.width}px` 
                 }}
               >
-                <span style={{ 
-                  fontSize: "14px", 
-                  fontWeight: activeTab === index ? "700" : "500", 
-                  letterSpacing: "0.2px",
-                  transition: "font-weight 0.15s ease"
-                }}>
-                  {tab.label}
-                </span>
-              </button>
-            ))}
-            <div style={{ ...indicatorStyle, transform: `translateX(${activeTab * 100}%)`, width: `${100 / APP_CONFIG.tabs.length}%` }}>
-              <div style={indicatorPillStyle} />
-            </div>
-          </nav>
+                <div style={indicatorPillStyle} />
+              </div>
+            </nav>
+          </div>
         )}
       </div>
       
@@ -667,9 +765,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           <PullToRefresh scrollRef={scrollContainerRef} onRefresh={handleRefresh}>
             <div 
             ref={scrollContainerRef}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
             style={{ 
               touchAction: "pan-y", 
-              overscrollBehaviorY: "contain",
+              overscrollBehaviorY: "contain", 
               overflowAnchor: "none",
               height: isDesktop ? "calc(100vh - 70px)" : "100vh", 
               overflowY: "auto", 
@@ -812,6 +912,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
+        .slidable-category-tabs::-webkit-scrollbar { display: none; width: 0; height: 0; }
       `}</style>
     </div>
   );
@@ -819,9 +920,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
 // 🖌 STYLES
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "12px", animation: "pulse 1.5s infinite" };
-const mobileNavStyle = { display: "flex", zIndex: 1000, background: "var(--bg-color)", borderBottom: "1px solid var(--border-color)" };
-const indicatorStyle = { position: "absolute", bottom: 0, left: 0, display: "flex", justifyContent: "center", transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)", pointerEvents: "none" };
-const indicatorPillStyle = { width: "36px", height: "3px", borderRadius: "3px", background: "var(--primary-color)" };
+const mobileNavWrapper = { position: "relative", width: "100%", background: "var(--bg-color)", borderBottom: "1px solid var(--border-color)", zIndex: 1000 };
+const mobileNavStyle = { display: "flex", alignItems: "center", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth", position: "relative", padding: "0 18px", maskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 24px, rgba(0,0,0,1) calc(100% - 24px), transparent 100%)", WebkitMaskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 24px, rgba(0,0,0,1) calc(100% - 24px), transparent 100%)" };
+const tabButtonStyle = { flexShrink: 0, padding: "13px 18px 12px 18px", background: "none", border: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent", outline: "none" };
+const indicatorStyle = { position: "absolute", bottom: 0, left: 0, display: "flex", justifyContent: "center", transition: "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), width 0.3s cubic-bezier(0.25, 1, 0.5, 1)", pointerEvents: "none", zIndex: 2 };
+const indicatorPillStyle = { width: "28px", height: "3px", borderRadius: "3px", background: "var(--primary-color)" };
 const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", padding: "20px 0" };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
