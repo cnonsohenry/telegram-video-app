@@ -74,6 +74,15 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const tabsNavRef = useRef(null);
   const tabRefs = useRef([]);
   const [indicatorStyleState, setIndicatorStyleState] = useState({ left: 0, width: 36 });
+  const [scrollBlendSide, setScrollBlendSide] = useState(() => 
+    activeTab >= Math.ceil(APP_CONFIG.tabs.length / 2) ? "left" : "right"
+  );
+
+  // Sync scroll blend side when activeTab changes
+  useEffect(() => {
+    const isSecondHalf = activeTab >= Math.ceil(APP_CONFIG.tabs.length / 2);
+    setScrollBlendSide(isSecondHalf ? "left" : "right");
+  }, [activeTab]);
 
   // Center active tab and update sliding indicator
   useEffect(() => {
@@ -97,6 +106,37 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     const rafId = requestAnimationFrame(updateIndicatorAndScroll);
     return () => cancelAnimationFrame(rafId);
   }, [activeTab, windowWidth]);
+
+  // Track manual horizontal scrolling of tabs to determine which end is scrolling away
+  const handleTabsScroll = () => {
+    if (!tabsNavRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = tabsNavRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 4) return;
+    if (scrollLeft > maxScroll * 0.45) {
+      setScrollBlendSide("left");
+    } else {
+      setScrollBlendSide("right");
+    }
+  };
+
+  // Nav container mask: only mask the single extreme end scrolling away
+  const getNavMaskStyle = () => {
+    if (scrollBlendSide === "right") {
+      // Right end is scrolling away from the screen; left end is solid and unmasked
+      return {
+        maskImage: "linear-gradient(90deg, #000 0%, #000 calc(100% - 20px), transparent 100%)",
+        WebkitMaskImage: "linear-gradient(90deg, #000 0%, #000 calc(100% - 20px), transparent 100%)"
+      };
+    } else if (scrollBlendSide === "left") {
+      // Left end is scrolling away from the screen; right end is solid and unmasked
+      return {
+        maskImage: "linear-gradient(90deg, transparent 0%, #000 20px, #000 100%)",
+        WebkitMaskImage: "linear-gradient(90deg, transparent 0%, #000 20px, #000 100%)"
+      };
+    }
+    return {};
+  };
 
   // 🟢 TikTok-Style Touch Gesture Swipe Detection (Horizontal swipe across feed)
   const touchStartX = useRef(0);
@@ -131,37 +171,89 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   };
 
   // 🟢 TikTok-Style Dynamic Tab Blending Effect:
-  // Active tab is prominent, adjacent tabs visible, while unactive tabs at extreme ends smoothly blend into the background
+  // ONLY one extreme end scrolling away from the screen blends into the background;
+  // the other end remains visible and never blends simultaneously.
   const getTabStyle = (index) => {
-    const dist = Math.abs(index - activeTab);
-    let opacity = 1;
-    let scale = 1;
-    let color = "#ffffff";
-    let fontWeight = "700";
-    let textShadow = "none";
+    const isCurrent = index === activeTab;
+    const blendSide = scrollBlendSide; // "right" or "left"
 
-    if (dist === 0) {
-      opacity = 1;
-      scale = 1;
-      color = "#ffffff";
-      fontWeight = "700";
-      textShadow = "0 0 10px rgba(255, 255, 255, 0.4)";
-    } else if (dist === 1) {
-      opacity = 0.72;
-      scale = 0.96;
-      color = "rgba(255, 255, 255, 0.75)";
-      fontWeight = "600";
-    } else if (dist === 2) {
-      opacity = 0.45;
-      scale = 0.92;
-      color = "rgba(255, 255, 255, 0.5)";
-      fontWeight = "500";
+    if (isCurrent) {
+      return {
+        opacity: 1,
+        transform: "scale(1)",
+        color: "#ffffff",
+        fontWeight: "700",
+        textShadow: "0 0 10px rgba(255, 255, 255, 0.4)",
+        letterSpacing: "0.15px",
+        fontSize: "13.5px",
+        transition: "opacity 0.28s cubic-bezier(0.25, 1, 0.5, 1), transform 0.28s cubic-bezier(0.25, 1, 0.5, 1), color 0.25s ease, font-weight 0.2s ease, text-shadow 0.25s ease",
+        display: "inline-block"
+      };
+    }
+
+    let opacity = 0.72;
+    let scale = 0.96;
+    let color = "rgba(255, 255, 255, 0.75)";
+    let fontWeight = "600";
+
+    if (blendSide === "right") {
+      // User is towards the left:
+      // Left side tabs (index < activeTab) are on-screen and NEVER blend into the background.
+      if (index < activeTab) {
+        opacity = 0.75;
+        scale = 0.96;
+        color = "rgba(255, 255, 255, 0.75)";
+        fontWeight = "600";
+      } else {
+        // Right side is scrolling away from the screen:
+        const rightDist = index - activeTab;
+        if (rightDist === 1) {
+          opacity = 0.72;
+          scale = 0.96;
+          color = "rgba(255, 255, 255, 0.75)";
+          fontWeight = "600";
+        } else if (rightDist === 2) {
+          opacity = 0.48;
+          scale = 0.92;
+          color = "rgba(255, 255, 255, 0.52)";
+          fontWeight = "500";
+        } else {
+          // 3 or more steps away: extreme end blends into the dark background
+          opacity = Math.max(0.08, 0.25 - (rightDist - 2) * 0.08);
+          scale = 0.86;
+          color = "rgba(255, 255, 255, 0.20)";
+          fontWeight = "500";
+        }
+      }
     } else {
-      // 3 or more steps away (extreme end blends into the dark background)
-      opacity = Math.max(0.08, 0.22 - (dist - 2) * 0.07);
-      scale = 0.86;
-      color = "rgba(255, 255, 255, 0.2)";
-      fontWeight = "500";
+      // User is towards the right (blendSide === "left"):
+      // Right side tabs (index > activeTab) are on-screen and NEVER blend into the background.
+      if (index > activeTab) {
+        opacity = 0.75;
+        scale = 0.96;
+        color = "rgba(255, 255, 255, 0.75)";
+        fontWeight = "600";
+      } else {
+        // Left side is scrolling away from the screen:
+        const leftDist = activeTab - index;
+        if (leftDist === 1) {
+          opacity = 0.72;
+          scale = 0.96;
+          color = "rgba(255, 255, 255, 0.75)";
+          fontWeight = "600";
+        } else if (leftDist === 2) {
+          opacity = 0.48;
+          scale = 0.92;
+          color = "rgba(255, 255, 255, 0.52)";
+          fontWeight = "500";
+        } else {
+          // 3 or more steps away: extreme end blends into the dark background
+          opacity = Math.max(0.08, 0.25 - (leftDist - 2) * 0.08);
+          scale = 0.86;
+          color = "rgba(255, 255, 255, 0.20)";
+          fontWeight = "500";
+        }
+      }
     }
 
     return {
@@ -169,7 +261,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       transform: `scale(${scale})`,
       color,
       fontWeight,
-      textShadow,
+      textShadow: "none",
       letterSpacing: "0.15px",
       fontSize: "13.5px",
       transition: "opacity 0.28s cubic-bezier(0.25, 1, 0.5, 1), transform 0.28s cubic-bezier(0.25, 1, 0.5, 1), color 0.25s ease, font-weight 0.2s ease, text-shadow 0.25s ease",
@@ -714,7 +806,11 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
             <nav 
               ref={tabsNavRef}
               className="slidable-category-tabs"
-              style={mobileNavStyle}
+              onScroll={handleTabsScroll}
+              style={{
+                ...mobileNavStyle,
+                ...getNavMaskStyle()
+              }}
             >
               {APP_CONFIG.tabs.map((tab, index) => (
                 <button 
@@ -927,7 +1023,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 // 🖌 STYLES
 const skeletonSocket = { width: "100%", aspectRatio: "9/16", background: "#1a1a1a", borderRadius: "12px", animation: "pulse 1.5s infinite" };
 const mobileNavWrapper = { position: "relative", width: "100%", background: "var(--bg-color)", borderBottom: "1px solid var(--border-color)", zIndex: 1000 };
-const mobileNavStyle = { display: "flex", alignItems: "center", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth", position: "relative", padding: "0 8px", maskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 12px, rgba(0,0,0,1) calc(100% - 12px), transparent 100%)", WebkitMaskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,1) 12px, rgba(0,0,0,1) calc(100% - 12px), transparent 100%)" };
+const mobileNavStyle = { display: "flex", alignItems: "center", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch", scrollBehavior: "smooth", position: "relative", padding: "0 8px" };
 const tabButtonStyle = { flexShrink: 0, padding: "12px 9px 11px 9px", background: "none", border: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent", outline: "none" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, display: "flex", justifyContent: "center", transition: "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), width 0.3s cubic-bezier(0.25, 1, 0.5, 1)", pointerEvents: "none", zIndex: 2 };
 const indicatorPillStyle = { width: "22px", height: "3px", borderRadius: "3px", background: "var(--primary-color)" };
