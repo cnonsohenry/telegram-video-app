@@ -42,7 +42,7 @@ export const APP_CONFIG = {
 
   // 🟢 NEW: Paywall & Monetization Config
   ads: {
-    smartlinkUrl: "https://www.effectivegatecpm.com/wmmi5uv2w5?key=23fa23a9f5a389595c81f702d570419b",
+    smartlinkUrl: "https://auctionr.org/4/4ed8b051fe5dded5ce7bfe8c6bcda90f",
     vastTag: "https://s.magsrv.com/v1/vast.php?idzone=5880122",
     adFrequency: 2, // Smartlink triggers on every 6th free video
     vastFrequency: 3, // VAST pre-roll triggers every 3rd free video
