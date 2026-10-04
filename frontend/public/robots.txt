@@ -9,4 +9,4 @@ Disallow: /login
 Disallow: /*?token=*
 Disallow: /*?legal=*
 
-Sitemap: https://videos.naijahomemade.com/sitemap.xml
+Sitemap: https://naijahomemade.com/sitemap.xml

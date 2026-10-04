@@ -2,7 +2,7 @@ import { Play, Flame, Grid3X3, User as UserIcon, Sparkles, Video } from "lucide-
 
 export const APP_CONFIG = {
   // 🟢 1. Core API & Ads
-  apiUrl: import.meta.env.VITE_API_URL || "https://videos.naijahomemade.com",
+  apiUrl: import.meta.env.VITE_API_URL || "https://naijahomemade.com",
   exoClickZoneId: import.meta.env.VITE_EXOCLICK_ZONE_ID || "5882826", // <-- This missing comma caused the crash!
 
   pythonEngineUrl: import.meta.env.VITE_PYTHON_ENGINE_URL || "https://engine.naijahomemade.com",

@@ -2,10 +2,11 @@
 import { showToast } from "./toast";
 
 export const shareVideo = async (video) => {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://naijahomemade.com';
   const shareData = {
     title: video.caption || "Check out this shot!",
     text: `Watch @${video.uploader_name || 'Member'} on Naija Homemade`,
-    url: `https://videos.naijahomemade.com/v/${video.message_id}`,
+    url: `${origin}/v/${video.message_id}`,
   };
 
   try {

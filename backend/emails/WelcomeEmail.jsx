@@ -18,7 +18,7 @@ export default function WelcomeEmail({ username = "Member" }) {
           
           <Section style={{ textAlign: 'center', marginTop: '30px', marginBottom: '30px' }}>
             <Button 
-              href="https://videos.naijahomemade.com"
+              href="https://naijahomemade.com"
               style={{ backgroundColor: '#ff3b30', color: '#ffffff', padding: '12px 24px', borderRadius: '30px', fontWeight: 'bold', textDecoration: 'none' }}
             >
               Start Watching Now

@@ -351,7 +351,7 @@ router.get("/studio/insights", authenticateToken, async (req, res) => {
     const totalViews = Number(videoSummaryRes.rows[0]?.total_views || 0);
     const totalLikes = Number(videoSummaryRes.rows[0]?.total_likes || 0);
 
-    const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const apiBaseUrl = process.env.API_BASE_URL || "https://naijahomemade.com";
     const mappedTopVideos = videosRes.rows.map(v => ({
       ...v,
       thumbnail_url: formatThumbnailUrl(v, apiBaseUrl)
@@ -501,7 +501,7 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
     }
 
     const newVideo = insertRes.rows[0];
-    const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const apiBaseUrl = process.env.API_BASE_URL || "https://naijahomemade.com";
     const thumbnailUrl = formatThumbnailUrl(newVideo, apiBaseUrl);
     const videoUrl = r2Result.staticUrl;
 
@@ -694,7 +694,7 @@ router.post("/complete-upload", authenticateToken, async (req, res) => {
     );
 
     const newVideo = insertRes.rows[0];
-    const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const apiBaseUrl = process.env.API_BASE_URL || "https://naijahomemade.com";
     const thumbnailUrl = formatThumbnailUrl(newVideo, apiBaseUrl);
     const videoUrl = `${R2_PUBLIC_DOMAIN}/${r2Key}`;
 
@@ -1083,7 +1083,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       [creator.username, username, String(creator.id || '0'), creator.telegram_user_id || null]
     );
 
-    const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const apiBaseUrl = process.env.API_BASE_URL || "https://naijahomemade.com";
     const creatorSubPrice = Number(creator.subscription_price || 0);
     const mappedVideos = videosRes.rows.map(v => ({
       id: v.id,
@@ -1233,7 +1233,7 @@ router.get("/:username/videos", async (req, res) => {
 
     const totalVideos = Number(countRes.rows[0]?.count || 0);
 
-    const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const apiBaseUrl = process.env.API_BASE_URL || "https://naijahomemade.com";
     const mappedVideos = videosRes.rows.map(v => ({
       id: v.id,
       chat_id: v.chat_id,
@@ -1570,7 +1570,7 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
       is_following: Boolean(c.is_following)
     }));
 
-    const apiBaseUrl = process.env.API_BASE_URL || "https://videos.naijahomemade.com";
+    const apiBaseUrl = process.env.API_BASE_URL || "https://naijahomemade.com";
     const creatorIds = creators.map(c => c.id).filter(Boolean);
 
     let videosByCreator = {};

@@ -105,7 +105,7 @@ export const createCryptoPayment = async (req, res, pool) => {
     const orderId = txRes.rows[0].id;
 
     // 2. Ask NOWPayments to generate a unique wallet address using USD
-    const callbackUrl = `${process.env.API_BASE_URL || 'https://videos.naijahomemade.com'}/api/crypto/webhook`;
+    const callbackUrl = `${process.env.API_BASE_URL || 'https://naijahomemade.com'}/api/crypto/webhook`;
     const npRes = await axios.post(
       "https://api.nowpayments.io/v1/payment",
       {

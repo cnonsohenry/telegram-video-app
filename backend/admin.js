@@ -107,7 +107,7 @@ router.get("/all-videos", authenticateToken, isAdmin, async (req, res) => {
         thumbUrl = `https://videodelivery.net/${v.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=600`;
       } else {
         // R2 files and Telegram files will use your upgraded local Thumbnail API!
-        const baseUrl = process.env.API_BASE_URL || 'https://videos.naijahomemade.com';
+        const baseUrl = process.env.API_BASE_URL || 'https://naijahomemade.com';
         thumbUrl = `${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`;
       }
 
@@ -503,7 +503,7 @@ export async function migrateLegacyVipToCreator(poolInstance) {
            TRUE, TRUE, 1881815190, 'Official VIP', 15, TRUE,
            'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
            'Official Naija Homemade VIP channel. All exclusive premium drops and uncut releases.',
-           'https://videos.naijahomemade.com/assets/default-avatar.png'
+           'https://naijahomemade.com/assets/default-avatar.png'
          )
          ON CONFLICT (telegram_user_id) DO UPDATE 
          SET is_creator = TRUE, is_managed = TRUE
@@ -910,7 +910,7 @@ router.get("/search", authenticateToken, isAdmin, async (req, res) => {
       if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
         thumbUrl = `https://videodelivery.net/${v.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=600`;
       } else {
-        const baseUrl = process.env.API_BASE_URL || 'https://videos.naijahomemade.com';
+        const baseUrl = process.env.API_BASE_URL || 'https://naijahomemade.com';
         thumbUrl = `${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`;
       }
       return { ...v, thumbnail_url: thumbUrl };

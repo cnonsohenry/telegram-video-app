@@ -229,7 +229,7 @@ router.post("/register", async (req, res) => {
                 subscription_price, social_links, is_verified, location, website`,
       [
         email, hash, desiredUsername, 
-        "https://videos.naijahomemade.com/assets/default-avatar.png",
+        "https://naijahomemade.com/assets/default-avatar.png",
         isCreator ? 'creator' : 'user',
         isCreator, displayName, category, bio, price, false
       ]

@@ -954,7 +954,7 @@ function buildSeoTags({ pageTitle, description, thumbUrl, canonicalUrl, appName,
 app.get('/v/:message_id', async (req, res) => {
   try {
     const { message_id } = req.params;
-    const frontendUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://naijahomemade.com';
     const appName = process.env.APP_NAME || 'NaijaHomemade';
 
     const result = await pool.query(`
@@ -1067,9 +1067,9 @@ app.get('/v/:message_id', async (req, res) => {
 app.get('/embed/:message_id', async (req, res) => {
   try {
     const { message_id } = req.params;
-    const frontendUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://naijahomemade.com';
     const publicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://bucket.naijahomemade.com';
-    const apiBaseUrl = process.env.API_BASE_URL || 'https://videos.naijahomemade.com';
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://naijahomemade.com';
 
     const result = await pool.query(
       `SELECT chat_id, message_id, file_id, cloudflare_id, category, caption, views, uploader_id 
@@ -2481,7 +2481,7 @@ Disallow: /login
 Disallow: /*?token=*
 Disallow: /*?legal=*
 
-Sitemap: https://videos.naijahomemade.com/sitemap.xml
+Sitemap: https://naijahomemade.com/sitemap.xml
 `);
 });
 
@@ -2507,8 +2507,8 @@ app.get('/sitemap.xml', async (req, res) => {
       LIMIT 5000
     `);
 
-    const baseUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
-    const apiBaseUrl = process.env.API_BASE_URL || 'https://videos.naijahomemade.com';
+    const baseUrl = process.env.FRONTEND_URL || 'https://naijahomemade.com';
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://naijahomemade.com';
     const publicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://bucket.naijahomemade.com';
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
@@ -2624,7 +2624,7 @@ app.use((req, res, next) => {
   }
 
   try {
-    const frontendUrl = process.env.FRONTEND_URL || 'https://videos.naijahomemade.com';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://naijahomemade.com';
     const appName = process.env.APP_NAME || 'NaijaHomemade';
     let pageTitle = 'Naija Homemade Videos - NaijaPorn & Trending Nigerian Creators | Naijahomemade';
     let description = 'Watch Best Naija Homemade porn videos for free on Naijahomemade.com. Discover high quality Most Relevant Naija XXX movies, leaks, and verified creator clips.';
