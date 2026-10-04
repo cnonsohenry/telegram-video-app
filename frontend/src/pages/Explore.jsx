@@ -935,10 +935,13 @@ export default function Explore({
     return params.get("q") || "";
   });
 
-  // 🟢 FOR YOU FEED STATE (Platform & legacy curated drops)
+  // 🟢 FOR YOU FEED STATE (Twitter/X Algorithm Platform & Curated Drops)
   const [forYouFeed, setForYouFeed] = useState([]);
   const [forYouLoading, setForYouLoading] = useState(true);
   const [forYouLoadingMore, setForYouLoadingMore] = useState(false);
+  const [forYouPage, setForYouPage] = useState(1);
+  const [hasMoreForYou, setHasMoreForYou] = useState(true);
+  const forYouPageRef = useRef(1);
 
   // 🟢 COMMUNITY FEED STATE (Contents posted by web creators only)
   const [communityFeed, setCommunityFeed] = useState([]);
@@ -1036,6 +1039,9 @@ export default function Explore({
       setSelectedCategory(catId);
       if (activeTab !== "for_you") setActiveTab("for_you");
     }
+    forYouPageRef.current = 1;
+    setForYouPage(1);
+    setHasMoreForYou(true);
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -1147,8 +1153,10 @@ export default function Explore({
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // 🟢 LOAD FOR YOU FEED (Current Explore feed excluding web creator content)
-  const loadForYouFeed = useCallback(async (isLoadMore = false, cat = selectedCategory) => {
+  // 🟢 LOAD FOR YOU FEED (Authentic Twitter/X Heavy Ranker Algorithmic Feed)
+  const loadForYouFeed = useCallback(async (isLoadMore = false, cat = selectedCategory, pageOverride = null) => {
+    const targetPage = pageOverride !== null ? pageOverride : (isLoadMore ? forYouPageRef.current + 1 : 1);
+
     if (isLoadMore) {
       setForYouLoadingMore(true);
     } else {
@@ -1158,11 +1166,21 @@ export default function Explore({
     }
 
     try {
-      if (cat) {
-        const currentPage = isLoadMore ? Math.floor(forYouFeed.length / 10) + 1 : 1;
-        const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${encodeURIComponent(cat)}&limit=10&page=${currentPage}`);
-        const data = res.ok ? await res.json() : { videos: [] };
+      const categoryParam = cat ? `&category=${encodeURIComponent(cat)}` : "";
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?sort=algo&page=${targetPage}&limit=12${categoryParam}`);
+      if (res.ok) {
+        const data = await res.json();
         const fetched = data.videos || [];
+
+        if (data.hasMore !== undefined) {
+          setHasMoreForYou(Boolean(data.hasMore));
+        } else {
+          setHasMoreForYou(fetched.length >= 12);
+        }
+
+        forYouPageRef.current = targetPage;
+        setForYouPage(targetPage);
+
         if (isLoadMore) {
           setForYouFeed(prev => {
             const existingIds = new Set(prev.map(v => String(v.message_id || v.id)));
@@ -1172,49 +1190,6 @@ export default function Explore({
         } else {
           setForYouFeed(fetched);
         }
-      } else {
-        const exploreCategories = [...APP_CONFIG.categories];
-        if (!exploreCategories.includes("premium")) {
-          exploreCategories.push("premium");
-        }
-        
-        const fetches = exploreCategories.map(async (categoryItem) => {
-          let res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${categoryItem}&limit=8&sort=random`);
-          let data = res.ok ? await res.json() : { videos: [] };
-          
-          if (!data.videos || data.videos.length === 0) {
-            res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=${categoryItem}&limit=8&page=1`);
-            data = res.ok ? await res.json() : { videos: [] };
-          }
-          return data;
-        });
-        
-        const results = await Promise.all(fetches);
-        
-        let combined = [];
-        results.forEach(data => {
-          if (data && data.videos) combined = [...combined, ...data.videos];
-        });
-
-        const uniqueMap = new Map();
-        combined.forEach(video => {
-          if (video && video.message_id) {
-            uniqueMap.set(video.message_id, video);
-          }
-        });
-        
-        const shuffled = Array.from(uniqueMap.values()).sort(() => 0.5 - Math.random());
-        
-        if (isLoadMore) {
-          setForYouFeed(prev => {
-            const newMap = new Map();
-            prev.forEach(v => newMap.set(v.message_id, v));
-            shuffled.forEach(v => newMap.set(v.message_id, v));
-            return Array.from(newMap.values());
-          });
-        } else {
-          setForYouFeed(shuffled);
-        }
       }
     } catch (err) {
       console.error("Failed to load explore for you feed", err);
@@ -1222,11 +1197,14 @@ export default function Explore({
       setForYouLoading(false);
       setForYouLoadingMore(false);
     }
-  }, [fetchFeaturedCreators, selectedCategory, forYouFeed.length]);
+  }, [fetchFeaturedCreators, selectedCategory]);
 
   useEffect(() => {
     if (activeTab === "for_you") {
-      loadForYouFeed(false, selectedCategory);
+      forYouPageRef.current = 1;
+      setForYouPage(1);
+      setHasMoreForYou(true);
+      loadForYouFeed(false, selectedCategory, 1);
     }
   }, [selectedCategory]);
 
@@ -1493,7 +1471,7 @@ export default function Explore({
       loadCommunityFeed(1, false);
     }
     if (tab === "for_you" && forYouFeed.length === 0 && !forYouLoading) {
-      loadForYouFeed(false);
+      loadForYouFeed(false, selectedCategory, 1);
     }
   };
 
@@ -1506,7 +1484,7 @@ export default function Explore({
     } else if (activeTab === "community") {
       if (communityLoading || communityLoadingMore) return;
     } else {
-      if (forYouLoading || forYouLoadingMore) return;
+      if (forYouLoading || forYouLoadingMore || !hasMoreForYou) return;
     }
     
     if (observer.current) observer.current.disconnect();
@@ -1518,7 +1496,7 @@ export default function Explore({
         } else if (activeTab === "community") {
           if (hasMoreCommunity) loadCommunityFeed(communityPage + 1, true);
         } else {
-          loadForYouFeed(true);
+          if (hasMoreForYou) loadForYouFeed(true, selectedCategory);
         }
       }
     });
@@ -1526,7 +1504,7 @@ export default function Explore({
   }, [
     searchQuery, searchLoading, searchLoadingMore, hasMoreSearch, searchPage, loadSearchFeed,
     activeTab, communityLoading, communityLoadingMore, hasMoreCommunity, communityPage, loadCommunityFeed,
-    forYouLoading, forYouLoadingMore, loadForYouFeed
+    forYouLoading, forYouLoadingMore, hasMoreForYou, loadForYouFeed, selectedCategory
   ]);
 
   // Action for empty community state
@@ -2107,7 +2085,7 @@ export default function Explore({
                 } else {
                   setSuggestedIndex(Math.floor(Math.random() * 4) + 2);
                   fetchFeaturedCreators();
-                  await loadForYouFeed(false, selectedCategory);
+                  await loadForYouFeed(false, selectedCategory, 1);
                 }
               }}
             >
@@ -2193,7 +2171,7 @@ export default function Explore({
                         setHasMoreCommunity(true);
                         await loadCommunityFeed(1, false);
                       } else {
-                        await loadForYouFeed(false, selectedCategory);
+                        await loadForYouFeed(false, selectedCategory, 1);
                       }
                     }}
                     style={desktopRefreshBtnStyle}

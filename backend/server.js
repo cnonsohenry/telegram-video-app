@@ -1238,8 +1238,48 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     likes_count: Number(v.likes_count || 0),
     comments_count: Number(v.comments_count || 0),
     shares_count: Number(v.shares_count || 0),
-    saves_count: Number(v.saves_count || 0)
+    saves_count: Number(v.saves_count || 0),
+    x_score: v.x_score !== undefined ? Number(v.x_score) : undefined
   };
+};
+
+/* =====================
+   HELPER: Author Diversity Interleaving (X-style recommendation)
+   Prevents author clustering in timelines (max consecutive items from same creator)
+===================== */
+const interleaveByAuthor = (items, maxConsecutive = 2) => {
+  if (!items || items.length <= 2) return items;
+  const result = [];
+  const pool = [...items];
+  
+  while (pool.length > 0) {
+    let nextIdx = 0;
+    const candidate = pool[0];
+    const candAuthor = candidate.uploader_id || candidate.uploader_handle || candidate.uploader_name;
+    
+    let consecutiveCount = 0;
+    for (let i = result.length - 1; i >= 0; i--) {
+      const prevAuthor = result[i].uploader_id || result[i].uploader_handle || result[i].uploader_name;
+      if (prevAuthor && candAuthor && String(prevAuthor) === String(candAuthor)) {
+        consecutiveCount++;
+      } else {
+        break;
+      }
+    }
+    
+    if (consecutiveCount >= maxConsecutive) {
+      const diffIdx = pool.findIndex(item => {
+        const itemAuthor = item.uploader_id || item.uploader_handle || item.uploader_name;
+        return !itemAuthor || !candAuthor || String(itemAuthor) !== String(candAuthor);
+      });
+      if (diffIdx !== -1) {
+        nextIdx = diffIdx;
+      }
+    }
+    
+    result.push(pool.splice(nextIdx, 1)[0]);
+  }
+  return result;
 };
 
 /* =====================
@@ -1254,10 +1294,21 @@ const COUNT_CACHE_TTL = 60 * 1000;
 app.get("/api/videos", async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    const page = Number(req.query.page || 1);
-    const limit = Number(req.query.limit || 12);
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.max(1, Math.min(50, Number(req.query.limit || 12)));
     const offset = (page - 1) * limit;
-    const category = req.query.category || "hotties";
+
+    // 🟢 Extract sort and seed parameters
+    const sort = (req.query.sort || "").toLowerCase().trim();
+    const isAlgo = sort === "algo" || sort === "x" || sort === "for_you" || sort === "algorithm" || sort === "explore";
+    const isRandom = sort === "random" || req.query.random === "true";
+    const seed = req.query.seed ? String(req.query.seed).trim() : "";
+    
+    // 🟢 Extract timeframe from query (defaults to all_time)
+    const timeframe = req.query.timeframe || "all_time";
+    
+    const rawCategory = req.query.category ? String(req.query.category).toLowerCase().trim() : "";
+    const category = rawCategory || (isAlgo ? "all" : "hotties");
     
     const isCommunity = req.query.community === "true" || category === "community";
     const communityCondition = isCommunity 
@@ -1266,21 +1317,78 @@ app.get("/api/videos", async (req, res) => {
         ? "((v.is_community IS NOT TRUE) OR (v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au WHERE (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id) AND au.is_banned = TRUE)))"
         : "(v.is_community IS NOT TRUE)";
     
-    // 🟢 NEW: Extract sort and seed parameters
-    const sort = (req.query.sort || "").toLowerCase().trim();
-    const isRandom = sort === "random" || req.query.random === "true";
-    const seed = req.query.seed ? String(req.query.seed).trim() : "";
-    
-    // 🟢 NEW: Extract timeframe from query (defaults to all_time)
-    const timeframe = req.query.timeframe || "all_time";
-    
     const apiBaseUrl = process.env.API_BASE_URL;
 
     let query;
     let queryValues;
     let timeFilter = `WHERE ${communityCondition}`;
 
-    if (category === "trends") {
+    const hasCategory = category && category !== "all" && category !== "community";
+    const catFilter = hasCategory 
+      ? `WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND ${communityCondition}` 
+      : `WHERE ${communityCondition}`;
+
+    if (isAlgo) {
+      // 🟢 Twitter/X Heavy Ranker Recommendation Algorithm
+      // Combines Likes (1.0), Shares (2.0), Comments (1.5), Saves (2.5), Views log-scale (1.5),
+      // Album richness bonus (3.0), Freshness discovery boosts (<6h, <12h, <24h),
+      // divided by gravity time decay: POWER(age_in_hours + 2.0, 1.25)
+      if (hasCategory) {
+        queryValues = [category, limit, offset];
+      } else {
+        queryValues = [limit, offset];
+      }
+
+      const limitOffsetPlaceholders = hasCategory ? "LIMIT $2 OFFSET $3" : "LIMIT $1 OFFSET $2";
+
+      query = `
+        WITH ScoredVideos AS (
+          SELECT v.*, 
+            ROW_NUMBER() OVER(
+              PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END 
+              ORDER BY v.created_at ASC
+            ) as rn,
+            COUNT(*) OVER(
+              PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END
+            ) as group_count,
+            (
+              (
+                1.0 +
+                COALESCE(v.likes_count, 0)::numeric * 1.0 +
+                COALESCE(v.shares_count, 0)::numeric * 2.0 +
+                COALESCE(v.comments_count, 0)::numeric * 1.5 +
+                COALESCE(v.saves_count, 0)::numeric * 2.5 +
+                LOG(GREATEST(COALESCE(v.views, 0), 1)::numeric + 1.0) * 1.5 +
+                (CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN 3.0 ELSE 0.0 END) +
+                (CASE 
+                   WHEN v.created_at >= NOW() - INTERVAL '6 hours' THEN 10.0
+                   WHEN v.created_at >= NOW() - INTERVAL '12 hours' THEN 5.0
+                   WHEN v.created_at >= NOW() - INTERVAL '24 hours' THEN 2.5
+                   ELSE 0.0 
+                 END)
+              )
+              /
+              POWER(GREATEST(EXTRACT(EPOCH FROM (NOW() - COALESCE(v.created_at, NOW())))::numeric / 3600.0, 0.0) + 2.0, 1.25)
+            ) as x_score
+          FROM videos v 
+          ${catFilter}
+        ),
+        PagedVideos AS (
+          SELECT * FROM ScoredVideos 
+          WHERE rn = 1 
+          ORDER BY x_score DESC, created_at DESC, id DESC
+          ${limitOffsetPlaceholders}
+        )
+        SELECT v.*, 
+          COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+          COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.subscription_price, 0) as subscription_price
+        FROM PagedVideos v 
+        LEFT JOIN users u ON v.uploader_id = u.user_id
+        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+        ORDER BY v.x_score DESC, v.created_at DESC, v.id DESC
+      `;
+    } else if (category === "trends") {
       // 🟢 Set the time filter based on the requested timeframe
       if (timeframe === "weekly") {
         timeFilter = `WHERE v.created_at >= NOW() - INTERVAL '7 days' AND ${communityCondition}`;
@@ -1311,11 +1419,6 @@ app.get("/api/videos", async (req, res) => {
       queryValues = [limit, offset];
     } else if (isRandom) {
       // 🟢 Random sorting across all time (supports deterministic seed for gap-free pagination)
-      const hasCategory = category && category !== "all" && category !== "community";
-      const catFilter = hasCategory 
-        ? `WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND ${communityCondition}` 
-        : `WHERE ${communityCondition}`;
-      
       let orderClause;
       if (hasCategory) {
         if (seed) {
@@ -1355,11 +1458,6 @@ app.get("/api/videos", async (req, res) => {
         LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
       `;
     } else {
-      const hasCategory = category && category !== "all" && category !== "community";
-      const catFilter = hasCategory 
-        ? `WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND ${communityCondition}` 
-        : `WHERE ${communityCondition}`;
-
       if (hasCategory) {
         queryValues = [category, limit, offset];
       } else {
@@ -1453,11 +1551,14 @@ app.get("/api/videos", async (req, res) => {
       suggestPromise
     ]);
 
+    const rawVideos = isAlgo ? interleaveByAuthor(videosRes.rows, 2) : videosRes.rows;
+
     res.json({
       page,
       limit,
       total,
-      videos: videosRes.rows.map(v => mapVideoToResponse(v, apiBaseUrl)),
+      hasMore: (offset + videosRes.rows.length) < total,
+      videos: rawVideos.map(v => mapVideoToResponse(v, apiBaseUrl)),
       suggestions: suggestions.map(v => mapVideoToResponse(v, apiBaseUrl))
     });
   } catch (err) {
