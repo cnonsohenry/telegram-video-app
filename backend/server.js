@@ -1330,21 +1330,28 @@ app.get("/api/videos", async (req, res) => {
 
     if (isAlgo) {
       // 🟢 Twitter/X Heavy Ranker Recommendation Algorithm + Session Exploration
-      // Combines Likes (1.0), Shares (2.0), Comments (1.5), Saves (2.5), Views log-scale (1.5),
-      // Album richness bonus (3.0), Freshness discovery boosts (<6h, <12h, <24h),
-      // divided by gravity time decay: POWER(age_in_hours + 2.0, 1.25),
-      // multiplied by session-based stochastic exploration jitter (0.70 - 1.30)
-      // so each user/session discovers a fresh, dynamic feed without identical repetition!
+      // Combines Likes (1.5), Shares (2.5), Comments (2.0), Saves (3.0), Views sqrt scale (0.4),
+      // Album richness bonus (3.0), Freshness velocity boosts (<24h, <3d, <7d),
+      // with a smooth 14-day exponential half-life decay that preserves evergreen viral hits (0.20 floor),
+      // multiplied by session-based stochastic exploration jitter (0.75 - 1.25),
+      // and round-robin category interleaving for diverse, balanced representation.
       let seedParam;
       let limitOffsetPlaceholders;
+      let pagedOrder;
+      let finalOrder;
+
       if (hasCategory) {
         queryValues = [category, seed, limit, offset];
         seedParam = "$2";
         limitOffsetPlaceholders = "LIMIT $3 OFFSET $4";
+        pagedOrder = "ORDER BY final_score DESC, created_at DESC, id DESC";
+        finalOrder = "ORDER BY v.final_score DESC, v.created_at DESC, v.id DESC";
       } else {
         queryValues = [seed, limit, offset];
         seedParam = "$1";
         limitOffsetPlaceholders = "LIMIT $2 OFFSET $3";
+        pagedOrder = "ORDER BY cat_rank ASC, final_score DESC";
+        finalOrder = "ORDER BY v.cat_rank ASC, v.final_score DESC";
       }
 
       query = `
@@ -1360,31 +1367,35 @@ app.get("/api/videos", async (req, res) => {
             (
               (
                 1.0 +
-                COALESCE(v.likes_count, 0)::numeric * 1.0 +
-                COALESCE(v.shares_count, 0)::numeric * 2.0 +
-                COALESCE(v.comments_count, 0)::numeric * 1.5 +
-                COALESCE(v.saves_count, 0)::numeric * 2.5 +
-                LOG(GREATEST(COALESCE(v.views, 0), 1)::numeric + 1.0) * 1.5 +
+                COALESCE(v.likes_count, 0)::numeric * 1.5 +
+                COALESCE(v.shares_count, 0)::numeric * 2.5 +
+                COALESCE(v.comments_count, 0)::numeric * 2.0 +
+                COALESCE(v.saves_count, 0)::numeric * 3.0 +
+                SQRT(GREATEST(COALESCE(v.views, 0), 0)::numeric) * 0.4 +
                 (CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN 3.0 ELSE 0.0 END) +
                 (CASE 
-                   WHEN v.created_at >= NOW() - INTERVAL '6 hours' THEN 10.0
-                   WHEN v.created_at >= NOW() - INTERVAL '12 hours' THEN 5.0
-                   WHEN v.created_at >= NOW() - INTERVAL '24 hours' THEN 2.5
+                   WHEN v.created_at >= NOW() - INTERVAL '24 hours' THEN 15.0
+                   WHEN v.created_at >= NOW() - INTERVAL '3 days' THEN 10.0
+                   WHEN v.created_at >= NOW() - INTERVAL '7 days' THEN 5.0
                    ELSE 0.0 
                  END)
               )
-              /
-              POWER(GREATEST(EXTRACT(EPOCH FROM (NOW() - COALESCE(v.created_at, NOW())))::numeric / 3600.0, 0.0) + 2.0, 1.25)
+              *
+              (0.20 + 0.80 * EXP(-1.0 * (EXTRACT(EPOCH FROM (NOW() - COALESCE(v.created_at, NOW())))::numeric / 86400.0) / 14.0))
             ) as base_score,
-            (0.70 + 0.60 * (abs(hashtext(v.id::text || ${seedParam})) % 10000) / 10000.0) as jitter
+            (0.75 + 0.50 * (abs(hashtext(v.id::text || ${seedParam})) % 10000) / 10000.0) as jitter
           FROM videos v 
           ${catFilter}
         ),
-        PagedVideos AS (
-          SELECT *, (base_score * jitter) as final_score
+        RankedVideos AS (
+          SELECT *, (base_score * jitter) as final_score,
+            ROW_NUMBER() OVER(PARTITION BY category ORDER BY (base_score * jitter) DESC) as cat_rank
           FROM ScoredVideos 
-          WHERE rn = 1 
-          ORDER BY (base_score * jitter) DESC, created_at DESC, id DESC
+          WHERE rn = 1
+        ),
+        PagedVideos AS (
+          SELECT * FROM RankedVideos 
+          ${pagedOrder}
           ${limitOffsetPlaceholders}
         )
         SELECT v.*, 
@@ -1394,7 +1405,7 @@ app.get("/api/videos", async (req, res) => {
         FROM PagedVideos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id
         LEFT JOIN app_users au ON (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text)
-        ORDER BY v.final_score DESC, v.created_at DESC, v.id DESC
+        ${finalOrder}
       `;
     } else if (category === "trends") {
       // 🟢 Set the time filter based on the requested timeframe
