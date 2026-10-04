@@ -16,10 +16,11 @@ import pool from "./db.js";
 const router = express.Router();
 
 // 🟢 1. SETUP
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "12027172293-lrgugueucjjnvlg8ac09eqg820hner64.apps.googleusercontent.com";
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 export const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_change_me";
 
-console.log(`[AUTH] System Start. Google Client ID: ${process.env.GOOGLE_CLIENT_ID ? "✅ Loaded" : "⚠️ MISSING"}`);
+console.log(`[AUTH] System Start. Google Client ID: ${GOOGLE_CLIENT_ID ? "✅ Loaded" : "⚠️ MISSING"}`);
 
 // 🟢 2. SECURITY MIDDLEWARE (Anti-Identity-Swap)
 router.use((req, res, next) => {
@@ -100,7 +101,7 @@ router.post("/google", async (req, res) => {
   try {
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: GOOGLE_CLIENT_ID,
     });
     
     const payload = ticket.getPayload();
