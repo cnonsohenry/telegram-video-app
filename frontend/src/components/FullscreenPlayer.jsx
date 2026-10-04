@@ -13,6 +13,7 @@ import { shouldPlayVastAd, recordVastAdPlayed, getVastConfig } from "../utils/ad
 import { fetchVastAd, sendVastBeacons } from "../utils/vastParser";
 import { renderClickableCaption } from "./ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
+import { getPostDisplayName } from "../utils/date";
 import ReportModal from "./ReportModal";
 import useModalHistory from "../hooks/useModalHistory";
 
@@ -1261,7 +1262,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                           style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
                           onClick={handleCreatorClick}
                         >
-                          @{creatorHandle}
+                          {getPostDisplayName(video)}
                         </div>
 
                         {!isOwner && (

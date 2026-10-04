@@ -1090,7 +1090,8 @@ router.get("/:username", optionalAuth, async (req, res) => {
       chat_id: v.chat_id,
       message_id: v.message_id,
       uploader_id: v.uploader_id,
-      uploader_name: v.uploader_name || creator.username,
+      uploader_name: creator.display_name || v.uploader_name || creator.username,
+      display_name: creator.display_name || v.uploader_name || creator.username,
       uploader_handle: creator.username || username,
       subscription_price: creatorSubPrice,
       is_premium: String(v.category || "").toLowerCase().trim() === "premium",
@@ -1143,7 +1144,7 @@ router.get("/:username/videos", async (req, res) => {
 
   try {
     const appUserRes = await pool.query(
-      `SELECT id, username, telegram_user_id, subscription_price 
+      `SELECT id, username, display_name, telegram_user_id, subscription_price 
        FROM app_users 
        WHERE LOWER(username) = LOWER($1) 
           OR LOWER(COALESCE(display_name, '')) = LOWER($1)
@@ -1153,6 +1154,7 @@ router.get("/:username/videos", async (req, res) => {
     let creatorId = appUserRes.rows[0]?.id;
     let creatorTgId = appUserRes.rows[0]?.telegram_user_id || null;
     let creatorUsername = appUserRes.rows[0]?.username || username;
+    let creatorDisplayName = appUserRes.rows[0]?.display_name || appUserRes.rows[0]?.username || username;
     let creatorSubPrice = Number(appUserRes.rows[0]?.subscription_price || 0);
 
     if (!creatorId) {
@@ -1163,6 +1165,7 @@ router.get("/:username/videos", async (req, res) => {
       creatorId = tgRes.rows[0]?.user_id;
       creatorTgId = tgRes.rows[0]?.user_id;
       if (tgRes.rows[0]?.username) creatorUsername = tgRes.rows[0].username;
+      creatorDisplayName = tgRes.rows[0]?.full_name || tgRes.rows[0]?.username || username;
       creatorSubPrice = 15;
     }
 
@@ -1236,7 +1239,8 @@ router.get("/:username/videos", async (req, res) => {
       chat_id: v.chat_id,
       message_id: v.message_id,
       uploader_id: v.uploader_id,
-      uploader_name: v.uploader_name || username,
+      uploader_name: creatorDisplayName || v.uploader_name || username,
+      display_name: creatorDisplayName || v.uploader_name || username,
       uploader_handle: creatorUsername,
       subscription_price: creatorSubPrice,
       is_premium: String(v.category || "").toLowerCase().trim() === "premium",

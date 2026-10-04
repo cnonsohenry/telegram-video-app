@@ -3,6 +3,7 @@ import { Play, Copy, Lock } from 'lucide-react';
 
 import { APP_CONFIG } from "../config";
 import { renderClickableCaption } from "./ClickableCaption";
+import { formatTwitterDate, getPostDisplayName } from "../utils/date";
 
 export default function VideoCard({ video, onOpen, showDetails = true, priority = false, onCreatorClick }) {
   const videoRef = useRef(null);
@@ -260,15 +261,20 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
             <div style={avatarWrapperStyle}>
                <img 
                  src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
-                 alt={video.uploader_handle || "Avatar"}
+                 alt={getPostDisplayName(video)}
                  loading="lazy"
                  onError={(e) => { e.target.style.display = 'none'; }}
                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
                />
             </div>
             <span style={uploaderNameStyle}>
-              @{video.uploader_handle || video.uploader_name || APP_CONFIG.defaultUploader}
+              {getPostDisplayName(video)}
             </span>
+            {video.created_at && (
+              <span style={postDateStyle}>
+                &middot; {formatTwitterDate(video.created_at)}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -286,4 +292,5 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
 const captionTextStyle = { margin: "0 0 6px 0", fontSize: "12px", color: "#e0e0e0", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "500" };
 const userInfoRowStyle = { display: "flex", alignItems: "center", gap: "8px" };
 const avatarWrapperStyle = { width: "14px", height: "14px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid rgba(255,255,255,0.08)" };
-const uploaderNameStyle = { fontSize: "10px", color: "#777777", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const uploaderNameStyle = { fontSize: "10px", color: "#8e8e93", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "140px" };
+const postDateStyle = { fontSize: "10px", color: "#71767b", whiteSpace: "nowrap", flexShrink: 0 };

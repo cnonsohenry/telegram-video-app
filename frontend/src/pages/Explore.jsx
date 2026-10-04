@@ -14,6 +14,7 @@ import PostOptionsModal from "../components/PostOptionsModal";
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
 import { renderClickableCaption } from "../components/ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
+import { formatTwitterDate, getPostDisplayName } from "../utils/date";
 
 import FeedPost from "../components/FeedPost";
 
@@ -802,8 +803,14 @@ const DesktopRightSidebar = ({
                   </p>
                   <div style={desktopHighlightMeta}>
                     <span style={{ color: "#8e8e93", fontWeight: "600" }}>
-                      @{v.uploader_handle || v.uploader_name || "creator"}
+                      {getPostDisplayName(v)}
                     </span>
+                    {v.created_at && (
+                      <>
+                        <span>&middot;</span>
+                        <span>{formatTwitterDate(v.created_at)}</span>
+                      </>
+                    )}
                     <span>&middot;</span>
                     <span>{Number(v.views || 0).toLocaleString()} views</span>
                   </div>

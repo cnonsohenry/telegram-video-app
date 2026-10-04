@@ -7,6 +7,7 @@ import { APP_CONFIG } from "../config";
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
 import { renderClickableCaption } from "./ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
+import { formatTwitterDate, getPostDisplayName } from "../utils/date";
 
 export const postStyle = { 
   padding: "16px", 
@@ -21,7 +22,7 @@ export const contentColumnStyle = { flex: 1, display: "flex", flexDirection: "co
 const postHeaderStyle = { display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" };
 const avatarStyle = { width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover", backgroundColor: "#222" };
 const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#fff" };
-const timeStyle = { fontSize: "13px", color: "#71767b", textTransform: "capitalize", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const timeStyle = { fontSize: "13px", color: "#71767b", textTransform: "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 const captionStyle = { fontSize: "15px", lineHeight: "1.5", color: "#e7e9ea", margin: "0 0 12px 0", wordWrap: "break-word" };
 
 const videoContainerStyle = { 
@@ -596,6 +597,8 @@ export default function FeedPost({
 
   const uploaderId = video.uploader_id || video.user_id || video.creator_id || (video.creator && video.creator.id);
   const avatarUrl = video.avatar_url || video.creator?.avatar_url || (uploaderId ? `${APP_CONFIG.apiUrl}/api/avatar?user_id=${uploaderId}` : '/assets/default-avatar.png');
+  const displayName = getPostDisplayName(video);
+  const formattedDate = formatTwitterDate(video.created_at);
 
   return (
     <div ref={isLast ? lastElementRef : null} style={postStyle}>
@@ -610,7 +613,7 @@ export default function FeedPost({
       >
         <img 
           src={avatarUrl}
-          alt="avatar"
+          alt={displayName}
           onError={(e) => { e.target.src = '/assets/default-avatar.png'; }}
           style={avatarStyle}
         />
@@ -628,11 +631,13 @@ export default function FeedPost({
                 }
               }}
             >
-              @{creatorHandle}
+              {displayName}
             </span>
-            <span style={timeStyle}>
-              &middot; {video.created_at ? new Date(video.created_at).toLocaleDateString() : ""} &middot; {isPremium ? "VIP Exclusive" : (video.category || "video")}
-            </span>
+            {formattedDate && (
+              <span style={timeStyle}>
+                &middot; {formattedDate}
+              </span>
+            )}
           </div>
 
           <button

@@ -4,6 +4,7 @@ import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock, Users, CheckCircl
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
+import { getPostDisplayName } from "../utils/date";
 
 export default function AppHeader({ 
   isDesktop, searchTerm, setSearchTerm, 
@@ -327,7 +328,7 @@ export default function AppHeader({
                             {/* 🟢 THE FIX: Dynamic default caption */}
                             <p style={suggestedCaption}>{v.caption || APP_CONFIG.defaultCaption}</p>
                             <span style={suggestedUploader}>
-                              @{v.uploader_name} 
+                              {getPostDisplayName(v)} 
                               {!isDesktop && !(v.category === "premium" || v.is_premium) && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
                             </span>
                           </div>
@@ -487,7 +488,7 @@ export default function AppHeader({
                               {/* 🟢 THE FIX: Dynamic default caption */}
                               <p style={suggestedCaption}>{v.caption || APP_CONFIG.defaultCaption}</p>
                               <span style={suggestedUploader}>
-                                @{v.uploader_name} 
+                                {getPostDisplayName(v)} 
                                 {!isDesktop && !(v.category === "premium" || v.is_premium) && <span style={{ color: "#555" }}> • {Number(v.views).toLocaleString()} views</span>}
                               </span>
                             </div>
@@ -527,7 +528,7 @@ export default function AppHeader({
                             <div style={submittedVideoInfo}>
                               {/* 🟢 THE FIX: Dynamic default caption */}
                               <p style={suggestedCaption}>{v.caption || APP_CONFIG.defaultCaption}</p>
-                              <span style={suggestedUploader}>@{v.uploader_name}</span>
+                              <span style={suggestedUploader}>{getPostDisplayName(v)}</span>
                             </div>
                           </div>
                         ))}

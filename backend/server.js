@@ -1842,10 +1842,13 @@ app.get("/api/interactions/liked", authenticateToken, async (req, res) => {
     const total = Number(countRes.rows[0]?.count || 0);
 
     const query = `
-      SELECT v.*, u.username as uploader_name
+      SELECT v.*, 
+        COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
+        COALESCE(au.username, u.username, 'creator') as uploader_handle
       FROM likes l
       JOIN videos v ON l.message_id = v.message_id
       LEFT JOIN users u ON v.uploader_id = u.user_id
+      LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
       WHERE l.user_id = $1
       ORDER BY l.created_at DESC
       LIMIT $2 OFFSET $3

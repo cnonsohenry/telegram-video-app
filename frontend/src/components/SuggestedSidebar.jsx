@@ -4,6 +4,7 @@ import { Play, Lock } from "lucide-react";
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
 import { renderClickableCaption } from "./ClickableCaption";
+import { getPostDisplayName } from "../utils/date";
 
 export default function SuggestedSidebar({ onVideoClick }) {
   const [suggestions, setSuggestions] = useState([]);
@@ -90,8 +91,7 @@ export default function SuggestedSidebar({ onVideoClick }) {
                   </div>
                 )}
                 <div style={{ color: "#555", fontSize: "11px", fontWeight: "700", marginTop: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {/* 🟢 THE FIX: Dynamic Default Uploader */}
-                  @{v.uploader_name || APP_CONFIG.defaultUploader}
+                  {getPostDisplayName(v)}
                 </div>
               </div>
             </div>
