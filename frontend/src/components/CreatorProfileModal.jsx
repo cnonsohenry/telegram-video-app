@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { 
-  ArrowLeft, CheckCircle, Share2, Heart, Lock, Grid3X3, 
+  ArrowLeft, Share2, Heart, Lock, Grid3X3, 
   MapPin, Globe, Sparkles, Send, Play, Loader2, MessageCircle,
   Film, Link2, ChevronDown, Plus
 } from "lucide-react";
@@ -11,6 +11,7 @@ import PostOptionsModal from "./PostOptionsModal";
 import ReportModal from "./ReportModal";
 import CreatorTipModal from "./CreatorTipModal";
 import CreatorSubscribeModal from "./CreatorSubscribeModal";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { promptLogin, showToast } from "../utils/toast";
 
 export default function CreatorProfileModal({ 
@@ -391,7 +392,7 @@ export default function CreatorProfileModal({
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span style={topNavNameStyle}>{creatorData?.username || creatorUsername}</span>
-          <CheckCircle size={15} color="#0095f6" fill="#0095f6" />
+          {creatorData?.is_verified && <TwitterVerifiedBadge size={15} style={{ flexShrink: 0 }} />}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           {!creatorData?.is_owner && (
@@ -442,7 +443,7 @@ export default function CreatorProfileModal({
                     </div>
                     {creatorData?.is_verified && (
                       <div style={verifiedBadgeStyle}>
-                        <CheckCircle size={16} color="#00aff0" fill="#00aff0" />
+                        <TwitterVerifiedBadge size={16} />
                       </div>
                     )}
                   </div>
@@ -461,6 +462,9 @@ export default function CreatorProfileModal({
                       }}>
                         {creatorData?.display_name || creatorUsername}
                       </h1>
+                      {creatorData?.is_verified && (
+                        <TwitterVerifiedBadge size={17} style={{ flexShrink: 0 }} />
+                      )}
                     </div>
 
                     {/* Line 2: Bio directly next after display name */}
@@ -576,7 +580,7 @@ export default function CreatorProfileModal({
                   </div>
                   {creatorData?.is_verified && (
                     <div style={{ ...verifiedBadgeStyle, bottom: "4px", right: "4px" }}>
-                      <CheckCircle size={20} color="#00aff0" fill="#00aff0" />
+                      <TwitterVerifiedBadge size={20} />
                     </div>
                   )}
                 </div>
@@ -595,6 +599,9 @@ export default function CreatorProfileModal({
                     }}>
                       {creatorData?.display_name || creatorUsername}
                     </h1>
+                    {creatorData?.is_verified && (
+                      <TwitterVerifiedBadge size={22} style={{ flexShrink: 0 }} />
+                    )}
                   </div>
 
                   {/* Line 2: Bio directly after display name */}

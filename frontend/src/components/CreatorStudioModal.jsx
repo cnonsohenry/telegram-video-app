@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { 
   ArrowLeft, X, Sparkles, Users, DollarSign, Heart, Eye, ThumbsUp, 
-  MessageCircle, Settings, Calendar, Lock, CheckCircle, 
+  MessageCircle, Settings, Calendar, Lock, 
   CheckCircle2, Clock, TrendingUp, Edit3, Save, ExternalLink, 
   Loader2, AlertCircle, ShieldCheck, Plus, UploadCloud, Trash2
 } from "lucide-react";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import CreatorUploadModal from "./CreatorUploadModal";
 import { showToast } from "../utils/toast";
@@ -163,7 +164,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <h2 style={studioTitleStyle}>{creator.display_name || creator.username} Studio</h2>
-              {creator.is_verified && <CheckCircle size={15} color="#00aff0" fill="#00aff0" />}
+              {creator.is_verified && <TwitterVerifiedBadge size={16} style={{ flexShrink: 0 }} />}
             </div>
             <span style={studioSubtitleStyle}>Creator Monetization & Fan Intelligence</span>
           </div>

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { 
-  Settings, Grid3X3, Heart, Lock, CheckCircle, Share2, ArrowLeft, 
+  Settings, Grid3X3, Heart, Lock, Share2, ArrowLeft, 
   Camera, Sparkles, Edit3, MapPin, Globe, Award, ExternalLink, ShieldCheck, Eye,
   Film, Play, Plus, ChevronRight, TrendingUp, Link2, ChevronDown, Bookmark, Copy, MessageCircle
 } from "lucide-react"; 
+import TwitterVerifiedBadge from "../components/TwitterVerifiedBadge"; 
 import VideoCard from "../components/VideoCard"; 
 import SettingsView from "../components/SettingsView"; 
 import CreatorSetupModal from "../components/CreatorSetupModal";
@@ -637,7 +638,7 @@ export default function Profile({
             <div style={centerTitleContainer}>
               <h2 style={usernameStyle}>{user?.username || APP_CONFIG.defaultUploader}</h2>
               {(user?.is_creator || user?.is_verified) && (
-                <CheckCircle size={15} color="#0095f6" fill="#0095f6" style={{ marginLeft: "4px" }} />
+                <TwitterVerifiedBadge size={15} style={{ marginLeft: "4px" }} />
               )}
               <ChevronDown size={14} color="#a8a8a8" style={{ marginLeft: "2px" }} />
             </div>
@@ -697,7 +698,7 @@ export default function Profile({
                       {user?.display_name || user?.username || "Member"}
                     </h1>
                     {(user?.is_creator || user?.is_verified) && (
-                      <CheckCircle size={16} color="#0095f6" fill="#0095f6" />
+                      <TwitterVerifiedBadge size={16} />
                     )}
                   </div>
 
@@ -858,7 +859,7 @@ export default function Profile({
                     {user?.display_name || user?.username || "Member"}
                   </h1>
                   {(user?.is_creator || user?.is_verified) && (
-                    <CheckCircle size={20} color="#0095f6" fill="#0095f6" />
+                    <TwitterVerifiedBadge size={20} />
                   )}
                 </div>
 
@@ -1149,7 +1150,7 @@ export default function Profile({
                             <span style={{ fontSize: "14px", fontWeight: "700", color: "#fff" }}>
                               {sub.creator_display_name || sub.creator_username || "Creator"}
                             </span>
-                            <CheckCircle size={14} color="#0095f6" fill="#0095f6" />
+                            <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
                           </div>
                           <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
                             @{sub.creator_username || "creator"} · <span style={{ color: "#00d084", fontWeight: "600" }}>Active VIP Pass</span>

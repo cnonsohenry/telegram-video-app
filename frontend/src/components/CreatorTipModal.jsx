@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { 
-  X, Heart, CheckCircle, CheckCircle2, Copy, QrCode, 
+  X, Heart, CheckCircle2, Copy, QrCode, 
   Loader2, Sparkles, ArrowLeft, ShieldCheck, DollarSign
 } from "lucide-react";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import useModalHistory from "../hooks/useModalHistory";
 
@@ -288,7 +289,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <span style={creatorNameStyle}>{creator?.display_name || creator?.username}</span>
-                    <CheckCircle size={14} color="#00aff0" fill="#00aff0" />
+                    <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
                   </div>
                   <span style={creatorCategoryStyle}>{creator?.creator_category || "Creator"}</span>
                 </div>

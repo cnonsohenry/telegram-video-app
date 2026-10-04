@@ -6,6 +6,7 @@ import {
   Copy, Plus, CreditCard, X, Edit3, Film, Info, Smartphone
 } from "lucide-react";
 import LegalFooter from "./LegalFooter";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { showToast } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
 
@@ -184,7 +185,7 @@ export default function SettingsView({
                   {user?.display_name || user?.username || "Member"}
                 </span>
                 {(user?.is_creator || user?.is_verified) && (
-                  <CheckCircle size={14} color="#0095f6" fill="#0095f6" />
+                  <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
                 )}
               </div>
               <div style={{ fontSize: "13px", color: "#8e8e93", marginTop: "2px" }}>

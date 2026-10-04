@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
-  Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, CheckCircle, 
+  Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, 
   Sparkles, Lock, ChevronLeft, ChevronRight, X, ArrowRight, Users, Film, Plus,
   Home, Compass, Flame, TrendingUp, User, Search, MoreHorizontal, MoreVertical, Grid3X3, ArrowLeft, RefreshCw, Flag
 } from "lucide-react";
@@ -17,6 +17,7 @@ import { promptLogin, showToast } from "../utils/toast";
 import { formatTwitterDate, getPostDisplayName } from "../utils/date";
 
 import FeedPost from "../components/FeedPost";
+import TwitterVerifiedBadge from "../components/TwitterVerifiedBadge";
 
 // 🌟 INSTAGRAM-STYLE SUGGESTED CREATORS COMPONENT
 const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }) => {
@@ -167,7 +168,7 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
                 </div>
                 {creator.is_verified && (
                   <div style={igVerifiedBadge}>
-                    <CheckCircle size={13} color="#00aff0" fill="#00aff0" />
+                    <TwitterVerifiedBadge size={13} />
                   </div>
                 )}
               </div>
@@ -258,7 +259,7 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
               {creator.display_name || uname}
             </span>
             {creator.is_verified && (
-              <CheckCircle size={14} color="#1d9bf0" fill="#1d9bf0" stroke="#000" style={{ flexShrink: 0 }} />
+              <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
             )}
             {creator.creator_category && (
               <span style={{
@@ -619,7 +620,7 @@ const DesktopLeftSidebar = ({
                   {user.display_name || user.username || "Member"}
                 </span>
                 {(user.is_creator || user.role === "creator") && (
-                  <CheckCircle size={13} color="#00aff0" fill="#00aff0" />
+                  <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
                 )}
               </div>
               <span style={desktopUserPillHandle}>
@@ -860,7 +861,7 @@ const DesktopRightSidebar = ({
                   <div style={desktopSideCreatorInfo}>
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                       <span style={desktopSideCreatorName}>{creator.display_name || uname}</span>
-                      {creator.is_verified && <CheckCircle size={12} color="#00aff0" fill="#00aff0" />}
+                      {creator.is_verified && <TwitterVerifiedBadge size={13} style={{ flexShrink: 0 }} />}
                     </div>
                     <span style={desktopSideCreatorHandle}>@{uname}</span>
                   </div>

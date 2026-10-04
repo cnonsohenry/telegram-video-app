@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Sparkles, ChevronLeft, ChevronRight, X, CheckCircle, ArrowRight } from "lucide-react";
+import { Sparkles, ChevronLeft, ChevronRight, X, ArrowRight } from "lucide-react";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import { showToast, promptLogin } from "../utils/toast";
 
@@ -202,7 +203,7 @@ export default function DiscoverCreatorsSection({
                 </div>
                 {creator.is_verified && (
                   <div style={igVerifiedBadge}>
-                    <CheckCircle size={13} color="#00aff0" fill="#00aff0" />
+                    <TwitterVerifiedBadge size={13} />
                   </div>
                 )}
               </div>

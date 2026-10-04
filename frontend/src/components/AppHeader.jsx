@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock, Users, CheckCircle } from "lucide-react";
+import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock, Users } from "lucide-react";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -408,7 +409,7 @@ export default function AppHeader({
                                   {creator.display_name || creator.username}
                                 </span>
                                 {creator.is_verified && (
-                                  <CheckCircle size={13} color="#1d9bf0" fill="#1d9bf0" stroke="#000" style={{ flexShrink: 0 }} />
+                                  <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
                                 )}
                               </div>
 

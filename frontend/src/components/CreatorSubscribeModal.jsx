@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { 
-  X, CheckCircle, CheckCircle2, ShieldCheck, Copy, QrCode, 
+  X, CheckCircle2, ShieldCheck, Copy, QrCode, 
   Loader2, Sparkles, ArrowLeft, Lock, Star, MessageCircle, AlertCircle
 } from "lucide-react";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import { promptLogin } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
@@ -288,7 +289,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <span style={creatorNameStyle}>{creator?.display_name || creator?.username}</span>
-                    <CheckCircle size={15} color="#00aff0" fill="#00aff0" />
+                    <TwitterVerifiedBadge size={15} style={{ flexShrink: 0 }} />
                   </div>
                   <span style={creatorMetaStyle}>@{creator?.username} • {creator?.creator_category || "Creator"}</span>
                   <div style={priceTagStyle}>

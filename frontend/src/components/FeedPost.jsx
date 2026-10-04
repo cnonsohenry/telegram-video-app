@@ -8,6 +8,7 @@ import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subsc
 import { renderClickableCaption } from "./ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
 import { formatTwitterDate, getPostDisplayName } from "../utils/date";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 
 export const postStyle = { 
   padding: "16px", 
@@ -646,20 +647,58 @@ export default function FeedPost({
 
       <div style={contentColumnStyle}>
         <div style={{ ...postHeaderStyle, justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, flex: 1, overflow: "hidden", marginRight: "6px" }}>
+            {/* Display Name */}
             <span 
-              style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+              style={{ 
+                ...usernameStyle, 
+                whiteSpace: "nowrap", 
+                overflow: "hidden", 
+                textOverflow: "ellipsis",
+                flexShrink: 0,
+                maxWidth: "160px",
+                cursor: onCreatorClick ? "pointer" : "default" 
+              }}
               onClick={(e) => {
                 if (onCreatorClick) {
                   e.stopPropagation();
                   onCreatorClick(creatorHandle);
                 }
               }}
+              title={displayName}
             >
               {displayName}
             </span>
+
+            {/* Twitter Type Verified Badge */}
+            <TwitterVerifiedBadge size={15} style={{ flexShrink: 0 }} />
+
+            {/* Username (@handle) - Abbreviated when not enough space for date */}
+            <span 
+              style={{
+                fontSize: "14px",
+                color: "#71767b",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                flexShrink: 1,
+                minWidth: 0,
+                cursor: onCreatorClick ? "pointer" : "default"
+              }}
+              onClick={(e) => {
+                if (onCreatorClick) {
+                  e.stopPropagation();
+                  onCreatorClick(creatorHandle);
+                }
+              }}
+              title={`@${creatorHandle}`}
+            >
+              @{creatorHandle}
+            </span>
+
+            {/* Date - Preserved without truncation */}
             {formattedDate && (
-              <span style={timeStyle}>
+              <span style={{ ...timeStyle, flexShrink: 0, whiteSpace: "nowrap" }}>
                 &middot; {formattedDate}
               </span>
             )}

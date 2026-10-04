@@ -4,6 +4,7 @@ import { Play, Copy, Lock } from 'lucide-react';
 import { APP_CONFIG } from "../config";
 import { renderClickableCaption } from "./ClickableCaption";
 import { formatTwitterDate, getPostDisplayName } from "../utils/date";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 
 export default function VideoCard({ video, onOpen, showDetails = true, priority = false, onCreatorClick }) {
   const videoRef = useRef(null);
@@ -270,6 +271,12 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
             <span style={uploaderNameStyle}>
               {getPostDisplayName(video)}
             </span>
+            <TwitterVerifiedBadge size={11} style={{ flexShrink: 0 }} />
+            {(video.uploader_handle || video.creator_username || video.creator?.username) && (
+              <span style={{ fontSize: "10px", color: "#71767b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1, minWidth: 0 }}>
+                @{String(video.uploader_handle || video.creator_username || video.creator?.username).replace(/^@/, '')}
+              </span>
+            )}
             {video.created_at && (
               <span style={postDateStyle}>
                 &middot; {formatTwitterDate(video.created_at)}

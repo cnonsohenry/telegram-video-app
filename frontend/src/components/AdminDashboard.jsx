@@ -5,6 +5,7 @@ import {
   PlayCircle, Eye, PieChart, Activity, Star, Percent, Sparkles, CheckCircle, CheckCircle2, Heart, ExternalLink, DollarSign
 } from "lucide-react";
 import AdminUpload from "./AdminUpload"; 
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge"; 
 
 import { APP_CONFIG } from "../config";
 import { showToast } from "../utils/toast";
@@ -615,7 +616,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                     {Number(c.subscription_price) > 0 ? `$${Number(c.subscription_price).toLocaleString()}/mo` : "Free"}
                                   </td>
                                   <td style={tdStyle}>
-                                    {c.is_verified ? <CheckCircle size={15} color="#00aff0" fill="#00aff0" /> : <span style={{ color: "#8e8e93", fontSize: "12px" }}>No</span>}
+                                    {c.is_verified ? <TwitterVerifiedBadge size={15} /> : <span style={{ color: "#8e8e93", fontSize: "12px" }}>No</span>}
                                   </td>
                                   <td style={tdStyle}>
                                     <button onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: c.username }))} style={{ ...iconBtnStyle, color: "#00aff0" }}>
@@ -816,7 +817,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                     <div>
                                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                         <span style={{ fontWeight: "700", color: "#fff", fontSize: "13px" }}>{c.display_name || c.username}</span>
-                                        {c.is_verified && <CheckCircle size={13} color="#00aff0" fill="#00aff0" />}
+                                        {c.is_verified && <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />}
                                       </div>
                                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
                                         <span style={{ fontSize: "11px", color: "#8e8e93" }}>@{c.username}</span>
@@ -900,7 +901,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                       gap: "4px"
                                     }}
                                   >
-                                    <CheckCircle size={12} color={c.is_verified ? "#00aff0" : "#666"} />
+                                    {c.is_verified ? <TwitterVerifiedBadge size={13} /> : <CheckCircle size={12} color="#666" />}
                                     <span>{c.is_verified ? "Verified" : "Unverified"}</span>
                                   </button>
                                 </td>

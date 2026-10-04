@@ -1226,6 +1226,7 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     category: v.category,
     is_premium: isPremium,
     is_community: Boolean(v.is_community),
+    is_verified: v.is_verified !== undefined ? Boolean(v.is_verified) : true,
     subscription_price: Number(v.subscription_price || 0),
     uploader_id: v.uploader_id,
     uploader_name: uploaderName,
@@ -1444,6 +1445,7 @@ app.get("/api/videos", async (req, res) => {
           p.cat_rank, p.cat_order, p.final_score,
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.is_verified, true) as is_verified,
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedIds p
         JOIN videos v ON v.id = p.id
@@ -1473,6 +1475,7 @@ app.get("/api/videos", async (req, res) => {
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.is_verified, true) as is_verified,
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedVideos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id
@@ -1515,6 +1518,7 @@ app.get("/api/videos", async (req, res) => {
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.is_verified, true) as is_verified,
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedVideos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id
@@ -1543,6 +1547,7 @@ app.get("/api/videos", async (req, res) => {
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.is_verified, true) as is_verified,
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedVideos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id

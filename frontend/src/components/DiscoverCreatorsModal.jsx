@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
-  X, ArrowLeft, Search, CheckCircle, Sparkles, 
+  X, ArrowLeft, Search, Sparkles, 
   Users, Flame, Play 
 } from "lucide-react";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import { showToast, promptLogin } from "../utils/toast";
 
@@ -356,7 +357,7 @@ export default function DiscoverCreatorsModal({
                       borderColor: isActive ? "#0095f6" : "rgba(255, 255, 255, 0.1)"
                     }}
                   >
-                    {cat === "verified" && <CheckCircle size={12} style={{ marginRight: "4px" }} />}
+                    {cat === "verified" && <TwitterVerifiedBadge size={13} style={{ marginRight: "4px" }} />}
                     {cat === "popular" && <Flame size={12} style={{ marginRight: "4px" }} />}
                     {label}
                   </button>
@@ -446,7 +447,7 @@ export default function DiscoverCreatorsModal({
                           </div>
                           {creator.is_verified && (
                             <div style={verifiedBadgeStyle}>
-                              <CheckCircle size={13} color="#00aff0" fill="#00aff0" />
+                              <TwitterVerifiedBadge size={13} />
                             </div>
                           )}
                         </div>
@@ -457,6 +458,9 @@ export default function DiscoverCreatorsModal({
                             <span style={displayNameStyle}>
                               {creator.display_name || uname}
                             </span>
+                            {creator.is_verified && (
+                              <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
+                            )}
                           </div>
 
                           {/* Line 2: Bio directly next after display name, 1 line with ellipsis "..." */}
