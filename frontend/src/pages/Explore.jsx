@@ -1545,14 +1545,14 @@ export default function Explore({
   const renderTimelineContent = () => {
     // 1. Search Results View
     if (isSearching) {
-      if (searchLoading) {
+      if (searchLoading && searchFeed.length === 0) {
         return [...Array(5)].map((_, i) => (
           <div key={i} style={postStyle}>
             <div style={avatarColumnStyle}><div style={skeletonAvatar} /></div>
             <div style={contentColumnStyle}>
               <div style={skeletonTextBase} />
               <div style={{ ...skeletonTextBase, width: "80%", marginTop: "6px", marginBottom: "12px" }} />
-              <div style={{ ...skeletonVideo, width: "75%" }} />
+              <div style={skeletonVideo} />
             </div>
           </div>
         ));
@@ -1717,14 +1717,14 @@ export default function Explore({
 
     // 2. Community Tab View (Web creator uploads only)
     if (activeTab === "community") {
-      if (communityLoading) {
+      if (communityLoading && communityFeed.length === 0) {
         return [...Array(5)].map((_, i) => (
           <div key={i} style={postStyle}>
             <div style={avatarColumnStyle}><div style={skeletonAvatar} /></div>
             <div style={contentColumnStyle}>
               <div style={skeletonTextBase} />
               <div style={{ ...skeletonTextBase, width: "80%", marginTop: "6px", marginBottom: "12px" }} />
-              <div style={{ ...skeletonVideo, width: "75%" }} />
+              <div style={skeletonVideo} />
             </div>
           </div>
         ));
@@ -1785,14 +1785,14 @@ export default function Explore({
     }
 
     // 3. For You Tab View (Platform content & Suggested Creators)
-    if (forYouLoading) {
+    if (forYouLoading && forYouFeed.length === 0) {
       return [...Array(5)].map((_, i) => (
         <div key={i} style={postStyle}>
           <div style={avatarColumnStyle}><div style={skeletonAvatar} /></div>
           <div style={contentColumnStyle}>
             <div style={skeletonTextBase} />
             <div style={{ ...skeletonTextBase, width: "80%", marginTop: "6px", marginBottom: "12px" }} />
-            <div style={{ ...skeletonVideo, width: "75%" }} />
+            <div style={skeletonVideo} />
           </div>
         </div>
       ));
@@ -3183,14 +3183,14 @@ const captionStyle = { fontSize: "15px", lineHeight: "1.5", color: "#e7e9ea", ma
 const videoContainerStyle = { position: "relative", borderRadius: "16px", overflow: "hidden", background: "#111", border: "1px solid #333", cursor: "pointer", maxHeight: "600px" };
 
 // 🟢 FIX: Let media scale naturally up to 600px tall
-const thumbnailImgStyle = { width: "100%", height: "auto", maxHeight: "600px", objectFit: "cover", display: "block" };
+const thumbnailImgStyle = { width: "100%", height: "100%", maxHeight: "560px", objectFit: "cover", display: "block" };
 const playOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "48px", height: "48px", borderRadius: "50%", background: "rgba(0, 0, 0, 0.6)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,0.5)", border: "1.5px solid rgba(255,255,255,0.25)", backdropFilter: "blur(4px)" };
 const groupBadgeStyle = { position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.15)", zIndex: 11 };
 const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "12px", maxWidth: "425px" };
 const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", color: "#71767b", fontSize: "13px", cursor: "pointer", transition: "color 0.2s ease" };
 const skeletonAvatar = { width: "40px", height: "40px", borderRadius: "50%", animation: "skeleton-loading 1.5s infinite" };
 const skeletonTextBase = { width: "150px", height: "20px", borderRadius: "4px", marginTop: "4px", animation: "skeleton-loading 1.5s infinite" };
-const skeletonVideo = { width: "100%", height: "300px", borderRadius: "16px", animation: "skeleton-loading 1.5s infinite" };
+const skeletonVideo = { width: "100%", maxWidth: "380px", aspectRatio: "4 / 5", minHeight: "260px", borderRadius: "16px", animation: "skeleton-loading 1.5s infinite" };
 
 // 🌟 Instagram-Style Suggested Creators Styles
 const igSuggestedWrapper = {

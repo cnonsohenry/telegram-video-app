@@ -27,15 +27,21 @@ const captionStyle = { fontSize: "15px", lineHeight: "1.5", color: "#e7e9ea", ma
 
 const videoContainerStyle = { 
   position: "relative", 
+  width: "100%",
   borderRadius: "16px", 
   overflow: "hidden", 
-  background: "#111", 
-  border: "1px solid #333", 
+  background: "#161616", 
+  border: "1px solid rgba(255, 255, 255, 0.12)", 
   cursor: "pointer", 
-  maxHeight: "600px" 
+  maxHeight: "560px",
+  minHeight: "220px",
+  aspectRatio: "16 / 9",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center"
 };
 
-const thumbnailImgStyle = { width: "100%", height: "auto", maxHeight: "600px", objectFit: "cover", display: "block" };
+const thumbnailImgStyle = { width: "100%", height: "100%", maxHeight: "560px", objectFit: "cover", display: "block" };
 const playOverlayStyle = { 
   position: "absolute", 
   top: "50%", 
@@ -51,7 +57,8 @@ const playOverlayStyle = {
   justifyContent: "center", 
   boxShadow: "0 4px 16px rgba(0,0,0,0.5)", 
   border: "1.5px solid rgba(255,255,255,0.25)", 
-  backdropFilter: "blur(4px)" 
+  backdropFilter: "blur(4px)",
+  zIndex: 2 
 };
 
 const groupBadgeStyle = { 
@@ -297,8 +304,13 @@ export default function FeedPost({
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoUrl, setVideoUrl] = useState(video.video_url || null);
   
-  // Track vertical vs landscape orientation. Default to true (75% width).
+  // Track vertical vs landscape orientation. Default to true (portrait card).
   const [isPortrait, setIsPortrait] = useState(true);
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [video.message_id, video.id]);
   
   const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
   const [isLiked, setIsLiked] = useState(false);
@@ -869,7 +881,13 @@ export default function FeedPost({
           /* Standard Single Video Post */
           <div 
             ref={containerRef} 
-            style={{ ...videoContainerStyle, width: isPortrait ? "75%" : "100%" }} 
+            style={{ 
+              ...videoContainerStyle, 
+              width: "100%",
+              maxWidth: isPortrait ? "min(380px, 100%)" : "100%",
+              aspectRatio: isPortrait ? "4 / 5" : "16 / 9",
+              transition: "aspect-ratio 0.2s ease, max-width 0.2s ease"
+            }} 
             onClick={() => {
               if (!isUnlocked) {
                 const token = localStorage.getItem("token");
@@ -891,6 +909,21 @@ export default function FeedPost({
               }
             }}
           >
+            {/* Shimmer skeleton placeholder before image loads */}
+            {!imgLoaded && !isPlaying && (
+              <div 
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "linear-gradient(110deg, #161616 8%, #242424 18%, #161616 33%)",
+                  backgroundSize: "200% 100%",
+                  animation: "skeleton-loading 1.5s infinite",
+                  borderRadius: "inherit",
+                  zIndex: 1
+                }} 
+              />
+            )}
+
             {isPlaying && videoUrl && isUnlocked ? (
               <video 
                 ref={videoRef} 
@@ -911,9 +944,17 @@ export default function FeedPost({
               <img 
                 src={video.thumbnail_url || (video.message_id ? `${APP_CONFIG.apiUrl}/api/thumb/${video.chat_id}/${video.message_id}` : '/assets/default-thumbnail.jpg')} 
                 alt="thumbnail" 
-                style={thumbnailImgStyle} 
+                style={{
+                  ...thumbnailImgStyle,
+                  opacity: imgLoaded ? 1 : 0,
+                  transition: "opacity 0.2s ease"
+                }} 
                 loading="lazy" 
-                onLoad={handleMediaLoad} 
+                onLoad={(e) => {
+                  setImgLoaded(true);
+                  handleMediaLoad(e);
+                }} 
+                onError={() => setImgLoaded(true)}
               />
             )}
 
