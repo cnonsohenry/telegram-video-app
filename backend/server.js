@@ -1312,9 +1312,9 @@ app.get("/api/videos", async (req, res) => {
     
     const isCommunity = req.query.community === "true" || category === "community";
     const communityCondition = isCommunity 
-      ? "(v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au WHERE (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id) AND au.is_banned = TRUE))" 
+      ? "(v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au WHERE (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text) AND au.is_banned = TRUE))" 
       : (category === "amateurs" || category === "amateur")
-        ? "((v.is_community IS NOT TRUE) OR (v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au WHERE (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id) AND au.is_banned = TRUE)))"
+        ? "((v.is_community IS NOT TRUE) OR (v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au WHERE (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text) AND au.is_banned = TRUE)))"
         : "(v.is_community IS NOT TRUE)";
     
     const apiBaseUrl = process.env.API_BASE_URL;
@@ -1393,7 +1393,7 @@ app.get("/api/videos", async (req, res) => {
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedVideos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id
-        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+        LEFT JOIN app_users au ON (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text)
         ORDER BY v.final_score DESC, v.created_at DESC, v.id DESC
       `;
     } else if (category === "trends") {
@@ -1421,7 +1421,7 @@ app.get("/api/videos", async (req, res) => {
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedVideos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id
-        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+        LEFT JOIN app_users au ON (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text)
         ORDER BY v.views DESC
       `;
       queryValues = [limit, offset];
@@ -1463,7 +1463,7 @@ app.get("/api/videos", async (req, res) => {
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedVideos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id
-        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+        LEFT JOIN app_users au ON (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text)
       `;
     } else {
       if (hasCategory) {
@@ -1491,7 +1491,7 @@ app.get("/api/videos", async (req, res) => {
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedVideos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id
-        LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
+        LEFT JOIN app_users au ON (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text)
         ORDER BY v.created_at DESC
       `;
     }
