@@ -1302,7 +1302,7 @@ app.get("/api/videos", async (req, res) => {
     const sort = (req.query.sort || "").toLowerCase().trim();
     const isAlgo = sort === "algo" || sort === "x" || sort === "for_you" || sort === "algorithm" || sort === "explore";
     const isRandom = sort === "random" || req.query.random === "true";
-    const seed = req.query.seed ? String(req.query.seed).trim() : "";
+    const seed = req.query.seed ? String(req.query.seed).trim() : Math.floor(Math.random() * 1000000).toString();
     
     // 🟢 Extract timeframe from query (defaults to all_time)
     const timeframe = req.query.timeframe || "all_time";
@@ -1329,17 +1329,23 @@ app.get("/api/videos", async (req, res) => {
       : `WHERE ${communityCondition}`;
 
     if (isAlgo) {
-      // 🟢 Twitter/X Heavy Ranker Recommendation Algorithm
+      // 🟢 Twitter/X Heavy Ranker Recommendation Algorithm + Session Exploration
       // Combines Likes (1.0), Shares (2.0), Comments (1.5), Saves (2.5), Views log-scale (1.5),
       // Album richness bonus (3.0), Freshness discovery boosts (<6h, <12h, <24h),
-      // divided by gravity time decay: POWER(age_in_hours + 2.0, 1.25)
+      // divided by gravity time decay: POWER(age_in_hours + 2.0, 1.25),
+      // multiplied by session-based stochastic exploration jitter (0.70 - 1.30)
+      // so each user/session discovers a fresh, dynamic feed without identical repetition!
+      let seedParam;
+      let limitOffsetPlaceholders;
       if (hasCategory) {
-        queryValues = [category, limit, offset];
+        queryValues = [category, seed, limit, offset];
+        seedParam = "$2";
+        limitOffsetPlaceholders = "LIMIT $3 OFFSET $4";
       } else {
-        queryValues = [limit, offset];
+        queryValues = [seed, limit, offset];
+        seedParam = "$1";
+        limitOffsetPlaceholders = "LIMIT $2 OFFSET $3";
       }
-
-      const limitOffsetPlaceholders = hasCategory ? "LIMIT $2 OFFSET $3" : "LIMIT $1 OFFSET $2";
 
       query = `
         WITH ScoredVideos AS (
@@ -1369,14 +1375,16 @@ app.get("/api/videos", async (req, res) => {
               )
               /
               POWER(GREATEST(EXTRACT(EPOCH FROM (NOW() - COALESCE(v.created_at, NOW())))::numeric / 3600.0, 0.0) + 2.0, 1.25)
-            ) as x_score
+            ) as base_score,
+            (0.70 + 0.60 * (abs(hashtext(v.id::text || ${seedParam})) % 10000) / 10000.0) as jitter
           FROM videos v 
           ${catFilter}
         ),
         PagedVideos AS (
-          SELECT * FROM ScoredVideos 
+          SELECT *, (base_score * jitter) as final_score
+          FROM ScoredVideos 
           WHERE rn = 1 
-          ORDER BY x_score DESC, created_at DESC, id DESC
+          ORDER BY (base_score * jitter) DESC, created_at DESC, id DESC
           ${limitOffsetPlaceholders}
         )
         SELECT v.*, 
@@ -1386,7 +1394,7 @@ app.get("/api/videos", async (req, res) => {
         FROM PagedVideos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id
         LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
-        ORDER BY v.x_score DESC, v.created_at DESC, v.id DESC
+        ORDER BY v.final_score DESC, v.created_at DESC, v.id DESC
       `;
     } else if (category === "trends") {
       // 🟢 Set the time filter based on the requested timeframe

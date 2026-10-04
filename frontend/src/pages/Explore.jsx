@@ -942,6 +942,8 @@ export default function Explore({
   const [forYouPage, setForYouPage] = useState(1);
   const [hasMoreForYou, setHasMoreForYou] = useState(true);
   const forYouPageRef = useRef(1);
+  const isFetchingForYouRef = useRef(false);
+  const sessionSeedRef = useRef(Math.floor(Math.random() * 1000000).toString());
 
   // 🟢 COMMUNITY FEED STATE (Contents posted by web creators only)
   const [communityFeed, setCommunityFeed] = useState([]);
@@ -1153,9 +1155,18 @@ export default function Explore({
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // 🟢 LOAD FOR YOU FEED (Authentic Twitter/X Heavy Ranker Algorithmic Feed)
+  // 🟢 LOAD FOR YOU FEED (Authentic Twitter/X Heavy Ranker Algorithmic Feed + Session Exploration)
   const loadForYouFeed = useCallback(async (isLoadMore = false, cat = selectedCategory, pageOverride = null) => {
+    if (isFetchingForYouRef.current) return;
+
     const targetPage = pageOverride !== null ? pageOverride : (isLoadMore ? forYouPageRef.current + 1 : 1);
+
+    // On fresh load, pull-to-refresh, or category switch: generate new session exploration seed
+    if (!isLoadMore) {
+      sessionSeedRef.current = Math.floor(Math.random() * 1000000).toString();
+    }
+
+    isFetchingForYouRef.current = true;
 
     if (isLoadMore) {
       setForYouLoadingMore(true);
@@ -1167,7 +1178,8 @@ export default function Explore({
 
     try {
       const categoryParam = cat ? `&category=${encodeURIComponent(cat)}` : "";
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?sort=algo&page=${targetPage}&limit=12${categoryParam}`);
+      const seedParam = `&seed=${sessionSeedRef.current}`;
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?sort=algo&page=${targetPage}&limit=12${categoryParam}${seedParam}`);
       if (res.ok) {
         const data = await res.json();
         const fetched = data.videos || [];
@@ -1194,6 +1206,7 @@ export default function Explore({
     } catch (err) {
       console.error("Failed to load explore for you feed", err);
     } finally {
+      isFetchingForYouRef.current = false;
       setForYouLoading(false);
       setForYouLoadingMore(false);
     }
@@ -1484,7 +1497,7 @@ export default function Explore({
     } else if (activeTab === "community") {
       if (communityLoading || communityLoadingMore) return;
     } else {
-      if (forYouLoading || forYouLoadingMore || !hasMoreForYou) return;
+      if (forYouLoading || forYouLoadingMore || !hasMoreForYou || isFetchingForYouRef.current) return;
     }
     
     if (observer.current) observer.current.disconnect();
@@ -1496,9 +1509,13 @@ export default function Explore({
         } else if (activeTab === "community") {
           if (hasMoreCommunity) loadCommunityFeed(communityPage + 1, true);
         } else {
-          if (hasMoreForYou) loadForYouFeed(true, selectedCategory);
+          if (hasMoreForYou && !isFetchingForYouRef.current) {
+            loadForYouFeed(true, selectedCategory);
+          }
         }
       }
+    }, {
+      rootMargin: "300px"
     });
     if (node) observer.current.observe(node);
   }, [

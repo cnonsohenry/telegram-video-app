@@ -392,6 +392,7 @@ export default function FeedPost({
   }, [isPlaying, isAnyModalOpen]);
 
   useEffect(() => {
+    if (!isPlaying) return;
     const token = localStorage.getItem("token");
     if (!token) return;
 
@@ -404,7 +405,7 @@ export default function FeedPost({
       if (data.isSaved) setIsSaved(true);
     })
     .catch(err => console.error("Failed to fetch interaction state", err));
-  }, [video.message_id]);
+  }, [isPlaying, video.message_id]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -420,7 +421,7 @@ export default function FeedPost({
 
   useEffect(() => {
     let timer;
-    if (isPlaying && !videoUrl && isUnlocked) {
+    if (isPlaying && isUnlocked) {
       timer = setTimeout(async () => {
         try {
           const token = localStorage.getItem("token");
@@ -431,10 +432,22 @@ export default function FeedPost({
             if (data.video_url) setVideoUrl(data.video_url);
           }
         } catch (e) {}
-      }, 300); 
+      }, 250); 
+    } else if (!isPlaying) {
+      // 🟢 Offscreen memory & decoder cleanup to keep mobile devices cool and prevent crashes
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.removeAttribute('src');
+        videoRef.current.load();
+      }
+      setVideoUrl(null);
     }
     return () => clearTimeout(timer);
-  }, [isPlaying, videoUrl, video.chat_id, video.message_id, isUnlocked]);
+  }, [isPlaying, isUnlocked, video.chat_id, video.message_id]);
 
   // Attach HLS or video src whenever videoUrl is available
   useEffect(() => {
@@ -745,7 +758,7 @@ export default function FeedPost({
                   style={albumVideoCardStyle}
                 >
                   {/* Thumbnail / Video */}
-                  {idx === 0 && videoUrl && isUnlocked ? (
+                  {idx === 0 && isPlaying && videoUrl && isUnlocked ? (
                     <video 
                       ref={videoRef} 
                       style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }} 
@@ -878,7 +891,7 @@ export default function FeedPost({
               }
             }}
           >
-            {videoUrl && isUnlocked ? (
+            {isPlaying && videoUrl && isUnlocked ? (
               <video 
                 ref={videoRef} 
                 style={{ ...thumbnailImgStyle, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }} 
