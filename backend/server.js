@@ -1329,12 +1329,13 @@ app.get("/api/videos", async (req, res) => {
       : `WHERE ${communityCondition}`;
 
     if (isAlgo) {
-      // 🟢 Twitter/X Heavy Ranker Recommendation Algorithm + Session Exploration
-      // Combines Likes (1.5), Shares (2.5), Comments (2.0), Saves (3.0), Views sqrt scale (0.4),
-      // Album richness bonus (3.0), Freshness velocity boosts (<24h, <3d, <7d),
-      // with a smooth 14-day exponential half-life decay that preserves evergreen viral hits (0.20 floor),
-      // multiplied by session-based stochastic exploration jitter (0.75 - 1.25),
-      // and round-robin category interleaving for diverse, balanced representation.
+      // 🟢 Twitter/X Multi-Signal Dynamic Heavy Ranker + Session Exploration
+      // Eliminates single-score dominance by independently scoring three distinct pillars:
+      // 1. Freshness Velocity (recency boost for <24h, <3d, <7d + early velocity)
+      // 2. Engagement Intensity (log-scaled interactions so high-share outliers don't monopolize)
+      // 3. Viral Reach (log-scaled views and reach)
+      // Each refresh dynamically varies dimension weights (w_fresh, w_eng, w_viral) and category rotation,
+      // coupled with per-video stochastic Gumbel exploration so different high-quality videos lead each refresh!
       let seedParam;
       let limitOffsetPlaceholders;
       let pagedOrder;
@@ -1350,8 +1351,8 @@ app.get("/api/videos", async (req, res) => {
         queryValues = [seed, limit, offset];
         seedParam = "$1";
         limitOffsetPlaceholders = "LIMIT $2 OFFSET $3";
-        pagedOrder = "ORDER BY cat_rank ASC, final_score DESC";
-        finalOrder = "ORDER BY v.cat_rank ASC, v.final_score DESC";
+        pagedOrder = "ORDER BY cat_rank ASC, cat_order ASC, final_score DESC";
+        finalOrder = "ORDER BY v.cat_rank ASC, v.cat_order ASC, v.final_score DESC";
       }
 
       query = `
@@ -1364,34 +1365,72 @@ app.get("/api/videos", async (req, res) => {
             COUNT(*) OVER(
               PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END
             ) as group_count,
+
+            -- Signal 1: Freshness Velocity (< 7 days)
             (
-              (
+              (CASE 
+                 WHEN v.created_at >= NOW() - INTERVAL '24 hours' THEN 35.0
+                 WHEN v.created_at >= NOW() - INTERVAL '3 days' THEN 22.0
+                 WHEN v.created_at >= NOW() - INTERVAL '7 days' THEN 12.0
+                 ELSE 0.0 
+               END)
+              + LN(GREATEST(COALESCE(v.likes_count, 0) * 3 + COALESCE(v.shares_count, 0) * 4 + 1, 1)::numeric) * 4.0
+              + LN(GREATEST(COALESCE(v.views, 0), 1)::numeric + 1.0) * 1.5
+            ) as fresh_score,
+
+            -- Signal 2: Engagement Intensity (log-scaled interactions so outlier share counts don't monopolize)
+            (
+              LN(GREATEST(
                 1.0 +
-                COALESCE(v.likes_count, 0)::numeric * 1.5 +
-                COALESCE(v.shares_count, 0)::numeric * 2.5 +
-                COALESCE(v.comments_count, 0)::numeric * 2.0 +
-                COALESCE(v.saves_count, 0)::numeric * 3.0 +
-                SQRT(GREATEST(COALESCE(v.views, 0), 0)::numeric) * 0.4 +
-                (CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN 3.0 ELSE 0.0 END) +
-                (CASE 
-                   WHEN v.created_at >= NOW() - INTERVAL '24 hours' THEN 15.0
-                   WHEN v.created_at >= NOW() - INTERVAL '3 days' THEN 10.0
-                   WHEN v.created_at >= NOW() - INTERVAL '7 days' THEN 5.0
-                   ELSE 0.0 
-                 END)
-              )
-              *
-              (0.20 + 0.80 * EXP(-1.0 * (EXTRACT(EPOCH FROM (NOW() - COALESCE(v.created_at, NOW())))::numeric / 86400.0) / 14.0))
-            ) as base_score,
-            (0.75 + 0.50 * (abs(hashtext(v.id::text || ${seedParam})) % 10000) / 10000.0) as jitter
+                COALESCE(v.likes_count, 0)::numeric * 3.0 +
+                COALESCE(v.shares_count, 0)::numeric * 4.0 +
+                COALESCE(v.comments_count, 0)::numeric * 3.0 +
+                COALESCE(v.saves_count, 0)::numeric * 4.0 +
+                (CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN 3.0 ELSE 0.0 END)
+              , 1.0)) * 8.0
+              -- Smooth 14-day exponential half-life decay (0.35 floor)
+              * (0.35 + 0.65 * EXP(-1.0 * (EXTRACT(EPOCH FROM (NOW() - COALESCE(v.created_at, NOW())))::numeric / 86400.0) / 14.0))
+            ) as eng_score,
+
+            -- Signal 3: Viral Reach (views log scale + engagement support)
+            (
+              LN(GREATEST(COALESCE(v.views, 0), 1)::numeric + 1.0) * 4.5 +
+              LN(GREATEST(COALESCE(v.likes_count, 0) + 1, 1)::numeric) * 3.0
+            ) as viral_score,
+
+            -- Independent stochastic perturbations per candidate
+            (-1.0 * LN(-1.0 * LN(((abs(hashtext(v.id::text || ${seedParam} || 'g_f')) % 998000 + 1000)::numeric / 1000000.0)))) as g_fresh,
+            (-1.0 * LN(-1.0 * LN(((abs(hashtext(v.id::text || ${seedParam} || 'g_e')) % 998000 + 1000)::numeric / 1000000.0)))) as g_eng,
+            (-1.0 * LN(-1.0 * LN(((abs(hashtext(v.id::text || ${seedParam} || 'g_v')) % 998000 + 1000)::numeric / 1000000.0)))) as g_viral
           FROM videos v 
           ${catFilter}
         ),
-        RankedVideos AS (
-          SELECT *, (base_score * jitter) as final_score,
-            ROW_NUMBER() OVER(PARTITION BY category ORDER BY (base_score * jitter) DESC) as cat_rank
+        SessionWeighted AS (
+          SELECT *,
+            -- Session-level dynamic dimension weights driven by the refresh seed
+            (0.7 + 1.4 * ((abs(hashtext(${seedParam} || 'w_f')) % 1000) / 1000.0)) as w_fresh,
+            (0.7 + 1.4 * ((abs(hashtext(${seedParam} || 'w_e')) % 1000) / 1000.0)) as w_eng,
+            (0.5 + 1.0 * ((abs(hashtext(${seedParam} || 'w_v')) % 1000) / 1000.0)) as w_viral
           FROM ScoredVideos 
           WHERE rn = 1
+        ),
+        RankedVideos AS (
+          SELECT *,
+            (
+              (fresh_score * w_fresh + 3.0 * g_fresh) +
+              (eng_score * w_eng + 3.0 * g_eng) +
+              (viral_score * w_viral + 2.0 * g_viral)
+            ) as final_score,
+            ROW_NUMBER() OVER(
+              PARTITION BY category 
+              ORDER BY (
+                (fresh_score * w_fresh + 3.0 * g_fresh) +
+                (eng_score * w_eng + 3.0 * g_eng) +
+                (viral_score * w_viral + 2.0 * g_viral)
+              ) DESC, created_at DESC, id DESC
+            ) as cat_rank,
+            (abs(hashtext(category || ${seedParam} || 'cat')) % 100) as cat_order
+          FROM SessionWeighted
         ),
         PagedVideos AS (
           SELECT * FROM RankedVideos 
