@@ -34,6 +34,7 @@ import { verifyPayment } from "./controllers/payment.js";
 import { createCryptoPayment, cryptoWebhook, checkCryptoTransaction } from "./controllers/crypto.js";
 import { z } from "zod"; 
 import cron from "node-cron";
+import { getPrivacyHtml, getTermsHtml, getAboutHtml } from "./legalTemplates.js";
 
 // 🟢 FIX: Catch unhandled promises and exceptions to stop PM2 crash loops
 process.on('uncaughtException', (err) => {
@@ -2713,6 +2714,13 @@ app.use((req, res, next) => {
     let html = getTemplate();
     if (/<\/head>/i.test(html)) {
       html = stripDefaultSeoTags(html).replace('</head>', seoTags);
+      if (req.path === '/privacy' || req.path === '/privacy-policy') {
+        html = html.replace('<div id="root"></div>', `<div id="root">${getPrivacyHtml()}</div>`);
+      } else if (req.path === '/terms' || req.path === '/terms-of-service' || req.path === '/tos') {
+        html = html.replace('<div id="root"></div>', `<div id="root">${getTermsHtml()}</div>`);
+      } else if (req.path === '/about') {
+        html = html.replace('<div id="root"></div>', `<div id="root">${getAboutHtml()}</div>`);
+      }
       return res.send(html);
     }
   } catch (err) {
@@ -2741,6 +2749,24 @@ app.use(prerender);
    SERVE THE COMPILED FRONTEND
 ======================================================= */
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+// 🟢 SSR for Google OAuth verification, Trust & Safety reviewers, and legal crawlers
+app.get(['/privacy', '/privacy-policy', '/terms', '/terms-of-service', '/tos', '/about'], (req, res) => {
+  try {
+    let html = getTemplate();
+    if (req.path === '/privacy' || req.path === '/privacy-policy') {
+      html = html.replace('<div id="root"></div>', `<div id="root">${getPrivacyHtml()}</div>`);
+    } else if (req.path === '/terms' || req.path === '/terms-of-service' || req.path === '/tos') {
+      html = html.replace('<div id="root"></div>', `<div id="root">${getTermsHtml()}</div>`);
+    } else if (req.path === '/about') {
+      html = html.replace('<div id="root"></div>', `<div id="root">${getAboutHtml()}</div>`);
+    }
+    res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+    return res.send(html);
+  } catch (err) {
+    res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
+  }
+});
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
