@@ -2640,6 +2640,10 @@ app.use((req, res, next) => {
       pageTitle = 'Terms of Service - NaijaHomemade';
       description = 'Official Terms of Service and user agreement for NaijaHomemade.';
       canonicalUrl = `${frontendUrl}/terms`;
+    } else if (req.path === '/about') {
+      pageTitle = 'About Us - NaijaHomemade';
+      description = 'Learn about NaijaHomemade, the premier African video creator platform and streaming community.';
+      canonicalUrl = `${frontendUrl}/about`;
     } else if (req.path === '/explore') {
       pageTitle = 'Explore Trending Nigerian Homemade Videos & Creators | NaijaHomemade';
       description = 'Discover and stream trending Nigerian creators, verified models, and exclusive homemade videos on NaijaHomemade.';
