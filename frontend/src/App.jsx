@@ -43,10 +43,22 @@ export default function App() {
   const [isFooterVisible, setIsFooterVisible] = useState(true);
   const [activeVideo, setActiveVideo] = useState(null); 
   const [showPaywall, setShowPaywall] = useState(false);
-  // 🟢 Initialize activeLegalPage from URL query param (?legal=about, ?legal=terms, etc.)
+  // 🟢 Initialize activeLegalPage from URL query param (?legal=about, ?legal=terms) OR direct path (/privacy, /terms)
   const [activeLegalPage, setActiveLegalPage] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("legal") || null;
+    const legalParam = params.get("legal");
+    if (legalParam) return legalParam;
+
+    const path = window.location.pathname.toLowerCase().replace(/\/+$/, "");
+    if (path === "/privacy" || path === "/privacy-policy") return "privacy";
+    if (path === "/terms" || path === "/terms-of-service" || path === "/tos") return "terms";
+    if (path === "/dmca") return "dmca";
+    if (path === "/2257") return "2257";
+    if (path === "/about") return "about";
+    if (path === "/contact") return "contact";
+    if (path === "/cookies") return "cookies";
+
+    return null;
   }); 
   const [isSharedVideoView, setIsSharedVideoView] = useState(false);
   
@@ -343,10 +355,11 @@ export default function App() {
     setActiveLegalPage(pageId);
     activeLegalPageRef.current = pageId;
     const currentState = window.history.state || {};
+    const url = pageId === "privacy" ? "/privacy" : (pageId === "terms" ? "/terms" : `/?legal=${encodeURIComponent(pageId)}`);
     window.history.pushState(
       { ...currentState, legal: pageId },
       document.title,
-      `/?legal=${encodeURIComponent(pageId)}`
+      url
     );
   }, []);
 

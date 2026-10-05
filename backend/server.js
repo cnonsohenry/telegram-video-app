@@ -2618,8 +2618,9 @@ app.use((req, res, next) => {
 
   if (!isBot) return next();
 
-  // Only intercept root / or /explore
-  if (req.path !== '/' && req.path !== '/explore') {
+  // Intercept root, /explore, and public legal policy paths
+  const legalPaths = ['/privacy', '/privacy-policy', '/terms', '/terms-of-service', '/tos', '/dmca', '/2257', '/about', '/contact', '/cookies'];
+  if (req.path !== '/' && req.path !== '/explore' && !legalPaths.includes(req.path)) {
     return next();
   }
 
@@ -2631,7 +2632,15 @@ app.use((req, res, next) => {
     let canonicalUrl = `${frontendUrl}/`;
     let robots = 'index, follow, max-image-preview:large, max-video-preview:-1';
 
-    if (req.path === '/explore') {
+    if (req.path === '/privacy' || req.path === '/privacy-policy') {
+      pageTitle = 'Privacy Policy - NaijaHomemade';
+      description = 'Official Privacy Notice and data protection policies for NaijaHomemade.';
+      canonicalUrl = `${frontendUrl}/privacy`;
+    } else if (req.path === '/terms' || req.path === '/terms-of-service' || req.path === '/tos') {
+      pageTitle = 'Terms of Service - NaijaHomemade';
+      description = 'Official Terms of Service and user agreement for NaijaHomemade.';
+      canonicalUrl = `${frontendUrl}/terms`;
+    } else if (req.path === '/explore') {
       pageTitle = 'Explore Trending Nigerian Homemade Videos & Creators | NaijaHomemade';
       description = 'Discover and stream trending Nigerian creators, verified models, and exclusive homemade videos on NaijaHomemade.';
       canonicalUrl = `${frontendUrl}/explore`;

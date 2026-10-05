@@ -36,12 +36,12 @@ export default function LegalFooter({ onOpenLegal }) {
 
       {/* Legal Links with the border moved to the top of this container */}
       <div style={linkRowStyle}>
-        <a href="/?legal=about" onClick={(e) => handleLegalClick(e, "about")} style={linkStyle}>About</a>
-        <a href="/?legal=terms" onClick={(e) => handleLegalClick(e, "terms")} style={linkStyle}>Terms</a>
-        <a href="/?legal=privacy" onClick={(e) => handleLegalClick(e, "privacy")} style={linkStyle}>Privacy</a>
-        <a href="/?legal=cookies" onClick={(e) => handleLegalClick(e, "cookies")} style={linkStyle}>Cookies</a>
-        <a href="/?legal=dmca" onClick={(e) => handleLegalClick(e, "dmca")} style={linkStyle}>DMCA</a>
-        <a href="/?legal=2257" onClick={(e) => handleLegalClick(e, "2257")} style={linkStyle}>2257</a>
+        <a href="/about" onClick={(e) => handleLegalClick(e, "about")} style={linkStyle}>About</a>
+        <a href="/terms" onClick={(e) => handleLegalClick(e, "terms")} style={linkStyle}>Terms</a>
+        <a href="/privacy" onClick={(e) => handleLegalClick(e, "privacy")} style={linkStyle}>Privacy</a>
+        <a href="/cookies" onClick={(e) => handleLegalClick(e, "cookies")} style={linkStyle}>Cookies</a>
+        <a href="/dmca" onClick={(e) => handleLegalClick(e, "dmca")} style={linkStyle}>DMCA</a>
+        <a href="/2257" onClick={(e) => handleLegalClick(e, "2257")} style={linkStyle}>2257</a>
       </div>
       
       {/* 🟢 THE FIX: Dynamic Brand Name for the copyright */}

@@ -898,10 +898,10 @@ const DesktopRightSidebar = ({
       {/* 5. Twitter-style Mini Legal Footer */}
       <footer style={desktopFooterStyle}>
         <div style={desktopFooterLinks}>
-          <a href="/?legal=terms" style={desktopFooterLink}>Terms of Service</a>
-          <a href="/?legal=privacy" style={desktopFooterLink}>Privacy Policy</a>
-          <a href="/?legal=dmca" style={desktopFooterLink}>DMCA</a>
-          <a href="/?legal=2257" style={desktopFooterLink}>18 U.S.C. 2257</a>
+          <a href="/terms" style={desktopFooterLink}>Terms of Service</a>
+          <a href="/privacy" style={desktopFooterLink}>Privacy Policy</a>
+          <a href="/dmca" style={desktopFooterLink}>DMCA</a>
+          <a href="/2257" style={desktopFooterLink}>18 U.S.C. 2257</a>
         </div>
         <div style={desktopFooterCopy}>
           &copy; 2026 NaijaHomemade, Inc.
