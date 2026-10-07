@@ -168,7 +168,7 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
                 </div>
                 {creator.is_verified && (
                   <div style={igVerifiedBadge}>
-                    <TwitterVerifiedBadge size={13} />
+                    <TwitterVerifiedBadge size={15} />
                   </div>
                 )}
               </div>
@@ -181,11 +181,6 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
               {/* Handle */}
               <span style={igHandleName}>
                 @{uname}
-              </span>
-
-              {/* Category tag */}
-              <span style={igCategoryTag}>
-                {creator.creator_category || "Telegram Creator"}
               </span>
 
               {/* Follow Button (Instagram Style) */}
@@ -3268,14 +3263,14 @@ const igScrollTrack = {
 
 const igCardBox = {
   position: "relative",
-  flex: "0 0 152px",
-  width: "152px",
-  minWidth: "152px",
-  maxWidth: "152px",
+  flex: "0 0 156px",
+  width: "156px",
+  minWidth: "156px",
+  maxWidth: "156px",
   background: "#161616",
   border: "1px solid rgba(255, 255, 255, 0.12)",
-  borderRadius: "12px",
-  padding: "16px 10px 14px 10px",
+  borderRadius: "14px",
+  padding: "18px 12px 14px 12px",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
@@ -3306,20 +3301,20 @@ const igDismissBtn = {
 
 const igAvatarContainer = {
   position: "relative",
-  width: "60px",
-  height: "60px",
-  marginBottom: "10px",
+  width: "84px",
+  height: "84px",
+  marginBottom: "12px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center"
 };
 
 const igAvatarRing = {
-  width: "60px",
-  height: "60px",
+  width: "84px",
+  height: "84px",
   borderRadius: "50%",
-  padding: "2px",
-  background: "rgba(255, 255, 255, 0.15)",
+  padding: "2.5px",
+  background: "rgba(255, 255, 255, 0.16)",
   boxSizing: "border-box",
   display: "flex",
   alignItems: "center",
@@ -3338,18 +3333,18 @@ const igAvatarImg = {
 
 const igVerifiedBadge = {
   position: "absolute",
-  bottom: "-1px",
-  right: "-1px",
+  bottom: "1px",
+  right: "1px",
   background: "#000",
   borderRadius: "50%",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  padding: "1px"
+  padding: "1.5px"
 };
 
 const igDisplayName = {
-  fontSize: "13px",
+  fontSize: "14px",
   fontWeight: "700",
   color: "#ffffff",
   textAlign: "center",
@@ -3361,7 +3356,7 @@ const igDisplayName = {
 };
 
 const igHandleName = {
-  fontSize: "11px",
+  fontSize: "12px",
   color: "#8e8e93",
   textAlign: "center",
   width: "100%",
@@ -3371,24 +3366,9 @@ const igHandleName = {
   marginTop: "2px"
 };
 
-const igCategoryTag = {
-  fontSize: "10px",
-  fontWeight: "600",
-  color: "#00aff0",
-  background: "rgba(0, 175, 240, 0.12)",
-  padding: "2px 7px",
-  borderRadius: "10px",
-  marginTop: "6px",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  maxWidth: "100%",
-  display: "inline-block"
-};
-
 const igFollowBtn = {
   width: "100%",
-  marginTop: "12px",
+  marginTop: "14px",
   padding: "7px 0",
   borderRadius: "8px",
   fontSize: "13px",
@@ -3405,7 +3385,7 @@ const igFollowBtn = {
 
 const igFollowingBtn = {
   width: "100%",
-  marginTop: "12px",
+  marginTop: "14px",
   padding: "6px 0",
   borderRadius: "8px",
   fontSize: "13px",
