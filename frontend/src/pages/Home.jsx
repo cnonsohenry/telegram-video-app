@@ -777,6 +777,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         background: "var(--bg-color)" 
       }}>
         <AppHeader 
+          tab="home"
           isDesktop={isDesktop} 
           searchTerm={searchTerm} 
           setSearchTerm={setSearchTerm} 

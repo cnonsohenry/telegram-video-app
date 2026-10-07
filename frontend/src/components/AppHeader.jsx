@@ -13,7 +13,8 @@ export default function AppHeader({
   suggestions = [],
   onVideoClick,
   onCreatorClick,
-  onSearchSubmit
+  onSearchSubmit,
+  tab = "home"
 }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const isLoggedIn = user && (user.id || user.email);
@@ -61,7 +62,14 @@ export default function AppHeader({
   useEffect(() => {
     const handleSearchPopState = (event) => {
       const state = event.state || {};
-      if (isSearchOpenRef.current && !state.searchOpen) {
+      const currentTab = state.tab || (window.location.search.includes("tab=explore") ? "explore" : "home");
+
+      if (state.searchOpen && !state.videoPlayer && !state.creatorProfile) {
+        if (!isSearchOpenRef.current && (!tab || currentTab === tab)) {
+          isSearchOpenRef.current = true;
+          setIsSearchOpen(true);
+        }
+      } else if (isSearchOpenRef.current && !state.searchOpen) {
         isSearchOpenRef.current = false;
         setIsSearchOpen(false);
       }
@@ -69,15 +77,19 @@ export default function AppHeader({
 
     window.addEventListener("popstate", handleSearchPopState);
     return () => window.removeEventListener("popstate", handleSearchPopState);
-  }, []);
+  }, [tab]);
 
   useEffect(() => {
     const handleOpenSearchModal = () => {
-      handleOpenSearch();
+      const currentState = window.history.state || {};
+      const currentTab = currentState.tab || (window.location.search.includes("tab=explore") ? "explore" : "home");
+      if (!tab || currentTab === tab) {
+        handleOpenSearch();
+      }
     };
     window.addEventListener("openSearchModal", handleOpenSearchModal);
     return () => window.removeEventListener("openSearchModal", handleOpenSearchModal);
-  }, []);
+  }, [tab]);
 
   useEffect(() => {
     if (isSearchOpen) document.body.style.overflow = "hidden";
@@ -185,29 +197,16 @@ export default function AppHeader({
   };
 
   const handleExecuteSearch = (video, e) => {
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     saveSearchHistory(searchTerm);
-    isSearchOpenRef.current = false;
-    setIsSearchOpen(false);
-    if (window.history.state?.searchOpen) {
-      window.history.replaceState(
-        { ...(window.history.state || {}), searchOpen: false },
-        document.title
-      );
+    if (onVideoClick) {
+      onVideoClick(video, e);
     }
-    onVideoClick(video, e);
   };
 
   const handleCreatorClick = (creator, e) => {
-    e.stopPropagation();
+    if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     saveSearchHistory(searchTerm);
-    isSearchOpenRef.current = false;
-    setIsSearchOpen(false);
-    if (window.history.state?.searchOpen) {
-      window.history.replaceState(
-        { ...(window.history.state || {}), searchOpen: false },
-        document.title
-      );
-    }
     const uname = creator.username;
     if (onCreatorClick) {
       onCreatorClick(uname);

@@ -1872,6 +1872,7 @@ export default function Explore({
             {/* AppHeader is kept in tree for portal search modal */}
             <div style={{ display: isSearching ? "none" : "block" }}>
               <AppHeader 
+                tab="explore"
                 isDesktop={false} 
                 searchTerm={searchQuery} 
                 setSearchTerm={setSearchQuery} 
