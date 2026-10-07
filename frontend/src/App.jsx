@@ -702,7 +702,11 @@ export default function App() {
             const playRes = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${videoData.chat_id}&message_id=${videoData.message_id}`, { headers });
             if (playRes.ok) {
               const playData = await playRes.json();
-              setActiveVideo({ ...videoData, video_url: playData.video_url });
+              if (playData.video_url) {
+                const ts = Date.now();
+                const separator = playData.video_url.includes('?') ? '&' : '?';
+                setActiveVideo({ ...videoData, video_url: `${playData.video_url}${separator}cb=${ts}` });
+              }
             }
           }
         } catch (error) {
@@ -792,15 +796,18 @@ export default function App() {
 
       // Clear completely first
       setActiveVideo(null);
+      // 🟢 Pause any existing feed videos to release HTTP range-request socket locks
+      try {
+        document.querySelectorAll('video').forEach(el => el.pause());
+      } catch (_) {}
+
       await new Promise(resolve => setTimeout(resolve, 50));
       
-      // 🟢 THE FIX: The Cache-Buster Trick
-      // We append ?fs=1 to the URL. This forces the browser to open a fresh, 
-      // clean connection, ignoring any aborted downloads from the background feed!
+      const ts = Date.now();
       if (video.video_url) {
         console.log("⚡ Instant Fullscreen (Busting browser cache lock)");
         const separator = video.video_url.includes('?') ? '&' : '?';
-        const freshUrl = `${video.video_url}${separator}fs=1`;
+        const freshUrl = `${video.video_url}${separator}cb=${ts}`;
         
         setActiveVideo({ ...video, video_url: freshUrl });
         return;
@@ -816,7 +823,7 @@ export default function App() {
       
       if (data.video_url) {
         const separator = data.video_url.includes('?') ? '&' : '?';
-        const freshUrl = `${data.video_url}${separator}fs=1`;
+        const freshUrl = `${data.video_url}${separator}cb=${ts}`;
         setActiveVideo({ ...video, video_url: freshUrl });
       }
     } catch (e) { 

@@ -526,6 +526,19 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   const playVideo = async (video) => {
     try {
+      // Pause any existing feed videos to release HTTP range-request socket locks
+      try {
+        document.querySelectorAll('video').forEach(el => el.pause());
+      } catch (_) {}
+
+      const ts = Date.now();
+      if (video.video_url) {
+        const separator = video.video_url.includes('?') ? '&' : '?';
+        const freshUrl = `${video.video_url}${separator}cb=${ts}`;
+        setActiveVideo({ ...video, video_url: freshUrl });
+        return;
+      }
+
       setActiveVideo({ ...video, video_url: null }); 
       const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -533,7 +546,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       if (!res.ok) throw new Error("Server error");
       const data = await res.json();
       if (data.video_url) {
-        setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
+        const separator = data.video_url.includes('?') ? '&' : '?';
+        const freshUrl = `${data.video_url}${separator}cb=${ts}`;
+        setActiveVideo(prev => ({ ...prev, video_url: freshUrl }));
       }
     } catch (e) { 
       setActiveVideo(null);

@@ -468,13 +468,30 @@ export default function Profile({
     }
 
     try {
+      // Pause any existing feed videos to release HTTP range-request socket locks
+      try {
+        document.querySelectorAll('video').forEach(el => el.pause());
+      } catch (_) {}
+
+      const ts = Date.now();
+      if (video.video_url) {
+        const separator = video.video_url.includes('?') ? '&' : '?';
+        const freshUrl = `${video.video_url}${separator}cb=${ts}`;
+        setActiveVideo({ ...video, video_url: freshUrl });
+        return;
+      }
+
       setActiveVideo({ ...video, video_url: null }); 
       const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/video?chat_id=${video.chat_id}&message_id=${video.message_id}`, { headers });
       if (!res.ok) throw new Error("Fetch failed");
       const data = await res.json();
-      if (data.video_url) setActiveVideo(prev => ({ ...prev, video_url: data.video_url }));
+      if (data.video_url) {
+        const separator = data.video_url.includes('?') ? '&' : '?';
+        const freshUrl = `${data.video_url}${separator}cb=${ts}`;
+        setActiveVideo(prev => ({ ...prev, video_url: freshUrl }));
+      }
     } catch (err) {
       console.error("Profile Video Load Error:", err);
       setActiveVideo(null);

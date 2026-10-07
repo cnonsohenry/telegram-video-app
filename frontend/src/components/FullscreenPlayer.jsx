@@ -408,10 +408,17 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     const playVideo = () => {
       const playPromise = videoElement.play();
       if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          setIsPlaying(false);
-          setShowControls(true);
-        });
+        playPromise
+          .then(() => {
+            setIsLoading(false);
+            setIsPlaying(true);
+          })
+          .catch((err) => {
+            console.warn("[Player] Autoplay promise caught:", err);
+            setIsLoading(false);
+            setIsPlaying(false);
+            setShowControls(true);
+          });
       }
     };
 
@@ -440,6 +447,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
               break;
             default:
               hls.destroy();
+              setIsLoading(false);
               break;
           }
         }
@@ -447,11 +455,31 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     } else {
       if (videoElement.src !== video.video_url) {
         videoElement.src = video.video_url;
+        try { videoElement.load(); } catch (_) {}
       }
       playVideo();
     }
 
+    // 🟢 Playback Watchdog: Detect and break browser range request / cache socket stalls
+    const watchdogTimer = setTimeout(() => {
+      if (videoElement && videoElement.readyState < 2 && video.video_url && adState === "finished") {
+        console.warn("⚠️ [Watchdog] Video stream stalled in cache/socket lock. Attempting clean reconnect...");
+        try {
+          const cleanUrl = video.video_url.replace(/([?&])_retry=\d+/g, '');
+          const retrySep = cleanUrl.includes('?') ? '&' : '?';
+          const freshRetryUrl = `${cleanUrl}${retrySep}_retry=${Date.now()}`;
+          videoElement.src = freshRetryUrl;
+          videoElement.load();
+          videoElement.play().catch(() => {
+            setIsLoading(false);
+            setShowControls(true);
+          });
+        } catch (_) {}
+      }
+    }, 4500);
+
     return () => {
+      clearTimeout(watchdogTimer);
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -461,6 +489,9 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
 
   const handleTimeUpdate = () => {
     if (videoRef.current && !isDraggingRef.current) {
+      if (isLoading && videoRef.current.currentTime > 0) {
+        setIsLoading(false);
+      }
       setCurrentTime(videoRef.current.currentTime);
       if (videoRef.current.duration && Number.isFinite(videoRef.current.duration) && videoRef.current.duration !== duration) {
         setDuration(videoRef.current.duration);
@@ -750,6 +781,15 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     document.body.style.position = "fixed";
     document.body.style.top = `-${scrollY}px`;
     document.body.style.width = "100%";
+
+    // 🟢 Pause any background feed videos to release HTTP range-request socket locks
+    try {
+      document.querySelectorAll('video').forEach(el => {
+        if (el !== videoRef.current && el !== adVideoRef.current) {
+          el.pause();
+        }
+      });
+    } catch (_) {}
 
     return () => {
       document.body.style.overflow = originalStyle.overflow;
@@ -1174,9 +1214,19 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
               }
             }}
             onWaiting={() => setIsLoading(true)}
+            onLoadedData={() => setIsLoading(false)}
             onCanPlay={() => setIsLoading(false)}
+            onCanPlayThrough={() => setIsLoading(false)}
+            onPlaying={() => {
+              setIsLoading(false);
+              setIsPlaying(true);
+            }}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
+            onError={(e) => {
+              console.warn("[Player] Video error event:", e);
+              setIsLoading(false);
+            }}
             style={{ 
                 width: "100%", height: "100%", 
                 objectFit: isZoomed ? "cover" : "contain",
