@@ -673,32 +673,9 @@ export default function Profile({
           {/* MOBILE HEADER LAYOUT */}
           {!isDesktop ? (
             <div>
-              {/* Top Row: Avatar on left; Display Name, Bio, Stats to the right */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", marginBottom: "14px" }}>
+              {/* Top Row: Details on left; Avatar on right (TikTok style) */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "14px" }}>
                 
-                {/* Cyan Gradient Ring Avatar + Camera Edit Badge */}
-                <div style={{ position: "relative", flexShrink: 0 }}>
-                  <div style={storyGradientRingMobile}>
-                    <div style={avatarInnerCircleMobile}>
-                      <img
-                        src={user?.avatar_url || "/assets/default-avatar.png"}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        alt={user?.display_name || user?.username || "Avatar"}
-                        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Camera / Edit shortcut badge */}
-                  <button 
-                    onClick={() => setShowEditModal(true)} 
-                    style={mobileAvatarEditBadge}
-                    title="Change Profile Photo"
-                  >
-                    <Camera size={13} color="#fff" />
-                  </button>
-                </div>
-
                 {/* Display Name, Bio, Inline Stats */}
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
                   {/* Line 1: Display Name */}
@@ -774,6 +751,28 @@ export default function Profile({
                     )}
                   </div>
                 </div>
+
+                {/* Avatar on Right (No blue outline) + Camera Edit Badge */}
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <div style={avatarInnerCircleMobile}>
+                    <img
+                      src={user?.avatar_url || "/assets/default-avatar.png"}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      alt={user?.display_name || user?.username || "Avatar"}
+                      onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                    />
+                  </div>
+                  
+                  {/* Camera / Edit shortcut badge */}
+                  <button 
+                    onClick={() => setShowEditModal(true)} 
+                    style={mobileAvatarEditBadge}
+                    title="Change Profile Photo"
+                  >
+                    <Camera size={13} color="#fff" />
+                  </button>
+                </div>
+
               </div>
 
               {/* Action Buttons Row (Only Edit profile and Upload) */}
@@ -836,30 +835,9 @@ export default function Profile({
             </div>
           ) : (
             /* DESKTOP HEADER LAYOUT */
-            <div style={{ display: "flex", gap: "36px", alignItems: "flex-start", marginBottom: "24px" }}>
+            <div style={{ display: "flex", gap: "36px", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "24px" }}>
               
-              {/* Desktop Avatar (Left column 132px) */}
-              <div style={{ flexShrink: 0, position: "relative" }}>
-                <div style={storyGradientRingDesktop}>
-                  <div style={avatarInnerCircleDesktop}>
-                    <img
-                      src={user?.avatar_url || "/assets/default-avatar.png"}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      alt={user?.display_name || user?.username || "Avatar"}
-                      onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                    />
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setShowEditModal(true)} 
-                  style={desktopAvatarEditBadge}
-                  title="Change Profile Photo"
-                >
-                  <Camera size={15} color="#fff" />
-                </button>
-              </div>
-
-              {/* Desktop Details (Right column) */}
+              {/* Desktop Details (Left column) */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 
                 {/* Line 1: Display Name */}
@@ -997,6 +975,26 @@ export default function Profile({
                   </div>
                 )}
               </div>
+
+              {/* Desktop Avatar (Right column 132px, No blue story outline) */}
+              <div style={{ flexShrink: 0, position: "relative" }}>
+                <div style={avatarInnerCircleDesktop}>
+                  <img
+                    src={user?.avatar_url || "/assets/default-avatar.png"}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    alt={user?.display_name || user?.username || "Avatar"}
+                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                  />
+                </div>
+                <button 
+                  onClick={() => setShowEditModal(true)} 
+                  style={desktopAvatarEditBadge}
+                  title="Change Profile Photo"
+                >
+                  <Camera size={15} color="#fff" />
+                </button>
+              </div>
+
             </div>
           )}
 
@@ -1497,11 +1495,9 @@ const groupTitleStyle = {
 const headerIconButton = { background: "none", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: "4px" };
 const desktopIconBtnStyle = { background: "#262626", border: "1px solid #363636", borderRadius: "8px", width: "36px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
 
-// TikTok / Creator Gradient Rings & Avatars
+// TikTok / Creator Avatars (Clean, no story blue outline)
 const storyGradientRingMobile = {
-  padding: "2.5px",
   borderRadius: "50%",
-  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
   display: "inline-block"
 };
 
@@ -1509,15 +1505,13 @@ const avatarInnerCircleMobile = {
   width: "84px",
   height: "84px",
   borderRadius: "50%",
-  border: "2.5px solid #000000",
+  border: "1.5px solid rgba(255, 255, 255, 0.12)",
   overflow: "hidden",
   backgroundColor: "#1c1c1e"
 };
 
 const storyGradientRingDesktop = {
-  padding: "3.5px",
   borderRadius: "50%",
-  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
   display: "inline-block"
 };
 
@@ -1525,7 +1519,7 @@ const avatarInnerCircleDesktop = {
   width: "132px",
   height: "132px",
   borderRadius: "50%",
-  border: "3.5px solid #000000",
+  border: "2px solid rgba(255, 255, 255, 0.12)",
   overflow: "hidden",
   backgroundColor: "#1c1c1e"
 };

@@ -428,26 +428,8 @@ export default function CreatorProfileModal({
             {/* MOBILE HEADER */}
             {!isDesktop ? (
               <div style={{ padding: "16px 16px 10px 16px" }}>
-                {/* Top Row: Avatar on left; Display Name, Bio, Handle to the right */}
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", marginBottom: "14px" }}>
-                  <div style={avatarContainerMobile}>
-                    <div style={storyGradientRingMobile}>
-                      <div style={avatarInnerCircleMobile}>
-                        <img 
-                          src={avatar} 
-                          alt={creatorData?.display_name} 
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                        />
-                      </div>
-                    </div>
-                    {creatorData?.is_verified && (
-                      <div style={verifiedBadgeStyle}>
-                        <TwitterVerifiedBadge size={16} />
-                      </div>
-                    )}
-                  </div>
-
+                {/* Top Row: Details on left; Avatar on right (TikTok style) */}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "14px" }}>
                   <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
                     {/* Line 1: Display Name */}
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
@@ -505,6 +487,23 @@ export default function CreatorProfileModal({
                         <span>likes</span>
                       </span>
                     </div>
+                  </div>
+
+                  {/* Avatar on Right (No blue outline) */}
+                  <div style={avatarContainerMobile}>
+                    <div style={avatarInnerCircleMobile}>
+                      <img 
+                        src={avatar} 
+                        alt={creatorData?.display_name} 
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                      />
+                    </div>
+                    {creatorData?.is_verified && (
+                      <div style={verifiedBadgeStyle}>
+                        <TwitterVerifiedBadge size={16} />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -566,25 +565,9 @@ export default function CreatorProfileModal({
               </div>
             ) : (
               /* DESKTOP HEADER */
-              <div style={{ display: "flex", gap: "36px", alignItems: "flex-start", padding: "32px 24px 20px 24px", marginBottom: "16px" }}>
-                <div style={{ flexShrink: 0, position: "relative" }}>
-                  <div style={storyGradientRingDesktop}>
-                    <div style={avatarInnerCircleDesktop}>
-                      <img 
-                        src={avatar} 
-                        alt={creatorData?.display_name} 
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                      />
-                    </div>
-                  </div>
-                  {creatorData?.is_verified && (
-                    <div style={{ ...verifiedBadgeStyle, bottom: "4px", right: "4px" }}>
-                      <TwitterVerifiedBadge size={20} />
-                    </div>
-                  )}
-                </div>
-
+              <div style={{ display: "flex", gap: "36px", alignItems: "flex-start", justifyContent: "space-between", padding: "32px 24px 20px 24px", marginBottom: "16px" }}>
+                
+                {/* Desktop Details on Left */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {/* Line 1: Display Name */}
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
@@ -700,6 +683,24 @@ export default function CreatorProfileModal({
                     </div>
                   )}
                 </div>
+
+                {/* Desktop Avatar on Right (132px, No blue story outline) */}
+                <div style={{ flexShrink: 0, position: "relative" }}>
+                  <div style={avatarInnerCircleDesktop}>
+                    <img 
+                      src={avatar} 
+                      alt={creatorData?.display_name} 
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                    />
+                  </div>
+                  {creatorData?.is_verified && (
+                    <div style={{ ...verifiedBadgeStyle, bottom: "4px", right: "4px" }}>
+                      <TwitterVerifiedBadge size={20} />
+                    </div>
+                  )}
+                </div>
+
               </div>
             )}
 
@@ -1002,9 +1003,7 @@ const avatarContainerMobile = {
 };
 
 const storyGradientRingMobile = {
-  padding: "2.5px",
   borderRadius: "50%",
-  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
   display: "inline-block",
   flexShrink: 0
 };
@@ -1013,15 +1012,13 @@ const avatarInnerCircleMobile = {
   width: "84px",
   height: "84px",
   borderRadius: "50%",
-  border: "2.5px solid #000000",
+  border: "1.5px solid rgba(255, 255, 255, 0.12)",
   overflow: "hidden",
   backgroundColor: "#1c1c1e"
 };
 
 const storyGradientRingDesktop = {
-  padding: "3.5px",
   borderRadius: "50%",
-  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
   display: "inline-block"
 };
 
@@ -1029,7 +1026,7 @@ const avatarInnerCircleDesktop = {
   width: "132px",
   height: "132px",
   borderRadius: "50%",
-  border: "3.5px solid #000000",
+  border: "2px solid rgba(255, 255, 255, 0.12)",
   overflow: "hidden",
   backgroundColor: "#1c1c1e"
 };
