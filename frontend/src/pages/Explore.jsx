@@ -166,17 +166,17 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
                     style={igAvatarImg}
                   />
                 </div>
-                {creator.is_verified && (
-                  <div style={igVerifiedBadge}>
-                    <TwitterVerifiedBadge size={15} />
-                  </div>
-                )}
               </div>
 
               {/* Display Name */}
-              <span style={igDisplayName} title={creator.display_name || uname}>
-                {creator.display_name || uname}
-              </span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", minWidth: 0 }}>
+                <span style={igDisplayName} title={creator.display_name || uname}>
+                  {creator.display_name || uname}
+                </span>
+                {creator.is_verified && (
+                  <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
+                )}
+              </div>
 
               {/* Handle */}
               <span style={igHandleName}>

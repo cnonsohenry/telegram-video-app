@@ -119,8 +119,7 @@ export default function DiscoverCreatorsSection({
     <div style={{ ...igSuggestedWrapper, ...style }}>
       {/* Section Header */}
       <div style={igSuggestedHeader}>
-        <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-          <Sparkles size={16} color="#00aff0" />
+        <div style={{ display: "flex", alignItems: "center" }}>
           <span style={igSuggestedTitle}>{title}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -201,16 +200,16 @@ export default function DiscoverCreatorsSection({
                     style={igAvatarImg}
                   />
                 </div>
-                {creator.is_verified && (
-                  <div style={igVerifiedBadge}>
-                    <TwitterVerifiedBadge size={13} />
-                  </div>
-                )}
               </div>
 
               {/* Creator Names & Category */}
-              <div style={igDisplayName} title={creator.display_name || uname}>
-                {creator.display_name || uname}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", minWidth: 0 }}>
+                <span style={igDisplayName} title={creator.display_name || uname}>
+                  {creator.display_name || uname}
+                </span>
+                {creator.is_verified && (
+                  <TwitterVerifiedBadge size={13} style={{ flexShrink: 0 }} />
+                )}
               </div>
               <div style={igHandleName}>
                 @{uname}

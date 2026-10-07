@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
-  X, ArrowLeft, Search, Sparkles, 
-  Users, Flame, Play 
+  X, ArrowLeft, Search, 
+  Users, Play 
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
@@ -294,8 +294,7 @@ export default function DiscoverCreatorsModal({
             >
               <ArrowLeft size={22} color="#ffffff" />
             </button>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Sparkles size={18} color="#00aff0" />
+            <div style={{ display: "flex", alignItems: "center" }}>
               <h2 style={titleStyle}>Discover Creators</h2>
             </div>
           </div>
@@ -310,7 +309,7 @@ export default function DiscoverCreatorsModal({
           </button>
         </div>
 
-        {/* Scrollable Container: holds search bar, categories, and creator cards */}
+        {/* Scrollable Container: holds search bar and creator cards */}
         <div style={listContainerStyle}>
           {/* Search Input Bar (Scrolls with content) */}
           <div style={searchBarWrapper}>
@@ -335,36 +334,6 @@ export default function DiscoverCreatorsModal({
               )}
             </div>
           </div>
-
-          {/* Category Pills Bar (Scrolls with content) */}
-          {categories.length > 1 && (
-            <div style={categoryTrackStyle}>
-              {categories.map((cat) => {
-                const isActive = selectedCategory === cat;
-                let label = cat;
-                if (cat === "all") label = "All Creators";
-                else if (cat === "verified") label = "Verified";
-                else if (cat === "popular") label = "Popular";
-
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    style={{
-                      ...categoryPillStyle,
-                      background: isActive ? "#0095f6" : "rgba(255, 255, 255, 0.08)",
-                      color: isActive ? "#ffffff" : "#a8a8a8",
-                      borderColor: isActive ? "#0095f6" : "rgba(255, 255, 255, 0.1)"
-                    }}
-                  >
-                    {cat === "verified" && <TwitterVerifiedBadge size={13} style={{ marginRight: "4px" }} />}
-                    {cat === "popular" && <Flame size={12} style={{ marginRight: "4px" }} />}
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
 
           {/* Creator Cards Section */}
           <div style={cardsContainerStyle}>
@@ -402,7 +371,7 @@ export default function DiscoverCreatorsModal({
                   No creators found
                 </div>
                 <div style={{ fontSize: "13px", color: "#8e8e93", maxWidth: "260px", textAlign: "center" }}>
-                  {searchQuery ? `No Telegram creators matched "${searchQuery}"` : "No creators available in this category."}
+                  {searchQuery ? `No Telegram creators matched "${searchQuery}"` : "No creators available."}
                 </div>
               </div>
             ) : (
@@ -445,11 +414,6 @@ export default function DiscoverCreatorsModal({
                               style={avatarImgStyle}
                             />
                           </div>
-                          {creator.is_verified && (
-                            <div style={verifiedBadgeStyle}>
-                              <TwitterVerifiedBadge size={13} />
-                            </div>
-                          )}
                         </div>
 
                         <div style={creatorInfoStyle}>
@@ -459,7 +423,7 @@ export default function DiscoverCreatorsModal({
                               {creator.display_name || uname}
                             </span>
                             {creator.is_verified && (
-                              <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
+                              <TwitterVerifiedBadge size={15} style={{ flexShrink: 0 }} />
                             )}
                           </div>
 
@@ -673,7 +637,7 @@ const listContainerStyle = {
 };
 
 const searchBarWrapper = {
-  padding: "14px 16px 8px 16px",
+  padding: "14px 16px 12px 16px",
   background: "transparent"
 };
 
@@ -681,10 +645,11 @@ const searchBoxStyle = {
   display: "flex",
   alignItems: "center",
   gap: "10px",
-  backgroundColor: "#1e1e1e",
-  borderRadius: "10px",
-  padding: "9px 14px",
-  border: "1px solid rgba(255, 255, 255, 0.08)"
+  background: "inherit",
+  borderRadius: "9999px",
+  padding: "9px 16px",
+  border: "1px solid rgba(255, 255, 255, 0.15)",
+  boxSizing: "border-box"
 };
 
 const searchInputStyle = {
@@ -765,18 +730,16 @@ const topRowStyle = {
 
 const avatarContainerStyle = {
   position: "relative",
-  width: "50px",
-  height: "50px",
+  width: "54px",
+  height: "54px",
   flexShrink: 0,
-  marginRight: "10px"
+  marginRight: "12px"
 };
 
 const avatarRingStyle = {
-  width: "58px",
-  height: "58px",
+  width: "54px",
+  height: "54px",
   borderRadius: "50%",
-  padding: "2.5px",
-  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
   boxSizing: "border-box",
   display: "flex",
   alignItems: "center",
@@ -789,7 +752,7 @@ const avatarImgStyle = {
   borderRadius: "50%",
   objectFit: "cover",
   backgroundColor: "#161616",
-  border: "2px solid #181818",
+  border: "1.5px solid rgba(255, 255, 255, 0.12)",
   display: "block"
 };
 
