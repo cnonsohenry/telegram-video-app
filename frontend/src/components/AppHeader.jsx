@@ -16,8 +16,15 @@ export default function AppHeader({
   onSearchSubmit,
   tab = "home"
 }) {
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(() => {
+    const state = typeof window !== "undefined" ? window.history.state : null;
+    const currentTab = state?.tab || (typeof window !== "undefined" && window.location.search.includes("tab=explore") ? "explore" : "home");
+    return Boolean(state?.searchOpen && !state?.videoPlayer && !state?.creatorProfile && (!tab || currentTab === tab));
+  });
   const isLoggedIn = user && (user.id || user.email);
+
+  const overlayContentRef = useRef(null);
+  const searchScrollPosRef = useRef(0);
 
   const [searchResults, setSearchResults] = useState([]);
   const [searchCreators, setSearchCreators] = useState([]);
@@ -69,15 +76,23 @@ export default function AppHeader({
           isSearchOpenRef.current = true;
           setIsSearchOpen(true);
         }
-      } else if (isSearchOpenRef.current && !state.searchOpen) {
-        isSearchOpenRef.current = false;
-        setIsSearchOpen(false);
+      } else {
+        if (isSearchOpenRef.current) {
+          isSearchOpenRef.current = false;
+          setIsSearchOpen(false);
+        }
       }
     };
 
     window.addEventListener("popstate", handleSearchPopState);
     return () => window.removeEventListener("popstate", handleSearchPopState);
   }, [tab]);
+
+  useEffect(() => {
+    if (isSearchOpen && overlayContentRef.current && searchScrollPosRef.current > 0) {
+      overlayContentRef.current.scrollTop = searchScrollPosRef.current;
+    }
+  }, [isSearchOpen]);
 
   useEffect(() => {
     const handleOpenSearchModal = () => {
@@ -199,6 +214,9 @@ export default function AppHeader({
   const handleExecuteSearch = (video, e) => {
     if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     saveSearchHistory(searchTerm);
+    searchScrollPosRef.current = overlayContentRef.current?.scrollTop || 0;
+    isSearchOpenRef.current = false;
+    setIsSearchOpen(false);
     if (onVideoClick) {
       onVideoClick(video, e);
     }
@@ -207,6 +225,9 @@ export default function AppHeader({
   const handleCreatorClick = (creator, e) => {
     if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     saveSearchHistory(searchTerm);
+    searchScrollPosRef.current = overlayContentRef.current?.scrollTop || 0;
+    isSearchOpenRef.current = false;
+    setIsSearchOpen(false);
     const uname = creator.username;
     if (onCreatorClick) {
       onCreatorClick(uname);
@@ -252,7 +273,7 @@ export default function AppHeader({
             <button onClick={handleSearchSubmit} style={searchActionBtnStyle}>Search</button>
           </div>
 
-          <div style={overlayContentStyle}>
+          <div ref={overlayContentRef} style={overlayContentStyle}>
             
             {!searchTerm.trim() ? (
               <>
