@@ -158,7 +158,12 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
 
               {/* Center Avatar with Story Ring */}
               <div style={igAvatarContainer}>
-                <div style={igAvatarRing}>
+                <div style={{
+                  ...igAvatarRing,
+                  background: creator.has_active_story 
+                    ? "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)" 
+                    : "rgba(255, 255, 255, 0.16)"
+                }}>
                   <img 
                     src={creator.avatar_url || "/assets/default-avatar.png"} 
                     alt={creator.display_name || uname}

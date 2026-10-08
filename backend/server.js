@@ -333,8 +333,25 @@ async function initDatabase() {
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS saves_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS seo_description TEXT`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS media_group_id TEXT`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS creator_stories (
+          id SERIAL PRIMARY KEY,
+          creator_id INT REFERENCES app_users(id) ON DELETE CASCADE,
+          username VARCHAR(50) NOT NULL,
+          video_url TEXT NOT NULL,
+          thumbnail_url TEXT,
+          duration NUMERIC DEFAULT 10.0,
+          sound_title TEXT DEFAULT 'Trending TikTok Sound',
+          created_at TIMESTAMP DEFAULT NOW(),
+          expires_at TIMESTAMP DEFAULT (NOW() + INTERVAL '24 hours'),
+          is_active BOOLEAN DEFAULT TRUE
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_stories_active ON creator_stories(username, expires_at)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_stories_is_active ON creator_stories(is_active)`);
       
-      console.log("✅ Database initialized (Admins, App_Users, Videos, Transactions & Interactions)");
+      console.log("✅ Database initialized (Admins, App_Users, Videos, Transactions, Stories & Interactions)");
 
       // Auto-sync Telegram uploaders as managed creators in app_users in background
       syncTelegramCreators(pool).catch((sErr) => {
@@ -657,6 +674,137 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       fs.unlinkSync(req.file.path);
     }
     res.status(500).json({ error: "Upload failed" });
+  }
+});
+
+/* =====================
+   CREATOR 24-HOUR STATUS STORIES ENDPOINTS
+===================== */
+app.post("/api/stories/push", upload.single("video"), async (req, res) => {
+  try {
+    const apiKey = req.headers['x-api-key'] || req.headers['x-api-secret'] || req.body.api_key || req.query.api_key;
+    if (!apiKey || !API_SECRETS.includes(apiKey)) {
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const videoFile = req.file;
+    if (!videoFile) return res.status(400).json({ error: "No video file provided" });
+
+    const rawUsername = req.body.username || req.query.username;
+    if (!rawUsername) {
+      if (fs.existsSync(videoFile.path)) fs.unlinkSync(videoFile.path);
+      return res.status(400).json({ error: "Missing creator username" });
+    }
+
+    const username = String(rawUsername).trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const soundTitle = req.body.sound_title || req.query.sound_title || "Trending TikTok Sound";
+    const duration = parseFloat(req.body.duration || req.query.duration || 10.0) || 10.0;
+    const internalId = `story_${Date.now()}`;
+
+    // 1. Generate thumbnail using FFmpeg
+    let thumbKey = null;
+    try {
+      const thumbPath = `${videoFile.path}.jpg`;
+      await execPromise(`ffmpeg -i "${videoFile.path}" -ss 00:00:01.000 -vframes 1 -vf scale=400:-1 -q:v 5 "${thumbPath}" -y`);
+      if (fs.existsSync(thumbPath)) {
+        const thumbBuffer = fs.readFileSync(thumbPath);
+        thumbKey = `thumbs/story_${internalId}.jpg`;
+        await r2.send(new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: thumbKey,
+          Body: thumbBuffer,
+          ContentType: "image/jpeg",
+        }));
+        fs.unlinkSync(thumbPath);
+      }
+    } catch (tErr) {
+      console.warn("⚠️ [STORY] FFmpeg thumbnail extraction warning:", tErr.message);
+    }
+
+    // 2. Upload Story Video to R2
+    const fileStream = fs.createReadStream(videoFile.path);
+    const r2Key = `stories/${username}/${internalId}.mp4`;
+    await r2.send(new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: r2Key,
+      Body: fileStream,
+      ContentType: "video/mp4",
+    }));
+
+    if (fs.existsSync(videoFile.path)) {
+      fs.unlinkSync(videoFile.path);
+    }
+
+    // 3. Resolve Creator from app_users
+    const userRes = await pool.query(
+      "SELECT id, username, display_name FROM app_users WHERE LOWER(username) = LOWER($1)",
+      [username]
+    );
+    const creatorId = userRes.rows.length > 0 ? userRes.rows[0].id : null;
+
+    // 4. Archive previous active stories for this creator
+    await pool.query(
+      "UPDATE creator_stories SET is_active = FALSE WHERE LOWER(username) = LOWER($1)",
+      [username]
+    );
+
+    // 5. Insert new 24-hour Status Story
+    const publicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://bucket.naijahomemade.com';
+    const finalVideoUrl = `${publicDomain}/${r2Key}`;
+    const finalThumbUrl = thumbKey ? `${publicDomain}/${thumbKey}` : null;
+
+    const insertRes = await pool.query(
+      `INSERT INTO creator_stories (
+         creator_id, username, video_url, thumbnail_url, duration, sound_title, expires_at, is_active
+       ) VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours', TRUE)
+       RETURNING *`,
+      [
+        creatorId,
+        username,
+        finalVideoUrl,
+        finalThumbUrl,
+        duration,
+        soundTitle
+      ]
+    );
+
+    console.log(`✅ [STORY] Successfully published 24h status story for @${username} (Expires in 24 hours)`);
+    return res.json({
+      success: true,
+      message: `24-hour status story published for @${username}`,
+      story: insertRes.rows[0]
+    });
+  } catch (err) {
+    console.error("❌ [STORY PUSH ERROR]", err);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    return res.status(500).json({ error: "Failed to publish story" });
+  }
+});
+
+app.get("/api/stories/active", async (req, res) => {
+  try {
+    const activeRes = await pool.query(
+      `SELECT DISTINCT ON (s.username)
+              s.id, s.creator_id, s.username, s.video_url, s.thumbnail_url, 
+              s.duration, s.sound_title, s.created_at, s.expires_at,
+              COALESCE(u.display_name, s.username) as display_name,
+              COALESCE(u.avatar_url, '/assets/default-avatar.png') as avatar_url,
+              COALESCE(u.is_verified, TRUE) as is_verified
+       FROM creator_stories s
+       LEFT JOIN app_users u ON (s.creator_id = u.id OR LOWER(s.username) = LOWER(u.username))
+       WHERE s.is_active = TRUE AND s.expires_at > NOW()
+       ORDER BY s.username, s.created_at DESC`
+    );
+    return res.json({
+      count: activeRes.rows.length,
+      stories: activeRes.rows
+    });
+  } catch (err) {
+    console.error("❌ [ACTIVE STORIES ERROR]", err);
+    return res.status(500).json({ error: "Failed to fetch active stories" });
   }
 });
 

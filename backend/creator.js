@@ -1109,9 +1109,38 @@ router.get("/:username", optionalAuth, async (req, res) => {
       created_at: v.created_at
     }));
 
+    // Fetch Active 24-Hour Status Story
+    let activeStory = null;
+    try {
+      const storyRes = await pool.query(
+        `SELECT id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at 
+         FROM creator_stories 
+         WHERE LOWER(username) = LOWER($1) 
+           AND is_active = TRUE 
+           AND expires_at > NOW() 
+         ORDER BY created_at DESC LIMIT 1`,
+        [creator.username || username]
+      );
+      if (storyRes.rows.length > 0) {
+        const s = storyRes.rows[0];
+        activeStory = {
+          id: s.id,
+          username: s.username,
+          video_url: s.video_url,
+          thumbnail_url: s.thumbnail_url,
+          duration: Number(s.duration || 10.0),
+          sound_title: s.sound_title || "Trending TikTok Sound",
+          created_at: s.created_at,
+          expires_at: s.expires_at
+        };
+      }
+    } catch (sErr) {}
+
     res.json({
       creator: {
         ...creator,
+        has_active_story: !!activeStory,
+        active_story: activeStory,
         stats: {
           followers: totalFollowers,
           subscribers: subCount,
@@ -1128,6 +1157,49 @@ router.get("/:username", optionalAuth, async (req, res) => {
   } catch (err) {
     console.error("[GET CREATOR ERROR]", err);
     res.status(500).json({ error: "Failed to fetch creator profile" });
+  }
+});
+
+/* =======================================================
+   3.5. GET ACTIVE CREATOR STORY
+   GET /api/creator/:username/story
+======================================================= */
+router.get("/:username/story", optionalAuth, async (req, res) => {
+  const { username } = req.params;
+  if (!username) return res.status(400).json({ error: "Username required" });
+
+  try {
+    const storyRes = await pool.query(
+      `SELECT id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at 
+       FROM creator_stories 
+       WHERE LOWER(username) = LOWER($1) 
+         AND is_active = TRUE 
+         AND expires_at > NOW() 
+       ORDER BY created_at DESC LIMIT 1`,
+      [username]
+    );
+
+    if (storyRes.rows.length === 0) {
+      return res.json({ has_active_story: false });
+    }
+
+    const s = storyRes.rows[0];
+    return res.json({
+      has_active_story: true,
+      story: {
+        id: s.id,
+        username: s.username,
+        video_url: s.video_url,
+        thumbnail_url: s.thumbnail_url,
+        duration: Number(s.duration || 10.0),
+        sound_title: s.sound_title || "Trending TikTok Sound",
+        created_at: s.created_at,
+        expires_at: s.expires_at
+      }
+    });
+  } catch (err) {
+    console.error("[GET CREATOR STORY ERROR]", err);
+    res.status(500).json({ error: "Failed to fetch creator story" });
   }
 });
 
@@ -1632,6 +1704,15 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
       }
     }
 
+    // Check active 24-hour status stories for featured creators
+    let activeStoryUsernames = new Set();
+    try {
+      const activeStoriesRes = await pool.query(
+        "SELECT DISTINCT LOWER(username) as username FROM creator_stories WHERE is_active = TRUE AND expires_at > NOW()"
+      );
+      activeStoryUsernames = new Set(activeStoriesRes.rows.map(r => r.username));
+    } catch (sErr) {}
+
     creators = creators.map(c => {
       const poolVideos = videosByCreator[c.id] || [];
       // Pick up to 4 randomly from their most-performing videos
@@ -1657,6 +1738,7 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
 
       return {
         ...c,
+        has_active_story: activeStoryUsernames.has(String(c.username || '').toLowerCase()),
         sample_videos
       };
     });

@@ -12,6 +12,7 @@ import ReportModal from "./ReportModal";
 import CreatorTipModal from "./CreatorTipModal";
 import CreatorSubscribeModal from "./CreatorSubscribeModal";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
+import StoryPlayerModal from "./StoryPlayerModal";
 import { promptLogin, showToast } from "../utils/toast";
 
 export default function CreatorProfileModal({ 
@@ -39,7 +40,8 @@ export default function CreatorProfileModal({
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [optionsVideo, setOptionsVideo] = useState(null);
   const [reportedVideo, setReportedVideo] = useState(null);
-  const isAnyModalOpen = Boolean(showTipModal || showSubscribeModal || optionsVideo || reportedVideo);
+  const [isStoryPlayerOpen, setIsStoryPlayerOpen] = useState(false);
+  const isAnyModalOpen = Boolean(showTipModal || showSubscribeModal || optionsVideo || reportedVideo || isStoryPlayerOpen);
   const [tabVideos, setTabVideos] = useState({
     posts: [],
     reels: [],
@@ -489,16 +491,44 @@ export default function CreatorProfileModal({
                     </div>
                   </div>
 
-                  {/* Avatar on Right (No blue outline) */}
-                  <div style={avatarContainerMobile}>
-                    <div style={avatarInnerCircleMobile}>
-                      <img 
-                        src={avatar} 
-                        alt={creatorData?.display_name} 
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                      />
-                    </div>
+                  {/* Avatar on Right (Story ring if active 24h story exists) */}
+                  <div 
+                    onClick={() => {
+                      if (creatorData?.has_active_story && creatorData?.active_story) {
+                        setIsStoryPlayerOpen(true);
+                      }
+                    }}
+                    style={{
+                      ...avatarContainerMobile,
+                      cursor: creatorData?.has_active_story ? "pointer" : "default"
+                    }}
+                  >
+                    {creatorData?.has_active_story ? (
+                      <div style={{
+                        borderRadius: "50%",
+                        padding: "2.5px",
+                        background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+                        display: "inline-block"
+                      }}>
+                        <div style={avatarInnerCircleMobile}>
+                          <img 
+                            src={avatar} 
+                            alt={creatorData?.display_name} 
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={avatarInnerCircleMobile}>
+                        <img 
+                          src={avatar} 
+                          alt={creatorData?.display_name} 
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                        />
+                      </div>
+                    )}
                     {creatorData?.is_verified && (
                       <div style={verifiedBadgeStyle}>
                         <TwitterVerifiedBadge size={16} />
@@ -684,16 +714,45 @@ export default function CreatorProfileModal({
                   )}
                 </div>
 
-                {/* Desktop Avatar on Right (132px, No blue story outline) */}
-                <div style={{ flexShrink: 0, position: "relative" }}>
-                  <div style={avatarInnerCircleDesktop}>
-                    <img 
-                      src={avatar} 
-                      alt={creatorData?.display_name} 
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                    />
-                  </div>
+                {/* Desktop Avatar on Right (Story ring if active 24h story exists) */}
+                <div 
+                  onClick={() => {
+                    if (creatorData?.has_active_story && creatorData?.active_story) {
+                      setIsStoryPlayerOpen(true);
+                    }
+                  }}
+                  style={{ 
+                    flexShrink: 0, 
+                    position: "relative",
+                    cursor: creatorData?.has_active_story ? "pointer" : "default"
+                  }}
+                >
+                  {creatorData?.has_active_story ? (
+                    <div style={{
+                      borderRadius: "50%",
+                      padding: "3.5px",
+                      background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+                      display: "inline-block"
+                    }}>
+                      <div style={avatarInnerCircleDesktop}>
+                        <img 
+                          src={avatar} 
+                          alt={creatorData?.display_name} 
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={avatarInnerCircleDesktop}>
+                      <img 
+                        src={avatar} 
+                        alt={creatorData?.display_name} 
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                      />
+                    </div>
+                  )}
                   {creatorData?.is_verified && (
                     <div style={{ ...verifiedBadgeStyle, bottom: "4px", right: "4px" }}>
                       <TwitterVerifiedBadge size={20} />
@@ -943,6 +1002,16 @@ export default function CreatorProfileModal({
           isOpen={Boolean(reportedVideo)}
           video={reportedVideo}
           onClose={() => setReportedVideo(null)}
+        />
+      )}
+
+      {/* 📱 24-HOUR STATUS STORY PLAYER */}
+      {isStoryPlayerOpen && (
+        <StoryPlayerModal
+          isOpen={isStoryPlayerOpen}
+          onClose={() => setIsStoryPlayerOpen(false)}
+          story={creatorData?.active_story}
+          creator={creatorData}
         />
       )}
 
