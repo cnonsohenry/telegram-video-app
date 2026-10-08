@@ -22,7 +22,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, creator }) {
   // Video time tracking
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
-    const duration = videoRef.current.duration || 10;
+    const duration = videoRef.current.duration || (story?.duration ? parseFloat(story.duration) : 30);
     const current = videoRef.current.currentTime;
     const pct = Math.min(100, (current / duration) * 100);
     setProgress(pct);
