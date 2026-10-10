@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock, Users } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
+import StoryAvatar from "./StoryAvatar";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -416,11 +417,12 @@ export default function AppHeader({
                               }}
                             >
                               <div style={{ position: "relative", width: "48px", height: "48px", marginBottom: "8px" }}>
-                                <img
-                                  src={creator.avatar_url || "/assets/default-avatar.png"}
-                                  alt={creator.display_name}
-                                  onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                                  style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "2px solid #1d9bf0" }}
+                                <StoryAvatar
+                                  username={creator.username}
+                                  avatarUrl={creator.avatar_url}
+                                  displayName={creator.display_name}
+                                  size={48}
+                                  borderWidth={2}
                                 />
                               </div>
 

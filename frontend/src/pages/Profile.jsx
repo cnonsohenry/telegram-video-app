@@ -14,6 +14,7 @@ import CreatorStudioModal from "../components/CreatorStudioModal";
 import CreatorUploadModal from "../components/CreatorUploadModal";
 import DiscoverCreatorsSection from "../components/DiscoverCreatorsSection";
 import DiscoverCreatorsModal from "../components/DiscoverCreatorsModal";
+import StoryAvatar from "../components/StoryAvatar";
 import FeedPost from "../components/FeedPost";
 import PostOptionsModal from "../components/PostOptionsModal";
 import ReportModal from "../components/ReportModal";
@@ -752,16 +753,16 @@ export default function Profile({
                   </div>
                 </div>
 
-                {/* Avatar on Right (No blue outline) + Camera Edit Badge */}
+                {/* Avatar on Right (Story ring if active) + Camera Edit Badge */}
                 <div style={{ position: "relative", flexShrink: 0 }}>
-                  <div style={avatarInnerCircleMobile}>
-                    <img
-                      src={user?.avatar_url || "/assets/default-avatar.png"}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      alt={user?.display_name || user?.username || "Avatar"}
-                      onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                    />
-                  </div>
+                  <StoryAvatar
+                    username={user?.username}
+                    avatarUrl={user?.avatar_url}
+                    displayName={user?.display_name || user?.username}
+                    size={84}
+                    borderWidth={3}
+                    onClick={() => setShowEditModal(true)}
+                  />
                   
                   {/* Camera / Edit shortcut badge */}
                   <button 
@@ -976,16 +977,16 @@ export default function Profile({
                 )}
               </div>
 
-              {/* Desktop Avatar (Right column 132px, No blue story outline) */}
+              {/* Desktop Avatar (Right column 132px, Story ring if active) */}
               <div style={{ flexShrink: 0, position: "relative" }}>
-                <div style={avatarInnerCircleDesktop}>
-                  <img
-                    src={user?.avatar_url || "/assets/default-avatar.png"}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    alt={user?.display_name || user?.username || "Avatar"}
-                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                  />
-                </div>
+                <StoryAvatar
+                  username={user?.username}
+                  avatarUrl={user?.avatar_url}
+                  displayName={user?.display_name || user?.username}
+                  size={132}
+                  borderWidth={3.5}
+                  onClick={() => setShowEditModal(true)}
+                />
                 <button 
                   onClick={() => setShowEditModal(true)} 
                   style={desktopAvatarEditBadge}

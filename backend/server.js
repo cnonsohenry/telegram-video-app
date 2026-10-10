@@ -803,18 +803,49 @@ app.post("/api/stories/push", upload.single("video"), async (req, res) => {
 
 app.get("/api/stories/active", async (req, res) => {
   try {
-    const activeRes = await pool.query(
-      `SELECT DISTINCT ON (s.username)
-              s.id, s.creator_id, s.username, s.video_url, s.thumbnail_url, 
-              s.duration, s.sound_title, s.created_at, s.expires_at,
-              COALESCE(u.display_name, s.username) as display_name,
-              COALESCE(u.avatar_url, '/assets/default-avatar.png') as avatar_url,
-              COALESCE(u.is_verified, TRUE) as is_verified
-       FROM creator_stories s
-       LEFT JOIN app_users u ON (s.creator_id = u.id OR LOWER(s.username) = LOWER(u.username))
-       WHERE s.is_active = TRUE AND s.expires_at > NOW()
-       ORDER BY s.username, s.created_at DESC`
-    );
+    let currentUserId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const decoded = jwt.verify(authHeader.split(" ")[1], JWT_SECRET);
+        currentUserId = decoded?.id || null;
+      } catch (e) {}
+    }
+
+    let activeRes;
+    if (currentUserId) {
+      activeRes = await pool.query(
+        `SELECT DISTINCT ON (s.username)
+                s.id, s.creator_id, s.username, s.video_url, s.thumbnail_url, 
+                s.duration, s.sound_title, s.created_at, s.expires_at,
+                COALESCE(u.display_name, s.username) as display_name,
+                COALESCE(u.avatar_url, '/assets/default-avatar.png') as avatar_url,
+                COALESCE(u.is_verified, TRUE) as is_verified,
+                CASE WHEN v.id IS NOT NULL THEN TRUE ELSE FALSE END as has_viewed
+         FROM creator_stories s
+         LEFT JOIN app_users u ON (s.creator_id = u.id OR LOWER(s.username) = LOWER(u.username))
+         LEFT JOIN creator_story_views v ON (v.story_id = s.id AND v.user_id = $1)
+         WHERE s.is_active = TRUE AND s.expires_at > NOW()
+         ORDER BY s.username, s.created_at DESC`,
+        [currentUserId]
+      );
+    } else {
+      activeRes = await pool.query(
+        `SELECT DISTINCT ON (s.username)
+                s.id, s.creator_id, s.username, NULL as video_url, s.thumbnail_url, 
+                s.duration, s.sound_title, s.created_at, s.expires_at,
+                COALESCE(u.display_name, s.username) as display_name,
+                COALESCE(u.avatar_url, '/assets/default-avatar.png') as avatar_url,
+                COALESCE(u.is_verified, TRUE) as is_verified,
+                FALSE as has_viewed,
+                TRUE as requires_auth
+         FROM creator_stories s
+         LEFT JOIN app_users u ON (s.creator_id = u.id OR LOWER(s.username) = LOWER(u.username))
+         WHERE s.is_active = TRUE AND s.expires_at > NOW()
+         ORDER BY s.username, s.created_at DESC`
+      );
+    }
+
     return res.json({
       count: activeRes.rows.length,
       stories: activeRes.rows

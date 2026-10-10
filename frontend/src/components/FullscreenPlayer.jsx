@@ -16,6 +16,7 @@ import { promptLogin, showToast } from "../utils/toast";
 import { getPostDisplayName } from "../utils/date";
 import ReportModal from "./ReportModal";
 import useModalHistory from "../hooks/useModalHistory";
+import StoryAvatar from "./StoryAvatar";
 
 export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick, onCreatorClick }) {
   const videoRef = useRef(null);
@@ -1299,11 +1300,12 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
 
                 {/* Middle Row: Avatar, Name, Follow button (transparent, bigger, free, next to username!), and Caption */}
                 <div style={postInfoStyle}>
-                   <img 
-                      src={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
-                      alt="avatar"
-                      onError={(e) => { e.target.src = '/assets/default-avatar.png'; }}
-                      style={{ ...avatarStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+                    <StoryAvatar
+                      username={creatorHandle}
+                      avatarUrl={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
+                      displayName={getPostDisplayName(video)}
+                      size={42}
+                      borderWidth={2}
                       onClick={handleCreatorClick}
                     />
                    <div style={textDetailsStyle}>

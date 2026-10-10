@@ -3,6 +3,7 @@ import { Sparkles, ChevronLeft, ChevronRight, X, ArrowRight } from "lucide-react
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import { showToast, promptLogin } from "../utils/toast";
+import StoryAvatar from "./StoryAvatar";
 
 export default function DiscoverCreatorsSection({ 
   creators: initialCreators, 
@@ -237,34 +238,15 @@ export default function DiscoverCreatorsSection({
               </button>
 
               {/* Center Avatar with Story Ring */}
-              <div 
-                style={igAvatarContainer}
-                onClick={(e) => {
-                  if (creator.has_active_story) {
-                    const token = localStorage.getItem("token");
-                    if (!user && !token) {
-                      e.stopPropagation();
-                      promptLogin("view story");
-                      return;
-                    }
-                  }
-                }}
-              >
-                <div style={{
-                  ...igAvatarRing,
-                  background: creator.has_active_story 
-                    ? ((viewedStoriesSet.has(String(uname).toLowerCase()) || Boolean(creator.has_viewed_story))
-                        ? "rgba(255, 255, 255, 0.35)"
-                        : "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)")
-                    : "rgba(255, 255, 255, 0.16)"
-                }}>
-                  <img 
-                    src={creator.avatar_url || "/assets/default-avatar.png"} 
-                    alt={creator.display_name || uname}
-                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                    style={igAvatarImg}
-                  />
-                </div>
+              <div style={igAvatarContainer}>
+                <StoryAvatar
+                  username={uname}
+                  avatarUrl={creator.avatar_url}
+                  displayName={creator.display_name || uname}
+                  size={60}
+                  borderWidth={2.5}
+                  onClick={() => onCreatorClick && onCreatorClick(uname)}
+                />
               </div>
 
               {/* Creator Names & Category */}

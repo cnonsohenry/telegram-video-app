@@ -6,6 +6,7 @@ import {
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import { showToast, promptLogin } from "../utils/toast";
+import StoryAvatar from "./StoryAvatar";
 
 // 🟢 Fast in-memory cache for instant Discover modal display
 let memoryCachedCreators = null;
@@ -406,14 +407,14 @@ export default function DiscoverCreatorsModal({
                       {/* Top Row: Avatar on left; Name, bio, follow count closer together without exceeding avatar pic */}
                       <div style={topRowStyle}>
                         <div style={avatarContainerStyle}>
-                          <div style={avatarRingStyle}>
-                            <img 
-                              src={creator.avatar_url || "/assets/default-avatar.png"} 
-                              alt={creator.display_name || uname}
-                              onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                              style={avatarImgStyle}
-                            />
-                          </div>
+                          <StoryAvatar
+                            username={uname}
+                            avatarUrl={creator.avatar_url}
+                            displayName={creator.display_name || uname}
+                            size={54}
+                            borderWidth={2.5}
+                            onClick={() => onCreatorClick && onCreatorClick(uname)}
+                          />
                         </div>
 
                         <div style={creatorInfoStyle}>

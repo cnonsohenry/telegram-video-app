@@ -18,6 +18,7 @@ import { formatTwitterDate, getPostDisplayName } from "../utils/date";
 
 import FeedPost from "../components/FeedPost";
 import TwitterVerifiedBadge from "../components/TwitterVerifiedBadge";
+import StoryAvatar from "../components/StoryAvatar";
 
 // 🌟 INSTAGRAM-STYLE SUGGESTED CREATORS COMPONENT
 const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }) => {
@@ -203,34 +204,15 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
               </button>
 
               {/* Center Avatar with Story Ring */}
-              <div 
-                style={igAvatarContainer}
-                onClick={(e) => {
-                  if (creator.has_active_story) {
-                    const token = localStorage.getItem("token");
-                    if (!user && !token) {
-                      e.stopPropagation();
-                      promptLogin("view story");
-                      return;
-                    }
-                  }
-                }}
-              >
-                <div style={{
-                  ...igAvatarRing,
-                  background: creator.has_active_story 
-                    ? ((viewedStoriesSet.has(String(uname).toLowerCase()) || Boolean(creator.has_viewed_story))
-                        ? "rgba(255, 255, 255, 0.35)"
-                        : "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)")
-                    : "rgba(255, 255, 255, 0.16)"
-                }}>
-                  <img 
-                    src={creator.avatar_url || "/assets/default-avatar.png"} 
-                    alt={creator.display_name || uname}
-                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                    style={igAvatarImg}
-                  />
-                </div>
+              <div style={igAvatarContainer}>
+                <StoryAvatar
+                  username={uname}
+                  avatarUrl={creator.avatar_url}
+                  displayName={creator.display_name || uname}
+                  size={60}
+                  borderWidth={2.5}
+                  onClick={() => onCreatorClick && onCreatorClick(uname)}
+                />
               </div>
 
               {/* Display Name */}
@@ -295,11 +277,13 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", minWidth: 0, flex: 1 }}>
         <div style={{ position: "relative", width: "44px", height: "44px", flexShrink: 0 }}>
-          <img
-            src={creator.avatar_url || "/assets/default-avatar.png"}
-            alt={creator.display_name || uname}
-            onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-            style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "2px solid #1d9bf0" }}
+          <StoryAvatar
+            username={uname}
+            avatarUrl={creator.avatar_url}
+            displayName={creator.display_name || uname}
+            size={44}
+            borderWidth={2}
+            onClick={() => onCreatorClick && onCreatorClick(uname)}
           />
         </div>
 
@@ -909,14 +893,14 @@ const DesktopRightSidebar = ({
                   onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"}
                   onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                 >
-                  <div style={desktopSideCreatorAvatarRing}>
-                    <img
-                      src={creator.avatar_url || "/assets/default-avatar.png"}
-                      alt=""
-                      onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                      style={desktopSideCreatorAvatarImg}
-                    />
-                  </div>
+                  <StoryAvatar
+                    username={uname}
+                    avatarUrl={creator.avatar_url}
+                    displayName={creator.display_name || uname}
+                    size={40}
+                    borderWidth={2}
+                    onClick={() => onCreatorClick && onCreatorClick(uname)}
+                  />
 
                   <div style={desktopSideCreatorInfo}>
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>

@@ -9,6 +9,7 @@ import { renderClickableCaption } from "./ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
 import { formatTwitterDate, getPostDisplayName } from "../utils/date";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
+import StoryAvatar from "./StoryAvatar";
 
 export const postStyle = { 
   padding: "16px", 
@@ -628,20 +629,19 @@ export default function FeedPost({
 
   return (
     <div ref={isLast ? lastElementRef : null} style={postStyle}>
-      <div 
-        style={{ ...avatarColumnStyle, cursor: onCreatorClick ? "pointer" : "default" }}
-        onClick={(e) => {
-          if (onCreatorClick) {
-            e.stopPropagation();
-            onCreatorClick(creatorHandle);
-          }
-        }}
-      >
-        <img 
-          src={avatarUrl}
-          alt={displayName}
-          onError={(e) => { e.target.src = '/assets/default-avatar.png'; }}
-          style={avatarStyle}
+      <div style={avatarColumnStyle}>
+        <StoryAvatar
+          username={creatorHandle}
+          avatarUrl={avatarUrl}
+          displayName={displayName}
+          size={40}
+          borderWidth={2}
+          onClick={(e) => {
+            if (onCreatorClick) {
+              e.stopPropagation();
+              onCreatorClick(creatorHandle);
+            }
+          }}
         />
       </div>
 
