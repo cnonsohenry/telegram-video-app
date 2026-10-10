@@ -12,7 +12,7 @@ import ReportModal from "./ReportModal";
 import CreatorTipModal from "./CreatorTipModal";
 import CreatorSubscribeModal from "./CreatorSubscribeModal";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
-import StoryPlayerModal from "./StoryPlayerModal";
+import StoryAvatar from "./StoryAvatar";
 import { promptLogin, showToast } from "../utils/toast";
 
 export default function CreatorProfileModal({ 
@@ -40,51 +40,7 @@ export default function CreatorProfileModal({
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [optionsVideo, setOptionsVideo] = useState(null);
   const [reportedVideo, setReportedVideo] = useState(null);
-  const [isStoryPlayerOpen, setIsStoryPlayerOpen] = useState(false);
-  const [hasViewedStory, setHasViewedStory] = useState(false);
-  const isAnyModalOpen = Boolean(showTipModal || showSubscribeModal || optionsVideo || reportedVideo || isStoryPlayerOpen);
-
-  // Synchronize viewed story status across components
-  useEffect(() => {
-    const handleStoryViewedEvent = (e) => {
-      const viewedUname = e.detail?.username;
-      const cleanTarget = String(creatorUsername || "").replace(/^@/, "").toLowerCase();
-      if (viewedUname && String(viewedUname).toLowerCase() === cleanTarget) {
-        setHasViewedStory(true);
-      }
-    };
-    window.addEventListener("storyViewed", handleStoryViewedEvent);
-    return () => window.removeEventListener("storyViewed", handleStoryViewedEvent);
-  }, [creatorUsername]);
-
-  const handleAvatarStoryClick = async () => {
-    if (!creatorData?.has_active_story) return;
-
-    const token = localStorage.getItem("token");
-    if (!currentUser && !token) {
-      promptLogin("view story");
-      return;
-    }
-
-    // If story payload lacks video_url (e.g. loaded unauthenticated), fetch fresh authenticated story
-    if (!creatorData?.active_story?.video_url) {
-      try {
-        const cleanUsername = String(creatorUsername || "").replace(/^@/, "").trim();
-        const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUsername)}/story`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const sData = await res.json();
-          if (sData.has_active_story && sData.story) {
-            setCreatorData(prev => ({ ...prev, active_story: sData.story }));
-          }
-        }
-      } catch (e) {}
-    }
-
-    setHasViewedStory(true);
-    setIsStoryPlayerOpen(true);
-  };
+  const isAnyModalOpen = Boolean(showTipModal || showSubscribeModal || optionsVideo || reportedVideo);
   const [tabVideos, setTabVideos] = useState({
     posts: [],
     reels: [],
@@ -172,22 +128,6 @@ export default function CreatorProfileModal({
         const data = await res.json();
         if (isMounted) {
           setCreatorData(data.creator);
-          const isStoryViewedServer = Boolean(data.creator.has_viewed_story);
-          let isViewedLocally = false;
-          try {
-            if (token) {
-              const payload = JSON.parse(atob(token.split(".")[1]));
-              const currentUserId = payload?.id;
-              if (currentUserId && data.creator.active_story?.id) {
-                const storageKey = `viewed_stories_${currentUserId}`;
-                const views = JSON.parse(localStorage.getItem(storageKey) || "[]");
-                if (views.includes(data.creator.active_story.id)) {
-                  isViewedLocally = true;
-                }
-              }
-            }
-          } catch (e) {}
-          setHasViewedStory(isStoryViewedServer || isViewedLocally);
 
           const initialVideos = data.videos || [];
           setVideos(initialVideos);
@@ -551,47 +491,17 @@ export default function CreatorProfileModal({
                     </div>
                   </div>
 
-                  {/* Avatar on Right (Story ring if active 24h story exists) */}
-                  <div 
-                    onClick={handleAvatarStoryClick}
-                    style={{
-                      ...avatarContainerMobile,
-                      cursor: creatorData?.has_active_story ? "pointer" : "default"
-                    }}
-                  >
-                    {creatorData?.has_active_story ? (
-                      <div style={{
-                        borderRadius: "50%",
-                        padding: "2.5px",
-                        background: hasViewedStory
-                          ? "rgba(255, 255, 255, 0.35)"
-                          : "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
-                        display: "inline-block"
-                      }}>
-                        <div style={avatarInnerCircleMobile}>
-                          <img 
-                            src={avatar} 
-                            alt={creatorData?.display_name} 
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                            onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={avatarInnerCircleMobile}>
-                        <img 
-                          src={avatar} 
-                          alt={creatorData?.display_name} 
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                        />
-                      </div>
-                    )}
-                    {creatorData?.is_verified && (
-                      <div style={verifiedBadgeStyle}>
-                        <TwitterVerifiedBadge size={16} />
-                      </div>
-                    )}
+                  {/* Avatar on Right */}
+                  <div style={avatarContainerMobile}>
+                    <StoryAvatar
+                      username={creatorUsername}
+                      avatarUrl={avatar}
+                      displayName={creatorData?.display_name || creatorUsername}
+                      size={84}
+                      borderWidth={2.5}
+                      showVerifiedBadge={Boolean(creatorData?.is_verified)}
+                      badgeSize={16}
+                    />
                   </div>
                 </div>
 
@@ -772,48 +682,17 @@ export default function CreatorProfileModal({
                   )}
                 </div>
 
-                {/* Desktop Avatar on Right (Story ring if active 24h story exists) */}
-                <div 
-                  onClick={handleAvatarStoryClick}
-                  style={{ 
-                    flexShrink: 0, 
-                    position: "relative",
-                    cursor: creatorData?.has_active_story ? "pointer" : "default"
-                  }}
-                >
-                  {creatorData?.has_active_story ? (
-                    <div style={{
-                      borderRadius: "50%",
-                      padding: "3.5px",
-                      background: hasViewedStory
-                        ? "rgba(255, 255, 255, 0.35)"
-                        : "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
-                      display: "inline-block"
-                    }}>
-                      <div style={avatarInnerCircleDesktop}>
-                        <img 
-                          src={avatar} 
-                          alt={creatorData?.display_name} 
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={avatarInnerCircleDesktop}>
-                      <img 
-                        src={avatar} 
-                        alt={creatorData?.display_name} 
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                      />
-                    </div>
-                  )}
-                  {creatorData?.is_verified && (
-                    <div style={{ ...verifiedBadgeStyle, bottom: "4px", right: "4px" }}>
-                      <TwitterVerifiedBadge size={20} />
-                    </div>
-                  )}
+                {/* Desktop Avatar on Right */}
+                <div style={{ flexShrink: 0, position: "relative" }}>
+                  <StoryAvatar
+                    username={creatorUsername}
+                    avatarUrl={avatar}
+                    displayName={creatorData?.display_name || creatorUsername}
+                    size={132}
+                    borderWidth={3.5}
+                    showVerifiedBadge={Boolean(creatorData?.is_verified)}
+                    badgeSize={20}
+                  />
                 </div>
 
               </div>
@@ -1058,16 +937,6 @@ export default function CreatorProfileModal({
           isOpen={Boolean(reportedVideo)}
           video={reportedVideo}
           onClose={() => setReportedVideo(null)}
-        />
-      )}
-
-      {/* 📱 24-HOUR STATUS STORY PLAYER */}
-      {isStoryPlayerOpen && (
-        <StoryPlayerModal
-          isOpen={isStoryPlayerOpen}
-          onClose={() => setIsStoryPlayerOpen(false)}
-          story={creatorData?.active_story}
-          creator={creatorData}
         />
       )}
 

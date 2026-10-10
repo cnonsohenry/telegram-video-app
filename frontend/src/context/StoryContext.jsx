@@ -138,7 +138,7 @@ export function StoryProvider({ children }) {
     [storiesMap]
   );
 
-  // Open story handler with auth check
+  // Open story handler with auth check - always fetches fresh authenticated story
   const openStory = useCallback(
     async (username, fallbackCreator = null) => {
       const token = localStorage.getItem("token");
@@ -148,22 +148,11 @@ export function StoryProvider({ children }) {
       }
 
       const cleanUname = String(username || "").replace(/^@/, "").trim();
+      if (!cleanUname) return;
+
       const cached = storiesMap[cleanUname.toLowerCase()];
 
-      // If cached story has video_url:
-      if (cached?.video_url) {
-        setActiveStoryModal({
-          story: cached,
-          creator: fallbackCreator || {
-            username: cleanUname,
-            display_name: cached.display_name,
-            avatar_url: cached.avatar_url
-          }
-        });
-        return;
-      }
-
-      // Otherwise fetch authenticated story from API
+      // 1. Fetch fresh authenticated story from backend to guarantee latest active status
       try {
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUname)}/story`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -175,19 +164,32 @@ export function StoryProvider({ children }) {
               story: data.story,
               creator: fallbackCreator || {
                 username: cleanUname,
-                display_name: data.story.display_name || cached?.display_name,
+                display_name: data.story.display_name || cached?.display_name || cleanUname,
                 avatar_url: data.story.avatar_url || cached?.avatar_url
               }
             });
-            // Update map
+            // Update map with fresh story
             setStoriesMap((prev) => ({
               ...prev,
               [cleanUname.toLowerCase()]: data.story
             }));
+            return;
           }
         }
       } catch (err) {
         console.warn("[OPEN STORY FETCH NOTICE]", err);
+      }
+
+      // 2. Fallback to cached in memory if network request fails
+      if (cached?.video_url) {
+        setActiveStoryModal({
+          story: cached,
+          creator: fallbackCreator || {
+            username: cleanUname,
+            display_name: cached.display_name || cleanUname,
+            avatar_url: cached.avatar_url
+          }
+        });
       }
     },
     [storiesMap]

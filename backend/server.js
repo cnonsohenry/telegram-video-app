@@ -815,7 +815,7 @@ app.get("/api/stories/active", async (req, res) => {
     let activeRes;
     if (currentUserId) {
       activeRes = await pool.query(
-        `SELECT DISTINCT ON (s.username)
+        `SELECT DISTINCT ON (LOWER(s.username))
                 s.id, s.creator_id, s.username, s.video_url, s.thumbnail_url, 
                 s.duration, s.sound_title, s.created_at, s.expires_at,
                 COALESCE(u.display_name, s.username) as display_name,
@@ -826,12 +826,12 @@ app.get("/api/stories/active", async (req, res) => {
          LEFT JOIN app_users u ON (s.creator_id = u.id OR LOWER(s.username) = LOWER(u.username))
          LEFT JOIN creator_story_views v ON (v.story_id = s.id AND v.user_id = $1)
          WHERE s.is_active = TRUE AND s.expires_at > NOW()
-         ORDER BY s.username, s.created_at DESC`,
+         ORDER BY LOWER(s.username), s.created_at DESC`,
         [currentUserId]
       );
     } else {
       activeRes = await pool.query(
-        `SELECT DISTINCT ON (s.username)
+        `SELECT DISTINCT ON (LOWER(s.username))
                 s.id, s.creator_id, s.username, NULL as video_url, s.thumbnail_url, 
                 s.duration, s.sound_title, s.created_at, s.expires_at,
                 COALESCE(u.display_name, s.username) as display_name,
@@ -842,7 +842,7 @@ app.get("/api/stories/active", async (req, res) => {
          FROM creator_stories s
          LEFT JOIN app_users u ON (s.creator_id = u.id OR LOWER(s.username) = LOWER(u.username))
          WHERE s.is_active = TRUE AND s.expires_at > NOW()
-         ORDER BY s.username, s.created_at DESC`
+         ORDER BY LOWER(s.username), s.created_at DESC`
       );
     }
 
