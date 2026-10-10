@@ -350,6 +350,19 @@ async function initDatabase() {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_stories_active ON creator_stories(username, expires_at)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_stories_is_active ON creator_stories(is_active)`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS creator_story_views (
+          id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+          story_id INT NOT NULL REFERENCES creator_stories(id) ON DELETE CASCADE,
+          viewed_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(user_id, story_id)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_story_views_user ON creator_story_views(user_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_story_views_story ON creator_story_views(story_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_story_views_user_story ON creator_story_views(user_id, story_id)`);
       
       console.log("✅ Database initialized (Admins, App_Users, Videos, Transactions, Stories & Interactions)");
 
@@ -427,6 +440,10 @@ app.post("/webhook", (req, res) => {
 /* =====================
    PREMIUM UPLOAD (STREAM & R2 THUMBNAIL SUPPORT)
 ===================== */
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 const upload = multer({ dest: "uploads/" }); 
 
 app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) => {

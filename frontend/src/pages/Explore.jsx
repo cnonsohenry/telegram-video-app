@@ -24,7 +24,53 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
   const [followingMap, setFollowingMap] = useState({});
   const [loadingMap, setLoadingMap] = useState({});
   const [dismissedSet, setDismissedSet] = useState(new Set());
+  const [viewedStoriesSet, setViewedStoriesSet] = useState(new Set());
   const trackRef = useRef(null);
+
+  // Synchronize viewed stories on creators prop update or local storage
+  useEffect(() => {
+    const s = new Set();
+    (creators || []).forEach(c => {
+      if (c.has_viewed_story) {
+        s.add(String(c.username || '').toLowerCase());
+      }
+    });
+
+    try {
+      const token = localStorage.getItem("token");
+      if (token) {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const currentUserId = payload?.id;
+        if (currentUserId) {
+          const storageKey = `viewed_stories_${currentUserId}`;
+          const views = JSON.parse(localStorage.getItem(storageKey) || "[]");
+          (creators || []).forEach(c => {
+            if (c.active_story_id && views.includes(c.active_story_id)) {
+              s.add(String(c.username || '').toLowerCase());
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
+    setViewedStoriesSet(s);
+  }, [creators]);
+
+  // Real-time listener for story view events
+  useEffect(() => {
+    const handleStoryViewed = (e) => {
+      const viewedUname = e.detail?.username;
+      if (viewedUname) {
+        setViewedStoriesSet(prev => {
+          const next = new Set(prev);
+          next.add(String(viewedUname).toLowerCase());
+          return next;
+        });
+      }
+    };
+    window.addEventListener("storyViewed", handleStoryViewed);
+    return () => window.removeEventListener("storyViewed", handleStoryViewed);
+  }, []);
 
   const handleDismiss = (username) => {
     setDismissedSet((prev) => {
@@ -157,11 +203,25 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
               </button>
 
               {/* Center Avatar with Story Ring */}
-              <div style={igAvatarContainer}>
+              <div 
+                style={igAvatarContainer}
+                onClick={(e) => {
+                  if (creator.has_active_story) {
+                    const token = localStorage.getItem("token");
+                    if (!user && !token) {
+                      e.stopPropagation();
+                      promptLogin("view story");
+                      return;
+                    }
+                  }
+                }}
+              >
                 <div style={{
                   ...igAvatarRing,
                   background: creator.has_active_story 
-                    ? "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)" 
+                    ? ((viewedStoriesSet.has(String(uname).toLowerCase()) || Boolean(creator.has_viewed_story))
+                        ? "rgba(255, 255, 255, 0.35)"
+                        : "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)")
                     : "rgba(255, 255, 255, 0.16)"
                 }}>
                   <img 

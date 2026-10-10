@@ -1111,6 +1111,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
 
     // Fetch Active 24-Hour Status Story
     let activeStory = null;
+    let hasViewedStory = false;
     try {
       const storyRes = await pool.query(
         `SELECT id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at 
@@ -1123,15 +1124,30 @@ router.get("/:username", optionalAuth, async (req, res) => {
       );
       if (storyRes.rows.length > 0) {
         const s = storyRes.rows[0];
+        const currentUserId = req.user?.id || null;
+
+        if (currentUserId) {
+          try {
+            const viewCheck = await pool.query(
+              "SELECT 1 FROM creator_story_views WHERE user_id = $1 AND story_id = $2 LIMIT 1",
+              [currentUserId, s.id]
+            );
+            hasViewedStory = viewCheck.rows.length > 0;
+          } catch (vErr) {}
+        }
+
         activeStory = {
           id: s.id,
           username: s.username,
-          video_url: s.video_url,
+          // Only authenticated users can receive the playable story video_url
+          video_url: currentUserId ? s.video_url : null,
           thumbnail_url: s.thumbnail_url,
           duration: Number(s.duration || 10.0),
           sound_title: s.sound_title || "Trending TikTok Sound",
           created_at: s.created_at,
-          expires_at: s.expires_at
+          expires_at: s.expires_at,
+          requires_auth: !currentUserId,
+          has_viewed: hasViewedStory
         };
       }
     } catch (sErr) {}
@@ -1140,6 +1156,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       creator: {
         ...creator,
         has_active_story: !!activeStory,
+        has_viewed_story: hasViewedStory,
         active_story: activeStory,
         stats: {
           followers: totalFollowers,
@@ -1163,10 +1180,19 @@ router.get("/:username", optionalAuth, async (req, res) => {
 /* =======================================================
    3.5. GET ACTIVE CREATOR STORY
    GET /api/creator/:username/story
+   (Requires authentication: Only logged-in users can view story)
 ======================================================= */
 router.get("/:username/story", optionalAuth, async (req, res) => {
   const { username } = req.params;
   if (!username) return res.status(400).json({ error: "Username required" });
+
+  const currentUserId = req.user?.id || null;
+  if (!currentUserId) {
+    return res.status(401).json({ 
+      error: "Authentication required to view story post", 
+      requires_auth: true 
+    });
+  }
 
   try {
     const storyRes = await pool.query(
@@ -1184,8 +1210,20 @@ router.get("/:username/story", optionalAuth, async (req, res) => {
     }
 
     const s = storyRes.rows[0];
+
+    // Check if this user has already viewed this story
+    let hasViewed = false;
+    try {
+      const viewCheck = await pool.query(
+        "SELECT 1 FROM creator_story_views WHERE user_id = $1 AND story_id = $2 LIMIT 1",
+        [currentUserId, s.id]
+      );
+      hasViewed = viewCheck.rows.length > 0;
+    } catch (vErr) {}
+
     return res.json({
       has_active_story: true,
+      has_viewed_story: hasViewed,
       story: {
         id: s.id,
         username: s.username,
@@ -1194,12 +1232,58 @@ router.get("/:username/story", optionalAuth, async (req, res) => {
         duration: Number(s.duration || 10.0),
         sound_title: s.sound_title || "Trending TikTok Sound",
         created_at: s.created_at,
-        expires_at: s.expires_at
+        expires_at: s.expires_at,
+        has_viewed: hasViewed
       }
     });
   } catch (err) {
     console.error("[GET CREATOR STORY ERROR]", err);
     res.status(500).json({ error: "Failed to fetch creator story" });
+  }
+});
+
+/* =======================================================
+   3.6. RECORD CREATOR STORY VIEW
+   POST /api/creator/:username/story/view
+   (Requires authentication: Records user view in database)
+======================================================= */
+router.post("/:username/story/view", authenticateToken, async (req, res) => {
+  const { username } = req.params;
+  const userId = req.user.id;
+  let { story_id } = req.body;
+
+  try {
+    if (!story_id) {
+      const storyRes = await pool.query(
+        `SELECT id FROM creator_stories 
+         WHERE LOWER(username) = LOWER($1) 
+           AND is_active = TRUE 
+           AND expires_at > NOW() 
+         ORDER BY created_at DESC LIMIT 1`,
+        [username]
+      );
+      if (storyRes.rows.length === 0) {
+        return res.status(404).json({ error: "No active story found to mark as viewed" });
+      }
+      story_id = storyRes.rows[0].id;
+    }
+
+    await pool.query(
+      `INSERT INTO creator_story_views (user_id, story_id, viewed_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id, story_id) DO UPDATE SET viewed_at = NOW()`,
+      [userId, story_id]
+    );
+
+    return res.json({
+      success: true,
+      viewed: true,
+      story_id: Number(story_id),
+      user_id: userId
+    });
+  } catch (err) {
+    console.error("[RECORD STORY VIEW ERROR]", err);
+    return res.status(500).json({ error: "Failed to record story view" });
   }
 });
 
@@ -1572,20 +1656,37 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
     // Fast-path: In-memory cache for default discover list (no search query)
     if (!search && cachedFeaturedCreators && (Date.now() - cachedFeaturedTime < FEATURED_CACHE_TTL)) {
       let myFollows = new Set();
+      let viewedStoryUsernames = new Set();
       if (currentUserId) {
         try {
-          const followRes = await pool.query(
-            "SELECT creator_id FROM creator_follows WHERE follower_id = $1",
-            [currentUserId]
-          );
+          const [followRes, viewedRes] = await Promise.all([
+            pool.query(
+              "SELECT creator_id FROM creator_follows WHERE follower_id = $1",
+              [currentUserId]
+            ),
+            pool.query(
+              `SELECT DISTINCT LOWER(s.username) as username 
+               FROM creator_stories s
+               INNER JOIN creator_story_views v ON v.story_id = s.id
+               WHERE v.user_id = $1 
+                 AND s.is_active = TRUE 
+                 AND s.expires_at > NOW()`,
+              [currentUserId]
+            )
+          ]);
           myFollows = new Set(followRes.rows.map(r => String(r.creator_id)));
+          viewedStoryUsernames = new Set(viewedRes.rows.map(r => r.username));
         } catch (fErr) {}
       }
 
-      const result = cachedFeaturedCreators.slice(0, limit).map(c => ({
-        ...c,
-        is_following: currentUserId ? Boolean(myFollows.has(String(c.id)) || (c.telegram_user_id && myFollows.has(String(c.telegram_user_id)))) : false
-      }));
+      const result = cachedFeaturedCreators.slice(0, limit).map(c => {
+        const unameLower = String(c.username || '').toLowerCase();
+        return {
+          ...c,
+          is_following: currentUserId ? Boolean(myFollows.has(String(c.id)) || (c.telegram_user_id && myFollows.has(String(c.telegram_user_id)))) : false,
+          has_viewed_story: currentUserId ? Boolean(c.has_active_story && viewedStoryUsernames.has(unameLower)) : false
+        };
+      });
 
       return res.json({ creators: result });
     }
@@ -1706,11 +1807,25 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
 
     // Check active 24-hour status stories for featured creators
     let activeStoryUsernames = new Set();
+    let viewedStoryUsernames = new Set();
     try {
       const activeStoriesRes = await pool.query(
         "SELECT DISTINCT LOWER(username) as username FROM creator_stories WHERE is_active = TRUE AND expires_at > NOW()"
       );
       activeStoryUsernames = new Set(activeStoriesRes.rows.map(r => r.username));
+
+      if (currentUserId) {
+        const viewedRes = await pool.query(
+          `SELECT DISTINCT LOWER(s.username) as username 
+           FROM creator_stories s
+           INNER JOIN creator_story_views v ON v.story_id = s.id
+           WHERE v.user_id = $1 
+             AND s.is_active = TRUE 
+             AND s.expires_at > NOW()`,
+          [currentUserId]
+        );
+        viewedStoryUsernames = new Set(viewedRes.rows.map(r => r.username));
+      }
     } catch (sErr) {}
 
     creators = creators.map(c => {
@@ -1736,9 +1851,14 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
         uploader_handle: c.username
       }));
 
+      const unameLower = String(c.username || '').toLowerCase();
+      const hasActiveStory = activeStoryUsernames.has(unameLower);
+      const hasViewedStory = Boolean(currentUserId && hasActiveStory && viewedStoryUsernames.has(unameLower));
+
       return {
         ...c,
-        has_active_story: activeStoryUsernames.has(String(c.username || '').toLowerCase()),
+        has_active_story: hasActiveStory,
+        has_viewed_story: hasViewedStory,
         sample_videos
       };
     });
@@ -1749,8 +1869,12 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
         const bCount = (b.sample_videos && b.sample_videos.length > 0) ? 1 : 0;
         return bCount - aCount;
       });
-      // Store in memory cache for subsequent requests
-      cachedFeaturedCreators = creators;
+      // Store in memory cache for subsequent requests (without user-specific following/viewed flags)
+      cachedFeaturedCreators = creators.map(c => ({
+        ...c,
+        is_following: false,
+        has_viewed_story: false
+      }));
       cachedFeaturedTime = Date.now();
     }
 

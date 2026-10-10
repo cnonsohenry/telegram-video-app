@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import useModalHistory from "../hooks/useModalHistory";
+import { APP_CONFIG } from "../config";
+import { promptLogin } from "../utils/toast";
 
 export function StoryPlayerModal({ isOpen, onClose, story, creator }) {
   const handleSafeClose = useModalHistory(isOpen, onClose, "storyPlayer");
@@ -9,6 +11,68 @@ export function StoryPlayerModal({ isOpen, onClose, story, creator }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const pauseTimeoutRef = useRef(null);
+
+  // Enforce authentication: Only logged-in users can view stories
+  useEffect(() => {
+    if (isOpen) {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        promptLogin("view story");
+        handleSafeClose();
+        return;
+      }
+    }
+  }, [isOpen, handleSafeClose]);
+
+  // Record story view when player is open and story is loaded
+  useEffect(() => {
+    if (!isOpen || !story) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const recordStoryView = async () => {
+      try {
+        const uname = creator?.username || story?.username;
+        if (!uname) return;
+
+        // Optimistically record in local storage for instant responsiveness
+        try {
+          const tokenPayload = JSON.parse(atob(token.split(".")[1]));
+          const userId = tokenPayload?.id;
+          if (userId && story.id) {
+            const storageKey = `viewed_stories_${userId}`;
+            const currentViews = JSON.parse(localStorage.getItem(storageKey) || "[]");
+            if (!currentViews.includes(story.id)) {
+              currentViews.push(story.id);
+              localStorage.setItem(storageKey, JSON.stringify(currentViews));
+            }
+          }
+        } catch (e) {}
+
+        // Dispatch event so avatar rings in explore/profile immediately turn gray
+        window.dispatchEvent(new CustomEvent("storyViewed", {
+          detail: {
+            storyId: story.id,
+            username: uname
+          }
+        }));
+
+        // Send view record to backend
+        await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(uname)}/story/view`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ story_id: story.id })
+        });
+      } catch (err) {
+        console.warn("[STORY VIEW RECORD NOTICE]", err);
+      }
+    };
+
+    recordStoryView();
+  }, [isOpen, story?.id, creator?.username, story?.username]);
 
   // Reset when story or open state changes
   useEffect(() => {
@@ -209,7 +273,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, creator }) {
                   height: "42px",
                   borderRadius: "50%",
                   padding: "2px",
-                  background: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+                  background: "rgba(255, 255, 255, 0.35)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
