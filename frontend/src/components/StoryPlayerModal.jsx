@@ -12,8 +12,8 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const pauseTimeoutRef = useRef(null);
-  const pointerStartRef = useRef({ time: 0, x: 0, y: 0 });
-  const isHoldingRef = useRef(false);
+  const pointerStartRef = useRef({ time: 0, x: 0, y: 0, isHolding: false });
+  const lastNavTimeRef = useRef(0);
 
   // Normalize list of active stories
   const storyList = useMemo(() => {
@@ -119,52 +119,70 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     setProgress(pct);
   };
 
-  // Navigation handlers
-  const goToNext = useCallback(() => {
-    if (currentIndex < storyList.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      setProgress(0);
-      setIsVideoReady(false);
-    } else {
-      handleSafeClose();
-    }
-  }, [currentIndex, storyList.length, handleSafeClose]);
+  // Debounced, rock-solid navigation handlers
+  const navigateWithDebounce = useCallback(
+    (direction) => {
+      const now = Date.now();
+      if (now - lastNavTimeRef.current < 300) return;
+      lastNavTimeRef.current = now;
 
-  const goToPrev = useCallback(() => {
-    if (videoRef.current && videoRef.current.currentTime > 2) {
-      videoRef.current.currentTime = 0;
-      setProgress(0);
-      videoRef.current.play().catch(() => {});
-      return;
-    }
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
-      setProgress(0);
-      setIsVideoReady(false);
-    } else {
-      if (videoRef.current) {
-        videoRef.current.currentTime = 0;
-        videoRef.current.play().catch(() => {});
+      if (direction === "next") {
+        setCurrentIndex((prev) => {
+          if (prev < storyList.length - 1) {
+            setProgress(0);
+            setIsVideoReady(false);
+            return prev + 1;
+          } else {
+            handleSafeClose();
+            return prev;
+          }
+        });
+      } else if (direction === "prev") {
+        if (videoRef.current && videoRef.current.currentTime > 2) {
+          videoRef.current.currentTime = 0;
+          setProgress(0);
+          videoRef.current.play().catch(() => {});
+          return;
+        }
+        setCurrentIndex((prev) => {
+          if (prev > 0) {
+            setProgress(0);
+            setIsVideoReady(false);
+            return prev - 1;
+          } else {
+            if (videoRef.current) {
+              videoRef.current.currentTime = 0;
+              videoRef.current.play().catch(() => {});
+            }
+            setProgress(0);
+            return 0;
+          }
+        });
       }
-      setProgress(0);
-    }
-  }, [currentIndex]);
+    },
+    [storyList.length, handleSafeClose]
+  );
+
+  const goToNext = useCallback(() => navigateWithDebounce("next"), [navigateWithDebounce]);
+  const goToPrev = useCallback(() => navigateWithDebounce("prev"), [navigateWithDebounce]);
 
   const handleVideoEnded = () => {
     goToNext();
   };
 
-  // Tap-and-hold to pause story, quick tap left/right to navigate
+  // Pointer Down / Up tap & hold handling (unified across touch and mouse, preventing double-fires)
   const handlePointerDown = (e) => {
     if (e.button && e.button !== 0) return;
-    const clientX = e.clientX ?? (e.touches && e.touches[0]?.clientX) ?? 0;
-    const clientY = e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0;
-    pointerStartRef.current = { time: Date.now(), x: clientX, y: clientY };
-    isHoldingRef.current = false;
+    pointerStartRef.current = {
+      time: Date.now(),
+      x: e.clientX,
+      y: e.clientY,
+      isHolding: false
+    };
 
     if (pauseTimeoutRef.current) clearTimeout(pauseTimeoutRef.current);
     pauseTimeoutRef.current = setTimeout(() => {
-      isHoldingRef.current = true;
+      pointerStartRef.current.isHolding = true;
       if (videoRef.current && !videoRef.current.paused) {
         videoRef.current.pause();
         setIsPaused(true);
@@ -178,9 +196,8 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       pauseTimeoutRef.current = null;
     }
 
-    if (isHoldingRef.current) {
-      // User held down to pause, now release to resume
-      isHoldingRef.current = false;
+    if (pointerStartRef.current.isHolding) {
+      pointerStartRef.current.isHolding = false;
       if (videoRef.current && isPaused) {
         videoRef.current.play().catch(() => {});
         setIsPaused(false);
@@ -188,18 +205,15 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       return;
     }
 
-    // Quick tap
     const elapsed = Date.now() - pointerStartRef.current.time;
-    if (elapsed < 250) {
-      const clientX = e.clientX ?? (e.changedTouches && e.changedTouches[0]?.clientX) ?? 0;
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const clickX = clientX - rect.left;
-        if (clickX < rect.width * 0.35) {
-          goToPrev();
-        } else {
-          goToNext();
-        }
+    // Fast tap (< 250ms): navigate left 35% prev, right 65% next
+    if (elapsed < 250 && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      if (clickX < rect.width * 0.35) {
+        goToPrev();
+      } else {
+        goToNext();
       }
     }
   };
@@ -240,10 +254,9 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     currentStory.display_name ||
     creator?.username ||
     currentStory.username;
-  const username = creator?.username || currentStory.username;
   const avatarUrl =
     creator?.avatar_url || currentStory.avatar_url || "/assets/default-avatar.png";
-  const soundTitle = currentStory.sound_title || "Trending TikTok Sound";
+  const soundTitle = currentStory.sound_title || "Trending Afrobeat Track";
   const videoSrc = currentStory.video_url || currentStory.raw_video_url;
 
   return (
@@ -261,23 +274,24 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
         overflow: "hidden"
       }}
     >
-      {/* Desktop Prev Button */}
+      {/* Desktop Prev Button (Outside Frame) */}
       {storyList.length > 1 && currentIndex > 0 && (
         <button
           type="button"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             goToPrev();
           }}
           style={{
             position: "absolute",
-            left: "calc(50% - 290px)",
+            left: "calc(50% - 280px)",
             top: "50%",
             transform: "translateY(-50%)",
-            background: "rgba(255, 255, 255, 0.15)",
-            border: "1px solid rgba(255, 255, 255, 0.25)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
+            background: "rgba(255, 255, 255, 0.2)",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
             borderRadius: "50%",
             width: "48px",
             height: "48px",
@@ -297,23 +311,24 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
         </button>
       )}
 
-      {/* Desktop Next Button */}
-      {storyList.length > 1 && currentIndex < storyList.length - 1 && (
+      {/* Desktop Next Button (Outside Frame) */}
+      {storyList.length > 1 && (
         <button
           type="button"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             goToNext();
           }}
           style={{
             position: "absolute",
-            right: "calc(50% - 290px)",
+            right: "calc(50% - 280px)",
             top: "50%",
             transform: "translateY(-50%)",
-            background: "rgba(255, 255, 255, 0.15)",
-            border: "1px solid rgba(255, 255, 255, 0.25)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
+            background: "rgba(255, 255, 255, 0.2)",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
             borderRadius: "50%",
             width: "48px",
             height: "48px",
@@ -325,7 +340,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             zIndex: 100,
             transition: "all 0.2s"
           }}
-          title="Next Story"
+          title={currentIndex < storyList.length - 1 ? "Next Story" : "Close Story"}
         >
           <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -336,10 +351,8 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       {/* Story Container (Vertical 9:16 mobile frame on desktop, full screen on mobile) */}
       <div
         ref={containerRef}
-        onMouseDown={handlePointerDown}
-        onMouseUp={handlePointerUp}
-        onTouchStart={handlePointerDown}
-        onTouchEnd={handlePointerUp}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
         style={{
           position: "relative",
           width: "100%",
@@ -383,7 +396,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             top: 0,
             left: 0,
             right: 0,
-            height: "140px",
+            height: "150px",
             background: "linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)",
             pointerEvents: "none",
             zIndex: 10
@@ -397,18 +410,98 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             bottom: 0,
             left: 0,
             right: 0,
-            height: "160px",
-            background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)",
+            height: "100px",
+            background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%)",
             pointerEvents: "none",
             zIndex: 10
           }}
         />
 
+        {/* In-Frame Previous Tap Chevron (Left) */}
+        {storyList.length > 1 && currentIndex > 0 && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              goToPrev();
+            }}
+            style={{
+              position: "absolute",
+              left: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "rgba(0, 0, 0, 0.35)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              borderRadius: "50%",
+              width: "38px",
+              height: "38px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              cursor: "pointer",
+              zIndex: 25,
+              opacity: 0.7,
+              transition: "opacity 0.2s"
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
+            title="Previous Story"
+          >
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+
+        {/* In-Frame Next Tap Chevron (Right) */}
+        {storyList.length > 1 && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              goToNext();
+            }}
+            style={{
+              position: "absolute",
+              right: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "rgba(0, 0, 0, 0.35)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              borderRadius: "50%",
+              width: "38px",
+              height: "38px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              cursor: "pointer",
+              zIndex: 25,
+              opacity: 0.7,
+              transition: "opacity 0.2s"
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
+            title={currentIndex < storyList.length - 1 ? "Next Story" : "Close Story"}
+          >
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
+
         {/* Top Header & Segmented Progress Bar */}
         <div
           style={{
             position: "relative",
-            zIndex: 20,
+            zIndex: 30,
             padding: "16px 16px 8px 16px",
             display: "flex",
             flexDirection: "column",
@@ -460,7 +553,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
 
           {/* Creator Profile Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
               <div
                 style={{
                   width: "42px",
@@ -487,31 +580,71 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                 />
               </div>
 
-              <div>
+              <div style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+                {/* Creator Display Name & Verified Badge */}
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ color: "#fff", fontWeight: "700", fontSize: "15px" }}>
+                  <span
+                    style={{
+                      color: "#fff",
+                      fontWeight: "700",
+                      fontSize: "15px",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis"
+                    }}
+                  >
                     {displayName}
                   </span>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="#00d2ff">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="#00d2ff" style={{ flexShrink: 0 }}>
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                   </svg>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ color: "#00e5ff", fontSize: "12px", fontWeight: "600" }}>
-                    Status Story
+
+                {/* Song Details in place of "Status Story" tag */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    marginTop: "2px",
+                    minWidth: 0
+                  }}
+                >
+                  <svg width="12" height="12" fill="#ff007f" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                  </svg>
+                  <span
+                    style={{
+                      color: "rgba(255, 255, 255, 0.88)",
+                      fontSize: "12px",
+                      fontWeight: "500",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      maxWidth: "200px"
+                    }}
+                    title={soundTitle}
+                  >
+                    {soundTitle}
                   </span>
                   {storyList.length > 1 && (
-                    <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "12px", fontWeight: "600" }}>
-                      ({currentIndex + 1}/{storyList.length})
+                    <span
+                      style={{
+                        color: "rgba(255, 255, 255, 0.6)",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        flexShrink: 0
+                      }}
+                    >
+                      • {currentIndex + 1}/{storyList.length}
                     </span>
                   )}
-                  <span style={{ color: "rgba(255,255,255,0.5)", fontSize: "12px" }}>• 24h</span>
                 </div>
               </div>
             </div>
 
             {/* Top Right Controls (Mute & Close) */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
               <button
                 type="button"
                 onPointerDown={(e) => e.stopPropagation()}
@@ -598,65 +731,8 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
           </div>
         )}
 
-        {/* Spacer */}
+        {/* Spacer for full-bleed video */}
         <div style={{ flex: 1 }} />
-
-        {/* Bottom Audio Info Pill */}
-        <div
-          style={{
-            position: "relative",
-            zIndex: 20,
-            padding: "16px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between"
-          }}
-        >
-          <div
-            onPointerDown={(e) => e.stopPropagation()}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              backgroundColor: "rgba(0, 0, 0, 0.65)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              padding: "8px 16px",
-              borderRadius: "999px",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
-              maxWidth: "80%",
-              overflow: "hidden"
-            }}
-          >
-            <svg width="16" height="16" fill="#ff007f" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-            </svg>
-            <span
-              style={{
-                color: "#f4f4f5",
-                fontSize: "13px",
-                fontWeight: "600",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis"
-              }}
-            >
-              {soundTitle}
-            </span>
-          </div>
-
-          <div
-            style={{
-              color: "rgba(255, 255, 255, 0.6)",
-              fontSize: "12px",
-              fontWeight: "600",
-              letterSpacing: "0.05em",
-              flexShrink: 0
-            }}
-          >
-            STATUS REEL
-          </div>
-        </div>
       </div>
     </div>
   );

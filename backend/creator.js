@@ -1781,7 +1781,7 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
                v.created_at,
                ROW_NUMBER() OVER (
                  PARTITION BY cm.creator_id 
-                 ORDER BY COALESCE(v.views, 0) DESC, COALESCE(v.likes_count, 0) DESC, v.id DESC
+                 ORDER BY RANDOM()
                ) as rank
              FROM creator_matches cm
              JOIN videos v ON v.status = 'ready' AND (
@@ -1790,7 +1790,7 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
                OR (cm.telegram_user_mapping IS NOT NULL AND v.uploader_id = cm.telegram_user_mapping)
              )
            )
-           SELECT * FROM creator_videos WHERE rank <= 12`,
+           SELECT * FROM creator_videos WHERE rank <= 30`,
           [creatorIds]
         );
 
