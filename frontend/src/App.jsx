@@ -727,7 +727,17 @@ export default function App() {
     setToken(userToken);
     setUser(userData);
     if (userData.settings?.theme) applyTheme(userData.settings.theme);
-    handleTabSwitch("profile"); 
+    window.dispatchEvent(new CustomEvent("refreshUser", { detail: userData }));
+
+    // Never switch tabs away if the user was interacting with a creator profile or watching a video
+    if (viewingCreatorRef.current || activeVideoRef.current) {
+      return;
+    }
+
+    // Only switch to profile if user logged in directly from the profile tab
+    if (activeTabRef.current === "profile") {
+      handleTabSwitch("profile");
+    }
   };
 
   const onLogout = useCallback(() => {
