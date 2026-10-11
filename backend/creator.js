@@ -1109,55 +1109,52 @@ router.get("/:username", optionalAuth, async (req, res) => {
       created_at: v.created_at
     }));
 
-    // Fetch Active 24-Hour Status Story
+    // Fetch Active 24-Hour Status Stories (Multi-story support)
     let activeStory = null;
+    let activeStories = [];
     let hasViewedStory = false;
     try {
+      const currentUserId = req.user?.id || null;
       const storyRes = await pool.query(
-        `SELECT id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at 
-         FROM creator_stories 
-         WHERE LOWER(username) = LOWER($1) 
-           AND is_active = TRUE 
-           AND expires_at > NOW() 
-         ORDER BY created_at DESC LIMIT 1`,
-        [creator.username || username]
+        `SELECT s.id, s.creator_id, s.username, s.thumbnail_url, s.duration, s.sound_title, s.created_at, s.expires_at
+                ${currentUserId ? ", s.video_url, CASE WHEN v.id IS NOT NULL THEN TRUE ELSE FALSE END as has_viewed" : ", NULL as video_url, FALSE as has_viewed, TRUE as requires_auth"}
+         FROM creator_stories s
+         ${currentUserId ? "LEFT JOIN creator_story_views v ON (v.story_id = s.id AND v.user_id = $2)" : ""}
+         WHERE LOWER(s.username) = LOWER($1) 
+           AND s.is_active = TRUE 
+           AND s.expires_at > NOW() 
+         ORDER BY s.created_at ASC`,
+        currentUserId ? [creator.username || username, currentUserId] : [creator.username || username]
       );
       if (storyRes.rows.length > 0) {
-        const s = storyRes.rows[0];
-        const currentUserId = req.user?.id || null;
-
-        if (currentUserId) {
-          try {
-            const viewCheck = await pool.query(
-              "SELECT 1 FROM creator_story_views WHERE user_id = $1 AND story_id = $2 LIMIT 1",
-              [currentUserId, s.id]
-            );
-            hasViewedStory = viewCheck.rows.length > 0;
-          } catch (vErr) {}
-        }
-
-        activeStory = {
+        activeStories = storyRes.rows.map(s => ({
           id: s.id,
+          creator_id: s.creator_id,
           username: s.username,
-          // Only authenticated users can receive the playable story video_url
-          video_url: currentUserId ? s.video_url : null,
+          video_url: s.video_url,
           thumbnail_url: s.thumbnail_url,
           duration: Number(s.duration || 10.0),
           sound_title: s.sound_title || "Trending TikTok Sound",
           created_at: s.created_at,
           expires_at: s.expires_at,
           requires_auth: !currentUserId,
-          has_viewed: hasViewedStory
-        };
+          has_viewed: Boolean(s.has_viewed)
+        }));
+        const hasViewedAll = currentUserId ? activeStories.every(s => s.has_viewed) : false;
+        const firstUnviewed = activeStories.find(s => !s.has_viewed) || activeStories[0];
+        activeStory = firstUnviewed;
+        hasViewedStory = hasViewedAll;
       }
     } catch (sErr) {}
 
     res.json({
       creator: {
         ...creator,
-        has_active_story: !!activeStory,
+        has_active_story: activeStories.length > 0,
         has_viewed_story: hasViewedStory,
         active_story: activeStory,
+        active_stories: activeStories,
+        story_count: activeStories.length,
         stats: {
           followers: totalFollowers,
           subscribers: subCount,
@@ -1196,45 +1193,49 @@ router.get("/:username/story", optionalAuth, async (req, res) => {
 
   try {
     const storyRes = await pool.query(
-      `SELECT id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at 
-       FROM creator_stories 
-       WHERE LOWER(username) = LOWER($1) 
-         AND is_active = TRUE 
-         AND expires_at > NOW() 
-       ORDER BY created_at DESC LIMIT 1`,
-      [username]
+      `SELECT s.id, s.creator_id, s.username, s.video_url, s.thumbnail_url, s.duration, s.sound_title, s.created_at, s.expires_at,
+              COALESCE(u.display_name, s.username) as display_name,
+              COALESCE(u.avatar_url, '/assets/default-avatar.png') as avatar_url,
+              CASE WHEN v.id IS NOT NULL THEN TRUE ELSE FALSE END as has_viewed
+       FROM creator_stories s
+       LEFT JOIN app_users u ON (s.creator_id = u.id OR LOWER(s.username) = LOWER(u.username))
+       LEFT JOIN creator_story_views v ON (v.story_id = s.id AND v.user_id = $2)
+       WHERE LOWER(s.username) = LOWER($1) 
+         AND s.is_active = TRUE 
+         AND s.expires_at > NOW() 
+       ORDER BY s.created_at ASC`,
+      [username, currentUserId]
     );
 
     if (storyRes.rows.length === 0) {
-      return res.json({ has_active_story: false });
+      return res.json({ has_active_story: false, stories: [] });
     }
 
-    const s = storyRes.rows[0];
+    const stories = storyRes.rows.map(s => ({
+      id: s.id,
+      creator_id: s.creator_id,
+      username: s.username,
+      display_name: s.display_name,
+      avatar_url: s.avatar_url,
+      video_url: s.video_url,
+      thumbnail_url: s.thumbnail_url,
+      duration: Number(s.duration || 10.0),
+      sound_title: s.sound_title || "Trending TikTok Sound",
+      created_at: s.created_at,
+      expires_at: s.expires_at,
+      has_viewed: Boolean(s.has_viewed)
+    }));
 
-    // Check if this user has already viewed this story
-    let hasViewed = false;
-    try {
-      const viewCheck = await pool.query(
-        "SELECT 1 FROM creator_story_views WHERE user_id = $1 AND story_id = $2 LIMIT 1",
-        [currentUserId, s.id]
-      );
-      hasViewed = viewCheck.rows.length > 0;
-    } catch (vErr) {}
+    const hasViewedAll = stories.every(s => s.has_viewed);
+    const firstUnviewed = stories.find(s => !s.has_viewed) || stories[0];
 
     return res.json({
       has_active_story: true,
-      has_viewed_story: hasViewed,
-      story: {
-        id: s.id,
-        username: s.username,
-        video_url: s.video_url,
-        thumbnail_url: s.thumbnail_url,
-        duration: Number(s.duration || 10.0),
-        sound_title: s.sound_title || "Trending TikTok Sound",
-        created_at: s.created_at,
-        expires_at: s.expires_at,
-        has_viewed: hasViewed
-      }
+      count: stories.length,
+      has_viewed_story: hasViewedAll,
+      has_viewed_all: hasViewedAll,
+      stories: stories,
+      story: firstUnviewed
     });
   } catch (err) {
     console.error("[GET CREATOR STORY ERROR]", err);
@@ -1667,28 +1668,27 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
             pool.query(
               `SELECT DISTINCT LOWER(s.username) as username 
                FROM creator_stories s
-               INNER JOIN creator_story_views v ON v.story_id = s.id
-               WHERE v.user_id = $1 
-                 AND s.is_active = TRUE 
-                 AND s.expires_at > NOW()`,
+               LEFT JOIN creator_story_views v ON (v.story_id = s.id AND v.user_id = $1)
+               WHERE s.is_active = TRUE 
+                 AND s.expires_at > NOW()
+                 AND v.id IS NULL`,
               [currentUserId]
             )
           ]);
           myFollows = new Set(followRes.rows.map(r => String(r.creator_id)));
-          viewedStoryUsernames = new Set(viewedRes.rows.map(r => r.username));
+          const unviewedStoryUsernames = new Set(viewedRes.rows.map(r => r.username));
+          const result = cachedFeaturedCreators.slice(0, limit).map(c => {
+            const unameLower = String(c.username || '').toLowerCase();
+            return {
+              ...c,
+              is_following: currentUserId ? Boolean(myFollows.has(String(c.id)) || (c.telegram_user_id && myFollows.has(String(c.telegram_user_id)))) : false,
+              has_viewed_story: currentUserId ? Boolean(c.has_active_story && !unviewedStoryUsernames.has(unameLower)) : false
+            };
+          });
+
+          return res.json({ creators: result });
         } catch (fErr) {}
       }
-
-      const result = cachedFeaturedCreators.slice(0, limit).map(c => {
-        const unameLower = String(c.username || '').toLowerCase();
-        return {
-          ...c,
-          is_following: currentUserId ? Boolean(myFollows.has(String(c.id)) || (c.telegram_user_id && myFollows.has(String(c.telegram_user_id)))) : false,
-          has_viewed_story: currentUserId ? Boolean(c.has_active_story && viewedStoryUsernames.has(unameLower)) : false
-        };
-      });
-
-      return res.json({ creators: result });
     }
 
     // Return exclusively genuine Telegram creators with randomized dynamic rotation
@@ -1815,16 +1815,16 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
       activeStoryUsernames = new Set(activeStoriesRes.rows.map(r => r.username));
 
       if (currentUserId) {
-        const viewedRes = await pool.query(
+        const unviewedRes = await pool.query(
           `SELECT DISTINCT LOWER(s.username) as username 
            FROM creator_stories s
-           INNER JOIN creator_story_views v ON v.story_id = s.id
-           WHERE v.user_id = $1 
-             AND s.is_active = TRUE 
-             AND s.expires_at > NOW()`,
+           LEFT JOIN creator_story_views v ON (v.story_id = s.id AND v.user_id = $1)
+           WHERE s.is_active = TRUE 
+             AND s.expires_at > NOW()
+             AND v.id IS NULL`,
           [currentUserId]
         );
-        viewedStoryUsernames = new Set(viewedRes.rows.map(r => r.username));
+        viewedStoryUsernames = new Set(unviewedRes.rows.map(r => r.username));
       }
     } catch (sErr) {}
 
@@ -1853,7 +1853,7 @@ router.get("/featured/list", optionalAuth, async (req, res) => {
 
       const unameLower = String(c.username || '').toLowerCase();
       const hasActiveStory = activeStoryUsernames.has(unameLower);
-      const hasViewedStory = Boolean(currentUserId && hasActiveStory && viewedStoryUsernames.has(unameLower));
+      const hasViewedStory = Boolean(currentUserId && hasActiveStory && !viewedStoryUsernames.has(unameLower));
 
       return {
         ...c,

@@ -39,10 +39,33 @@ export function StoryProvider({ children }) {
       if (res.ok) {
         const data = await res.json();
         const map = {};
-        if (Array.isArray(data.stories)) {
+
+        // Support both grouped creators and flat stories array
+        if (Array.isArray(data.creators)) {
+          data.creators.forEach((c) => {
+            if (c.username) {
+              map[String(c.username).toLowerCase().trim()] = c;
+            }
+          });
+        } else if (Array.isArray(data.stories)) {
           data.stories.forEach((s) => {
             if (s.username) {
-              map[String(s.username).toLowerCase().trim()] = s;
+              const uname = String(s.username).toLowerCase().trim();
+              if (!map[uname]) {
+                map[uname] = {
+                  creator_id: s.creator_id,
+                  username: s.username,
+                  display_name: s.display_name,
+                  avatar_url: s.avatar_url,
+                  is_verified: s.is_verified,
+                  stories: [],
+                  has_viewed_all: true
+                };
+              }
+              map[uname].stories.push(s);
+              if (!s.has_viewed) {
+                map[uname].has_viewed_all = false;
+              }
             }
           });
         }
@@ -93,10 +116,21 @@ export function StoryProvider({ children }) {
       if (username) {
         const key = String(username).toLowerCase().trim();
         setStoriesMap((prev) => {
-          if (!prev[key]) return prev;
+          const existing = prev[key];
+          if (!existing) return prev;
+          const updatedStories = (existing.stories || []).map((s) =>
+            s.id === storyId ? { ...s, has_viewed: true } : s
+          );
+          const allViewed =
+            updatedStories.length > 0 &&
+            updatedStories.every((s) => s.has_viewed || (storyId && s.id === storyId));
           return {
             ...prev,
-            [key]: { ...prev[key], has_viewed: true }
+            [key]: {
+              ...existing,
+              stories: updatedStories,
+              has_viewed_all: allViewed
+            }
           };
         });
       }
@@ -110,20 +144,31 @@ export function StoryProvider({ children }) {
     (username) => {
       if (!username) return false;
       const key = String(username).replace(/^@/, "").toLowerCase().trim();
-      return Boolean(storiesMap[key]);
+      const creatorInfo = storiesMap[key];
+      if (!creatorInfo) return false;
+      if (Array.isArray(creatorInfo.stories)) return creatorInfo.stories.length > 0;
+      return true;
     },
     [storiesMap]
   );
 
-  // Helper: check if user has viewed the story
+  // Helper: check if user has viewed ALL active stories of this creator
   const isStoryViewed = useCallback(
     (username) => {
       if (!username) return false;
       const key = String(username).replace(/^@/, "").toLowerCase().trim();
-      const s = storiesMap[key];
-      if (!s) return false;
-      if (s.has_viewed) return true;
-      if (s.id && localViewedIds.has(s.id)) return true;
+      const creatorInfo = storiesMap[key];
+      if (!creatorInfo) return false;
+
+      // If active stories array exists, require every story to be viewed
+      if (Array.isArray(creatorInfo.stories) && creatorInfo.stories.length > 0) {
+        return creatorInfo.stories.every(
+          (s) => s.has_viewed || localViewedIds.has(s.id)
+        );
+      }
+      if (creatorInfo.has_viewed_all !== undefined) return creatorInfo.has_viewed_all;
+      if (creatorInfo.has_viewed) return true;
+      if (creatorInfo.id && localViewedIds.has(creatorInfo.id)) return true;
       return false;
     },
     [storiesMap, localViewedIds]
@@ -138,7 +183,7 @@ export function StoryProvider({ children }) {
     [storiesMap]
   );
 
-  // Open story handler with auth check - always fetches fresh authenticated story
+  // Open story handler with auth check - always fetches fresh authenticated story sequence
   const openStory = useCallback(
     async (username, fallbackCreator = null) => {
       const token = localStorage.getItem("token");
@@ -152,26 +197,38 @@ export function StoryProvider({ children }) {
 
       const cached = storiesMap[cleanUname.toLowerCase()];
 
-      // 1. Fetch fresh authenticated story from backend to guarantee latest active status
+      // 1. Fetch fresh authenticated stories from backend to guarantee latest sequence
       try {
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUname)}/story`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.has_active_story && data.story) {
+          if (data.has_active_story && (Array.isArray(data.stories) || data.story)) {
+            const storiesList = Array.isArray(data.stories) && data.stories.length > 0
+              ? data.stories
+              : [data.story];
+            
+            const firstStory = data.story || storiesList[0];
+
             setActiveStoryModal({
-              story: data.story,
+              stories: storiesList,
+              story: firstStory,
               creator: fallbackCreator || {
                 username: cleanUname,
-                display_name: data.story.display_name || cached?.display_name || cleanUname,
-                avatar_url: data.story.avatar_url || cached?.avatar_url
+                display_name: firstStory?.display_name || cached?.display_name || cleanUname,
+                avatar_url: firstStory?.avatar_url || cached?.avatar_url
               }
             });
-            // Update map with fresh story
+
+            // Update map with fresh stories
             setStoriesMap((prev) => ({
               ...prev,
-              [cleanUname.toLowerCase()]: data.story
+              [cleanUname.toLowerCase()]: {
+                ...(prev[cleanUname.toLowerCase()] || {}),
+                stories: storiesList,
+                has_viewed_all: Boolean(data.has_viewed_all)
+              }
             }));
             return;
           }
@@ -181,15 +238,22 @@ export function StoryProvider({ children }) {
       }
 
       // 2. Fallback to cached in memory if network request fails
-      if (cached?.video_url) {
-        setActiveStoryModal({
-          story: cached,
-          creator: fallbackCreator || {
-            username: cleanUname,
-            display_name: cached.display_name || cleanUname,
-            avatar_url: cached.avatar_url
-          }
-        });
+      if (cached) {
+        const cachedStories = Array.isArray(cached.stories) && cached.stories.length > 0
+          ? cached.stories
+          : (cached.video_url ? [cached] : []);
+
+        if (cachedStories.length > 0) {
+          setActiveStoryModal({
+            stories: cachedStories,
+            story: cachedStories[0],
+            creator: fallbackCreator || {
+              username: cleanUname,
+              display_name: cached.display_name || cleanUname,
+              avatar_url: cached.avatar_url
+            }
+          });
+        }
       }
     },
     [storiesMap]
@@ -223,11 +287,12 @@ export function StoryProvider({ children }) {
     >
       {children}
 
-      {/* Global Story Player Modal */}
+      {/* Global Multi-Story Player Modal */}
       {activeStoryModal && (
         <StoryPlayerModal
           isOpen={Boolean(activeStoryModal)}
           onClose={closeStory}
+          stories={activeStoryModal.stories || (activeStoryModal.story ? [activeStoryModal.story] : [])}
           story={activeStoryModal.story}
           creator={activeStoryModal.creator}
         />

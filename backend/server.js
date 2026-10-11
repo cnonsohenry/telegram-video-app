@@ -760,9 +760,9 @@ app.post("/api/stories/push", upload.single("video"), async (req, res) => {
     );
     const creatorId = userRes.rows.length > 0 ? userRes.rows[0].id : null;
 
-    // 4. Archive previous active stories for this creator
+    // 4. Archive genuinely expired stories for this creator
     await pool.query(
-      "UPDATE creator_stories SET is_active = FALSE WHERE LOWER(username) = LOWER($1)",
+      "UPDATE creator_stories SET is_active = FALSE WHERE LOWER(username) = LOWER($1) AND expires_at <= NOW()",
       [username]
     );
 
@@ -815,8 +815,7 @@ app.get("/api/stories/active", async (req, res) => {
     let activeRes;
     if (currentUserId) {
       activeRes = await pool.query(
-        `SELECT DISTINCT ON (LOWER(s.username))
-                s.id, s.creator_id, s.username, s.video_url, s.thumbnail_url, 
+        `SELECT s.id, s.creator_id, s.username, s.video_url, s.thumbnail_url, 
                 s.duration, s.sound_title, s.created_at, s.expires_at,
                 COALESCE(u.display_name, s.username) as display_name,
                 COALESCE(u.avatar_url, '/assets/default-avatar.png') as avatar_url,
@@ -826,13 +825,12 @@ app.get("/api/stories/active", async (req, res) => {
          LEFT JOIN app_users u ON (s.creator_id = u.id OR LOWER(s.username) = LOWER(u.username))
          LEFT JOIN creator_story_views v ON (v.story_id = s.id AND v.user_id = $1)
          WHERE s.is_active = TRUE AND s.expires_at > NOW()
-         ORDER BY LOWER(s.username), s.created_at DESC`,
+         ORDER BY LOWER(s.username), s.created_at ASC`,
         [currentUserId]
       );
     } else {
       activeRes = await pool.query(
-        `SELECT DISTINCT ON (LOWER(s.username))
-                s.id, s.creator_id, s.username, NULL as video_url, s.thumbnail_url, 
+        `SELECT s.id, s.creator_id, s.username, NULL as video_url, s.thumbnail_url, 
                 s.duration, s.sound_title, s.created_at, s.expires_at,
                 COALESCE(u.display_name, s.username) as display_name,
                 COALESCE(u.avatar_url, '/assets/default-avatar.png') as avatar_url,
@@ -842,12 +840,48 @@ app.get("/api/stories/active", async (req, res) => {
          FROM creator_stories s
          LEFT JOIN app_users u ON (s.creator_id = u.id OR LOWER(s.username) = LOWER(u.username))
          WHERE s.is_active = TRUE AND s.expires_at > NOW()
-         ORDER BY LOWER(s.username), s.created_at DESC`
+         ORDER BY LOWER(s.username), s.created_at ASC`
       );
     }
 
+    // Group stories by creator
+    const creatorsMap = {};
+    activeRes.rows.forEach(row => {
+      const uname = String(row.username || '').toLowerCase();
+      if (!creatorsMap[uname]) {
+        creatorsMap[uname] = {
+          creator_id: row.creator_id,
+          username: row.username,
+          display_name: row.display_name,
+          avatar_url: row.avatar_url,
+          is_verified: row.is_verified,
+          stories: [],
+          has_viewed_all: true
+        };
+      }
+      creatorsMap[uname].stories.push({
+        id: row.id,
+        creator_id: row.creator_id,
+        username: row.username,
+        display_name: row.display_name,
+        avatar_url: row.avatar_url,
+        video_url: row.video_url,
+        thumbnail_url: row.thumbnail_url,
+        duration: Number(row.duration || 10),
+        sound_title: row.sound_title,
+        created_at: row.created_at,
+        expires_at: row.expires_at,
+        has_viewed: Boolean(row.has_viewed),
+        requires_auth: Boolean(row.requires_auth)
+      });
+      if (!row.has_viewed) {
+        creatorsMap[uname].has_viewed_all = false;
+      }
+    });
+
     return res.json({
-      count: activeRes.rows.length,
+      count: Object.keys(creatorsMap).length,
+      creators: Object.values(creatorsMap),
       stories: activeRes.rows
     });
   } catch (err) {
