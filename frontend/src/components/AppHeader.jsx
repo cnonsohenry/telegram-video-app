@@ -188,12 +188,9 @@ export default function AppHeader({
     if (!term) return;
     setSearchTerm(term);
     saveSearchHistory(term);
-    if (onSearchSubmit) {
-      isSearchOpenRef.current = false;
-      setIsSearchOpen(false);
+    setHasSubmittedSearch(true);
+    if (typeof onSearchSubmit === 'function') {
       onSearchSubmit(term);
-    } else {
-      setHasSubmittedSearch(true); 
     }
   };
 
@@ -209,15 +206,10 @@ export default function AppHeader({
     const term = (searchTerm || "").trim();
     if (term) {
       saveSearchHistory(term);
-      if (onSearchSubmit) {
-        isSearchOpenRef.current = false;
-        setIsSearchOpen(false);
+      setHasSubmittedSearch(true);
+      if (typeof onSearchSubmit === 'function') {
         onSearchSubmit(term);
-      } else {
-        setHasSubmittedSearch(true);
       }
-    } else {
-      handleCloseSearch();
     }
   };
 

@@ -2035,6 +2035,7 @@ app.get("/api/search", async (req, res) => {
 
     const cleanQ = q.replace(/^@/, "").trim();
     const searchParam = `%${cleanQ}%`;
+    const tokens = cleanQ.split(/\s+/).filter(w => w.length > 0);
 
     let formattedCreators = [];
     let formattedVideos = [];
@@ -2046,6 +2047,23 @@ app.get("/api/search", async (req, res) => {
     if (shouldSearchCreators) {
       const creatorLimit = type === "creators" ? limit : 8;
       const creatorOffset = type === "creators" ? offset : 0;
+
+      const creatorParams = [currentUserId, searchParam, cleanQ];
+      const creatorTokenConditions = [];
+
+      tokens.forEach(tok => {
+        creatorParams.push(`%${tok}%`);
+        const idx = creatorParams.length;
+        creatorTokenConditions.push(`CONCAT_WS(' ', u.username, u.display_name, u.creator_category, u.creator_bio) ILIKE $${idx}`);
+      });
+
+      const creatorMatchCondition = creatorTokenConditions.length > 0
+        ? `(${creatorTokenConditions.join(" AND ")})`
+        : `CONCAT_WS(' ', u.username, u.display_name, u.creator_category, u.creator_bio) ILIKE $2`;
+
+      const cLimitIdx = creatorParams.length + 1;
+      const cOffsetIdx = creatorParams.length + 2;
+      creatorParams.push(creatorLimit, creatorOffset);
 
       const creatorQuery = `
         SELECT u.id, u.username, u.display_name, 
@@ -2084,24 +2102,19 @@ app.get("/api/search", async (req, res) => {
           OR u.email LIKE 'tg_%@internal.naijahomemade.com' 
           OR (u.telegram_user_id IS NOT NULL AND (u.telegram_user_id > 10000000 OR u.telegram_user_id < 0))
         )
-        AND (u.username ILIKE $2 OR u.display_name ILIKE $2 OR u.creator_category ILIKE $2 OR u.creator_bio ILIKE $2)
+        AND (${creatorMatchCondition})
         ORDER BY 
           CASE WHEN LOWER(u.username) = LOWER($3) THEN 1
                WHEN LOWER(u.username) LIKE LOWER($3) || '%' THEN 2
                WHEN LOWER(COALESCE(u.display_name, '')) = LOWER($3) THEN 3
-               ELSE 4
+               WHEN CONCAT_WS(' ', u.username, u.display_name) ILIKE $2 THEN 4
+               ELSE 5
           END,
           followers_count DESC, video_count DESC, u.id DESC
-        LIMIT $4 OFFSET $5
+        LIMIT $${cLimitIdx} OFFSET $${cOffsetIdx}
       `;
 
-      const creatorRes = await pool.query(creatorQuery, [
-        currentUserId, 
-        searchParam, 
-        cleanQ, 
-        creatorLimit, 
-        creatorOffset
-      ]);
+      const creatorRes = await pool.query(creatorQuery, creatorParams);
 
       formattedCreators = creatorRes.rows.map(c => ({
         id: c.id,
@@ -2127,6 +2140,23 @@ app.get("/api/search", async (req, res) => {
       const isCommunity = req.query.community === "true" || req.query.category === "community";
       const communityCondition = isCommunity ? "v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND (au.is_banned IS NOT TRUE OR au.is_banned IS NULL)" : "(v.is_community IS NOT TRUE)";
 
+      const videoParams = [searchParam]; // $1 = '%cleanQ%'
+      const videoTokenConditions = [];
+
+      tokens.forEach(tok => {
+        videoParams.push(`%${tok}%`);
+        const idx = videoParams.length;
+        videoTokenConditions.push(`CONCAT_WS(' ', v.caption, v.search_phrase, v.seo_description, v.category, au.username, au.display_name, u.username) ILIKE $${idx}`);
+      });
+
+      const videoMatchCondition = videoTokenConditions.length > 0
+        ? `(${videoTokenConditions.join(" AND ")})`
+        : `CONCAT_WS(' ', v.caption, v.search_phrase, v.seo_description, v.category, au.username, au.display_name, u.username) ILIKE $1`;
+
+      const vLimitIdx = videoParams.length + 1;
+      const vOffsetIdx = videoParams.length + 2;
+      videoParams.push(limit, offset);
+
       const searchQuery = `
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
@@ -2136,12 +2166,20 @@ app.get("/api/search", async (req, res) => {
         LEFT JOIN users u ON v.uploader_id = u.user_id 
         LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
         WHERE ${communityCondition}
-          AND (v.caption ILIKE $1 OR u.username ILIKE $1 OR au.username ILIKE $1 OR au.display_name ILIKE $1)
-        ORDER BY v.created_at DESC 
-        LIMIT $2 OFFSET $3
+          AND (${videoMatchCondition})
+        ORDER BY 
+          CASE 
+            WHEN v.caption ILIKE $1 THEN 1
+            WHEN v.search_phrase ILIKE $1 THEN 2
+            WHEN CONCAT_WS(' ', v.caption, v.search_phrase) ILIKE $1 THEN 3
+            ELSE 4
+          END,
+          v.views DESC,
+          v.created_at DESC 
+        LIMIT $${vLimitIdx} OFFSET $${vOffsetIdx}
       `;
       
-      const { rows } = await pool.query(searchQuery, [searchParam, limit, offset]);
+      const { rows } = await pool.query(searchQuery, videoParams);
       formattedVideos = rows.map(v => mapVideoToResponse(v, apiBaseUrl));
     }
 
