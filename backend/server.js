@@ -327,6 +327,17 @@ async function initDatabase() {
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_comments_message_id_created_at ON comments (message_id, created_at DESC)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments (user_id)`);
 
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS comment_likes (
+          user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          comment_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(user_id, comment_id)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_comment_likes_comment_id ON comment_likes (comment_id)`);
+      await pool.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0`);
+
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS likes_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS comments_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS shares_count BIGINT DEFAULT 0`);
@@ -2384,17 +2395,77 @@ app.post("/api/comments", authenticateToken, async (req, res) => {
 app.get("/api/comments/:message_id", async (req, res) => {
   try {
     const { message_id } = req.params;
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const decoded = jwt.verify(authHeader.split(" ")[1], JWT_SECRET);
+        userId = decoded.id;
+      } catch (e) {}
+    }
+
     const { rows } = await pool.query(`
-      SELECT c.id, c.content, c.created_at, u.username, u.avatar_url 
+      SELECT 
+        c.id, 
+        c.content, 
+        c.created_at, 
+        COALESCE(c.likes_count, 0) as likes_count,
+        u.username, 
+        u.avatar_url,
+        ${userId ? `EXISTS(SELECT 1 FROM comment_likes cl WHERE cl.comment_id = c.id AND cl.user_id = $2) AS user_liked` : `false AS user_liked`}
       FROM comments c
       LEFT JOIN app_users u ON c.user_id = u.id
       WHERE c.message_id = $1
       ORDER BY c.created_at DESC
       LIMIT 100
-    `, [message_id]);
+    `, userId ? [message_id, userId] : [message_id]);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch comments" });
+  }
+});
+
+app.post("/api/comments/:comment_id/like", authenticateToken, async (req, res) => {
+  try {
+    const { comment_id } = req.params;
+    const user_id = req.user.id;
+
+    const existing = await pool.query(
+      "SELECT 1 FROM comment_likes WHERE user_id = $1 AND comment_id = $2",
+      [user_id, comment_id]
+    );
+
+    let user_liked = false;
+    if (existing.rows.length > 0) {
+      await pool.query(
+        "DELETE FROM comment_likes WHERE user_id = $1 AND comment_id = $2",
+        [user_id, comment_id]
+      );
+      await pool.query(
+        "UPDATE comments SET likes_count = GREATEST(0, COALESCE(likes_count, 1) - 1) WHERE id = $1",
+        [comment_id]
+      );
+      user_liked = false;
+    } else {
+      await pool.query(
+        "INSERT INTO comment_likes (user_id, comment_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [user_id, comment_id]
+      );
+      await pool.query(
+        "UPDATE comments SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = $1",
+        [comment_id]
+      );
+      user_liked = true;
+    }
+
+    const updated = await pool.query(
+      "SELECT COALESCE(likes_count, 0) as likes_count FROM comments WHERE id = $1",
+      [comment_id]
+    );
+    res.json({ success: true, user_liked, likes_count: Number(updated.rows[0]?.likes_count || 0) });
+  } catch (err) {
+    console.error("Failed to like comment:", err);
+    res.status(500).json({ error: "Failed to toggle comment like" });
   }
 });
 

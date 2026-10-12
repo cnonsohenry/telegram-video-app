@@ -208,15 +208,13 @@ const modalBackdrop = {
 };
 
 const modalBox = {
-  background: "#000000",
-  borderTop: "1px solid #2f3336",
-  borderLeft: "1px solid #2f3336",
-  borderRight: "1px solid #2f3336",
+  background: "#18181b",
+  border: "none",
   borderRadius: "24px 24px 0 0",
   width: "100%",
   maxWidth: "480px",
   padding: "10px 18px max(24px, env(safe-area-inset-bottom, 24px))",
-  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.85)",
   boxSizing: "border-box",
   maxHeight: "88vh",
   overflowY: "auto",
@@ -286,8 +284,8 @@ const reasonOption = {
 
 const detailsTextarea = {
   width: "100%",
-  background: "#16181c",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
+  background: "#27272a",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
   borderRadius: "8px",
   padding: "10px 12px",
   color: "#ffffff",
@@ -306,8 +304,8 @@ const actionRow = {
 };
 
 const cancelBtn = {
-  background: "transparent",
-  border: "1px solid rgba(255, 255, 255, 0.15)",
+  background: "#27272a",
+  border: "none",
   color: "#ffffff",
   padding: "11px 20px",
   borderRadius: "9999px",

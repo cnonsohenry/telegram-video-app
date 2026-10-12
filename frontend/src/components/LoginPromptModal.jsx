@@ -181,10 +181,8 @@ const overlayStyle = {
 const cardStyle = {
   width: "100%",
   maxWidth: "480px",
-  backgroundColor: "#000000",
-  borderTop: "1px solid #2f3336",
-  borderLeft: "1px solid #2f3336",
-  borderRight: "1px solid #2f3336",
+  backgroundColor: "#18181b",
+  border: "none",
   borderRadius: "24px 24px 0 0",
   padding: "10px 20px max(24px, env(safe-area-inset-bottom, 24px))",
   boxSizing: "border-box",
@@ -193,7 +191,7 @@ const cardStyle = {
   alignItems: "center",
   textAlign: "center",
   position: "relative",
-  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.85)",
   animation: "loginSheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
 };
 
@@ -264,8 +262,8 @@ const perksRowStyle = {
 };
 
 const perkPillStyle = {
-  background: "#16181c",
-  border: "1px solid #2f3336",
+  background: "#27272a",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
   borderRadius: "100px",
   padding: "5px 12px",
   fontSize: "11.5px",
@@ -305,9 +303,9 @@ const secondaryBtnStyle = {
   width: "100%",
   padding: "13px",
   borderRadius: "9999px",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
-  background: "rgba(255, 255, 255, 0.04)",
-  color: "#8e8e93",
+  border: "none",
+  background: "#27272a",
+  color: "#ffffff",
   fontSize: "14px",
   fontWeight: "600",
   cursor: "pointer",

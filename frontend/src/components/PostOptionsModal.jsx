@@ -207,8 +207,8 @@ export default function PostOptionsModal({
             type="button" 
             style={cancelBtnStyle} 
             onClick={handleSafeClose}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)"}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#323236"}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#27272a"}
           >
             Cancel
           </button>
@@ -246,15 +246,13 @@ const overlayStyle = {
 const sheetStyle = {
   width: "100%",
   maxWidth: "460px",
-  backgroundColor: "#000000",
-  borderTop: "1px solid #2f3336",
-  borderLeft: "1px solid #2f3336",
-  borderRight: "1px solid #2f3336",
+  backgroundColor: "#18181b",
+  border: "none",
   borderRadius: "22px 22px 0 0",
   padding: "10px 14px max(20px, env(safe-area-inset-bottom, 20px))",
   boxSizing: "border-box",
   animation: "sheetSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1)",
-  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.85)",
   display: "flex",
   flexDirection: "column"
 };
@@ -325,8 +323,8 @@ const cancelBtnStyle = {
   width: "100%",
   padding: "14px",
   borderRadius: "9999px",
-  backgroundColor: "rgba(255, 255, 255, 0.08)",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
+  backgroundColor: "#27272a",
+  border: "none",
   color: "#ffffff",
   fontSize: "15px",
   fontWeight: "700",

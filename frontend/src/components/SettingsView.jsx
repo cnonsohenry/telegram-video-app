@@ -577,8 +577,8 @@ export default function SettingsView({
               <button 
                 style={logoutSheetCancelBtn} 
                 onClick={handleCloseLogoutConfirm}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.12)"}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)"}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#323236"}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#27272a"}
               >
                 Cancel
               </button>
@@ -645,7 +645,7 @@ const ModalSheet = ({ title, onClose, children }) => (
       <div style={dragHandleWrapper}>
         <div style={dragHandlePill} />
       </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", borderBottom: "1px solid #222", paddingBottom: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "10px" }}>
         <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#fff", margin: 0 }}>{title}</h3>
         <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer", padding: "6px", color: "#8e8e93", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <X size={18} />
@@ -801,16 +801,14 @@ const modalOverlayStyle = {
 const modalContentStyle = {
   width: "100%",
   maxWidth: "480px",
-  backgroundColor: "#000000",
-  borderTop: "1px solid #2f3336",
-  borderLeft: "1px solid #2f3336",
-  borderRight: "1px solid #2f3336",
+  backgroundColor: "#18181b",
+  border: "none",
   borderRadius: "24px 24px 0 0",
   padding: "10px 18px max(24px, env(safe-area-inset-bottom, 24px))",
   boxSizing: "border-box",
   maxHeight: "85vh",
   overflowY: "auto",
-  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.85)",
   animation: "slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
 };
 
@@ -835,9 +833,9 @@ const modalToggleRow = {
   alignItems: "center",
   justifyContent: "space-between",
   padding: "10px 12px",
-  backgroundColor: "#121214",
+  backgroundColor: "#27272a",
   borderRadius: "10px",
-  border: "1px solid #222"
+  border: "1px solid rgba(255, 255, 255, 0.06)"
 };
 
 const subItemCard = {
@@ -845,16 +843,16 @@ const subItemCard = {
   alignItems: "center",
   justifyContent: "space-between",
   padding: "10px 12px",
-  backgroundColor: "#121214",
+  backgroundColor: "#27272a",
   borderRadius: "10px",
-  border: "1px solid #222"
+  border: "1px solid rgba(255, 255, 255, 0.06)"
 };
 
 const viewChannelBtn = {
   padding: "5px 12px",
   borderRadius: "14px",
-  backgroundColor: "#222",
-  border: "1px solid #333",
+  backgroundColor: "#323236",
+  border: "none",
   color: "#fff",
   fontSize: "12px",
   fontWeight: "600",
@@ -862,8 +860,8 @@ const viewChannelBtn = {
 };
 
 const cryptoChip = {
-  backgroundColor: "#18181a",
-  border: "1px solid #2a2a2a",
+  backgroundColor: "#27272a",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
   borderRadius: "6px",
   padding: "3px 8px",
   fontSize: "11.5px",
@@ -874,15 +872,13 @@ const cryptoChip = {
 const logoutSheetStyle = {
   width: "100%",
   maxWidth: "460px",
-  backgroundColor: "#000000",
-  borderTop: "1px solid #2f3336",
-  borderLeft: "1px solid #2f3336",
-  borderRight: "1px solid #2f3336",
+  backgroundColor: "#18181b",
+  border: "none",
   borderRadius: "24px 24px 0 0",
   padding: "10px 18px max(24px, env(safe-area-inset-bottom, 24px))",
   textAlign: "center",
   boxSizing: "border-box",
-  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.8)",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.85)",
   animation: "slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
 };
 
@@ -925,8 +921,8 @@ const logoutSheetCancelBtn = {
   width: "100%",
   padding: "13px",
   borderRadius: "9999px",
-  border: "1px solid rgba(255, 255, 255, 0.14)",
-  backgroundColor: "rgba(255, 255, 255, 0.06)",
+  border: "none",
+  backgroundColor: "#27272a",
   color: "#ffffff",
   fontWeight: "700",
   fontSize: "15px",
