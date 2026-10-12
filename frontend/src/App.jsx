@@ -109,6 +109,7 @@ export default function App() {
 
   useEffect(() => {
     activeTabRef.current = activeTab;
+    window.__activeTab = activeTab;
     // Reset footer to visible whenever the user switches tabs!
     setIsFooterVisible(true);
   }, [activeTab]);

@@ -2381,11 +2381,36 @@ app.post("/api/comments", authenticateToken, async (req, res) => {
 
     if (!content || !content.trim()) return res.status(400).json({ error: "Comment cannot be empty" });
 
-    const parentIdVal = parent_id ? parseInt(parent_id, 10) : null;
+    let parentIdVal = parent_id ? parseInt(parent_id, 10) : null;
+    let cleanContent = content.trim();
+
+    // If no parent_id was explicitly provided, infer parent_id from leading @mention
+    if (!parentIdVal && cleanContent.startsWith("@")) {
+      const match = cleanContent.match(/^@([a-zA-Z0-9_]+)\s*/);
+      if (match) {
+        const targetUsername = match[1];
+        const parentLookup = await pool.query(`
+          SELECT c.id FROM comments c 
+          JOIN app_users u ON c.user_id = u.id 
+          WHERE c.message_id = $1 AND LOWER(u.username) = LOWER($2) AND c.parent_id IS NULL
+          ORDER BY c.created_at DESC LIMIT 1
+        `, [message_id, targetUsername]);
+        if (parentLookup.rows.length > 0) {
+          parentIdVal = parentLookup.rows[0].id;
+        }
+      }
+    }
+
+    // Since replies are nested under their parent comment, strip leading @mention from reply content
+    if (parentIdVal && cleanContent.startsWith("@")) {
+      cleanContent = cleanContent.replace(/^@\w+\s*/, "").trim();
+    }
+
+    if (!cleanContent) return res.status(400).json({ error: "Comment cannot be empty" });
 
     const result = await pool.query(
       "INSERT INTO comments (user_id, message_id, content, parent_id) VALUES ($1, $2, $3, $4) RETURNING *",
-      [user_id, message_id, content.trim(), parentIdVal]
+      [user_id, message_id, cleanContent, parentIdVal]
     );
     await pool.query("UPDATE videos SET comments_count = comments_count + 1 WHERE message_id=$1", [message_id]);
     

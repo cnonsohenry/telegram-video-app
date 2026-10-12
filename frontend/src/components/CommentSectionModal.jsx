@@ -68,13 +68,23 @@ export function generateSearchPhrase(video) {
   return categoryFallbacks[category] || (category ? `${category} trending viral` : "nigerian viral dance");
 }
 
+export function stripParentMention(content, parentUsername) {
+  if (!content || typeof content !== "string") return "";
+  let text = content;
+  if (parentUsername) {
+    const escaped = parentUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    text = text.replace(new RegExp(`^@${escaped}\\s*`, 'i'), '');
+  }
+  return text.replace(/^@\w+\s*/, '');
+}
+
 export default function CommentSectionModal({ video, onClose }) {
   const [comments, setComments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   const [expandedReplies, setExpandedReplies] = useState(() => new Set());
-  const [replyingTo, setReplyingTo] = useState(null); // { parentId, username, targetCommentId }
+  const [replyingTo, setReplyingTo] = useState(null); // { parentId, username, displayName, targetCommentId }
   const listRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -117,18 +127,20 @@ export default function CommentSectionModal({ video, onClose }) {
     const repliesMap = new Map();
 
     comments.forEach(c => {
-      if (c.parent_id) {
-        if (!repliesMap.has(c.parent_id)) {
-          repliesMap.set(c.parent_id, []);
+      const pid = c.parent_id ? String(c.parent_id) : null;
+      if (pid) {
+        if (!repliesMap.has(pid)) {
+          repliesMap.set(pid, []);
         }
-        repliesMap.get(c.parent_id).push(c);
+        repliesMap.get(pid).push(c);
       } else {
         parents.push({ ...c, replies: [] });
       }
     });
 
     parents.forEach(p => {
-      const threadReplies = repliesMap.get(p.id) || [];
+      const pKey = String(p.id);
+      const threadReplies = repliesMap.get(pKey) || [];
       threadReplies.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       p.replies = threadReplies;
     });
@@ -149,6 +161,10 @@ export default function CommentSectionModal({ video, onClose }) {
     setIsPosting(true);
 
     const parentIdToSend = replyingTo ? replyingTo.parentId : null;
+    let commentTextToSend = newComment.trim();
+    if (parentIdToSend && commentTextToSend.startsWith("@")) {
+      commentTextToSend = commentTextToSend.replace(/^@\w+\s*/, "").trim();
+    }
 
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/comments`, {
@@ -156,7 +172,7 @@ export default function CommentSectionModal({ video, onClose }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ 
           message_id: video.message_id, 
-          content: newComment,
+          content: commentTextToSend,
           parent_id: parentIdToSend
         })
       });
@@ -167,7 +183,7 @@ export default function CommentSectionModal({ video, onClose }) {
           setNewComment("");
           if (parentIdToSend) {
             // Automatically expand reply thread so author sees their reply
-            setExpandedReplies(prev => new Set(prev).add(parentIdToSend));
+            setExpandedReplies(prev => new Set(prev).add(String(parentIdToSend)));
           }
           setReplyingTo(null);
           window.dispatchEvent(new CustomEvent("commentAdded", { 
@@ -183,7 +199,7 @@ export default function CommentSectionModal({ video, onClose }) {
   };
 
   const handleReplyClick = (targetComment, isChild = false, parentId = null) => {
-    if (!targetComment?.username) return;
+    if (!targetComment) return;
     const rootParentId = isChild ? parentId : targetComment.id;
     setReplyingTo({
       parentId: rootParentId,
@@ -191,11 +207,7 @@ export default function CommentSectionModal({ video, onClose }) {
       displayName: targetComment.display_name || targetComment.username,
       targetCommentId: targetComment.id
     });
-    const replyPrefix = `@${targetComment.username} `;
-    setNewComment(prev => {
-      if (prev.startsWith(replyPrefix)) return prev;
-      return `${replyPrefix}${prev.replace(/^@\w+\s*/, "")}`;
-    });
+    // Do NOT prepend @username to the input text since replies are nested
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -203,16 +215,16 @@ export default function CommentSectionModal({ video, onClose }) {
 
   const handleCancelReply = () => {
     setReplyingTo(null);
-    setNewComment(prev => prev.replace(/^@\w+\s*/, ""));
   };
 
   const toggleReplies = (parentId) => {
+    const idKey = String(parentId);
     setExpandedReplies(prev => {
       const next = new Set(prev);
-      if (next.has(parentId)) {
-        next.delete(parentId);
+      if (next.has(idKey)) {
+        next.delete(idKey);
       } else {
-        next.add(parentId);
+        next.add(idKey);
       }
       return next;
     });
@@ -304,16 +316,16 @@ export default function CommentSectionModal({ video, onClose }) {
               onClick={handleSearchPhraseClick}
               role="button"
               tabIndex={0}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)"}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(0, 175, 240, 0.12)"}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)"}
             >
               <div style={searchPhraseLeftStyle}>
-                <Search size={14} color="#a1a1aa" style={{ flexShrink: 0 }} />
+                <Search size={14} color="#00aff0" style={{ flexShrink: 0 }} />
                 <span style={searchPhraseLabelStyle}>Search</span>
                 <span style={searchPhraseDotStyle}>•</span>
                 <span style={searchPhraseTextStyle}>{searchPhrase}</span>
               </div>
-              <ChevronRight size={15} color="#71767b" style={{ flexShrink: 0 }} />
+              <ChevronRight size={15} color="#00aff0" style={{ flexShrink: 0 }} />
             </div>
           )}
 
@@ -409,30 +421,25 @@ export default function CommentSectionModal({ video, onClose }) {
                       {/* 🟢 TIKTOK STACKED REPLIES & HIDE FEATURE */}
                       {p.replies && p.replies.length > 0 && (
                         <div style={repliesWrapperStyle}>
-                          {/* View / Hide Toggle Button */}
-                          <div style={repliesToggleRowStyle}>
-                            <div style={repliesLineDecorator} />
-                            <button 
-                              type="button"
-                              onClick={() => toggleReplies(p.id)}
-                              style={repliesToggleBtnStyle}
-                            >
-                              <span>
-                                {expandedReplies.has(p.id)
-                                  ? "Hide replies"
-                                  : `View ${p.replies.length} ${p.replies.length === 1 ? "reply" : "replies"}`
-                                }
-                              </span>
-                              {expandedReplies.has(p.id) ? (
-                                <ChevronUp size={13} color="#a1a1aa" />
-                              ) : (
+                          {/* View Replies Toggle Button (ONLY when collapsed) */}
+                          {!expandedReplies.has(String(p.id)) && (
+                            <div style={repliesToggleRowStyle}>
+                              <div style={repliesLineDecorator} />
+                              <button 
+                                type="button"
+                                onClick={() => toggleReplies(p.id)}
+                                style={repliesToggleBtnStyle}
+                              >
+                                <span>
+                                  {`View ${p.replies.length} ${p.replies.length === 1 ? "reply" : "replies"}`}
+                                </span>
                                 <ChevronDown size={13} color="#a1a1aa" />
-                              )}
-                            </button>
-                          </div>
+                              </button>
+                            </div>
+                          )}
 
                           {/* Expanded Nested Replies */}
-                          {expandedReplies.has(p.id) && (
+                          {expandedReplies.has(String(p.id)) && (
                             <div style={repliesThreadContainerStyle}>
                               {p.replies.map(reply => (
                                 <div key={reply.id} style={replyItemStyle}>
@@ -459,7 +466,7 @@ export default function CommentSectionModal({ video, onClose }) {
                                       {reply.display_name || reply.username}
                                     </span>
                                     <p style={{ ...commentText, fontSize: "13.5px" }}>
-                                      {renderClickableCaption(reply.content)}
+                                      {renderClickableCaption(stripParentMention(reply.content, p.username))}
                                     </p>
 
                                     {/* Reply Action Row */}
@@ -497,7 +504,7 @@ export default function CommentSectionModal({ video, onClose }) {
                                 </div>
                               ))}
 
-                              {/* Bottom Hide Replies Toggle for easy collapse */}
+                              {/* Bottom Hide Replies Toggle: ONLY place "Hide replies" appears */}
                               <div style={repliesBottomHideRowStyle}>
                                 <div style={repliesLineDecorator} />
                                 <button 
@@ -775,7 +782,7 @@ const searchPhraseDotStyle = {
 const searchPhraseTextStyle = {
   fontSize: "13.5px",
   fontWeight: "700",
-  color: "#ffffff",
+  color: "#00aff0",
   letterSpacing: "-0.2px",
   overflow: "hidden",
   textOverflow: "ellipsis",

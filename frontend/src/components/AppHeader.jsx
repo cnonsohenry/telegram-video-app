@@ -98,7 +98,7 @@ export default function AppHeader({
   useEffect(() => {
     const handleOpenSearchModal = (e) => {
       const currentState = window.history.state || {};
-      const currentTab = currentState.tab || (window.location.search.includes("tab=explore") ? "explore" : "home");
+      const currentTab = window.__activeTab || currentState.tab || (window.location.search.includes("tab=explore") ? "explore" : "home");
       if (!tab || currentTab === tab) {
         if (e?.detail?.query) {
           setSearchTerm(e.detail.query);
