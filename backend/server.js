@@ -326,6 +326,8 @@ async function initDatabase() {
 
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_comments_message_id_created_at ON comments (message_id, created_at DESC)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments (user_id)`);
+      await pool.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_comments_parent_id ON comments (parent_id)`);
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS comment_likes (
@@ -343,6 +345,7 @@ async function initDatabase() {
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS shares_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS saves_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS seo_description TEXT`);
+      await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS search_phrase TEXT`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS media_group_id TEXT`);
 
       await pool.query(`
@@ -2373,20 +2376,22 @@ app.post("/api/interactions/share", async (req, res) => {
 
 app.post("/api/comments", authenticateToken, async (req, res) => {
   try {
-    const { message_id, content } = req.body;
+    const { message_id, content, parent_id } = req.body;
     const user_id = req.user.id;
 
     if (!content || !content.trim()) return res.status(400).json({ error: "Comment cannot be empty" });
 
+    const parentIdVal = parent_id ? parseInt(parent_id, 10) : null;
+
     const result = await pool.query(
-      "INSERT INTO comments (user_id, message_id, content) VALUES ($1, $2, $3) RETURNING *",
-      [user_id, message_id, content.trim()]
+      "INSERT INTO comments (user_id, message_id, content, parent_id) VALUES ($1, $2, $3, $4) RETURNING *",
+      [user_id, message_id, content.trim(), parentIdVal]
     );
     await pool.query("UPDATE videos SET comments_count = comments_count + 1 WHERE message_id=$1", [message_id]);
     
-    const user = await pool.query("SELECT username, avatar_url FROM app_users WHERE id=$1", [user_id]);
+    const user = await pool.query("SELECT username, COALESCE(display_name, username) AS display_name, avatar_url FROM app_users WHERE id=$1", [user_id]);
     
-    res.json({ success: true, comment: { ...result.rows[0], ...user.rows[0] } });
+    res.json({ success: true, comment: { ...result.rows[0], ...user.rows[0], user_liked: false, likes_count: 0 } });
   } catch (err) {
     res.status(500).json({ error: "Failed to post comment" });
   }
@@ -2408,16 +2413,18 @@ app.get("/api/comments/:message_id", async (req, res) => {
       SELECT 
         c.id, 
         c.content, 
+        c.parent_id,
         c.created_at, 
         COALESCE(c.likes_count, 0) as likes_count,
         u.username, 
+        COALESCE(u.display_name, u.username) AS display_name,
         u.avatar_url,
         ${userId ? `EXISTS(SELECT 1 FROM comment_likes cl WHERE cl.comment_id = c.id AND cl.user_id = $2) AS user_liked` : `false AS user_liked`}
       FROM comments c
       LEFT JOIN app_users u ON c.user_id = u.id
       WHERE c.message_id = $1
-      ORDER BY c.created_at DESC
-      LIMIT 100
+      ORDER BY c.created_at ASC
+      LIMIT 250
     `, userId ? [message_id, userId] : [message_id]);
     res.json(rows);
   } catch (err) {

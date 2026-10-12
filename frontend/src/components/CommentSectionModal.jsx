@@ -1,15 +1,85 @@
-import React, { useState, useEffect, useRef } from "react";
-import { X, Send, Loader2, Heart } from "lucide-react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { X, Send, Loader2, Heart, Search, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { renderClickableCaption } from "./ClickableCaption";
+
+export function generateSearchPhrase(video) {
+  if (video?.search_phrase && typeof video.search_phrase === "string" && video.search_phrase.trim()) {
+    return video.search_phrase.trim().toLowerCase();
+  }
+
+  const caption = (video?.caption || "").trim();
+  const seo = (video?.seo_description || "").trim();
+  const category = (video?.category || "").toLowerCase().trim();
+
+  // 1. Hashtags
+  const hashtags = (caption.match(/#([a-zA-Z0-9_]+)/g) || []).map(h => h.slice(1).toLowerCase());
+  if (hashtags.length >= 2) {
+    return hashtags.slice(0, 3).join(" ");
+  } else if (hashtags.length === 1) {
+    return `${category || "nigerian"} ${hashtags[0]}`;
+  }
+
+  const fillerRegex = /\b(this|that|these|those|the|a|an|is|are|was|were|been|being|have|has|had|do|does|did|will|would|shall|should|can|could|may|might|must|you|your|yours|me|my|mine|we|us|our|ours|he|him|his|she|her|hers|it|its|they|them|their|theirs|think|handle|feel|feeling|know|want|see|watch|watching|look|looking|get|getting|got|and|or|but|if|then|else|when|where|why|how|all|any|both|each|few|more|most|other|some|such|no|nor|not|only|own|same|so|than|too|very|just|baby|babe|boo|dear|hey|hi|hello|peek|ready|press|play|video|clip|tape|homemade|captivating|unleashes|showcases|indulging|into|world|behind|doors|closed|night|unfolds|inner|couldn|didn|doesn|don|wasn|weren|haven|hasn|hadn|won|wouldn|ain|gonna|wanna|gotta)\b/gi;
+
+  const cleanCap = caption
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/@\w+/g, "")
+    .replace(/#\w+/g, "")
+    .replace(/['’]/g, "")
+    .replace(/[^\w\s]/gi, " ")
+    .replace(fillerRegex, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  const capWords = cleanCap.split(" ").filter(w => w.length > 2);
+  if (capWords.length >= 2) {
+    return capWords.slice(0, 3).join(" ");
+  }
+
+  if (seo) {
+    const cleanSeo = seo
+      .replace(/['’]/g, "")
+      .replace(/[^\w\s]/gi, " ")
+      .replace(fillerRegex, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    const seoWords = cleanSeo.split(" ").filter(w => w.length > 2);
+    if (seoWords.length >= 2) {
+      return seoWords.slice(0, 3).join(" ");
+    }
+  }
+
+  if (capWords.length === 1) {
+    return `${category || "nigerian"} ${capWords[0]}`;
+  }
+
+  const categoryFallbacks = {
+    baddies: "nigerian baddie dance",
+    afrobeat: "afrobeat music vibes",
+    premium: "vip exclusive tape",
+    model: "fashion glamour model",
+    fitness: "baddie fitness workout",
+    community: "viral nigerian moments"
+  };
+
+  return categoryFallbacks[category] || (category ? `${category} trending viral` : "nigerian viral dance");
+}
 
 export default function CommentSectionModal({ video, onClose }) {
   const [comments, setComments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
+  const [expandedReplies, setExpandedReplies] = useState(() => new Set());
+  const [replyingTo, setReplyingTo] = useState(null); // { parentId, username, targetCommentId }
   const listRef = useRef(null);
   const inputRef = useRef(null);
+
+  // 🟢 Generate TikTok-style search phrase for this video
+  const searchPhrase = useMemo(() => generateSearchPhrase(video), [video]);
 
   // 🟢 Lock background scroll so only the modal scrolls
   useEffect(() => {
@@ -41,12 +111,31 @@ export default function CommentSectionModal({ video, onClose }) {
     return () => { isMounted = false; };
   }, [video?.message_id]);
 
-  // 🟢 Scroll to top when a new comment is added
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = 0;
-    }
-  }, [comments.length]);
+  // 🟢 Structured top-level comments with stacked replies
+  const structuredComments = useMemo(() => {
+    const parents = [];
+    const repliesMap = new Map();
+
+    comments.forEach(c => {
+      if (c.parent_id) {
+        if (!repliesMap.has(c.parent_id)) {
+          repliesMap.set(c.parent_id, []);
+        }
+        repliesMap.get(c.parent_id).push(c);
+      } else {
+        parents.push({ ...c, replies: [] });
+      }
+    });
+
+    parents.forEach(p => {
+      const threadReplies = repliesMap.get(p.id) || [];
+      threadReplies.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      p.replies = threadReplies;
+    });
+
+    parents.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return parents;
+  }, [comments]);
 
   const handlePost = async (e) => {
     e.preventDefault();
@@ -59,17 +148,28 @@ export default function CommentSectionModal({ video, onClose }) {
     }
     setIsPosting(true);
 
+    const parentIdToSend = replyingTo ? replyingTo.parentId : null;
+
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message_id: video.message_id, content: newComment })
+        body: JSON.stringify({ 
+          message_id: video.message_id, 
+          content: newComment,
+          parent_id: parentIdToSend
+        })
       });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          setComments([data.comment, ...comments]);
+          setComments(prev => [...prev, data.comment]);
           setNewComment("");
+          if (parentIdToSend) {
+            // Automatically expand reply thread so author sees their reply
+            setExpandedReplies(prev => new Set(prev).add(parentIdToSend));
+          }
+          setReplyingTo(null);
           window.dispatchEvent(new CustomEvent("commentAdded", { 
             detail: { message_id: video.message_id, comment: data.comment } 
           }));
@@ -82,16 +182,40 @@ export default function CommentSectionModal({ video, onClose }) {
     setIsPosting(false);
   };
 
-  const handleReply = (username) => {
-    if (!username) return;
-    const replyPrefix = `@${username} `;
+  const handleReplyClick = (targetComment, isChild = false, parentId = null) => {
+    if (!targetComment?.username) return;
+    const rootParentId = isChild ? parentId : targetComment.id;
+    setReplyingTo({
+      parentId: rootParentId,
+      username: targetComment.username,
+      displayName: targetComment.display_name || targetComment.username,
+      targetCommentId: targetComment.id
+    });
+    const replyPrefix = `@${targetComment.username} `;
     setNewComment(prev => {
       if (prev.startsWith(replyPrefix)) return prev;
-      return `${replyPrefix}${prev}`;
+      return `${replyPrefix}${prev.replace(/^@\w+\s*/, "")}`;
     });
     if (inputRef.current) {
       inputRef.current.focus();
     }
+  };
+
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+    setNewComment(prev => prev.replace(/^@\w+\s*/, ""));
+  };
+
+  const toggleReplies = (parentId) => {
+    setExpandedReplies(prev => {
+      const next = new Set(prev);
+      if (next.has(parentId)) {
+        next.delete(parentId);
+      } else {
+        next.add(parentId);
+      }
+      return next;
+    });
   };
 
   const handleLikeComment = async (commentId) => {
@@ -138,6 +262,12 @@ export default function CommentSectionModal({ video, onClose }) {
     }
   };
 
+  const handleSearchPhraseClick = () => {
+    if (!searchPhrase) return;
+    onClose();
+    window.dispatchEvent(new CustomEvent("openSearchModal", { detail: { query: searchPhrase } }));
+  };
+
   const formatCommentDate = (dateStr) => {
     if (!dateStr) return "";
     const now = new Date();
@@ -167,7 +297,27 @@ export default function CommentSectionModal({ video, onClose }) {
             <div style={dragHandlePill} />
           </div>
 
-          {/* Header */}
+          {/* 🌟 TIKTOK SEARCH PHRASE PILL AT TOP OF COMMENT COUNT */}
+          {searchPhrase && (
+            <div 
+              style={searchPhraseBannerStyle}
+              onClick={handleSearchPhraseClick}
+              role="button"
+              tabIndex={0}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)"}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)"}
+            >
+              <div style={searchPhraseLeftStyle}>
+                <Search size={14} color="#a1a1aa" style={{ flexShrink: 0 }} />
+                <span style={searchPhraseLabelStyle}>Search</span>
+                <span style={searchPhraseDotStyle}>•</span>
+                <span style={searchPhraseTextStyle}>{searchPhrase}</span>
+              </div>
+              <ChevronRight size={15} color="#71767b" style={{ flexShrink: 0 }} />
+            </div>
+          )}
+
+          {/* Header with Comment Count */}
           <div style={commentHeaderWrapperStyle}>
             <h3 style={commentHeaderTitleStyle}>
               {comments.length > 0 ? comments.length : (video.comments_count || 0)} Comments
@@ -191,67 +341,179 @@ export default function CommentSectionModal({ video, onClose }) {
                   </div>
                 ))}
               </div>
-            ) : comments.length === 0 ? (
+            ) : structuredComments.length === 0 ? (
               <p style={{ textAlign: "center", color: "#8e8e93", marginTop: "30px", fontSize: "14px" }}>
                 No comments yet. Be the first to reply!
               </p>
             ) : (
-              comments.map(c => (
-                <div key={c.id} style={commentItemStyle}>
-                  <img 
-                    src={c.avatar_url || '/assets/default-avatar.png'} 
-                    alt="avatar" 
-                    style={commentAvatarStyle}
-                    onClick={() => {
-                      if (c.username) {
-                        window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: c.username }));
-                      }
-                    }} 
-                  />
-                  <div style={commentContentWrapper}>
-                    <span 
-                      style={{ ...commentUsernameStyle, cursor: "pointer" }}
+              structuredComments.map(p => (
+                <div key={p.id} style={commentItemContainerStyle}>
+                  {/* Top-Level Parent Comment */}
+                  <div style={commentItemStyle}>
+                    <img 
+                      src={p.avatar_url || '/assets/default-avatar.png'} 
+                      alt="avatar" 
+                      style={commentAvatarStyle}
                       onClick={() => {
-                        if (c.username) {
-                          window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: c.username }));
+                        if (p.username) {
+                          window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: p.username }));
                         }
-                      }}
-                      title={`View @${c.username}'s profile`}
-                    >
-                      @{c.username}
-                    </span>
-                    <p style={commentText}>{renderClickableCaption(c.content)}</p>
+                      }} 
+                    />
+                    <div style={commentContentWrapper}>
+                      <span 
+                        style={{ ...commentDisplayNameStyle, cursor: "pointer" }}
+                        onClick={() => {
+                          if (p.username) {
+                            window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: p.username }));
+                          }
+                        }}
+                        title={`View @${p.username}'s profile`}
+                      >
+                        {p.display_name || p.username}
+                      </span>
+                      <p style={commentText}>{renderClickableCaption(p.content)}</p>
 
-                    {/* Action Row: Date & Reply at extreme left, Like at extreme right */}
-                    <div style={commentActionRowStyle}>
-                      <div style={commentActionLeftStyle}>
-                        <span style={commentDateStyle}>{formatCommentDate(c.created_at)}</span>
+                      {/* Parent Action Row: Date & Reply at extreme left, Like at extreme right */}
+                      <div style={commentActionRowStyle}>
+                        <div style={commentActionLeftStyle}>
+                          <span style={commentDateStyle}>{formatCommentDate(p.created_at)}</span>
+                          <button 
+                            type="button" 
+                            onClick={() => handleReplyClick(p, false, p.id)} 
+                            style={commentReplyBtnStyle}
+                          >
+                            Reply
+                          </button>
+                        </div>
+
                         <button 
                           type="button" 
-                          onClick={() => handleReply(c.username)} 
-                          style={commentReplyBtnStyle}
+                          onClick={() => handleLikeComment(p.id)} 
+                          style={commentLikeBtnStyle}
+                          aria-label="Like comment"
                         >
-                          Reply
+                          <Heart 
+                            size={14} 
+                            color={p.user_liked ? "#ff2d55" : "#8e8e93"} 
+                            fill={p.user_liked ? "#ff2d55" : "none"} 
+                          />
+                          {Number(p.likes_count || 0) > 0 && (
+                            <span style={{ fontSize: "11.5px", color: p.user_liked ? "#ff2d55" : "#8e8e93", fontWeight: 600 }}>
+                              {p.likes_count}
+                            </span>
+                          )}
                         </button>
                       </div>
 
-                      <button 
-                        type="button" 
-                        onClick={() => handleLikeComment(c.id)} 
-                        style={commentLikeBtnStyle}
-                        aria-label="Like comment"
-                      >
-                        <Heart 
-                          size={14} 
-                          color={c.user_liked ? "#ff2d55" : "#8e8e93"} 
-                          fill={c.user_liked ? "#ff2d55" : "none"} 
-                        />
-                        {Number(c.likes_count || 0) > 0 && (
-                          <span style={{ fontSize: "11.5px", color: c.user_liked ? "#ff2d55" : "#8e8e93", fontWeight: 600 }}>
-                            {c.likes_count}
-                          </span>
-                        )}
-                      </button>
+                      {/* 🟢 TIKTOK STACKED REPLIES & HIDE FEATURE */}
+                      {p.replies && p.replies.length > 0 && (
+                        <div style={repliesWrapperStyle}>
+                          {/* View / Hide Toggle Button */}
+                          <div style={repliesToggleRowStyle}>
+                            <div style={repliesLineDecorator} />
+                            <button 
+                              type="button"
+                              onClick={() => toggleReplies(p.id)}
+                              style={repliesToggleBtnStyle}
+                            >
+                              <span>
+                                {expandedReplies.has(p.id)
+                                  ? "Hide replies"
+                                  : `View ${p.replies.length} ${p.replies.length === 1 ? "reply" : "replies"}`
+                                }
+                              </span>
+                              {expandedReplies.has(p.id) ? (
+                                <ChevronUp size={13} color="#a1a1aa" />
+                              ) : (
+                                <ChevronDown size={13} color="#a1a1aa" />
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Expanded Nested Replies */}
+                          {expandedReplies.has(p.id) && (
+                            <div style={repliesThreadContainerStyle}>
+                              {p.replies.map(reply => (
+                                <div key={reply.id} style={replyItemStyle}>
+                                  <img 
+                                    src={reply.avatar_url || '/assets/default-avatar.png'} 
+                                    alt="avatar" 
+                                    style={replyAvatarStyle}
+                                    onClick={() => {
+                                      if (reply.username) {
+                                        window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: reply.username }));
+                                      }
+                                    }} 
+                                  />
+                                  <div style={commentContentWrapper}>
+                                    <span 
+                                      style={{ ...commentDisplayNameStyle, fontSize: "12.5px", cursor: "pointer" }}
+                                      onClick={() => {
+                                        if (reply.username) {
+                                          window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: reply.username }));
+                                        }
+                                      }}
+                                      title={`View @${reply.username}'s profile`}
+                                    >
+                                      {reply.display_name || reply.username}
+                                    </span>
+                                    <p style={{ ...commentText, fontSize: "13.5px" }}>
+                                      {renderClickableCaption(reply.content)}
+                                    </p>
+
+                                    {/* Reply Action Row */}
+                                    <div style={commentActionRowStyle}>
+                                      <div style={commentActionLeftStyle}>
+                                        <span style={commentDateStyle}>{formatCommentDate(reply.created_at)}</span>
+                                        <button 
+                                          type="button" 
+                                          onClick={() => handleReplyClick(reply, true, p.id)} 
+                                          style={commentReplyBtnStyle}
+                                        >
+                                          Reply
+                                        </button>
+                                      </div>
+
+                                      <button 
+                                        type="button" 
+                                        onClick={() => handleLikeComment(reply.id)} 
+                                        style={commentLikeBtnStyle}
+                                        aria-label="Like reply"
+                                      >
+                                        <Heart 
+                                          size={13} 
+                                          color={reply.user_liked ? "#ff2d55" : "#8e8e93"} 
+                                          fill={reply.user_liked ? "#ff2d55" : "none"} 
+                                        />
+                                        {Number(reply.likes_count || 0) > 0 && (
+                                          <span style={{ fontSize: "11px", color: reply.user_liked ? "#ff2d55" : "#8e8e93", fontWeight: 600 }}>
+                                            {reply.likes_count}
+                                          </span>
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+
+                              {/* Bottom Hide Replies Toggle for easy collapse */}
+                              <div style={repliesBottomHideRowStyle}>
+                                <div style={repliesLineDecorator} />
+                                <button 
+                                  type="button"
+                                  onClick={() => toggleReplies(p.id)}
+                                  style={repliesToggleBtnStyle}
+                                >
+                                  <span>Hide replies</span>
+                                  <ChevronUp size={13} color="#a1a1aa" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                     </div>
                   </div>
                 </div>
@@ -261,23 +523,42 @@ export default function CommentSectionModal({ video, onClose }) {
 
           {/* 🟢 COMPOSER: Permanently docked at the bottom with blended gray input */}
           <form onSubmit={handlePost} style={composerFormStyle}>
-            <input
-              ref={inputRef}
-              type="text"
-              value={newComment}
-              onChange={e => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
-              style={composerInputStyle}
-            />
-            <button
-              type="submit"
-              disabled={isPosting || !newComment.trim()}
-              onMouseDown={e => e.preventDefault()} 
-              onTouchStart={e => e.preventDefault()}
-              style={{ ...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1 }}
-            >
-              {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
-            </button>
+            {/* Replying Banner Indicator */}
+            {replyingTo && (
+              <div style={replyingBannerStyle}>
+                <span style={replyingBannerTextStyle}>
+                  Replying to <span style={{ color: "#ffffff", fontWeight: 700 }}>{replyingTo.displayName || replyingTo.username}</span>
+                </span>
+                <button 
+                  type="button" 
+                  onClick={handleCancelReply}
+                  style={cancelReplyBtnStyle}
+                  aria-label="Cancel reply"
+                >
+                  <X size={14} color="#8e8e93" />
+                </button>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", width: "100%" }}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                placeholder={replyingTo ? `Reply to ${replyingTo.displayName || replyingTo.username}...` : "Add a comment..."}
+                style={composerInputStyle}
+              />
+              <button
+                type="submit"
+                disabled={isPosting || !newComment.trim()}
+                onMouseDown={e => e.preventDefault()} 
+                onTouchStart={e => e.preventDefault()}
+                style={{ ...commentSendBtnStyle, opacity: !newComment.trim() ? 0.5 : 1 }}
+              >
+                {isPosting ? <Loader2 size={20} className="animate-spin" /> : <Send size={18} />}
+              </button>
+            </div>
           </form>
 
         </div>
@@ -371,7 +652,13 @@ const commentAvatarStyle = {
 
 const commentContentWrapper = { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 };
 
-const commentUsernameStyle = { fontSize: "13px", fontWeight: 700, color: "#aaa" };
+const commentDisplayNameStyle = { 
+  fontSize: "13.5px", 
+  fontWeight: "700", 
+  color: "#ffffff", 
+  letterSpacing: "-0.2px" 
+};
+const commentUsernameStyle = commentDisplayNameStyle;
 
 const commentText = {
   fontSize: "14px", color: "#e7e9ea",
@@ -448,4 +735,147 @@ const commentSendBtnStyle = {
   display: "flex", alignItems: "center", justifyContent: "center",
   color: "#fff", cursor: "pointer",
   transition: "opacity 0.2s ease", flexShrink: 0
+};
+
+// ─── TIKTOK SEARCH PHRASE BANNER STYLES ──────────────────────────────────────────
+
+const searchPhraseBannerStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  margin: "4px 16px 8px 16px",
+  padding: "9px 14px",
+  backgroundColor: "rgba(255, 255, 255, 0.05)",
+  borderRadius: "12px",
+  cursor: "pointer",
+  transition: "background-color 0.15s ease",
+  userSelect: "none"
+};
+
+const searchPhraseLeftStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis"
+};
+
+const searchPhraseLabelStyle = {
+  fontSize: "13px",
+  color: "#a1a1aa",
+  fontWeight: "500"
+};
+
+const searchPhraseDotStyle = {
+  fontSize: "13px",
+  color: "#71767b"
+};
+
+const searchPhraseTextStyle = {
+  fontSize: "13.5px",
+  fontWeight: "700",
+  color: "#ffffff",
+  letterSpacing: "-0.2px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap"
+};
+
+// ─── TIKTOK STACKED REPLIES & REPLY HIDE STYLES ─────────────────────────────────
+
+const commentItemContainerStyle = {
+  display: "flex",
+  flexDirection: "column"
+};
+
+const repliesWrapperStyle = {
+  marginTop: "6px"
+};
+
+const repliesToggleRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  marginTop: "4px"
+};
+
+const repliesLineDecorator = {
+  width: "24px",
+  height: "1px",
+  backgroundColor: "rgba(255, 255, 255, 0.18)"
+};
+
+const repliesToggleBtnStyle = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  fontSize: "12.5px",
+  fontWeight: "600",
+  color: "#a1a1aa",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "4px",
+  transition: "color 0.15s ease"
+};
+
+const repliesThreadContainerStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "14px",
+  marginTop: "12px",
+  paddingLeft: "14px",
+  marginLeft: "10px",
+  borderLeft: "1.5px solid rgba(255, 255, 255, 0.08)"
+};
+
+const replyItemStyle = {
+  display: "flex",
+  gap: "10px",
+  alignItems: "flex-start"
+};
+
+const replyAvatarStyle = {
+  width: "28px",
+  height: "28px",
+  borderRadius: "50%",
+  objectFit: "cover",
+  flexShrink: 0,
+  border: "1px solid rgba(255, 255, 255, 0.12)",
+  cursor: "pointer"
+};
+
+const repliesBottomHideRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  paddingTop: "4px"
+};
+
+// ─── COMPOSER REPLYING BANNER STYLES ────────────────────────────────────────────
+
+const replyingBannerStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  width: "100%",
+  padding: "4px 8px 8px 8px",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+  marginBottom: "8px"
+};
+
+const replyingBannerTextStyle = {
+  fontSize: "12px",
+  color: "#8e8e93"
+};
+
+const cancelReplyBtnStyle = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  padding: "2px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center"
 };
