@@ -519,10 +519,10 @@ export default function App() {
     }
   }, []);
 
-  const handleCloseComments = useCallback(() => {
+  const handleCloseComments = useCallback((isTransitioning = false) => {
     activeCommentVideoRef.current = null;
     setActiveCommentVideo(null);
-    if (window.history.state?.commentModal) {
+    if (!isTransitioning && window.history.state?.commentModal) {
       window.history.back();
     }
   }, []);

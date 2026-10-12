@@ -51,7 +51,13 @@ export default function AppHeader({
   const handleOpenSearch = () => {
     setIsSearchOpen(true);
     isSearchOpenRef.current = true;
-    if (!window.history.state?.searchOpen) {
+    const currentState = window.history.state || {};
+    if (currentState.commentModal) {
+      window.history.replaceState(
+        { ...currentState, commentModal: false, searchOpen: true },
+        document.title
+      );
+    } else if (!currentState.searchOpen) {
       window.history.pushState(
         { ...(window.history.state || {}), searchOpen: true },
         document.title
@@ -70,9 +76,9 @@ export default function AppHeader({
   useEffect(() => {
     const handleSearchPopState = (event) => {
       const state = event.state || {};
-      const currentTab = state.tab || (window.location.search.includes("tab=explore") ? "explore" : "home");
+      const currentTab = window.__activeTab || state.tab || (window.location.search.includes("tab=explore") ? "explore" : "home");
 
-      if (state.searchOpen && !state.videoPlayer && !state.creatorProfile) {
+      if (state.searchOpen) {
         if (!isSearchOpenRef.current && (!tab || currentTab === tab)) {
           isSearchOpenRef.current = true;
           setIsSearchOpen(true);
@@ -644,7 +650,7 @@ const avatarStyle = (isDesktop) => ({ width: isDesktop ? "36px" : "30px", height
 const loginBadgeStyle = { background: "var(--primary-color)", color: "#fff", padding: "6px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "800" };
 const mobileHeaderStyle = { zIndex: 100, padding: "12px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0a0a0a", borderBottom: "1px solid #262626" };
 
-const searchOverlayStyle = { position: "fixed", inset: 0, zIndex: 999999, background: "var(--bg-color)", display: "flex", flexDirection: "column", animation: "fadeIn 0.2s ease-out" };
+const searchOverlayStyle = { position: "fixed", inset: 0, zIndex: 1000100, background: "var(--bg-color)", display: "flex", flexDirection: "column", animation: "fadeIn 0.2s ease-out" };
 const overlayHeaderStyle = { display: "flex", alignItems: "center", gap: "12px", padding: "15px", borderBottom: "1px solid #222" };
 const iconBtnStyle = { background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex" };
 const activeSearchBarStyle = { display: "flex", alignItems: "center", background: "#1c1c1e", borderRadius: "8px", padding: "0 10px", flex: 1, height: "40px" };

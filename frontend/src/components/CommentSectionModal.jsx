@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { X, Send, Loader2, Heart, Search, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Send, Loader2, Heart, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { renderClickableCaption } from "./ClickableCaption";
 
@@ -276,7 +276,9 @@ export default function CommentSectionModal({ video, onClose }) {
 
   const handleSearchPhraseClick = () => {
     if (!searchPhrase) return;
-    onClose();
+    if (typeof onClose === "function") {
+      onClose(true);
+    }
     window.dispatchEvent(new CustomEvent("openSearchModal", { detail: { query: searchPhrase } }));
   };
 
@@ -309,23 +311,26 @@ export default function CommentSectionModal({ video, onClose }) {
             <div style={dragHandlePill} />
           </div>
 
-          {/* 🌟 TIKTOK SEARCH PHRASE PILL AT TOP OF COMMENT COUNT */}
+          {/* 🌟 TIKTOK SEARCH PHRASE AT TOP OF COMMENT COUNT */}
           {searchPhrase && (
             <div 
-              style={searchPhraseBannerStyle}
+              style={searchPhraseRowStyle}
               onClick={handleSearchPhraseClick}
               role="button"
               tabIndex={0}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(0, 175, 240, 0.12)"}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)"}
+              onMouseEnter={(e) => {
+                const textEl = e.currentTarget.querySelector(".search-phrase-text");
+                if (textEl) textEl.style.textDecoration = "underline";
+              }}
+              onMouseLeave={(e) => {
+                const textEl = e.currentTarget.querySelector(".search-phrase-text");
+                if (textEl) textEl.style.textDecoration = "none";
+              }}
             >
-              <div style={searchPhraseLeftStyle}>
-                <Search size={14} color="#00aff0" style={{ flexShrink: 0 }} />
-                <span style={searchPhraseLabelStyle}>Search</span>
-                <span style={searchPhraseDotStyle}>•</span>
-                <span style={searchPhraseTextStyle}>{searchPhrase}</span>
-              </div>
-              <ChevronRight size={15} color="#00aff0" style={{ flexShrink: 0 }} />
+              <Search size={14} color="#00aff0" style={{ flexShrink: 0 }} />
+              <span style={searchPhraseLabelStyle}>Search</span>
+              <span style={searchPhraseDotStyle}>•</span>
+              <span className="search-phrase-text" style={searchPhraseTextStyle}>{searchPhrase}</span>
             </div>
           )}
 
@@ -637,10 +642,17 @@ const commentHeaderWrapperStyle = {
 const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, color: "#fff" };
 
 const closeBottomSheetBtnStyle = {
-  background: "rgba(255, 255, 255, 0.08)", border: "none", borderRadius: "50%",
-  width: "32px", height: "32px",
-  display: "flex", alignItems: "center", justifyContent: "center",
-  cursor: "pointer", transition: "background 0.2s", flexShrink: 0
+  background: "none",
+  backgroundColor: "transparent",
+  border: "none",
+  padding: "4px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  transition: "opacity 0.2s",
+  flexShrink: 0,
+  opacity: 0.85
 };
 
 const commentsListStyle = {
@@ -744,28 +756,20 @@ const commentSendBtnStyle = {
   transition: "opacity 0.2s ease", flexShrink: 0
 };
 
-// ─── TIKTOK SEARCH PHRASE BANNER STYLES ──────────────────────────────────────────
+// ─── TIKTOK SEARCH PHRASE STYLES (UNBOXED) ───────────────────────────────────
 
-const searchPhraseBannerStyle = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  margin: "4px 16px 8px 16px",
-  padding: "9px 14px",
-  backgroundColor: "rgba(255, 255, 255, 0.05)",
-  borderRadius: "12px",
-  cursor: "pointer",
-  transition: "background-color 0.15s ease",
-  userSelect: "none"
-};
-
-const searchPhraseLeftStyle = {
-  display: "flex",
+const searchPhraseRowStyle = {
+  display: "inline-flex",
   alignItems: "center",
   gap: "6px",
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis"
+  margin: "4px 20px 8px 20px",
+  padding: "2px 0",
+  background: "none",
+  backgroundColor: "transparent",
+  border: "none",
+  cursor: "pointer",
+  userSelect: "none",
+  width: "fit-content"
 };
 
 const searchPhraseLabelStyle = {
@@ -786,7 +790,8 @@ const searchPhraseTextStyle = {
   letterSpacing: "-0.2px",
   overflow: "hidden",
   textOverflow: "ellipsis",
-  whiteSpace: "nowrap"
+  whiteSpace: "nowrap",
+  transition: "text-decoration 0.15s ease"
 };
 
 // ─── TIKTOK STACKED REPLIES & REPLY HIDE STYLES ─────────────────────────────────
