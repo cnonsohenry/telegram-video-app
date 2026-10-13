@@ -980,6 +980,9 @@ export default function Explore({
     return params.get("q") || "";
   });
 
+  // 🟢 Isolated search term for AppHeader portal modal to prevent overriding Explore For You timeline
+  const [headerSearchTerm, setHeaderSearchTerm] = useState("");
+
   // 🟢 FOR YOU FEED STATE (Twitter/X Algorithm Platform & Curated Drops)
   const [forYouFeed, setForYouFeed] = useState([]);
   const [forYouLoading, setForYouLoading] = useState(true);
@@ -1141,6 +1144,7 @@ export default function Explore({
   const [isUIHidden, setIsUIHidden] = useState(false);
   
   const scrollContainerRef = useRef(null);
+  const scrollPositionRef = useRef(0);
   const lastScrollY = useRef(0);
   const isFirstMount = useRef(true);
 
@@ -1177,13 +1181,17 @@ export default function Explore({
     return () => window.removeEventListener('videoDeleted', handleVideoDeleted);
   }, []);
 
-  // 🟢 Scroll Listener
+  // 🟢 Scroll Listener with Persistent Position Tracking
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const handleScroll = () => {
       const currentY = container.scrollTop;
+
+      if (!isAnyModalOpen && currentY > 0) {
+        scrollPositionRef.current = currentY;
+      }
 
       if (currentY < 50) {
         setIsUIHidden(false);
@@ -1198,7 +1206,61 @@ export default function Explore({
 
     container.addEventListener("scroll", handleScroll, { passive: true });
     return () => container.removeEventListener("scroll", handleScroll);
+  }, [isAnyModalOpen]);
+
+  // 🟢 Restore scroll position when modals (comments, video, stories) close
+  useEffect(() => {
+    if (!isAnyModalOpen && scrollContainerRef.current && scrollPositionRef.current > 0) {
+      const savedY = scrollPositionRef.current;
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = savedY;
+        }
+      });
+      setTimeout(() => {
+        if (scrollContainerRef.current && Math.abs(scrollContainerRef.current.scrollTop - savedY) > 10) {
+          scrollContainerRef.current.scrollTop = savedY;
+        }
+      }, 60);
+    }
+  }, [isAnyModalOpen]);
+
+  // 🟢 Restore scroll position when search modal closes
+  useEffect(() => {
+    const handleRestoreFromSearch = () => {
+      if (scrollContainerRef.current && scrollPositionRef.current > 0) {
+        const savedY = scrollPositionRef.current;
+        requestAnimationFrame(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = savedY;
+          }
+        });
+        setTimeout(() => {
+          if (scrollContainerRef.current && Math.abs(scrollContainerRef.current.scrollTop - savedY) > 10) {
+            scrollContainerRef.current.scrollTop = savedY;
+          }
+        }, 60);
+      }
+    };
+
+    window.addEventListener("searchModalClosed", handleRestoreFromSearch);
+    return () => window.removeEventListener("searchModalClosed", handleRestoreFromSearch);
   }, []);
+
+  // 🟢 Wrapped interactions to capture scroll position immediately before opening overlays
+  const handleCommentClick = useCallback((video) => {
+    if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) {
+      scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+    }
+    if (onCommentClick) onCommentClick(video);
+  }, [onCommentClick]);
+
+  const handleFeedVideoClick = useCallback((video, e) => {
+    if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) {
+      scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+    }
+    if (onVideoClick) onVideoClick(video, e);
+  }, [onVideoClick]);
 
   // 🟢 LOAD FOR YOU FEED (Authentic Twitter/X Heavy Ranker Algorithmic Feed + Session Exploration)
   const loadForYouFeed = useCallback(async (isLoadMore = false, cat = selectedCategory, pageOverride = null) => {
@@ -1650,8 +1712,8 @@ export default function Explore({
             video={video}
             isLast={searchFeed.length === idx + 1}
             lastElementRef={lastElementRef}
-            onVideoClick={onVideoClick}
-            onCommentClick={onCommentClick} 
+            onVideoClick={handleFeedVideoClick}
+            onCommentClick={handleCommentClick} 
             isAnyModalOpen={isAnyModalOpen} 
             onCreatorClick={onCreatorClick}
             onReportClick={handleOpenReport}
@@ -1745,8 +1807,8 @@ export default function Explore({
                   video={video}
                   isLast={searchFeed.length === idx + 1}
                   lastElementRef={lastElementRef}
-                  onVideoClick={onVideoClick}
-                  onCommentClick={onCommentClick} 
+                  onVideoClick={handleFeedVideoClick}
+                  onCommentClick={handleCommentClick} 
                   isAnyModalOpen={isAnyModalOpen} 
                   onCreatorClick={onCreatorClick}
                   onReportClick={handleOpenReport}
@@ -1818,8 +1880,8 @@ export default function Explore({
           video={video}
           isLast={communityFeed.length === idx + 1}
           lastElementRef={lastElementRef}
-          onVideoClick={onVideoClick}
-          onCommentClick={onCommentClick} 
+          onVideoClick={handleFeedVideoClick}
+          onCommentClick={handleCommentClick} 
           isAnyModalOpen={isAnyModalOpen} 
           onCreatorClick={onCreatorClick}
           onReportClick={handleOpenReport}
@@ -1865,8 +1927,8 @@ export default function Explore({
             video={video}
             isLast={isLast}
             lastElementRef={lastElementRef}
-            onVideoClick={onVideoClick}
-            onCommentClick={onCommentClick} 
+            onVideoClick={handleFeedVideoClick}
+            onCommentClick={handleCommentClick} 
             isAnyModalOpen={isAnyModalOpen} 
             onCreatorClick={onCreatorClick}
             onReportClick={handleOpenReport}
@@ -1918,12 +1980,11 @@ export default function Explore({
               <AppHeader 
                 tab="explore"
                 isDesktop={false} 
-                searchTerm={searchQuery} 
-                setSearchTerm={setSearchQuery} 
-                onSearchSubmit={handleSearchSubmit}
+                searchTerm={headerSearchTerm} 
+                setSearchTerm={setHeaderSearchTerm} 
                 user={user} 
                 onProfileClick={onProfileClick} 
-                onVideoClick={onVideoClick}
+                onVideoClick={handleFeedVideoClick}
                 onCreatorClick={onCreatorClick}
               />
             </div>

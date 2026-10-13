@@ -20,7 +20,7 @@ export default function AppHeader({
   const [isSearchOpen, setIsSearchOpen] = useState(() => {
     const state = typeof window !== "undefined" ? window.history.state : null;
     const currentTab = state?.tab || (typeof window !== "undefined" && window.location.search.includes("tab=explore") ? "explore" : "home");
-    return Boolean(state?.searchOpen && !state?.videoPlayer && !state?.creatorProfile && (!tab || currentTab === tab));
+    return Boolean(state?.searchOpen && (!tab || currentTab === tab));
   });
   const isLoggedIn = user && (user.id || user.email);
 
@@ -54,12 +54,12 @@ export default function AppHeader({
     const currentState = window.history.state || {};
     if (currentState.commentModal) {
       window.history.replaceState(
-        { ...currentState, commentModal: false, searchOpen: true },
+        { ...currentState, commentModal: false, videoPlayer: false, searchOpen: true },
         document.title
       );
     } else if (!currentState.searchOpen) {
       window.history.pushState(
-        { ...(window.history.state || {}), searchOpen: true },
+        { ...(window.history.state || {}), searchOpen: true, videoPlayer: false },
         document.title
       );
     }
@@ -68,6 +68,7 @@ export default function AppHeader({
   const handleCloseSearch = () => {
     isSearchOpenRef.current = false;
     setIsSearchOpen(false);
+    window.dispatchEvent(new CustomEvent("searchModalClosed"));
     if (window.history.state?.searchOpen) {
       window.history.back();
     }
@@ -87,6 +88,7 @@ export default function AppHeader({
         if (isSearchOpenRef.current) {
           isSearchOpenRef.current = false;
           setIsSearchOpen(false);
+          window.dispatchEvent(new CustomEvent("searchModalClosed"));
         }
       }
     };

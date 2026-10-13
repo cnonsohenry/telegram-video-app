@@ -242,7 +242,12 @@ export default function App() {
     if (activeCommentVideo && activeCommentVideo.message_id) {
       if (!window.history.state?.commentModal) {
         window.history.pushState(
-          { ...(window.history.state || {}), commentModal: true, videoPlayer: true, messageId: String(activeCommentVideo.message_id) },
+          { 
+            ...(window.history.state || {}), 
+            commentModal: true, 
+            videoPlayer: !!activeVideoRef.current, 
+            messageId: String(activeCommentVideo.message_id) 
+          },
           document.title
         );
       }
@@ -515,7 +520,10 @@ export default function App() {
     if (window.history.state?.videoPlayer) {
       window.history.back();
     } else if (window.location.pathname.startsWith('/v/') || window.location.search.includes('v=')) {
-      window.history.replaceState({}, document.title, "/");
+      const remainingState = { ...(window.history.state || {}) };
+      delete remainingState.videoPlayer;
+      delete remainingState.messageId;
+      window.history.replaceState(remainingState, document.title, "/");
     }
   }, []);
 

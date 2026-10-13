@@ -135,6 +135,42 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     return () => window.removeEventListener("keydown", handlePlayerKeyDown);
   }, [duration, isEditingMode, isPlaying]);
 
+  // 🟢 Listen to pauseMainVideo and resumeMainVideo from modals (e.g. StoryPlayerModal)
+  const wasPlayingBeforeStoryRef = useRef(false);
+
+  useEffect(() => {
+    const handlePauseForStory = () => {
+      if (adVideoRef.current && !adVideoRef.current.paused) {
+        wasPlayingBeforeStoryRef.current = "ad";
+        try { adVideoRef.current.pause(); } catch (_) {}
+      } else if (videoRef.current && !videoRef.current.paused) {
+        wasPlayingBeforeStoryRef.current = "video";
+        try { videoRef.current.pause(); } catch (_) {}
+        setIsPlaying(false);
+      } else {
+        wasPlayingBeforeStoryRef.current = false;
+      }
+    };
+
+    const handleResumeFromStory = () => {
+      if (wasPlayingBeforeStoryRef.current === "ad" && adVideoRef.current) {
+        adVideoRef.current.play().catch(() => {});
+        wasPlayingBeforeStoryRef.current = false;
+      } else if (wasPlayingBeforeStoryRef.current === "video" && videoRef.current) {
+        videoRef.current.play().catch(() => {});
+        setIsPlaying(true);
+        wasPlayingBeforeStoryRef.current = false;
+      }
+    };
+
+    window.addEventListener("pauseMainVideo", handlePauseForStory);
+    window.addEventListener("resumeMainVideo", handleResumeFromStory);
+    return () => {
+      window.removeEventListener("pauseMainVideo", handlePauseForStory);
+      window.removeEventListener("resumeMainVideo", handleResumeFromStory);
+    };
+  }, []);
+
   // Creator & Follow States
   const creatorHandle = getVideoCreatorHandle(video);
   const uploaderId = video.uploader_id ? String(video.uploader_id) : null;

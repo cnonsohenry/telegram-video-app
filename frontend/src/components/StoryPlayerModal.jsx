@@ -36,6 +36,24 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     }
   }, [isOpen, handleSafeClose]);
 
+  // 🟢 Pause background media when story status is opened, resume when closed
+  useEffect(() => {
+    if (isOpen) {
+      document.querySelectorAll("video").forEach((el) => {
+        if (el !== videoRef.current) {
+          try { el.pause(); } catch (_) {}
+        }
+      });
+      window.dispatchEvent(new CustomEvent("pauseMainVideo"));
+    }
+    return () => {
+      if (videoRef.current) {
+        try { videoRef.current.pause(); } catch (_) {}
+      }
+      window.dispatchEvent(new CustomEvent("resumeMainVideo"));
+    };
+  }, [isOpen]);
+
   // Initialize currentIndex to targeted story or first unviewed story upon opening
   useEffect(() => {
     if (isOpen && storyList.length > 0) {
@@ -264,7 +282,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 99999,
+        zIndex: 1000150,
         backgroundColor: "rgba(0, 0, 0, 0.95)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
