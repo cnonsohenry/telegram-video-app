@@ -133,18 +133,18 @@ const vipLockCircleStyle = {
 };
 
 const vipSubscribeButtonStyle = {
-  background: "#fe2c55",
+  background: "#e11d48",
   color: "#ffffff",
   border: "none",
   borderRadius: "100px",
   padding: "10px 18px",
   fontSize: "12.5px",
-  fontWeight: "800",
+  fontWeight: "700",
   display: "flex",
   alignItems: "center",
   gap: "8px",
   cursor: "pointer",
-  boxShadow: "0 4px 16px rgba(254, 44, 85, 0.4)",
+  boxShadow: "0 2px 12px rgba(225, 29, 72, 0.25)",
   transition: "transform 0.15s ease",
   marginTop: "4px"
 };
@@ -255,13 +255,13 @@ const albumSubscribeBarBtnStyle = {
   marginTop: "10px",
   padding: "10px 16px",
   borderRadius: "24px",
-  background: "#fe2c55",
+  background: "#e11d48",
   border: "none",
   color: "#ffffff",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
-  boxShadow: "0 4px 16px rgba(254, 44, 85, 0.35)",
+  boxShadow: "0 2px 12px rgba(225, 29, 72, 0.22)",
   transition: "all 0.18s ease"
 };
 

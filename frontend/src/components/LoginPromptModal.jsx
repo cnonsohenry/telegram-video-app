@@ -15,9 +15,9 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
           title: "Sign in to Like Videos",
           subtitle: "Create a free account to like videos, support creators, and personalize your feed.",
           icon: Heart,
-          iconColor: "#ff2d55",
-          iconBg: "rgba(255, 45, 85, 0.15)",
-          iconBorder: "rgba(255, 45, 85, 0.3)"
+          iconColor: "#e11d48",
+          iconBg: "rgba(225, 29, 72, 0.12)",
+          iconBorder: "rgba(225, 29, 72, 0.22)"
         };
       case "comment":
         return {
@@ -286,16 +286,16 @@ const primaryBtnStyle = {
   padding: "14px",
   borderRadius: "9999px",
   border: "none",
-  background: "#ffffff",
-  color: "#000000",
+  background: "#e4e4e7",
+  color: "#09090b",
   fontSize: "15px",
-  fontWeight: "800",
+  fontWeight: "700",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   gap: "8px",
-  boxShadow: "0 4px 16px rgba(255, 255, 255, 0.15)",
+  boxShadow: "0 2px 10px rgba(0, 0, 0, 0.2)",
   transition: "0.2s"
 };
 

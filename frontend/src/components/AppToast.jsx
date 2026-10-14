@@ -49,12 +49,12 @@ export default function AppToast() {
   const isSuccess = toast.type === "success";
   const isError = toast.type === "error";
 
-  // Green for success (#34c759), Red for error/unfollow (#ff3b30), Cyan for info (#00aff0)
-  const accentColor = isSuccess ? "#34c759" : isError ? "#ff3b30" : "#00aff0";
+  // Green for success (#34c759), Rose for error/unfollow (#f43f5e), Cyan for info (#00aff0)
+  const accentColor = isSuccess ? "#34c759" : isError ? "#f43f5e" : "#00aff0";
   const glowColor = isSuccess 
     ? "rgba(52, 199, 89, 0.28)" 
     : isError 
-    ? "rgba(255, 59, 48, 0.28)" 
+    ? "rgba(244, 63, 94, 0.22)" 
     : "rgba(0, 175, 240, 0.28)";
 
   return (
@@ -75,7 +75,7 @@ export default function AppToast() {
       >
         <div style={iconBoxStyle}>
           {isSuccess && <CheckCircle2 size={19} color="#34c759" />}
-          {isError && <AlertCircle size={19} color="#ff3b30" />}
+          {isError && <AlertCircle size={19} color="#f43f5e" />}
           {!isSuccess && !isError && <Info size={19} color="#00aff0" />}
         </div>
 

@@ -2,16 +2,16 @@
 
 /* 🟢 1. THEME VARIABLES */
 :root {
-  --primary-color: #ff3b30;
-  --primary-glow: rgba(255, 59, 48, 0.4);
+  --primary-color: #e11d48;
+  --primary-glow: rgba(225, 29, 72, 0.25);
   --bg-color: #09090b;
   /* 🔴 Calm Dark Zinc Border */
   --border-color: rgba(255, 255, 255, 0.08); 
 }
 
 body.theme-orange {
-  --primary-color: #ff8c00;
-  --primary-glow: rgba(255, 140, 0, 0.4);
+  --primary-color: #f97316;
+  --primary-glow: rgba(249, 115, 22, 0.25);
   --bg-color: #09090b;
   /* 🟠 Orange Theme Border */
   --border-color: rgba(255, 255, 255, 0.1); 
@@ -36,7 +36,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Standardizes text color across themes */
-  color: #ffffff;
+  color: #f4f4f5;
 }
 
 /* 🟢 3. GLOBAL UI TWEAKS */

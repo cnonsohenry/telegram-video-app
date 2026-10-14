@@ -315,7 +315,7 @@ export default function AppHeader({
                 {suggestions.length > 0 && (
                   <div style={sectionStyle}>
                     <h3 style={sectionTitleStyle}>
-                      <Flame size={16} color="#ff3b30" fill="#ff3b30" /> 
+                      <Flame size={16} color="#e11d48" fill="#e11d48" /> 
                       You may like
                     </h3>
                     <div style={suggestedContentGrid(isDesktop)}>

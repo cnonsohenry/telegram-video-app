@@ -512,9 +512,9 @@ export default function DiscoverCreatorsModal({
                           disabled={isUpdating}
                           style={{
                             ...followBtnStyle,
-                            background: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
-                            color: isFollowing ? "#ffffff" : "#000000",
-                            border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none"
+                            background: isFollowing ? "rgba(255, 255, 255, 0.08)" : "#e4e4e7",
+                            color: isFollowing ? "#a1a1aa" : "#09090b",
+                            border: isFollowing ? "1px solid rgba(255, 255, 255, 0.12)" : "none"
                           }}
                         >
                           {isFollowing ? "Following" : "Follow"}
@@ -524,9 +524,9 @@ export default function DiscoverCreatorsModal({
                           onClick={(e) => handleSubscribeClick(e, creator)}
                           style={{
                             ...subscribeBtnStyle,
-                            background: isSubscribed ? "rgba(254, 44, 85, 0.18)" : "#fe2c55",
-                            color: isSubscribed ? "#fe2c55" : "#ffffff",
-                            border: isSubscribed ? "1px solid #fe2c55" : "none"
+                            background: isSubscribed ? "rgba(225, 29, 72, 0.14)" : "#e11d48",
+                            color: isSubscribed ? "#f43f5e" : "#f4f4f5",
+                            border: isSubscribed ? "1px solid rgba(225, 29, 72, 0.28)" : "none"
                           }}
                         >
                           {isSubscribed ? "Subscribed" : "Subscribe"}

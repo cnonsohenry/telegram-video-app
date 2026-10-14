@@ -789,8 +789,8 @@ export default function Profile({
                   onClick={() => setShowEditModal(true)} 
                   style={{
                     ...mobileActionButton,
-                    backgroundColor: "#ffffff",
-                    color: "#000000",
+                    backgroundColor: "#e4e4e7",
+                    color: "#09090b",
                     fontWeight: "700"
                   }}
                 >
@@ -928,8 +928,8 @@ export default function Profile({
                     onClick={() => setShowEditModal(true)} 
                     style={{
                       ...desktopActionButton,
-                      backgroundColor: "#ffffff",
-                      color: "#000000",
+                      backgroundColor: "#e4e4e7",
+                      color: "#09090b",
                       fontWeight: "700"
                     }}
                   >
@@ -1474,10 +1474,10 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
     background: "none", 
     border: "none", 
     padding: isDesktop ? "16px 0" : "12px 0",
-    borderTop: (isDesktop && active) ? "1px solid #ffffff" : "none",
-    borderBottom: (!isDesktop && active) ? "2px solid #ffffff" : "none",
-    opacity: active ? 1 : 0.4, 
-    color: active ? "#ffffff" : "#a8a8a8", 
+    borderTop: (isDesktop && active) ? "1px solid #e4e4e7" : "none",
+    borderBottom: (!isDesktop && active) ? "2px solid #e4e4e7" : "none",
+    opacity: active ? 1 : 0.45, 
+    color: active ? "#f4f4f5" : "#71717a", 
     cursor: "pointer",
     marginTop: isDesktop ? "-1px" : "0",
     flex: 1,

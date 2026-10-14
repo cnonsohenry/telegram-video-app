@@ -516,9 +516,9 @@ export default function CreatorProfileModal({
                       disabled={isFollowLoading}
                       style={{
                         ...mobileFollowBtn,
-                        backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
-                        color: isFollowing ? "#ffffff" : "#000000",
-                        border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none"
+                        backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.08)" : "#e4e4e7",
+                        color: isFollowing ? "#a1a1aa" : "#09090b",
+                        border: isFollowing ? "1px solid rgba(255, 255, 255, 0.12)" : "none"
                       }}
                     >
                       {isFollowLoading ? "..." : (isFollowing ? "Following" : "Follow")}
@@ -531,9 +531,9 @@ export default function CreatorProfileModal({
                       disabled={isSubscribing}
                       style={{
                         ...mobileSubscribeBtn,
-                        backgroundColor: isSubscribed ? "rgba(254, 44, 85, 0.18)" : "#fe2c55",
-                        color: isSubscribed ? "#fe2c55" : "#ffffff",
-                        border: isSubscribed ? "1px solid #fe2c55" : "none"
+                        backgroundColor: isSubscribed ? "rgba(225, 29, 72, 0.14)" : "#e11d48",
+                        color: isSubscribed ? "#f43f5e" : "#f4f4f5",
+                        border: isSubscribed ? "1px solid rgba(225, 29, 72, 0.28)" : "none"
                       }}
                     >
                       {isSubscribed ? "Subscribed" : "Subscribe"}
@@ -636,9 +636,9 @@ export default function CreatorProfileModal({
                         disabled={isFollowLoading}
                         style={{
                           ...desktopFollowBtn,
-                          backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
-                          color: isFollowing ? "#ffffff" : "#000000",
-                          border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none"
+                          backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.08)" : "#e4e4e7",
+                          color: isFollowing ? "#a1a1aa" : "#09090b",
+                          border: isFollowing ? "1px solid rgba(255, 255, 255, 0.12)" : "none"
                         }}
                       >
                         {isFollowLoading ? "..." : (isFollowing ? "Following" : "Follow")}
@@ -651,9 +651,9 @@ export default function CreatorProfileModal({
                         disabled={isSubscribing}
                         style={{
                           ...desktopSubscribeBtn,
-                          backgroundColor: isSubscribed ? "rgba(254, 44, 85, 0.18)" : "#fe2c55",
-                          color: isSubscribed ? "#fe2c55" : "#ffffff",
-                          border: isSubscribed ? "1px solid #fe2c55" : "none"
+                          backgroundColor: isSubscribed ? "rgba(225, 29, 72, 0.14)" : "#e11d48",
+                          color: isSubscribed ? "#f43f5e" : "#f4f4f5",
+                          border: isSubscribed ? "1px solid rgba(225, 29, 72, 0.28)" : "none"
                         }}
                       >
                         {isSubscribed ? "Subscribed" : "Subscribe"}
@@ -1301,7 +1301,7 @@ const lockedBannerStyle = {
 };
 
 const unlockNowBtnStyle = {
-  background: "#fe2c55",
+  background: "#e11d48",
   color: "#fff",
   border: "none",
   borderRadius: "8px",
@@ -1309,7 +1309,7 @@ const unlockNowBtnStyle = {
   fontWeight: "700",
   fontSize: "14px",
   cursor: "pointer",
-  boxShadow: "0 4px 14px rgba(254, 44, 85, 0.35)"
+  boxShadow: "0 2px 12px rgba(225, 29, 72, 0.25)"
 };
 
 const loaderCenterStyle = {

@@ -412,11 +412,11 @@ export default function CommentSectionModal({ video, onClose }) {
                         >
                           <Heart 
                             size={14} 
-                            color={p.user_liked ? "#ff2d55" : "#8e8e93"} 
-                            fill={p.user_liked ? "#ff2d55" : "none"} 
+                            color={p.user_liked ? "#f43f5e" : "#8e8e93"} 
+                            fill={p.user_liked ? "#f43f5e" : "none"} 
                           />
                           {Number(p.likes_count || 0) > 0 && (
-                            <span style={{ fontSize: "11.5px", color: p.user_liked ? "#ff2d55" : "#8e8e93", fontWeight: 600 }}>
+                            <span style={{ fontSize: "11.5px", color: p.user_liked ? "#f43f5e" : "#8e8e93", fontWeight: 600 }}>
                               {p.likes_count}
                             </span>
                           )}
@@ -495,11 +495,11 @@ export default function CommentSectionModal({ video, onClose }) {
                                       >
                                         <Heart 
                                           size={13} 
-                                          color={reply.user_liked ? "#ff2d55" : "#8e8e93"} 
-                                          fill={reply.user_liked ? "#ff2d55" : "none"} 
+                                          color={reply.user_liked ? "#f43f5e" : "#8e8e93"} 
+                                          fill={reply.user_liked ? "#f43f5e" : "none"} 
                                         />
                                         {Number(reply.likes_count || 0) > 0 && (
-                                          <span style={{ fontSize: "11px", color: reply.user_liked ? "#ff2d55" : "#8e8e93", fontWeight: 600 }}>
+                                          <span style={{ fontSize: "11px", color: reply.user_liked ? "#f43f5e" : "#8e8e93", fontWeight: 600 }}>
                                             {reply.likes_count}
                                           </span>
                                         )}

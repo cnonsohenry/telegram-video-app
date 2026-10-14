@@ -1618,8 +1618,8 @@ const usernameRowStyle = { display: "flex", alignItems: "center", justifyContent
 const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#fff", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 const followBtnStyle = {
   background: "transparent",
-  color: "#ffffff",
-  border: "1.5px solid rgba(255, 255, 255, 0.75)",
+  color: "#f4f4f5",
+  border: "1px solid rgba(255, 255, 255, 0.45)",
   borderRadius: "9999px",
   padding: "5px 16px",
   fontSize: "13.5px",

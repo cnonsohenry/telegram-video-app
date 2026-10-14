@@ -383,9 +383,9 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
             fontWeight: "700",
             cursor: "pointer",
             transition: "all 0.15s ease",
-            border: isFollowing ? "1px solid #536471" : "none",
-            background: isFollowing ? "transparent" : "#eff3f4",
-            color: isFollowing ? "#eff3f4" : "#0f1419",
+            border: isFollowing ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
+            background: isFollowing ? "transparent" : "#e4e4e7",
+            color: isFollowing ? "#a1a1aa" : "#09090b",
             whiteSpace: "nowrap",
             minWidth: "82px",
             textAlign: "center"
@@ -2125,9 +2125,9 @@ export default function Explore({
                       borderRadius: "18px",
                       fontSize: "12.5px",
                       fontWeight: searchSubTab === tab.key ? "700" : "500",
-                      background: searchSubTab === tab.key ? "#ffffff" : "#16181c",
-                      color: searchSubTab === tab.key ? "#000000" : "#71767b",
-                      border: `1px solid ${searchSubTab === tab.key ? "transparent" : "#2f3336"}`,
+                      background: searchSubTab === tab.key ? "rgba(255, 255, 255, 0.14)" : "rgba(255, 255, 255, 0.04)",
+                      color: searchSubTab === tab.key ? "#f4f4f5" : "#71767b",
+                      border: `1px solid ${searchSubTab === tab.key ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)"}`,
                       cursor: "pointer",
                       whiteSpace: "nowrap",
                       flexShrink: 0,
@@ -2396,9 +2396,9 @@ export default function Explore({
                             borderRadius: "20px",
                             fontSize: "13px",
                             fontWeight: searchSubTab === tab.key ? "700" : "500",
-                            background: searchSubTab === tab.key ? "#ffffff" : "#16181c",
-                            color: searchSubTab === tab.key ? "#000000" : "#71767b",
-                            border: `1px solid ${searchSubTab === tab.key ? "transparent" : "#2f3336"}`,
+                            background: searchSubTab === tab.key ? "rgba(255, 255, 255, 0.14)" : "rgba(255, 255, 255, 0.04)",
+                            color: searchSubTab === tab.key ? "#f4f4f5" : "#71767b",
+                            border: `1px solid ${searchSubTab === tab.key ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)"}`,
                             cursor: "pointer",
                             transition: "all 0.15s ease"
                           }}
@@ -2554,7 +2554,7 @@ const exploreTabActivePillStyle = {
   height: "3px",
   width: "56px",
   borderRadius: "3px 3px 0 0",
-  backgroundColor: "#ffffff"
+  backgroundColor: "#e4e4e7"
 };
 
 const communityCountPillStyle = {
@@ -3216,8 +3216,8 @@ const desktopSideCreatorHandle = {
 const desktopSideFollowBtn = {
   padding: "6px 16px",
   borderRadius: "9999px",
-  background: "#eff3f4",
-  color: "#0f1419",
+  background: "#e4e4e7",
+  color: "#09090b",
   border: "none",
   fontSize: "13px",
   fontWeight: "700",
@@ -3230,8 +3230,8 @@ const desktopSideFollowingBtn = {
   padding: "6px 16px",
   borderRadius: "9999px",
   background: "transparent",
-  color: "#eff3f4",
-  border: "1px solid #536471",
+  color: "#a1a1aa",
+  border: "1px solid rgba(255, 255, 255, 0.15)",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
@@ -3485,8 +3485,8 @@ const igFollowBtn = {
   borderRadius: "8px",
   fontSize: "13px",
   fontWeight: "700",
-  color: "#000000",
-  backgroundColor: "#ffffff",
+  color: "#09090b",
+  backgroundColor: "#e4e4e7",
   border: "none",
   cursor: "pointer",
   display: "flex",
@@ -3502,9 +3502,9 @@ const igFollowingBtn = {
   borderRadius: "8px",
   fontSize: "13px",
   fontWeight: "700",
-  color: "#ffffff",
-  backgroundColor: "rgba(255, 255, 255, 0.15)",
-  border: "1px solid rgba(255, 255, 255, 0.3)",
+  color: "#a1a1aa",
+  backgroundColor: "rgba(255, 255, 255, 0.08)",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
@@ -3565,18 +3565,18 @@ const vipLockCircleStyle = {
 };
 
 const vipSubscribeButtonStyle = {
-  background: "#fe2c55",
+  background: "#e11d48",
   color: "#ffffff",
   border: "none",
   borderRadius: "100px",
   padding: "10px 18px",
   fontSize: "12.5px",
-  fontWeight: "800",
+  fontWeight: "700",
   display: "flex",
   alignItems: "center",
   gap: "8px",
   cursor: "pointer",
-  boxShadow: "0 4px 16px rgba(254, 44, 85, 0.4)",
+  boxShadow: "0 2px 12px rgba(225, 29, 72, 0.25)",
   transition: "transform 0.15s ease",
   marginTop: "4px"
 };
@@ -3687,13 +3687,13 @@ const albumSubscribeBarBtnStyle = {
   marginTop: "10px",
   padding: "10px 16px",
   borderRadius: "24px",
-  background: "#fe2c55",
+  background: "#e11d48",
   border: "none",
   color: "#ffffff",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
-  boxShadow: "0 4px 16px rgba(254, 44, 85, 0.35)",
+  boxShadow: "0 2px 12px rgba(225, 29, 72, 0.22)",
   transition: "all 0.18s ease"
 };
 

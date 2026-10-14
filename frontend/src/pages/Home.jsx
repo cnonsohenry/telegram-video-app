@@ -245,7 +245,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return {
       opacity,
       transform: `scale(${scale})`,
-      color: "#ffffff",
+      color: activeTab === index ? "#f4f4f5" : "#a1a1aa",
       fontWeight,
       textShadow: "none",
       letterSpacing: "0.15px",
@@ -853,7 +853,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                 <button 
                   key={index} 
                   onClick={() => handleTabClick(index)} 
-                  style={{ ...desktopTabButtonStyle, background: activeTab === index ? "rgba(255,255,255,0.12)" : "transparent", color: activeTab === index ? "var(--primary-color)" : "#fff", justifyContent: isSidebarHovered ? "flex-start" : "center", paddingLeft: isSidebarHovered ? "24px" : "0" }}
+                  style={{ ...desktopTabButtonStyle, background: activeTab === index ? "rgba(255,255,255,0.08)" : "transparent", color: activeTab === index ? "var(--primary-color)" : "#f4f4f5", justifyContent: isSidebarHovered ? "flex-start" : "center", paddingLeft: isSidebarHovered ? "24px" : "0" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                      {tab.icon} 

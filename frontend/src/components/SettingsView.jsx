@@ -419,11 +419,11 @@ export default function SettingsView({
 
           {/* 🌟 LOG OUT (Clean minimal red text) */}
           <div 
-            style={{ ...settingsRowStyle, borderBottom: "none", color: "#fe2c55" }} 
+            style={{ ...settingsRowStyle, borderBottom: "none", color: "#f43f5e" }} 
             onClick={() => setShowLogoutConfirm(true)}
           >
-            <LogOut size={19} color="#fe2c55" />
-            <span style={{ ...rowLabelStyle, color: "#fe2c55", fontWeight: "600" }}>Log out</span>
+            <LogOut size={19} color="#f43f5e" />
+            <span style={{ ...rowLabelStyle, color: "#f43f5e", fontWeight: "600" }}>Log out</span>
           </div>
 
           <LegalFooter />
