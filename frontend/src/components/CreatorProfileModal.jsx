@@ -13,6 +13,7 @@ import CreatorTipModal from "./CreatorTipModal";
 import CreatorSubscribeModal from "./CreatorSubscribeModal";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import StoryAvatar from "./StoryAvatar";
+import StoryHighlightsTray from "./StoryHighlightsTray";
 import { promptLogin, showToast } from "../utils/toast";
 
 export default function CreatorProfileModal({ 
@@ -40,6 +41,7 @@ export default function CreatorProfileModal({
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [optionsVideo, setOptionsVideo] = useState(null);
   const [reportedVideo, setReportedVideo] = useState(null);
+  const [highlights, setHighlights] = useState([]);
   const isAnyModalOpen = Boolean(showTipModal || showSubscribeModal || optionsVideo || reportedVideo);
   const [tabVideos, setTabVideos] = useState({
     posts: [],
@@ -141,6 +143,7 @@ export default function CreatorProfileModal({
           setIsFollowing(isFoll);
           setSubscribersCount(Number(data.creator.stats?.subscribers || 0));
           setFollowersCount(Number(data.creator.stats?.followers || 0));
+          setHighlights(data.creator.highlights || []);
           setTabHasMore(prev => ({
             ...prev,
             posts: Boolean(initialVideos.length >= 12)
@@ -697,6 +700,22 @@ export default function CreatorProfileModal({
 
               </div>
             )}
+
+            {/* 🌟 INSTAGRAM STORY HIGHLIGHTS TRAY */}
+            <StoryHighlightsTray
+              highlights={highlights}
+              creator={creatorData}
+              isOwner={Boolean(creatorData?.is_owner)}
+              onHighlightCreated={(newHl) => {
+                setHighlights((prev) => [newHl, ...prev.filter(h => h.id !== newHl.id && !h.is_auto)]);
+              }}
+              onHighlightDeleted={(deletedId) => {
+                setHighlights((prev) => prev.filter(h => h.id !== deletedId));
+              }}
+              style={{
+                padding: isDesktop ? "0 24px 20px 24px" : "4px 16px 14px 16px"
+              }}
+            />
 
             {/* 🌟 INSTAGRAM TABS */}
             <div style={{ 

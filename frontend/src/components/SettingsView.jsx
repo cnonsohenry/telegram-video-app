@@ -490,8 +490,10 @@ export default function SettingsView({
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <div style={{ width: "38px", height: "38px", borderRadius: "50%", overflow: "hidden", backgroundColor: "#222" }}>
                       <img 
-                        src={`/api/avatar?user_id=${sub.creator_id}`}
+                        src={`/avatar.jpg?user_id=${sub.creator_id}`}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                       />

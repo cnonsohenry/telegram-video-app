@@ -623,7 +623,7 @@ export default function FeedPost({
   };
 
   const uploaderId = video.uploader_id || video.user_id || video.creator_id || (video.creator && video.creator.id);
-  const avatarUrl = video.avatar_url || video.creator?.avatar_url || (uploaderId ? `${APP_CONFIG.apiUrl}/api/avatar?user_id=${uploaderId}` : '/assets/default-avatar.png');
+  const avatarUrl = video.avatar_url || video.creator?.avatar_url || (uploaderId ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${uploaderId}` : '/assets/default-avatar.png');
   const displayName = getPostDisplayName(video);
   const formattedDate = formatTwitterDate(video.created_at);
 

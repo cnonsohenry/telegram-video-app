@@ -15,6 +15,7 @@ import CreatorUploadModal from "../components/CreatorUploadModal";
 import DiscoverCreatorsSection from "../components/DiscoverCreatorsSection";
 import DiscoverCreatorsModal from "../components/DiscoverCreatorsModal";
 import StoryAvatar from "../components/StoryAvatar";
+import StoryHighlightsTray from "../components/StoryHighlightsTray";
 import FeedPost from "../components/FeedPost";
 import PostOptionsModal from "../components/PostOptionsModal";
 import ReportModal from "../components/ReportModal";
@@ -87,6 +88,7 @@ export default function Profile({
     likes: 0,
     views: 0
   });
+  const [highlights, setHighlights] = useState([]);
 
   // 🟢 NEW: Scroll Tracking State
   const [isUIHidden, setIsUIHidden] = useState(false);
@@ -110,7 +112,7 @@ export default function Profile({
     return () => window.removeEventListener("openCreatorStudio", handleOpenStudio);
   }, []);
 
-  // Fetch live stats for creator profile from DB
+  // Fetch live stats & highlights for creator profile from DB
   useEffect(() => {
     if (!user?.username) return;
     let isMounted = true;
@@ -118,8 +120,13 @@ export default function Profile({
     fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(user.username)}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (isMounted && data?.creator?.stats) {
-          setCreatorStats(data.creator.stats);
+        if (isMounted && data?.creator) {
+          if (data.creator.stats) {
+            setCreatorStats(data.creator.stats);
+          }
+          if (Array.isArray(data.creator.highlights)) {
+            setHighlights(data.creator.highlights);
+          }
         }
       })
       .catch(() => {});
@@ -1029,6 +1036,22 @@ export default function Profile({
           />
         </div>
 
+        {/* 🌟 INSTAGRAM STORY HIGHLIGHTS TRAY */}
+        <StoryHighlightsTray
+          highlights={highlights}
+          creator={user}
+          isOwner={true}
+          onHighlightCreated={(newHl) => {
+            setHighlights((prev) => [newHl, ...prev.filter(h => h.id !== newHl.id && !h.is_auto)]);
+          }}
+          onHighlightDeleted={(deletedId) => {
+            setHighlights((prev) => prev.filter(h => h.id !== deletedId));
+          }}
+          style={{
+            padding: isDesktop ? "0 0 18px 0" : "4px 12px 14px 12px"
+          }}
+        />
+
         {/* 🌟 INSTAGRAM PROFILE TABS NAVIGATION */}
         <div style={{ 
           ...tabsContainerStyle, 
@@ -1155,9 +1178,11 @@ export default function Profile({
                           flexShrink: 0
                         }}>
                           <img 
-                            src={`/api/avatar?user_id=${sub.creator_id}`}
+                            src={`/avatar.jpg?user_id=${sub.creator_id}`}
                             onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                             alt=""
+                            loading="lazy"
+                            decoding="async"
                             style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
                           />
                         </div>

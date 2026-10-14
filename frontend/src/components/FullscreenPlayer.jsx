@@ -1338,7 +1338,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 <div style={postInfoStyle}>
                     <StoryAvatar
                       username={creatorHandle}
-                      avatarUrl={`${APP_CONFIG.apiUrl}/api/avatar?user_id=${video.uploader_id}`}
+                      avatarUrl={`${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${video.uploader_id}`}
                       displayName={getPostDisplayName(video)}
                       size={42}
                       borderWidth={2}

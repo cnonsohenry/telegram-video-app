@@ -21,13 +21,28 @@ export default function StoryAvatar({
   const active = hasActiveStory(cleanUsername);
   const viewed = isStoryViewed(cleanUsername);
 
+  // Normalize avatar URL to /avatar.jpg for global Cloudflare Edge HIT caching
+  const safeAvatarUrl = React.useMemo(() => {
+    if (!avatarUrl || avatarUrl === "null" || avatarUrl === "undefined") {
+      return "/assets/default-avatar.png";
+    }
+    if (avatarUrl.includes("/api/avatar") || avatarUrl.includes("/avatar")) {
+      let normalized = avatarUrl
+        .replace(/\/api\/avatar(?:\.jpg)?/, "/avatar.jpg")
+        .replace(/\/avatar(?!\.jpg)/, "/avatar.jpg");
+      normalized = normalized.replace(/[&?]v=\d+/, "");
+      return normalized;
+    }
+    return avatarUrl;
+  }, [avatarUrl]);
+
   const handleClick = (e) => {
     if (active) {
       e.stopPropagation();
       openStory(cleanUsername, {
         username: cleanUsername,
         display_name: displayName || cleanUsername,
-        avatar_url: avatarUrl
+        avatar_url: safeAvatarUrl
       });
     } else if (onClick) {
       onClick(e);
@@ -75,8 +90,10 @@ export default function StoryAvatar({
       title={active ? (viewed ? `Viewed Story by @${cleanUsername}` : `New Story by @${cleanUsername}`) : displayName || cleanUsername}
     >
       <img
-        src={avatarUrl || "/assets/default-avatar.png"}
+        src={safeAvatarUrl}
         alt={displayName || cleanUsername}
+        loading="lazy"
+        decoding="async"
         onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
         style={finalImgStyle}
       />

@@ -1147,6 +1147,102 @@ router.get("/:username", optionalAuth, async (req, res) => {
       }
     } catch (sErr) {}
 
+    // 6. Fetch Story Highlights (with smart fallback from archived stories)
+    let highlights = [];
+    try {
+      const currentUserId = req.user?.id || null;
+      const hlRes = await pool.query(
+        `SELECT id, creator_id, username, title, cover_url, story_ids, is_active, created_at, updated_at
+         FROM creator_story_highlights
+         WHERE LOWER(username) = LOWER($1) AND is_active = TRUE
+         ORDER BY updated_at DESC, id DESC`,
+        [creator.username || username]
+      );
+
+      if (hlRes.rows.length > 0) {
+        const allStoryIds = [...new Set(hlRes.rows.flatMap(h => h.story_ids || []))];
+        let storiesMap = new Map();
+        if (allStoryIds.length > 0) {
+          const sRes = await pool.query(
+            `SELECT id, creator_id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at
+             FROM creator_stories
+             WHERE id = ANY($1::INT[])`,
+            [allStoryIds]
+          );
+          sRes.rows.forEach(st => {
+            storiesMap.set(st.id, {
+              id: st.id,
+              creator_id: st.creator_id,
+              username: st.username,
+              video_url: currentUserId ? st.video_url : null,
+              thumbnail_url: st.thumbnail_url,
+              duration: Number(st.duration || 10.0),
+              sound_title: st.sound_title || "Trending TikTok Sound",
+              created_at: st.created_at,
+              expires_at: st.expires_at,
+              requires_auth: !currentUserId
+            });
+          });
+        }
+
+        highlights = hlRes.rows.map(h => {
+          const stList = (h.story_ids || []).map(sid => storiesMap.get(sid)).filter(Boolean);
+          const cover = h.cover_url || (stList[0]?.thumbnail_url) || creator.avatar_url;
+          return {
+            id: h.id,
+            creator_id: h.creator_id,
+            username: h.username,
+            title: h.title,
+            cover_url: cover,
+            story_ids: h.story_ids,
+            stories: stList,
+            story_count: stList.length,
+            created_at: h.created_at,
+            updated_at: h.updated_at
+          };
+        }).filter(h => h.story_count > 0);
+      } else {
+        // Fallback: Check if creator has archived stories
+        const archRes = await pool.query(
+          `SELECT id, creator_id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at
+           FROM creator_stories
+           WHERE LOWER(username) = LOWER($1) AND (is_archived = TRUE OR expires_at <= NOW())
+           ORDER BY created_at DESC LIMIT 30`,
+          [creator.username || username]
+        );
+
+        if (archRes.rows.length > 0) {
+          const archStories = archRes.rows.map(st => ({
+            id: st.id,
+            creator_id: st.creator_id,
+            username: st.username,
+            video_url: currentUserId ? st.video_url : null,
+            thumbnail_url: st.thumbnail_url,
+            duration: Number(st.duration || 10.0),
+            sound_title: st.sound_title || "Trending TikTok Sound",
+            created_at: st.created_at,
+            expires_at: st.expires_at,
+            requires_auth: !currentUserId
+          }));
+
+          highlights = [{
+            id: `auto_${creator.username || username}_1`,
+            creator_id: creator.id,
+            username: creator.username || username,
+            title: "Highlights",
+            cover_url: archStories[0].thumbnail_url,
+            story_ids: archStories.map(s => s.id),
+            stories: archStories.slice(0, 10),
+            story_count: Math.min(archStories.length, 10),
+            created_at: archStories[0].created_at,
+            is_auto: true
+          }];
+        }
+      }
+    } catch (hlErr) {
+      console.warn("[HIGHLIGHTS QUERY ERROR]", hlErr);
+    }
+
     res.json({
       creator: {
         ...creator,
@@ -1155,6 +1251,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
         active_story: activeStory,
         active_stories: activeStories,
         story_count: activeStories.length,
+        highlights: highlights,
         stats: {
           followers: totalFollowers,
           subscribers: subCount,
@@ -1285,6 +1382,270 @@ router.post("/:username/story/view", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error("[RECORD STORY VIEW ERROR]", err);
     return res.status(500).json({ error: "Failed to record story view" });
+  }
+});
+
+/* =======================================================
+   3.7. GET CREATOR STORY HIGHLIGHTS
+   GET /api/creator/:username/highlights
+======================================================= */
+router.get("/:username/highlights", optionalAuth, async (req, res) => {
+  const { username } = req.params;
+  if (!username) return res.status(400).json({ error: "Username required" });
+
+  try {
+    const currentUserId = req.user?.id || null;
+    const hlRes = await pool.query(
+      `SELECT id, creator_id, username, title, cover_url, story_ids, is_active, created_at, updated_at
+       FROM creator_story_highlights
+       WHERE LOWER(username) = LOWER($1) AND is_active = TRUE
+       ORDER BY updated_at DESC, id DESC`,
+      [username]
+    );
+
+    let highlights = [];
+    if (hlRes.rows.length > 0) {
+      const allStoryIds = [...new Set(hlRes.rows.flatMap(h => h.story_ids || []))];
+      let storiesMap = new Map();
+      if (allStoryIds.length > 0) {
+        const sRes = await pool.query(
+          `SELECT id, creator_id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at
+           FROM creator_stories
+           WHERE id = ANY($1::INT[])`,
+          [allStoryIds]
+        );
+        sRes.rows.forEach(st => {
+          storiesMap.set(st.id, {
+            id: st.id,
+            creator_id: st.creator_id,
+            username: st.username,
+            video_url: currentUserId ? st.video_url : null,
+            thumbnail_url: st.thumbnail_url,
+            duration: Number(st.duration || 10.0),
+            sound_title: st.sound_title || "Trending TikTok Sound",
+            created_at: st.created_at,
+            expires_at: st.expires_at,
+            requires_auth: !currentUserId
+          });
+        });
+      }
+
+      highlights = hlRes.rows.map(h => {
+        const stList = (h.story_ids || []).map(sid => storiesMap.get(sid)).filter(Boolean);
+        const cover = h.cover_url || (stList[0]?.thumbnail_url) || "/assets/default-avatar.png";
+        return {
+          id: h.id,
+          creator_id: h.creator_id,
+          username: h.username,
+          title: h.title,
+          cover_url: cover,
+          story_ids: h.story_ids,
+          stories: stList,
+          story_count: stList.length,
+          created_at: h.created_at,
+          updated_at: h.updated_at
+        };
+      }).filter(h => h.story_count > 0);
+    } else {
+      // Fallback: Check if creator has archived stories
+      const archRes = await pool.query(
+        `SELECT id, creator_id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at
+         FROM creator_stories
+         WHERE LOWER(username) = LOWER($1) AND (is_archived = TRUE OR expires_at <= NOW())
+         ORDER BY created_at DESC LIMIT 30`,
+        [username]
+      );
+
+      if (archRes.rows.length > 0) {
+        const archStories = archRes.rows.map(st => ({
+          id: st.id,
+          creator_id: st.creator_id,
+          username: st.username,
+          video_url: currentUserId ? st.video_url : null,
+          thumbnail_url: st.thumbnail_url,
+          duration: Number(st.duration || 10.0),
+          sound_title: st.sound_title || "Trending TikTok Sound",
+          created_at: st.created_at,
+          expires_at: st.expires_at,
+          requires_auth: !currentUserId
+        }));
+
+        highlights = [{
+          id: `auto_${username}_1`,
+          creator_id: null,
+          username: username,
+          title: "Highlights",
+          cover_url: archStories[0].thumbnail_url,
+          story_ids: archStories.map(s => s.id),
+          stories: archStories.slice(0, 10),
+          story_count: Math.min(archStories.length, 10),
+          created_at: archStories[0].created_at,
+          is_auto: true
+        }];
+      }
+    }
+
+    return res.json({ highlights });
+  } catch (err) {
+    console.error("[GET HIGHLIGHTS ERROR]", err);
+    return res.status(500).json({ error: "Failed to fetch highlights" });
+  }
+});
+
+/* =======================================================
+   3.8. GET CREATOR STORY ARCHIVE
+   GET /api/creator/:username/stories/archive
+   (Allows creator to browse all expired & archived stories)
+======================================================= */
+router.get("/:username/stories/archive", authenticateToken, async (req, res) => {
+  const { username } = req.params;
+  const userId = req.user.id;
+  if (!username) return res.status(400).json({ error: "Username required" });
+
+  try {
+    const userRes = await pool.query(
+      `SELECT id, username, telegram_user_id, role FROM app_users WHERE id = $1`,
+      [userId]
+    );
+    if (userRes.rows.length === 0) return res.status(401).json({ error: "User not found" });
+
+    const currentUser = userRes.rows[0];
+    const isOwner = 
+      currentUser.role === "admin" ||
+      currentUser.username.toLowerCase() === username.toLowerCase();
+
+    if (!isOwner) {
+      return res.status(403).json({ error: "Only the profile owner can view their story archive" });
+    }
+
+    const archRes = await pool.query(
+      `SELECT id, creator_id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at, is_active, is_archived
+       FROM creator_stories
+       WHERE LOWER(username) = LOWER($1) AND (is_archived = TRUE OR expires_at <= NOW())
+       ORDER BY created_at DESC`,
+      [username]
+    );
+
+    const archive = archRes.rows.map(s => ({
+      id: s.id,
+      creator_id: s.creator_id,
+      username: s.username,
+      video_url: s.video_url,
+      thumbnail_url: s.thumbnail_url,
+      duration: Number(s.duration || 10.0),
+      sound_title: s.sound_title || "Trending TikTok Sound",
+      created_at: s.created_at,
+      expires_at: s.expires_at,
+      is_archived: Boolean(s.is_archived)
+    }));
+
+    return res.json({ archive });
+  } catch (err) {
+    console.error("[GET ARCHIVE ERROR]", err);
+    return res.status(500).json({ error: "Failed to fetch story archive" });
+  }
+});
+
+/* =======================================================
+   3.9. CREATE STORY HIGHLIGHT
+   POST /api/creator/:username/highlights
+   (Allows creator to curate multiple stories into a highlight reel)
+======================================================= */
+router.post("/:username/highlights", authenticateToken, async (req, res) => {
+  const { username } = req.params;
+  const userId = req.user.id;
+  const { title, cover_url, story_ids } = req.body;
+
+  if (!story_ids || !Array.isArray(story_ids) || story_ids.length === 0) {
+    return res.status(400).json({ error: "At least one story is required to create a highlight" });
+  }
+
+  try {
+    const userRes = await pool.query(
+      `SELECT id, username, role FROM app_users WHERE id = $1`,
+      [userId]
+    );
+    if (userRes.rows.length === 0) return res.status(401).json({ error: "User not found" });
+
+    const currentUser = userRes.rows[0];
+    const isOwner = 
+      currentUser.role === "admin" ||
+      currentUser.username.toLowerCase() === username.toLowerCase();
+
+    if (!isOwner) {
+      return res.status(403).json({ error: "Only the profile owner can create highlights" });
+    }
+
+    const cleanTitle = (title ? String(title).trim().slice(0, 100) : "Highlights") || "Highlights";
+    const intStoryIds = story_ids.map(Number).filter(n => !isNaN(n) && n > 0);
+
+    const sRes = await pool.query(
+      `SELECT id, thumbnail_url, video_url, duration, sound_title, created_at, expires_at 
+       FROM creator_stories 
+       WHERE id = ANY($1::INT[]) AND LOWER(username) = LOWER($2)
+       ORDER BY created_at ASC`,
+      [intStoryIds, username]
+    );
+
+    if (sRes.rows.length === 0) {
+      return res.status(400).json({ error: "None of the selected stories were found for this creator" });
+    }
+
+    const firstCover = cover_url || sRes.rows[0].thumbnail_url || "/assets/default-avatar.png";
+
+    const insertRes = await pool.query(
+      `INSERT INTO creator_story_highlights (
+         creator_id, username, title, cover_url, story_ids, is_active, created_at, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, TRUE, NOW(), NOW())
+       RETURNING *`,
+      [userId, username, cleanTitle, firstCover, intStoryIds]
+    );
+
+    const newHl = insertRes.rows[0];
+    return res.status(201).json({
+      success: true,
+      highlight: {
+        ...newHl,
+        stories: sRes.rows.map(s => ({
+          ...s,
+          duration: Number(s.duration || 10.0)
+        })),
+        story_count: sRes.rows.length
+      }
+    });
+  } catch (err) {
+    console.error("[CREATE HIGHLIGHT ERROR]", err);
+    return res.status(500).json({ error: "Failed to create highlight" });
+  }
+});
+
+/* =======================================================
+   3.10. DELETE STORY HIGHLIGHT
+   DELETE /api/creator/:username/highlights/:id
+======================================================= */
+router.delete("/:username/highlights/:id", authenticateToken, async (req, res) => {
+  const { username, id } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const userRes = await pool.query(`SELECT id, username, role FROM app_users WHERE id = $1`, [userId]);
+    if (userRes.rows.length === 0) return res.status(401).json({ error: "User not found" });
+
+    const currentUser = userRes.rows[0];
+    const isOwner = currentUser.role === "admin" || currentUser.username.toLowerCase() === username.toLowerCase();
+    if (!isOwner) {
+      return res.status(403).json({ error: "Only the profile owner can delete highlights" });
+    }
+
+    await pool.query(
+      `DELETE FROM creator_story_highlights WHERE id = $1 AND LOWER(username) = LOWER($2)`,
+      [id, username]
+    );
+
+    return res.json({ success: true, deleted_id: Number(id) });
+  } catch (err) {
+    console.error("[DELETE HIGHLIGHT ERROR]", err);
+    return res.status(500).json({ error: "Failed to delete highlight" });
   }
 });
 

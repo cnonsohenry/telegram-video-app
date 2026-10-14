@@ -653,8 +653,10 @@ const DesktopLeftSidebar = ({
             title={`Logged in as ${user.display_name || user.username || "Creator"}`}
           >
             <img 
-              src={user.avatar_url || (user.id ? `${APP_CONFIG.apiUrl}/api/avatar?user_id=${user.id}` : "/assets/default-avatar.png")} 
+              src={user.avatar_url || (user.id ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${user.id}` : "/assets/default-avatar.png")} 
               alt="User Avatar"
+              loading="lazy"
+              decoding="async"
               onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
               style={desktopUserPillAvatar}
             />

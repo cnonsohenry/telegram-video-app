@@ -391,6 +391,8 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
           key={currentStory.id || currentIndex}
           ref={videoRef}
           src={videoSrc}
+          poster={currentStory?.thumbnail_url || undefined}
+          preload="auto"
           playsInline
           autoPlay
           muted={isMuted}
@@ -406,6 +408,16 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             backgroundColor: "#09090b"
           }}
         />
+
+        {/* Preload next story in background for instantaneous transitions */}
+        {storyList[currentIndex + 1]?.video_url && (
+          <video
+            src={storyList[currentIndex + 1].video_url}
+            preload="auto"
+            style={{ display: "none" }}
+            aria-hidden="true"
+          />
+        )}
 
         {/* Top Gradient Shadow */}
         <div

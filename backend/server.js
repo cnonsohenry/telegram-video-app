@@ -359,11 +359,29 @@ async function initDatabase() {
           sound_title TEXT DEFAULT 'Trending TikTok Sound',
           created_at TIMESTAMP DEFAULT NOW(),
           expires_at TIMESTAMP DEFAULT (NOW() + INTERVAL '24 hours'),
-          is_active BOOLEAN DEFAULT TRUE
+          is_active BOOLEAN DEFAULT TRUE,
+          is_archived BOOLEAN DEFAULT TRUE
         )
       `);
+      await pool.query(`ALTER TABLE creator_stories ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT TRUE`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_stories_active ON creator_stories(username, expires_at)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_stories_is_active ON creator_stories(is_active)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_stories_archived ON creator_stories(username, is_archived)`);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS creator_story_highlights (
+          id SERIAL PRIMARY KEY,
+          creator_id INT REFERENCES app_users(id) ON DELETE CASCADE,
+          username VARCHAR(50) NOT NULL,
+          title VARCHAR(100) NOT NULL DEFAULT 'Highlights',
+          cover_url TEXT,
+          story_ids INT[] DEFAULT '{}',
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_highlights_creator ON creator_story_highlights(username)`);
 
       await pool.query(`
         CREATE TABLE IF NOT EXISTS creator_story_views (
@@ -746,6 +764,7 @@ app.post("/api/stories/push", upload.single("video"), async (req, res) => {
           Key: thumbKey,
           Body: thumbBuffer,
           ContentType: "image/jpeg",
+          CacheControl: "public, max-age=31536000, immutable",
         }));
         fs.unlinkSync(thumbPath);
       }
@@ -761,6 +780,7 @@ app.post("/api/stories/push", upload.single("video"), async (req, res) => {
       Key: r2Key,
       Body: fileStream,
       ContentType: "video/mp4",
+      CacheControl: "public, max-age=31536000, immutable",
     }));
 
     if (fs.existsSync(videoFile.path)) {
@@ -776,7 +796,7 @@ app.post("/api/stories/push", upload.single("video"), async (req, res) => {
 
     // 4. Archive genuinely expired stories for this creator
     await pool.query(
-      "UPDATE creator_stories SET is_active = FALSE WHERE LOWER(username) = LOWER($1) AND expires_at <= NOW()",
+      "UPDATE creator_stories SET is_active = FALSE, is_archived = TRUE WHERE LOWER(username) = LOWER($1) AND expires_at <= NOW()",
       [username]
     );
 
@@ -787,8 +807,8 @@ app.post("/api/stories/push", upload.single("video"), async (req, res) => {
 
     const insertRes = await pool.query(
       `INSERT INTO creator_stories (
-         creator_id, username, video_url, thumbnail_url, duration, sound_title, expires_at, is_active
-       ) VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours', TRUE)
+         creator_id, username, video_url, thumbnail_url, duration, sound_title, expires_at, is_active, is_archived
+       ) VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours', TRUE, TRUE)
        RETURNING *`,
       [
         creatorId,
@@ -2728,12 +2748,18 @@ app.get("/api/thumb", (req, res) => {
 /* =======================================================
    🟢 BULLETPROOF AVATAR ROUTE (Cached & Timeout-Protected)
 ======================================================= */
-app.get("/api/avatar", async (req, res) => {
+const handleAvatarRequest = async (req, res) => {
+  res.set({
+    "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
+    "Access-Control-Allow-Origin": "*"
+  });
+
   try {
     const rawId = req.query.user_id || req.query.username || req.query.channel;
     
     // Prevent bad requests from breaking the image
     if (!rawId || rawId === 'undefined' || rawId === 'null') {
+      res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable" });
       return res.redirect('/assets/default-avatar.png');
     }
 
@@ -2742,6 +2768,7 @@ app.get("/api/avatar", async (req, res) => {
     // 🟢 1. Fast-Path: In-memory cache hit (1 hour TTL)
     const cached = avatarUrlCache.get(cleanStr);
     if (cached && cached.expiresAt > Date.now()) {
+      res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" });
       return res.redirect(cached.targetUrl);
     }
 
@@ -2762,8 +2789,10 @@ app.get("/api/avatar", async (req, res) => {
         userRow = userRes.rows[0];
         if (userRow.avatar_url && 
             !userRow.avatar_url.includes('/api/avatar') && 
+            !userRow.avatar_url.includes('/avatar?') &&
             !userRow.avatar_url.includes('default-avatar')) {
           avatarUrlCache.set(cleanStr, { targetUrl: userRow.avatar_url, expiresAt: Date.now() + 3600000 });
+          res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" });
           return res.redirect(userRow.avatar_url);
         }
       }
@@ -2819,6 +2848,7 @@ app.get("/api/avatar", async (req, res) => {
 
     if (!fileId) {
       avatarUrlCache.set(cleanStr, { targetUrl: '/assets/default-avatar.png', expiresAt: Date.now() + 300000 });
+      res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable" });
       return res.redirect('/assets/default-avatar.png');
     }
 
@@ -2833,9 +2863,15 @@ app.get("/api/avatar", async (req, res) => {
     return res.send(Buffer.from(imageRes.data));
   } catch (err) {
     // Ultimate Failsafe: Never show a broken image icon
+    res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable" });
     return res.redirect('/assets/default-avatar.png');
   }
-});
+};
+
+app.get("/avatar", handleAvatarRequest);
+app.get("/avatar.jpg", handleAvatarRequest);
+app.get("/api/avatar", handleAvatarRequest);
+app.get("/api/avatar.jpg", handleAvatarRequest);
 
 /* =====================
    ROBOTS.TXT

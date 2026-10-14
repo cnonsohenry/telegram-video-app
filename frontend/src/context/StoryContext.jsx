@@ -263,15 +263,40 @@ export function StoryProvider({ children }) {
     setActiveStoryModal(null);
   }, []);
 
+  // Open custom list of stories (e.g. for Highlights or Archive playback)
+  const openCustomStories = useCallback((stories, creator = null, initialIndex = 0) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      promptLogin("view highlights");
+      return;
+    }
+    if (!stories || stories.length === 0) return;
+
+    const startIndex = Math.max(0, Math.min(initialIndex, stories.length - 1));
+    setActiveStoryModal({
+      stories: stories,
+      story: stories[startIndex],
+      creator: creator || {
+        username: stories[0]?.username || "creator",
+        display_name: stories[0]?.display_name || stories[0]?.username || "Creator",
+        avatar_url: stories[0]?.avatar_url || "/assets/default-avatar.png"
+      }
+    });
+  }, []);
+
   // 4. Global openStoryPlayer event listener
   useEffect(() => {
     const handleOpenEvent = (e) => {
-      const { story, creator, username } = e.detail || {};
-      openStory(username || creator?.username || story?.username, creator || story);
+      const { story, stories, creator, username } = e.detail || {};
+      if (Array.isArray(stories) && stories.length > 0) {
+        openCustomStories(stories, creator);
+      } else {
+        openStory(username || creator?.username || story?.username, creator || story);
+      }
     };
     window.addEventListener("openStoryPlayer", handleOpenEvent);
     return () => window.removeEventListener("openStoryPlayer", handleOpenEvent);
-  }, [openStory]);
+  }, [openStory, openCustomStories]);
 
   return (
     <StoryContext.Provider
@@ -281,6 +306,7 @@ export function StoryProvider({ children }) {
         isStoryViewed,
         getStory,
         openStory,
+        openCustomStories,
         fetchActiveStories,
         refreshLocalViews
       }}
