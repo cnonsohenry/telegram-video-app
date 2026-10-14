@@ -980,7 +980,7 @@ const containerStyle = {
   position: "fixed",
   inset: 0,
   zIndex: 1000025,
-  backgroundColor: "#000000",
+  backgroundColor: "#09090b",
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
@@ -993,8 +993,8 @@ const topNavStyle = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  backgroundColor: "#000000",
-  borderBottom: "1px solid #1c1c1e",
+  backgroundColor: "#09090b",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
   zIndex: 100,
   flexShrink: 0
 };
@@ -1254,7 +1254,7 @@ const tabsContainerStyle = {
   display: "flex",
   position: "sticky",
   top: 0,
-  background: "#000000",
+  background: "#09090b",
   zIndex: 90
 };
 

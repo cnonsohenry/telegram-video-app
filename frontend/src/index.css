@@ -4,17 +4,17 @@
 :root {
   --primary-color: #ff3b30;
   --primary-glow: rgba(255, 59, 48, 0.4);
-  --bg-color: #000000;
-  /* 🔴 Red Theme Border: subtle dark gray */
-  --border-color: rgba(255, 255, 255, 0.1); 
+  --bg-color: #09090b;
+  /* 🔴 Calm Dark Zinc Border */
+  --border-color: rgba(255, 255, 255, 0.08); 
 }
 
 body.theme-orange {
   --primary-color: #ff8c00;
   --primary-glow: rgba(255, 140, 0, 0.4);
-  --bg-color: #0B0F1A;
-  /* 🟠 Orange Theme Border: lighter and blue-tinted for visibility */
-  --border-color: rgba(255, 255, 255, 0.15); 
+  --bg-color: #09090b;
+  /* 🟠 Orange Theme Border */
+  --border-color: rgba(255, 255, 255, 0.1); 
 }
 
 /* 🟢 2. WATERPROOF SHELL (Kills Trailing Space) */

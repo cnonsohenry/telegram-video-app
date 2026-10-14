@@ -1490,20 +1490,20 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
   </button>
 );
 
-// 🖌 STYLES (Clean AMOLED Instagram Dark Theme)
+// 🖌 STYLES (Clean Calm Black Instagram Dark Theme)
 const containerStyle = { 
   minHeight: "100%", 
-  background: "#000000", 
+  background: "var(--bg-color)", 
   color: "#f5f5f5", 
   position: "relative", 
   overflowX: "hidden" 
 };
 
 const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%" };
-const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid #1c1c1e", position: "sticky", top: 0, background: "#000000", zIndex: 100, backdropFilter: "blur(20px)" };
+const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", position: "sticky", top: 0, background: "#09090b", zIndex: 100, backdropFilter: "blur(20px)" };
 const centerTitleContainer = { display: "flex", alignItems: "center", cursor: "pointer" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0, color: "#fff" };
-const tabsContainerStyle = { display: "flex", position: "sticky", background: "#000000", zIndex: 90 };
+const tabsContainerStyle = { display: "flex", position: "sticky", background: "#09090b", zIndex: 90 };
 const loaderStyle = { padding: "40px", textAlign: "center", color: "#737373", fontSize: "14px" };
 
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", background: "#121214", borderBottom: "1px solid #262626" };

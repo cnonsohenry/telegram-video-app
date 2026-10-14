@@ -1381,8 +1381,8 @@ const StatCard = ({ title, value, icon, bg }) => (
 );
 
 // 🖌 UI STYLES
-const dashboardContainerStyle = { display: "flex", height: "100dvh", width: "100vw", background: "#050505", color: "#fff", position: "absolute", zIndex: 999999, top: 0, left: 0 };
-const sidebarStyle = { width: "260px", background: "#0a0a0a", borderRight: "1px solid rgba(255,255,255,0.05)", padding: "30px 20px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
+const dashboardContainerStyle = { display: "flex", height: "100dvh", width: "100vw", background: "#09090b", color: "#fff", position: "absolute", zIndex: 999999, top: 0, left: 0 };
+const sidebarStyle = { width: "260px", background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.08)", padding: "30px 20px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
 const logoStyle = { margin: 0, fontSize: "20px", fontWeight: "900", letterSpacing: "-1px", color: "#fff" };
 const mainContentStyle = { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" };
 const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "30px 40px", borderBottom: "1px solid rgba(255,255,255,0.05)" };

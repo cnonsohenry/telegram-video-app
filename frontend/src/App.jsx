@@ -994,7 +994,7 @@ export default function App() {
       )}
 
       {activeVideo && (
-        <div style={{ position: "fixed", inset: 0, zIndex: isCreatorOverVideo ? 999990 : 1000030, background: "#000" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: isCreatorOverVideo ? 999990 : 1000030, background: "var(--bg-color)" }}>
           <FullscreenPlayer 
             video={activeVideo}
             currentUser={user} 
@@ -1073,7 +1073,7 @@ export default function App() {
 }
 
 // 🖌 STYLES
-const navStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', backgroundColor: '#0a0a0a', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' };
+const navStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px', backgroundColor: '#09090b', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 10000, paddingBottom: 'env(safe-area-inset-bottom)' };
 const btnStyle = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', flex: 1, transition: 'all 0.3s ease' };
 const labelStyle = { fontSize: '10px', fontWeight: '700' };
 

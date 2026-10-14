@@ -820,7 +820,7 @@ const fullscreenContainerStyle = {
   position: "fixed",
   inset: 0,
   zIndex: 100003,
-  backgroundColor: "#000000",
+  backgroundColor: "#09090b",
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
@@ -839,11 +839,11 @@ const navBackBtnStyle = {
 
 const topNavStyle = {
   padding: "12px 16px",
-  borderBottom: "1px solid #1c1c1e",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  backgroundColor: "#000000",
+  backgroundColor: "#09090b",
   flexShrink: 0
 };
 
@@ -880,10 +880,10 @@ const closeBtnStyle = { background: "none", border: "none", cursor: "pointer", p
 const tabsBarStyle = {
   display: "flex",
   overflowX: "auto",
-  borderBottom: "1px solid #1a1a1a",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
   padding: "0 16px",
   gap: "10px",
-  background: "#000000",
+  background: "#09090b",
   flexShrink: 0
 };
 

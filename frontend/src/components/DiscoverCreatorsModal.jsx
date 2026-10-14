@@ -591,7 +591,7 @@ const mobileModalStyle = {
   inset: 0,
   width: "100%",
   height: "100%",
-  backgroundColor: "#000000",
+  backgroundColor: "#09090b",
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
@@ -604,7 +604,7 @@ const headerStyle = {
   justifyContent: "space-between",
   padding: "16px 18px",
   borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-  background: "#121212",
+  background: "#09090b",
   flexShrink: 0,
   zIndex: 10
 };

@@ -1579,8 +1579,8 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
 }
 
 // 🖌 UI STYLES
-const overlayStyle = { position: "fixed", inset: 0, height: "100dvh", backgroundColor: "#000", zIndex: 999999, display: "flex", flexDirection: "column", overflow: "hidden", touchAction: "none" };
-const stageStyle = { display: "flex", width: "100%", height: "100%", background: "#000", position: "relative" };
+const overlayStyle = { position: "fixed", inset: 0, height: "100dvh", backgroundColor: "#09090b", zIndex: 999999, display: "flex", flexDirection: "column", overflow: "hidden", touchAction: "none" };
+const stageStyle = { display: "flex", width: "100%", height: "100%", background: "#09090b", position: "relative" };
 const videoWrapperStyle = { flex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
 const loaderContainerStyle = { position: "absolute", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" };
 
@@ -1699,7 +1699,7 @@ const engagementBtnStyle = { background: "transparent", border: "none", display:
 const editFullscreenStyle = {
   position: "fixed",
   inset: 0,
-  background: "#000000",
+  background: "#09090b",
   display: "flex",
   flexDirection: "column",
   zIndex: 9999999,
@@ -1712,8 +1712,8 @@ const editTopNavStyle = {
   alignItems: "center",
   justifyContent: "space-between",
   padding: "0 16px",
-  borderBottom: "1px solid #1a1a1a",
-  backgroundColor: "#000000",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+  backgroundColor: "#09090b",
   flexShrink: 0
 };
 

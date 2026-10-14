@@ -1975,7 +1975,7 @@ export default function Explore({
             transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)",
             opacity: shouldHideUI ? 0 : 1,
             pointerEvents: shouldHideUI ? "none" : "auto",
-            background: "var(--bg-color, #0a0a0a)"
+            background: "var(--bg-color, #09090b)"
           }}>
             {/* AppHeader is kept in tree for portal search modal */}
             <div style={{ display: isSearching ? "none" : "block" }}>

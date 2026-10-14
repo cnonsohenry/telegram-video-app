@@ -658,13 +658,13 @@ const ModalSheet = ({ title, onClose, children }) => (
   </div>
 );
 
-// 🖌 STYLES (Clean monochrome AMOLED dark theme matching the rest of the app)
+// 🖌 STYLES (Clean Calm Black dark theme matching the rest of the app)
 const containerStyle = {
   position: "fixed",
   inset: 0,
   width: "100%",
   height: "100%",
-  backgroundColor: "#000000",
+  backgroundColor: "#09090b",
   color: "#fff",
   zIndex: 99999,
   display: "flex",
@@ -679,8 +679,8 @@ const navBarStyle = {
   alignItems: "center",
   justifyContent: "space-between",
   padding: "0 14px",
-  borderBottom: "1px solid #161616",
-  backgroundColor: "#000000",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+  backgroundColor: "#09090b",
   position: "sticky",
   top: 0,
   zIndex: 50,
