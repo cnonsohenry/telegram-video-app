@@ -20,7 +20,13 @@ export default function AppHeader({
   const [isSearchOpen, setIsSearchOpen] = useState(() => {
     const state = typeof window !== "undefined" ? window.history.state : null;
     const currentTab = state?.tab || (typeof window !== "undefined" && window.location.search.includes("tab=explore") ? "explore" : "home");
-    return Boolean(state?.searchOpen && (!tab || currentTab === tab));
+    return Boolean(
+      state?.searchOpen &&
+      !state?.creatorProfile &&
+      !state?.videoPlayer &&
+      !state?.storyPlayer &&
+      (!tab || currentTab === tab)
+    );
   });
   const isLoggedIn = user && (user.id || user.email);
 
@@ -79,7 +85,7 @@ export default function AppHeader({
       const state = event.state || {};
       const currentTab = window.__activeTab || state.tab || (window.location.search.includes("tab=explore") ? "explore" : "home");
 
-      if (state.searchOpen) {
+      if (state.searchOpen && !state.creatorProfile && !state.videoPlayer && !state.storyPlayer) {
         if (!isSearchOpenRef.current && (!tab || currentTab === tab)) {
           isSearchOpenRef.current = true;
           setIsSearchOpen(true);

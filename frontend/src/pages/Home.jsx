@@ -483,7 +483,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       }
 
       // 2. If any overlay modal is open/active, do not process category changes
-      if (state.videoPlayer || state.commentModal || state.paywall || state.searchOpen) {
+      if (state.videoPlayer || state.commentModal || state.paywall || state.searchOpen || state.creatorProfile || state.storyPlayer) {
         return;
       }
 

@@ -1494,6 +1494,9 @@ export default function Explore({
   useEffect(() => {
     const handleExplorePopState = (event) => {
       const state = event.state || {};
+      if (state.creatorProfile || state.storyPlayer || state.videoPlayer || state.commentModal) {
+        return;
+      }
       const params = new URLSearchParams(window.location.search);
       const urlQuery = params.get("q");
 

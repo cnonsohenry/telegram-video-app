@@ -228,8 +228,12 @@ export default function App() {
 
       // Only push a new history entry if this video is not already the active entry
       if (!currentState?.videoPlayer || currentState?.messageId !== String(activeVideo.message_id)) {
+        const nextState = { ...(currentState || {}), videoPlayer: true, messageId: String(activeVideo.message_id) };
+        delete nextState.searchOpen;
+        delete nextState.storyPlayer;
+        delete nextState.commentModal;
         window.history.pushState(
-          { ...(currentState || {}), videoPlayer: true, messageId: String(activeVideo.message_id) },
+          nextState,
           document.title,
           targetPath
         );
@@ -400,8 +404,12 @@ export default function App() {
     showDiscoverCreatorsRef.current = true;
     const currentState = window.history.state || {};
     if (!currentState.discoverCreators) {
+      const nextState = { ...currentState, discoverCreators: true };
+      delete nextState.searchOpen;
+      delete nextState.storyPlayer;
+      delete nextState.commentModal;
       window.history.pushState(
-        { ...currentState, discoverCreators: true },
+        nextState,
         document.title,
         window.location.search ? `${window.location.search}&discover=creators` : `/?discover=creators`
       );
@@ -439,8 +447,12 @@ export default function App() {
     setViewingCreator(username);
     viewingCreatorRef.current = username;
     const currentState = window.history.state || {};
+    const nextState = { ...currentState, creatorProfile: username };
+    delete nextState.searchOpen;
+    delete nextState.storyPlayer;
+    delete nextState.commentModal;
     window.history.pushState(
-      { ...currentState, creatorProfile: username },
+      nextState,
       document.title,
       `/?creator=${encodeURIComponent(username)}`
     );
