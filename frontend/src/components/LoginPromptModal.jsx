@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { 
   X, Heart, MessageCircle, Bookmark, UserPlus, Crown, Lock, ArrowRight, Sparkles 
 } from "lucide-react";
@@ -79,7 +80,7 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
   const config = getActionConfig(action);
   const Icon = config.icon;
 
-  return (
+  const content = (
     <div style={overlayStyle} onClick={handleSafeClose}>
       <div 
         style={cardStyle} 
@@ -162,12 +163,16 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
       `}</style>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(content, document.body)
+    : content;
 }
 
 const overlayStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 1000045,
+  zIndex: 1000300,
   backgroundColor: "rgba(0, 0, 0, 0.72)",
   backdropFilter: "blur(8px)",
   WebkitBackdropFilter: "blur(8px)",

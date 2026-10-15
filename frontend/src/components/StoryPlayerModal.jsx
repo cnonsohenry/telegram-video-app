@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import useModalHistory from "../hooks/useModalHistory";
 import { APP_CONFIG } from "../config";
 import { promptLogin } from "../utils/toast";
@@ -277,12 +278,12 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
   const soundTitle = currentStory.sound_title || "Trending Afrobeat Track";
   const videoSrc = currentStory.video_url || currentStory.raw_video_url;
 
-  return (
+  const modalContent = (
     <div
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 1000150,
+        zIndex: 1000200,
         backgroundColor: "rgba(0, 0, 0, 0.95)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
@@ -766,6 +767,10 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       </div>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 }
 
 export default StoryPlayerModal;

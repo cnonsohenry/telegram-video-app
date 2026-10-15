@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react"; 
+import { createPortal } from "react-dom";
 import Home from "./pages/Home";
 import Explore from "./pages/Explore"; 
 import Profile from "./pages/Profile";
@@ -1069,15 +1070,18 @@ export default function App() {
 
       {/* 🟢 TOP-LEVEL AUTH MODAL (ALWAYS ON TOP OF PLAYERS AND MODALS) */}
       {showAuthModal && !isLoggedIn && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 1000050 }}>
-          <AuthForm 
-            onLoginSuccess={(u, t) => {
-              onLoginSuccess(u, t);
-              handleCloseAuthModal();
-            }} 
-            onClose={handleCloseAuthModal} 
-          />
-        </div>
+        createPortal(
+          <div style={{ position: "fixed", inset: 0, zIndex: 1000350 }}>
+            <AuthForm 
+              onLoginSuccess={(u, t) => {
+                onLoginSuccess(u, t);
+                handleCloseAuthModal();
+              }} 
+              onClose={handleCloseAuthModal} 
+            />
+          </div>,
+          document.body
+        )
       )}
       
     </div>
