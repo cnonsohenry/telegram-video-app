@@ -247,6 +247,13 @@ export default function App() {
     if (activeVideo && activeVideo.message_id) {
       const currentState = window.history.state;
       const targetPath = `/v/${activeVideo.message_id}`;
+      const nextState = { ...(currentState || {}), videoPlayer: true, messageId: String(activeVideo.message_id) };
+      delete nextState.searchOpen;
+      delete nextState.storyPlayer;
+      delete nextState.commentModal;
+      delete nextState.profileFollowList;
+      delete nextState.creatorFollowList;
+      delete nextState.creatorFollowListUser;
 
       // Only push a new history entry if videoPlayer was not already open.
       // If videoPlayer was already active (swiped or clicked next video in player), use replaceState so hitting back once exits cleanly!
