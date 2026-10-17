@@ -1607,15 +1607,14 @@ app.get("/api/videos", async (req, res) => {
 
     // 🟢 Extract sort and seed parameters
     const sort = (req.query.sort || "").toLowerCase().trim();
-    const isAlgo = sort === "algo" || sort === "x" || sort === "for_you" || sort === "algorithm" || sort === "explore";
-    const isRandom = sort === "random" || req.query.random === "true";
+    const isRandom = sort === "random" || sort === "algo" || sort === "x" || sort === "for_you" || sort === "algorithm" || sort === "explore" || req.query.random === "true";
     const seed = req.query.seed ? String(req.query.seed).trim() : Math.floor(Math.random() * 1000000).toString();
     
     // 🟢 Extract timeframe from query (defaults to all_time)
     const timeframe = req.query.timeframe || "all_time";
     
     const rawCategory = req.query.category ? String(req.query.category).toLowerCase().trim() : "";
-    const category = rawCategory || (isAlgo ? "all" : "hotties");
+    const category = rawCategory || (isRandom ? "all" : "hotties");
     
     const isCommunity = req.query.community === "true" || category === "community";
     const communityCondition = isCommunity 
@@ -1635,120 +1634,43 @@ app.get("/api/videos", async (req, res) => {
       ? `WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND ${communityCondition}` 
       : `WHERE ${communityCondition}`;
 
-    if (isAlgo) {
-      // 🟢 Twitter/X Multi-Signal Dynamic Heavy Ranker (Ultra High Performance)
-      // Uses float8 hardware math, slim candidate projection, and late-join materialization
-      // to deliver instant (<250ms) refresh times across 14,000+ videos.
-      let seedParam;
+    if (isRandom) {
+      // 🟢 Purely random sorting across all catalog videos with deterministic seed for seamless infinite scrolling
       let limitOffsetPlaceholders;
-      let pagedOrder;
-      let finalOrder;
-      let algoFilter;
-
+      let seedParam;
       if (hasCategory) {
         queryValues = [category, seed, limit, offset];
         seedParam = "$2";
         limitOffsetPlaceholders = "LIMIT $3 OFFSET $4";
-        pagedOrder = "ORDER BY final_score DESC, created_at DESC, id DESC";
-        finalOrder = "ORDER BY p.final_score DESC, v.created_at DESC, v.id DESC";
-        algoFilter = `WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND ${communityCondition}`;
       } else {
         queryValues = [seed, limit, offset];
         seedParam = "$1";
         limitOffsetPlaceholders = "LIMIT $2 OFFSET $3";
-        pagedOrder = "ORDER BY cat_rank ASC, cat_order ASC, final_score DESC";
-        finalOrder = "ORDER BY p.cat_rank ASC, p.cat_order ASC, p.final_score DESC";
-        algoFilter = `WHERE ${communityCondition} AND (v.created_at >= NOW() - INTERVAL '45 days' OR v.views >= 50 OR v.likes_count > 0 OR v.shares_count > 0 OR v.category IN ('amateurs', 'amateur'))`;
       }
 
       query = `
-        WITH CandidatePool AS (
+        WITH DistinctVideos AS (
           SELECT 
             v.id,
-            v.category,
-            v.views::float8,
-            COALESCE(v.likes_count, 0)::float8 as likes_count,
-            COALESCE(v.shares_count, 0)::float8 as shares_count,
-            COALESCE(v.comments_count, 0)::float8 as comments_count,
-            COALESCE(v.saves_count, 0)::float8 as saves_count,
-            v.created_at,
-            v.media_group_id,
             ROW_NUMBER() OVER(
               PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END 
               ORDER BY v.created_at ASC
-            ) as rn
-          FROM videos v 
-          ${algoFilter}
-        ),
-        ScoredCandidates AS (
-          SELECT 
-            c.id,
-            c.category,
-            c.created_at,
-            (
-              (CASE 
-                 WHEN c.created_at >= NOW() - INTERVAL '24 hours' THEN 35.0::float8
-                 WHEN c.created_at >= NOW() - INTERVAL '3 days' THEN 22.0::float8
-                 WHEN c.created_at >= NOW() - INTERVAL '7 days' THEN 12.0::float8
-                 ELSE 0.0::float8 
-               END)
-              + ln(GREATEST(c.likes_count * 3.0 + c.shares_count * 4.0 + 1.0, 1.0)::float8) * 4.0
-              + ln(GREATEST(COALESCE(c.views, 0.0), 1.0)::float8 + 1.0) * 1.5
-            ) as fresh_score,
-            (
-              ln(GREATEST(
-                1.0 +
-                c.likes_count * 3.0 +
-                c.shares_count * 4.0 +
-                c.comments_count * 3.0 +
-                c.saves_count * 4.0 +
-                (CASE WHEN c.media_group_id IS NOT NULL AND c.media_group_id != 'none' THEN 3.0 ELSE 0.0 END)
-              , 1.0)::float8) * 8.0
-              * (0.35 + 0.65 * exp(-1.0 * (EXTRACT(EPOCH FROM (NOW() - COALESCE(c.created_at, NOW())))::float8 / 86400.0) / 14.0))
-            ) as eng_score,
-            (
-              ln(GREATEST(COALESCE(c.views, 0.0), 1.0)::float8 + 1.0) * 4.5 +
-              ln(GREATEST(c.likes_count + 1.0, 1.0)::float8) * 3.0
-            ) as viral_score,
-            (-1.0 * ln(-1.0 * ln(((abs(hashtext(c.id::text || ${seedParam} || 'g_f')) % 998000 + 1000)::float8 / 1000000.0)))) as g_fresh,
-            (-1.0 * ln(-1.0 * ln(((abs(hashtext(c.id::text || ${seedParam} || 'g_e')) % 998000 + 1000)::float8 / 1000000.0)))) as g_eng,
-            (-1.0 * ln(-1.0 * ln(((abs(hashtext(c.id::text || ${seedParam} || 'g_v')) % 998000 + 1000)::float8 / 1000000.0)))) as g_viral
-          FROM CandidatePool c
-          WHERE c.rn = 1
-        ),
-        SessionWeighted AS (
-          SELECT *,
-            (0.7 + 1.4 * ((abs(hashtext(${seedParam} || 'w_f')) % 1000) / 1000.0)) as w_fresh,
-            (0.7 + 1.4 * ((abs(hashtext(${seedParam} || 'w_e')) % 1000) / 1000.0)) as w_eng,
-            (0.5 + 1.0 * ((abs(hashtext(${seedParam} || 'w_v')) % 1000) / 1000.0)) as w_viral
-          FROM ScoredCandidates
-        ),
-        RankedIds AS (
-          SELECT id,
-            ROW_NUMBER() OVER(
-              PARTITION BY category 
-              ORDER BY (
-                (fresh_score * w_fresh + 3.0 * g_fresh) +
-                (eng_score * w_eng + 3.0 * g_eng) +
-                (viral_score * w_viral + 2.0 * g_viral)
-              ) DESC, created_at DESC, id DESC
-            ) as cat_rank,
-            (abs(hashtext(category || ${seedParam} || 'cat')) % 100) as cat_order,
-            (
-              (fresh_score * w_fresh + 3.0 * g_fresh) +
-              (eng_score * w_eng + 3.0 * g_eng) +
-              (viral_score * w_viral + 2.0 * g_viral)
-            ) as final_score
-          FROM SessionWeighted
+            ) as rn,
+            COUNT(*) OVER(
+              PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END
+            ) as group_count
+          FROM videos v
+          ${catFilter}
         ),
         PagedIds AS (
-          SELECT id, cat_rank, cat_order, final_score 
-          FROM RankedIds 
-          ${pagedOrder}
+          SELECT id, group_count, MD5(id::text || ${seedParam}) as rnd
+          FROM DistinctVideos
+          WHERE rn = 1
+          ORDER BY rnd ASC
           ${limitOffsetPlaceholders}
         )
-        SELECT v.*, 
-          p.cat_rank, p.cat_order, p.final_score,
+        SELECT v.*,
+          p.group_count,
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
           COALESCE(au.is_verified, true) as is_verified,
@@ -1757,7 +1679,7 @@ app.get("/api/videos", async (req, res) => {
         JOIN videos v ON v.id = p.id
         LEFT JOIN users u ON v.uploader_id = u.user_id
         LEFT JOIN app_users au ON (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text)
-        ${finalOrder}
+        ORDER BY p.rnd ASC
       `;
     } else if (category === "trends") {
       // 🟢 Set the time filter based on the requested timeframe
@@ -1789,47 +1711,6 @@ app.get("/api/videos", async (req, res) => {
         ORDER BY v.views DESC
       `;
       queryValues = [limit, offset];
-    } else if (isRandom) {
-      // 🟢 Random sorting across all time (supports deterministic seed for gap-free pagination)
-      let orderClause;
-      if (hasCategory) {
-        if (seed) {
-          orderClause = "ORDER BY MD5(id::text || $2) LIMIT $3 OFFSET $4";
-          queryValues = [category, seed, limit, offset];
-        } else {
-          orderClause = "ORDER BY RANDOM() LIMIT $2 OFFSET $3";
-          queryValues = [category, limit, offset];
-        }
-      } else {
-        if (seed) {
-          orderClause = "ORDER BY MD5(id::text || $1) LIMIT $2 OFFSET $3";
-          queryValues = [seed, limit, offset];
-        } else {
-          orderClause = "ORDER BY RANDOM() LIMIT $1 OFFSET $2";
-          queryValues = [limit, offset];
-        }
-      }
-
-      query = `
-        WITH GroupedVideos AS (
-          SELECT v.*, 
-            ROW_NUMBER() OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END ORDER BY v.created_at ASC) as rn,
-            COUNT(*) OVER(PARTITION BY CASE WHEN v.media_group_id IS NOT NULL AND v.media_group_id != 'none' THEN v.media_group_id ELSE v.message_id END) as group_count
-          FROM videos v 
-          ${catFilter}
-        ),
-        PagedVideos AS (
-          SELECT * FROM GroupedVideos WHERE rn = 1 ${orderClause}
-        )
-        SELECT v.*, 
-          COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
-          COALESCE(au.username, u.username, 'creator') as uploader_handle,
-          COALESCE(au.is_verified, true) as is_verified,
-          COALESCE(au.subscription_price, 0) as subscription_price
-        FROM PagedVideos v 
-        LEFT JOIN users u ON v.uploader_id = u.user_id
-        LEFT JOIN app_users au ON (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text)
-      `;
     } else {
       if (hasCategory) {
         queryValues = [category, limit, offset];
@@ -1863,8 +1744,8 @@ app.get("/api/videos", async (req, res) => {
     }
 
     let countPromise;
-    if (isAlgo) {
-      countPromise = Promise.resolve(1000);
+    if (isRandom) {
+      countPromise = Promise.resolve(15000);
     } else {
       let countQuery;
       let countValues;
@@ -1900,7 +1781,7 @@ app.get("/api/videos", async (req, res) => {
     }
 
     let suggestPromise;
-    if (page === 1 && !isAlgo) {
+    if (page === 1 && !isRandom) {
       const suggestQuery = `
         WITH RandomVideos AS (
           SELECT * FROM videos v
@@ -1929,7 +1810,7 @@ app.get("/api/videos", async (req, res) => {
       suggestPromise
     ]);
 
-    const rawVideos = isAlgo ? interleaveByAuthor(videosRes.rows, 2) : videosRes.rows;
+    const rawVideos = isRandom ? interleaveByAuthor(videosRes.rows, 2) : videosRes.rows;
 
     res.json({
       page,

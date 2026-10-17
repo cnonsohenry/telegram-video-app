@@ -1264,7 +1264,7 @@ export default function Explore({
     if (onVideoClick) onVideoClick(video, e);
   }, [onVideoClick]);
 
-  // 🟢 LOAD FOR YOU FEED (Authentic Twitter/X Heavy Ranker Algorithmic Feed + Session Exploration)
+  // 🟢 LOAD FOR YOU FEED (Purely Random Catalog Shuffling + Deterministic Pagination)
   const loadForYouFeed = useCallback(async (isLoadMore = false, cat = selectedCategory, pageOverride = null) => {
     if (isFetchingForYouRef.current) return;
 
@@ -1288,7 +1288,7 @@ export default function Explore({
     try {
       const categoryParam = cat ? `&category=${encodeURIComponent(cat)}` : "";
       const seedParam = `&seed=${sessionSeedRef.current}`;
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?sort=algo&page=${targetPage}&limit=12${categoryParam}${seedParam}`);
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?sort=random&page=${targetPage}&limit=12${categoryParam}${seedParam}`);
       if (res.ok) {
         const data = await res.json();
         const fetched = data.videos || [];
@@ -1590,15 +1590,43 @@ export default function Explore({
 
   // 🟢 TAB SWITCHING HANDLER
   const handleTabSwitch = (tab) => {
-    if (tab === activeTab) return;
+    if (tab === activeTab) {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      if (tab === "for_you") {
+        loadForYouFeed(false, selectedCategory, 1);
+      } else if (tab === "community") {
+        loadCommunityFeed(1, false);
+      }
+      return;
+    }
     setActiveTab(tab);
     if (tab === "community" && communityFeed.length === 0 && !communityLoading) {
       loadCommunityFeed(1, false);
     }
-    if (tab === "for_you" && forYouFeed.length === 0 && !forYouLoading) {
+    if (tab === "for_you") {
       loadForYouFeed(false, selectedCategory, 1);
     }
   };
+
+  // 🟢 Reselecting Explore in bottom navigation scrolls to top and re-randomizes feed
+  useEffect(() => {
+    const handleReselect = (e) => {
+      if (e.detail === "explore") {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+        }
+        if (activeTab === "for_you") {
+          loadForYouFeed(false, selectedCategory, 1);
+        } else if (activeTab === "community") {
+          loadCommunityFeed(1, false);
+        }
+      }
+    };
+    window.addEventListener("tabReselected", handleReselect);
+    return () => window.removeEventListener("tabReselected", handleReselect);
+  }, [activeTab, loadForYouFeed, loadCommunityFeed, selectedCategory]);
 
   // 🟢 INFINITE SCROLL OBSERVER
   const observer = useRef();
