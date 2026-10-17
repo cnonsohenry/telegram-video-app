@@ -149,7 +149,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
           {pollingStatus === "success" ? (
             <div style={successContainerStyle}>
               <div style={successIconStyle}>
-                <Sparkles size={40} color="#00d084" />
+                <Sparkles size={40} color="#f43f5e" />
               </div>
               <h3 style={successTitleStyle}>VIP Access Activated!</h3>
               <p style={successSubStyle}>
@@ -166,7 +166,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                   <div style={{ fontWeight: "800", color: "#fff", fontSize: "14px" }}>
                     {creator?.display_name || creator?.username}
                   </div>
-                  <div style={{ fontSize: "12px", color: "#00d084", fontWeight: "700" }}>
+                  <div style={{ fontSize: "12px", color: "#f43f5e", fontWeight: "700" }}>
                     Active VIP Subscriber ✓
                   </div>
                 </div>
@@ -220,7 +220,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                     style={copyBtnStyle}
                     title="Copy amount"
                   >
-                    {copiedField === "amount" ? <CheckCircle2 size={16} color="#00d084" /> : <Copy size={16} color="#fff" />}
+                    {copiedField === "amount" ? <CheckCircle2 size={16} color="#f4f4f5" /> : <Copy size={16} color="#fff" />}
                   </button>
                 </div>
 
@@ -237,7 +237,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                     style={{ ...copyBtnStyle, flexShrink: 0 }}
                     title="Copy wallet address"
                   >
-                    {copiedField === "address" ? <CheckCircle2 size={16} color="#00d084" /> : <Copy size={16} color="#fff" />}
+                    {copiedField === "address" ? <CheckCircle2 size={16} color="#f4f4f5" /> : <Copy size={16} color="#fff" />}
                   </button>
                 </div>
               </div>
@@ -351,7 +351,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
 
               {/* Guarantee Footer */}
               <div style={guaranteeRowStyle}>
-                <ShieldCheck size={16} color="#00d084" />
+                <ShieldCheck size={16} color="#f43f5e" />
                 <span>Instant blockchain activation • 256-bit secure checkout</span>
               </div>
             </div>
@@ -444,7 +444,7 @@ const creatorProfileAvatarStyle = {
 
 const creatorNameStyle = { fontWeight: "800", fontSize: "15px", color: "#fff" };
 const creatorMetaStyle = { fontSize: "12px", color: "#8e8e93", display: "block", marginTop: "2px" };
-const priceTagStyle = { fontSize: "15px", fontWeight: "900", color: "#00d084", marginTop: "4px" };
+const priceTagStyle = { fontSize: "15px", fontWeight: "900", color: "#f43f5e", marginTop: "4px" };
 
 const perksContainerStyle = {
   display: "flex",
@@ -643,7 +643,7 @@ const successIconStyle = {
   width: "72px",
   height: "72px",
   borderRadius: "50%",
-  background: "rgba(0, 208, 132, 0.15)",
+  background: "rgba(225, 29, 72, 0.15)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -658,7 +658,7 @@ const successCreatorCardStyle = {
   alignItems: "center",
   gap: "12px",
   background: "#1a1a1d",
-  border: "1px solid rgba(0, 208, 132, 0.3)",
+  border: "1px solid rgba(225, 29, 72, 0.3)",
   borderRadius: "14px",
   padding: "12px 18px",
   marginBottom: "24px"
@@ -666,7 +666,7 @@ const successCreatorCardStyle = {
 
 const doneBtnStyle = {
   width: "100%",
-  background: "linear-gradient(135deg, #00d084, #009e60)",
+  background: "#e11d48",
   color: "#fff",
   border: "none",
   borderRadius: "14px",
@@ -674,7 +674,7 @@ const doneBtnStyle = {
   fontWeight: "800",
   fontSize: "14px",
   cursor: "pointer",
-  boxShadow: "0 6px 18px rgba(0, 208, 132, 0.3)"
+  boxShadow: "0 6px 18px rgba(225, 29, 72, 0.3)"
 };
 
 const errorBannerStyle = {

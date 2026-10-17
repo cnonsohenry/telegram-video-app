@@ -19,6 +19,7 @@ import StoryHighlightsTray from "../components/StoryHighlightsTray";
 import FeedPost from "../components/FeedPost";
 import PostOptionsModal from "../components/PostOptionsModal";
 import ReportModal from "../components/ReportModal";
+import FollowListModal from "../components/FollowListModal";
 import { useVideos } from "../hooks/useVideos";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
@@ -37,7 +38,7 @@ export default function Profile({
   onOpenDiscoverCreators,
   onCommentClick
 }) {
-  const [activeTab, setActiveTab] = useState(user?.is_creator ? "videos" : "likes");
+  const [activeTab, setActiveTab] = useState("videos");
   const [currentView, setCurrentView] = useState("profile");
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
@@ -51,10 +52,10 @@ export default function Profile({
   }, [onOpenDiscoverCreators]);
 
   useEffect(() => {
-    if (!user?.is_creator && (activeTab === "videos" || activeTab === "reels" || activeTab === "premium")) {
-      setActiveTab("likes");
+    if (!user?.is_creator && activeTab === "premium") {
+      setActiveTab("videos");
     }
-  }, [user?.is_creator]);
+  }, [user?.is_creator, activeTab]);
   
   const [activeGroup, setActiveGroup] = useState(null);
   const [deletedVideoIds, setDeletedVideoIds] = useState(new Set());
@@ -62,10 +63,11 @@ export default function Profile({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadDefaultCategory, setUploadDefaultCategory] = useState("community");
   
-  // Creator Modals
+  // Creator & Social Modals
   const [showSetupModal, setShowSetupModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [followListTab, setFollowListTab] = useState(null); // "followers" | "following" | null
   const [optionsVideo, setOptionsVideo] = useState(null);
   const [reportedVideo, setReportedVideo] = useState(null);
 
@@ -76,14 +78,17 @@ export default function Profile({
     showStudioModal || 
     showUploadModal || 
     showDiscoverModal || 
+    followListTab ||
     optionsVideo || 
     reportedVideo || 
     currentView !== "profile"
   );
   
-  // Live creator stats
+  // Live profile stats
   const [creatorStats, setCreatorStats] = useState({
     posts: 0,
+    followers: 0,
+    following: 0,
     subscribers: 0,
     likes: 0,
     views: 0
@@ -112,12 +117,15 @@ export default function Profile({
     return () => window.removeEventListener("openCreatorStudio", handleOpenStudio);
   }, []);
 
-  // Fetch live stats & highlights for creator profile from DB
+  // Fetch live stats & highlights for user/creator profile from DB
   useEffect(() => {
     if (!user?.username) return;
     let isMounted = true;
 
-    fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(user.username)}`)
+    const token = localStorage.getItem("token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(user.username)}`, { headers })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (isMounted && data?.creator) {
@@ -145,6 +153,51 @@ export default function Profile({
   useEffect(() => {
     activeGroupRef.current = activeGroup;
   }, [activeGroup]);
+
+  const followListTabRef = useRef(followListTab);
+  useEffect(() => {
+    followListTabRef.current = followListTab;
+  }, [followListTab]);
+
+  const handleOpenFollowList = useCallback((tab) => {
+    followListTabRef.current = tab;
+    setFollowListTab(tab);
+    const currentState = window.history.state || {};
+    if (!currentState.profileFollowList) {
+      window.history.pushState(
+        { ...currentState, profileFollowList: tab },
+        document.title,
+        window.location.href
+      );
+    } else if (currentState.profileFollowList !== tab) {
+      window.history.replaceState(
+        { ...currentState, profileFollowList: tab },
+        document.title,
+        window.location.href
+      );
+    }
+  }, []);
+
+  const handleFollowListTabChange = useCallback((newTab) => {
+    followListTabRef.current = newTab;
+    setFollowListTab(newTab);
+    const currentState = window.history.state || {};
+    if (currentState.profileFollowList && currentState.profileFollowList !== newTab) {
+      window.history.replaceState(
+        { ...currentState, profileFollowList: newTab },
+        document.title,
+        window.location.href
+      );
+    }
+  }, []);
+
+  const handleCloseFollowList = useCallback(() => {
+    followListTabRef.current = null;
+    setFollowListTab(null);
+    if (window.history.state?.profileFollowList) {
+      window.history.back();
+    }
+  }, []);
 
   const handleOpenSettings = () => {
     setCurrentView("settings");
@@ -177,11 +230,33 @@ export default function Profile({
   useEffect(() => {
     const handleProfilePopState = (event) => {
       const state = event.state || {};
+
+      // Restore or close Profile FollowListModal based on history state
+      if (state.profileFollowList && !state.creatorProfile && !state.videoPlayer && !state.storyPlayer) {
+        if (followListTabRef.current !== state.profileFollowList) {
+          followListTabRef.current = state.profileFollowList;
+          setFollowListTab(state.profileFollowList);
+        }
+        return;
+      }
+      if (followListTabRef.current && (!state.profileFollowList || state.creatorProfile)) {
+        followListTabRef.current = null;
+        setFollowListTab(null);
+        if (!state.creatorProfile) return;
+      }
+
+      // Restore or close SettingsView based on history state
+      if (state.settingsOpen && !state.creatorProfile && !state.videoPlayer && currentViewRef.current !== "settings") {
+        currentViewRef.current = "settings";
+        setCurrentView("settings");
+        return;
+      }
       if (currentViewRef.current === "settings" && !state.settingsOpen) {
         currentViewRef.current = "profile";
         setCurrentView("profile");
         return;
       }
+
       if (activeGroupRef.current && !state.albumOpen) {
         activeGroupRef.current = null;
         setActiveGroup(null);
@@ -211,7 +286,7 @@ export default function Profile({
   const { videos: liked, loading: likedLoading, loadMore: loadMoreLiked } = useVideos("likes", fetchLimit);
   const { videos: saved, loading: savedLoading, loadMore: loadMoreSaved } = useVideos("saved", fetchLimit);
 
-  // Creator's own posts state
+  // User/Creator's own posts state
   const [creatorPosts, setCreatorPosts] = useState([]);
   const [creatorPostsLoading, setCreatorPostsLoading] = useState(false);
   const [creatorPostsPage, setCreatorPostsPage] = useState(1);
@@ -225,7 +300,7 @@ export default function Profile({
   const [hasLoadedPremiumOnce, setHasLoadedPremiumOnce] = useState(false);
 
   const fetchCreatorPosts = useCallback(async (targetPage, isNew) => {
-    if (!user?.username || !user?.is_creator) return;
+    if (!user?.username) return;
     setCreatorPostsLoading(true);
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(user.username)}/videos?page=${targetPage}&limit=${fetchLimit}`);
@@ -241,11 +316,11 @@ export default function Profile({
         setCreatorPostsPage(targetPage + 1);
       }
     } catch (e) {
-      console.error("Failed to load creator profile posts", e);
+      console.error("Failed to load profile posts", e);
     } finally {
       setCreatorPostsLoading(false);
     }
-  }, [user?.username, user?.is_creator, fetchLimit]);
+  }, [user?.username, fetchLimit]);
 
   const fetchCreatorPremiumPosts = useCallback(async (targetPage, isNew) => {
     if (!user?.username || !user?.is_creator) return;
@@ -272,11 +347,11 @@ export default function Profile({
   }, [user?.username, user?.is_creator, fetchLimit]);
 
   useEffect(() => {
-    if (user?.is_creator && user?.username) {
+    if (user?.username) {
       setCreatorPostsPage(1);
       fetchCreatorPosts(1, true);
     }
-  }, [user?.is_creator, user?.username, fetchCreatorPosts]);
+  }, [user?.username, fetchCreatorPosts]);
 
   useEffect(() => {
     if (user?.is_creator && user?.username && activeTab === "premium" && !hasLoadedPremiumOnce && !creatorPremiumLoading) {
@@ -296,54 +371,36 @@ export default function Profile({
       ...prev,
       posts: (prev.posts || 0) + 1
     }));
-    if (!user?.is_creator && onUpdateUser) {
-      onUpdateUser({ ...user, is_creator: true, role: "creator" });
-    }
   };
 
   let rawVideosToDisplay = [];
   let loading = false;
   let loadMore = () => {};
 
-  if (user?.is_creator) {
-    if (activeTab === "videos" || activeTab === "reels") {
-      rawVideosToDisplay = creatorPosts;
-      loading = creatorPostsLoading;
-      loadMore = () => {
-        if (!creatorPostsLoading && hasMoreCreatorPosts) {
-          fetchCreatorPosts(creatorPostsPage, false);
-        }
-      };
-    } else if (activeTab === "premium") {
-      // Creator sees their own VIP Exclusive / Premium uploaded content
-      rawVideosToDisplay = creatorPremiumPosts;
-      loading = creatorPremiumLoading;
-      loadMore = () => {
-        if (!creatorPremiumLoading && hasMoreCreatorPremiumPosts) {
-          fetchCreatorPremiumPosts(creatorPremiumPage, false);
-        }
-      };
-    } else if (activeTab === "likes") {
-      rawVideosToDisplay = liked || [];
-      loading = likedLoading;
-      loadMore = loadMoreLiked;
-    } else if (activeTab === "saved") {
-      rawVideosToDisplay = saved || [];
-      loading = savedLoading;
-      loadMore = loadMoreSaved;
-    }
-  } else {
-    // Non-creator viewer profile: strictly user-centric interactions (Liked, Saved)
-    // Creators' uploaded content NEVER shows on regular user profiles
-    if (activeTab === "likes") {
-      rawVideosToDisplay = liked || [];
-      loading = likedLoading;
-      loadMore = loadMoreLiked;
-    } else if (activeTab === "saved") {
-      rawVideosToDisplay = saved || [];
-      loading = savedLoading;
-      loadMore = loadMoreSaved;
-    }
+  if (activeTab === "videos" || activeTab === "reels") {
+    rawVideosToDisplay = creatorPosts;
+    loading = creatorPostsLoading;
+    loadMore = () => {
+      if (!creatorPostsLoading && hasMoreCreatorPosts) {
+        fetchCreatorPosts(creatorPostsPage, false);
+      }
+    };
+  } else if (activeTab === "premium" && user?.is_creator) {
+    rawVideosToDisplay = creatorPremiumPosts;
+    loading = creatorPremiumLoading;
+    loadMore = () => {
+      if (!creatorPremiumLoading && hasMoreCreatorPremiumPosts) {
+        fetchCreatorPremiumPosts(creatorPremiumPage, false);
+      }
+    };
+  } else if (activeTab === "likes") {
+    rawVideosToDisplay = liked || [];
+    loading = likedLoading;
+    loadMore = loadMoreLiked;
+  } else if (activeTab === "saved") {
+    rawVideosToDisplay = saved || [];
+    loading = savedLoading;
+    loadMore = loadMoreSaved;
   }
 
   useEffect(() => {
@@ -560,6 +617,18 @@ export default function Profile({
         />
 
         {/* 🌟 MODALS ACCESSIBLE DIRECTLY FROM SETTINGS */}
+        {showEditModal && (
+          <EditProfileModal 
+            user={user}
+            onClose={() => setShowEditModal(false)}
+            onOpenCreatorSetup={() => setShowSetupModal(true)}
+            onUpdateSuccess={(updatedUser) => {
+              handleUpdateSuccess(updatedUser);
+              setShowEditModal(false);
+            }}
+          />
+        )}
+
         {showSetupModal && (
           <CreatorSetupModal 
             user={user}
@@ -567,17 +636,6 @@ export default function Profile({
             onSetupSuccess={(updatedUser) => {
               handleUpdateSuccess(updatedUser);
               setShowSetupModal(false);
-            }}
-          />
-        )}
-
-        {showEditModal && (
-          <EditProfileModal 
-            user={user}
-            onClose={() => setShowEditModal(false)}
-            onUpdateSuccess={(updatedUser) => {
-              handleUpdateSuccess(updatedUser);
-              setShowEditModal(false);
             }}
           />
         )}
@@ -621,12 +679,10 @@ export default function Profile({
     return Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
   };
 
-  const postsCount = user?.is_creator ? (creatorStats.posts || creatorPosts.length || 0) : 0;
-  const followersCount = user?.is_creator ? (creatorStats.followers !== undefined ? creatorStats.followers : (creatorStats.subscribers || 0)) : 0;
-  const likesCount = user?.is_creator ? (creatorStats.likes || 0) : (liked?.length || 0);
-  const followingCount = (user?.follows && Array.isArray(user.follows)) 
-    ? user.follows.length 
-    : (user?.subscriptions?.length || 0);
+  const postsCount = creatorStats.posts !== undefined ? Math.max(creatorStats.posts, creatorPosts.length) : creatorPosts.length;
+  const followersCount = creatorStats.followers !== undefined ? creatorStats.followers : (user?.followers_count || 0);
+  const followingCount = creatorStats.following !== undefined ? creatorStats.following : (user?.following_count !== undefined ? user.following_count : (user?.follows?.length || 0));
+  const likesCount = creatorStats.likes || (liked?.length || 0);
 
   return (
     <div
@@ -675,13 +731,13 @@ export default function Profile({
           </div>
         )}
 
-        {/* 🌟 TIKTOK / CREATOR STYLE PROFILE HEADER */}
+        {/* 🌟 INSTAGRAM / CREATOR STYLE PROFILE HEADER */}
         <div style={{ padding: isDesktop ? "32px 20px 10px 20px" : "16px 16px 8px 16px" }}>
           
           {/* MOBILE HEADER LAYOUT */}
           {!isDesktop ? (
             <div>
-              {/* Top Row: Details on left; Avatar on right (TikTok style) */}
+              {/* Top Row: Details on left; Avatar on right */}
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "14px" }}>
                 
                 {/* Display Name, Bio, Inline Stats */}
@@ -717,7 +773,7 @@ export default function Profile({
                     </p>
                   )}
 
-                  {/* Line 3: Post, followers, likes count */}
+                  {/* Line 3: Followers, following, likes count */}
                   <div style={{
                     display: "flex",
                     alignItems: "center",
@@ -725,38 +781,28 @@ export default function Profile({
                     flexWrap: "wrap",
                     fontSize: "12.5px",
                     color: "#8e8e93",
-                    marginTop: "4px"
+                    marginTop: "6px"
                   }}>
-                    {user?.is_creator ? (
-                      <>
-                        <span>
-                          <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(postsCount)}</strong>{" "}
-                          <span>posts</span>
-                        </span>
-                        <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                        <span>
-                          <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
-                          <span>followers</span>
-                        </span>
-                        <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                        <span>
-                          <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
-                          <span>likes</span>
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span>
-                          <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
-                          <span>following</span>
-                        </span>
-                        <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                        <span>
-                          <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
-                          <span>likes</span>
-                        </span>
-                      </>
-                    )}
+                    <span
+                      onClick={() => handleOpenFollowList("followers")}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
+                      <span>followers</span>
+                    </span>
+                    <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                    <span
+                      onClick={() => handleOpenFollowList("following")}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
+                      <span>following</span>
+                    </span>
+                    <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                    <span>
+                      <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                      <span>likes</span>
+                    </span>
                   </div>
                 </div>
 
@@ -783,7 +829,7 @@ export default function Profile({
 
               </div>
 
-              {/* Action Buttons Row (Only Edit profile and Upload) */}
+              {/* Action Buttons Row */}
               <div style={mobileActionButtonsRow}>
                 <button 
                   onClick={() => setShowEditModal(true)} 
@@ -798,24 +844,49 @@ export default function Profile({
                 </button>
                 <button 
                   onClick={() => {
-                    if (user?.is_creator) {
-                      setUploadDefaultCategory(activeTab === "premium" ? "premium" : "community");
-                      setShowUploadModal(true);
-                    } else {
-                      setShowSetupModal(true);
-                    }
+                    setUploadDefaultCategory(activeTab === "premium" && user?.is_creator ? "premium" : "community");
+                    setShowUploadModal(true);
                   }} 
                   style={{
                     ...mobileActionButton,
-                    backgroundColor: "#262626",
-                    color: "#ffffff",
-                    border: "1px solid #363636",
+                    backgroundColor: "#27272a",
+                    color: "#f4f4f5",
+                    border: "1px solid rgba(255,255,255,0.08)",
                     fontWeight: "700"
                   }}
                 >
-                  <Plus size={16} color="#fff" />
+                  <Plus size={16} color="#f4f4f5" />
                   <span>Upload</span>
                 </button>
+                {user?.is_creator ? (
+                  <button
+                    onClick={() => setShowStudioModal(true)}
+                    style={{
+                      ...mobileActionButton,
+                      backgroundColor: "rgba(225, 29, 72, 0.14)",
+                      color: "#f43f5e",
+                      border: "1px solid rgba(225, 29, 72, 0.28)",
+                      fontWeight: "700"
+                    }}
+                  >
+                    <TrendingUp size={15} color="#f43f5e" />
+                    <span>Studio</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowSetupModal(true)}
+                    style={{
+                      ...mobileActionButton,
+                      backgroundColor: "rgba(225, 29, 72, 0.14)",
+                      color: "#f43f5e",
+                      border: "1px solid rgba(225, 29, 72, 0.28)",
+                      fontWeight: "700"
+                    }}
+                  >
+                    <ShieldCheck size={15} color="#f43f5e" />
+                    <span>Monetize</span>
+                  </button>
+                )}
               </div>
 
               {/* Website Link & Location */}
@@ -880,49 +951,39 @@ export default function Profile({
                   </p>
                 )}
 
-                {/* Line 3: Post, followers, likes count */}
+                {/* Line 3: Followers, following, likes count */}
                 <div style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "18px",
+                  gap: "16px",
                   fontSize: "14px",
                   color: "#8e8e93",
                   marginTop: "6px",
                   marginBottom: "16px"
                 }}>
-                  {user?.is_creator ? (
-                    <>
-                      <span>
-                        <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(postsCount)}</strong>{" "}
-                        <span>posts</span>
-                      </span>
-                      <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                      <span>
-                        <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
-                        <span>followers</span>
-                      </span>
-                      <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                      <span>
-                        <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
-                        <span>likes</span>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span>
-                        <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
-                        <span>following</span>
-                      </span>
-                      <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                      <span>
-                        <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
-                        <span>likes</span>
-                      </span>
-                    </>
-                  )}
+                  <span
+                    onClick={() => handleOpenFollowList("followers")}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
+                    <span>followers</span>
+                  </span>
+                  <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                  <span
+                    onClick={() => handleOpenFollowList("following")}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
+                    <span>following</span>
+                  </span>
+                  <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                  <span>
+                    <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                    <span>likes</span>
+                  </span>
                 </div>
 
-                {/* Action Buttons (Only Edit profile, Upload Video, and Settings) */}
+                {/* Action Buttons */}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
                   <button 
                     onClick={() => setShowEditModal(true)} 
@@ -937,24 +998,49 @@ export default function Profile({
                   </button>
                   <button 
                     onClick={() => {
-                      if (user?.is_creator) {
-                        setUploadDefaultCategory(activeTab === "premium" ? "premium" : "community");
-                        setShowUploadModal(true);
-                      } else {
-                        setShowSetupModal(true);
-                      }
+                      setUploadDefaultCategory(activeTab === "premium" && user?.is_creator ? "premium" : "community");
+                      setShowUploadModal(true);
                     }} 
                     style={{
                       ...desktopActionButton,
-                      backgroundColor: "#262626",
-                      color: "#ffffff",
-                      border: "1px solid #363636",
+                      backgroundColor: "#27272a",
+                      color: "#f4f4f5",
+                      border: "1px solid rgba(255,255,255,0.08)",
                       fontWeight: "700"
                     }}
                   >
-                    <Plus size={16} color="#fff" />
+                    <Plus size={16} color="#f4f4f5" />
                     <span>Upload Video</span>
                   </button>
+                  {user?.is_creator ? (
+                    <button
+                      onClick={() => setShowStudioModal(true)}
+                      style={{
+                        ...desktopActionButton,
+                        backgroundColor: "rgba(225, 29, 72, 0.14)",
+                        color: "#f43f5e",
+                        border: "1px solid rgba(225, 29, 72, 0.28)",
+                        fontWeight: "700"
+                      }}
+                    >
+                      <TrendingUp size={16} color="#f43f5e" />
+                      <span>Creator Studio</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setShowSetupModal(true)}
+                      style={{
+                        ...desktopActionButton,
+                        backgroundColor: "rgba(225, 29, 72, 0.14)",
+                        color: "#f43f5e",
+                        border: "1px solid rgba(225, 29, 72, 0.28)",
+                        fontWeight: "700"
+                      }}
+                    >
+                      <ShieldCheck size={16} color="#f43f5e" />
+                      <span>Verify & Monetize</span>
+                    </button>
+                  )}
                   <button onClick={handleOpenSettings} style={desktopIconBtnStyle} title="Settings">
                     <Settings size={18} color="#fff" />
                   </button>
@@ -1061,61 +1147,44 @@ export default function Profile({
           top: isDesktop ? "0" : (shouldHideUI ? "0px" : "48px"),
           transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
         }}>
-          {user?.is_creator ? (
-            <>
-              <TabButton 
-                isDesktop={isDesktop} 
-                active={activeTab === "videos"} 
-                onClick={() => setActiveTab("videos")} 
-                icon={<Grid3X3 size={isDesktop ? 16 : 22} />} 
-                label="POSTS" 
-              />
-              <TabButton 
-                isDesktop={isDesktop} 
-                active={activeTab === "premium"} 
-                onClick={() => setActiveTab("premium")} 
-                icon={<Lock size={isDesktop ? 16 : 22} />} 
-                label="VIP EXCLUSIVE" 
-              />
-              <TabButton 
-                isDesktop={isDesktop} 
-                active={activeTab === "likes"} 
-                onClick={() => setActiveTab("likes")} 
-                icon={<Heart size={isDesktop ? 16 : 22} />} 
-                label="LIKED" 
-              />
-              <TabButton 
-                isDesktop={isDesktop} 
-                active={activeTab === "saved"} 
-                onClick={() => setActiveTab("saved")} 
-                icon={<Bookmark size={isDesktop ? 16 : 22} />} 
-                label="SAVED" 
-              />
-            </>
-          ) : (
-            <>
-              <TabButton 
-                isDesktop={isDesktop} 
-                active={activeTab === "likes"} 
-                onClick={() => setActiveTab("likes")} 
-                icon={<Heart size={isDesktop ? 16 : 22} />} 
-                label="LIKED" 
-              />
-              <TabButton 
-                isDesktop={isDesktop} 
-                active={activeTab === "saved"} 
-                onClick={() => setActiveTab("saved")} 
-                icon={<Bookmark size={isDesktop ? 16 : 22} />} 
-                label="SAVED" 
-              />
-              <TabButton 
-                isDesktop={isDesktop} 
-                active={activeTab === "subscriptions"} 
-                onClick={() => setActiveTab("subscriptions")} 
-                icon={<Sparkles size={isDesktop ? 16 : 22} />} 
-                label="VIP PASSES" 
-              />
-            </>
+          <TabButton 
+            isDesktop={isDesktop} 
+            active={activeTab === "videos"} 
+            onClick={() => setActiveTab("videos")} 
+            icon={<Grid3X3 size={isDesktop ? 16 : 22} />} 
+            label="POSTS" 
+          />
+          {user?.is_creator && (
+            <TabButton 
+              isDesktop={isDesktop} 
+              active={activeTab === "premium"} 
+              onClick={() => setActiveTab("premium")} 
+              icon={<Lock size={isDesktop ? 16 : 22} />} 
+              label="VIP EXCLUSIVE" 
+            />
+          )}
+          <TabButton 
+            isDesktop={isDesktop} 
+            active={activeTab === "likes"} 
+            onClick={() => setActiveTab("likes")} 
+            icon={<Heart size={isDesktop ? 16 : 22} />} 
+            label="LIKED" 
+          />
+          <TabButton 
+            isDesktop={isDesktop} 
+            active={activeTab === "saved"} 
+            onClick={() => setActiveTab("saved")} 
+            icon={<Bookmark size={isDesktop ? 16 : 22} />} 
+            label="SAVED" 
+          />
+          {!user?.is_creator && (
+            <TabButton 
+              isDesktop={isDesktop} 
+              active={activeTab === "subscriptions"} 
+              onClick={() => setActiveTab("subscriptions")} 
+              icon={<Sparkles size={isDesktop ? 16 : 22} />} 
+              label="VIP PASSES" 
+            />
           )}
         </div>
 
@@ -1194,7 +1263,7 @@ export default function Profile({
                             <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
                           </div>
                           <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>
-                            @{sub.creator_username || "creator"} · <span style={{ color: "#00d084", fontWeight: "600" }}>Active VIP Pass</span>
+                            @{sub.creator_username || "creator"} · <span style={{ color: "#f43f5e", fontWeight: "600" }}>Active VIP Pass</span>
                           </div>
                         </div>
                       </div>
@@ -1303,7 +1372,7 @@ export default function Profile({
                       ? "No Saved Videos Yet"
                       : activeTab === "premium"
                       ? "No VIP Exclusive Posts"
-                      : "No Posts Yet"}
+                      : "Share Your First Video"}
                   </h3>
                   <p style={{ fontSize: "13px", color: "#8e8e93", maxWidth: "300px", margin: "0 auto", lineHeight: "1.4" }}>
                     {activeTab === "likes" 
@@ -1312,35 +1381,54 @@ export default function Profile({
                       ? "Videos you bookmark will appear here for easy access."
                       : activeTab === "premium"
                       ? "Exclusive paywalled content for your subscribers will be displayed here."
-                      : (user?.is_creator 
-                          ? "Share high quality videos and reels to engage your audience." 
-                          : "No posts to display.")}
+                      : "Upload videos and reels to your profile. Want to set a subscription price and monetize? Complete Email & Identity KYC."}
                   </p>
-                  {user?.is_creator && (activeTab === "videos" || activeTab === "premium") && (
-                    <button
-                      onClick={() => {
-                        setUploadDefaultCategory(activeTab === "premium" ? "premium" : "community");
-                        setShowUploadModal(true);
-                      }}
-                      style={{
-                        marginTop: "16px",
-                        padding: "10px 20px",
-                        borderRadius: "10px",
-                        background: activeTab === "premium" ? "linear-gradient(135deg, #FFD700, #ffae00)" : "linear-gradient(135deg, #00aff0, #0088cc)",
-                        color: activeTab === "premium" ? "#000" : "#fff",
-                        border: "none",
-                        fontSize: "13.5px",
-                        fontWeight: "700",
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        boxShadow: "0 4px 14px rgba(0, 0, 0, 0.4)"
-                      }}
-                    >
-                      <Plus size={16} />
-                      <span>Upload {activeTab === "premium" ? "VIP Exclusive Post" : "First Video"}</span>
-                    </button>
+                  {(activeTab === "videos" || activeTab === "premium") && (
+                    <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap", marginTop: "16px" }}>
+                      <button
+                        onClick={() => {
+                          setUploadDefaultCategory(activeTab === "premium" && user?.is_creator ? "premium" : "community");
+                          setShowUploadModal(true);
+                        }}
+                        style={{
+                          padding: "10px 20px",
+                          borderRadius: "10px",
+                          background: "#e4e4e7",
+                          color: "#09090b",
+                          border: "none",
+                          fontSize: "13.5px",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px"
+                        }}
+                      >
+                        <Plus size={16} />
+                        <span>Upload {activeTab === "premium" ? "VIP Exclusive Post" : "First Video"}</span>
+                      </button>
+                      {!user?.is_creator && (
+                        <button
+                          onClick={() => setShowSetupModal(true)}
+                          style={{
+                            padding: "10px 18px",
+                            borderRadius: "10px",
+                            background: "rgba(225, 29, 72, 0.14)",
+                            color: "#f43f5e",
+                            border: "1px solid rgba(225, 29, 72, 0.28)",
+                            fontSize: "13.5px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          <ShieldCheck size={16} />
+                          <span>Verify & Monetize</span>
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -1354,14 +1442,39 @@ export default function Profile({
         </div>
       </div>
 
-      {/* 🌟 CREATOR ONBOARDING MODAL */}
-      {showSetupModal && (
-        <CreatorSetupModal 
-          user={user}
-          onClose={() => setShowSetupModal(false)}
-          onSetupSuccess={(updatedUser) => {
-            handleUpdateSuccess(updatedUser);
-            setShowSetupModal(false);
+      {/* 🌟 FOLLOWERS / FOLLOWING LIST MODAL */}
+      {followListTab && user?.username && (
+        <FollowListModal
+          username={user.username}
+          displayName={user.display_name || user.username}
+          initialTab={followListTab}
+          followersCount={followersCount}
+          followingCount={followingCount}
+          isOwner={true}
+          currentUser={user}
+          onClose={handleCloseFollowList}
+          onTabChange={handleFollowListTabChange}
+          onSelectUser={(uname) => {
+            const cleanTarget = String(uname || "").replace(/^@/, "").trim();
+            if (!cleanTarget) return;
+            if (user?.username && cleanTarget.toLowerCase() === user.username.toLowerCase()) {
+              handleCloseFollowList();
+              return;
+            }
+            followListTabRef.current = null;
+            setFollowListTab(null);
+            if (onCreatorClick) {
+              onCreatorClick(cleanTarget);
+            } else {
+              window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: cleanTarget }));
+            }
+          }}
+          onCountsChange={({ followersDelta = 0, followingDelta = 0 }) => {
+            setCreatorStats(prev => ({
+              ...prev,
+              followers: Math.max(0, (prev.followers || 0) + followersDelta),
+              following: Math.max(0, (prev.following || 0) + followingDelta)
+            }));
           }}
         />
       )}
@@ -1371,9 +1484,22 @@ export default function Profile({
         <EditProfileModal 
           user={user}
           onClose={() => setShowEditModal(false)}
+          onOpenCreatorSetup={() => setShowSetupModal(true)}
           onUpdateSuccess={(updatedUser) => {
             handleUpdateSuccess(updatedUser);
             setShowEditModal(false);
+          }}
+        />
+      )}
+
+      {/* 🌟 CREATOR ONBOARDING MODAL */}
+      {showSetupModal && (
+        <CreatorSetupModal 
+          user={user}
+          onClose={() => setShowSetupModal(false)}
+          onSetupSuccess={(updatedUser) => {
+            handleUpdateSuccess(updatedUser);
+            setShowSetupModal(false);
           }}
         />
       )}

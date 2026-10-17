@@ -612,7 +612,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                     </div>
                                   </td>
                                   <td style={tdStyle}>{c.creator_category || "Creator"}</td>
-                                  <td style={{ ...tdStyle, color: "#00d084", fontWeight: "700" }}>
+                                  <td style={{ ...tdStyle, color: "#f43f5e", fontWeight: "700" }}>
                                     {Number(c.subscription_price) > 0 ? `$${Number(c.subscription_price).toLocaleString()}/mo` : "Free"}
                                   </td>
                                   <td style={tdStyle}>
@@ -640,7 +640,7 @@ export default function AdminDashboard({ user, onLogout }) {
               {/* 🟢 STANDARD TABS RENDERING */}
               {activeTab === "overview" && (
                 <div style={gridStatsStyle}>
-                  <StatCard title="Total Revenue" value={`$${stats.total_revenue_usd}`} icon={<TrendingUp size={24} color="#34C759" />} bg="rgba(52, 199, 89, 0.1)" />
+                  <StatCard title="Total Revenue" value={`$${stats.total_revenue_usd}`} icon={<TrendingUp size={24} color="#f43f5e" />} bg="rgba(225, 29, 72, 0.12)" />
                   <StatCard title="Total Users" value={stats.total_users} icon={<Users size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
                   <StatCard title="Premium Members" value={stats.premium_users} icon={<ShieldCheck size={24} color="var(--primary-color)" />} bg="rgba(247, 147, 26, 0.1)" />
                   <StatCard title="Pending Crypto" value={stats.pending_crypto_orders} icon={<Clock size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
@@ -666,8 +666,8 @@ export default function AdminDashboard({ user, onLogout }) {
                     <StatCard 
                       title="Verified Badges" 
                       value={creatorAnalytics.verified} 
-                      icon={<CheckCircle size={24} color="#00d084" />} 
-                      bg="rgba(0, 208, 132, 0.1)" 
+                      icon={<CheckCircle size={24} color="#00aff0" />} 
+                      bg="rgba(0, 175, 240, 0.1)" 
                     />
                     <StatCard 
                       title="Active VIP Subscribers" 
@@ -836,9 +836,9 @@ export default function AdminDashboard({ user, onLogout }) {
                                           </span>
                                         ) : (
                                           <span style={{
-                                            background: "rgba(0, 208, 132, 0.12)",
-                                            color: "#00d084",
-                                            border: "1px solid rgba(0, 208, 132, 0.3)",
+                                            background: "rgba(225, 29, 72, 0.12)",
+                                            color: "#f43f5e",
+                                            border: "1px solid rgba(225, 29, 72, 0.25)",
                                             borderRadius: "6px",
                                             padding: "1px 5px",
                                             fontSize: "9px",
@@ -866,7 +866,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                 </td>
                                 <td style={{ ...tdStyle, fontWeight: "700" }}>
                                   {Number(c.subscription_price) > 0 ? (
-                                    <span style={{ color: "#00d084" }}>${Number(c.subscription_price).toLocaleString()}/mo</span>
+                                    <span style={{ color: "#f43f5e" }}>${Number(c.subscription_price).toLocaleString()}/mo</span>
                                   ) : (
                                     <span style={{ color: "#8e8e93" }}>Free</span>
                                   )}
@@ -911,11 +911,11 @@ export default function AdminDashboard({ user, onLogout }) {
                                     onClick={() => handleToggleCreatorStatus(c)}
                                     disabled={updatingCreatorId === c.id}
                                     style={{
-                                      background: c.is_creator ? "rgba(0, 208, 132, 0.12)" : "rgba(255, 59, 48, 0.12)",
-                                      border: `1px solid ${c.is_creator ? "rgba(0, 208, 132, 0.3)" : "rgba(255, 59, 48, 0.3)"}`,
+                                      background: c.is_creator ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 59, 48, 0.12)",
+                                      border: `1px solid ${c.is_creator ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 59, 48, 0.3)"}`,
                                       borderRadius: "14px",
                                       padding: "4px 10px",
-                                      color: c.is_creator ? "#00d084" : "#ff3b30",
+                                      color: c.is_creator ? "#f4f4f5" : "#ff3b30",
                                       fontSize: "11px",
                                       fontWeight: "700",
                                       cursor: "pointer"
@@ -966,7 +966,7 @@ export default function AdminDashboard({ user, onLogout }) {
                   <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
                     <StatCard title="Total Videos" value={videoAnalytics.total} icon={<PlayCircle size={24} color="#ff3b30" />} bg="rgba(255, 59, 48, 0.1)" />
                     <StatCard title="Total Views" value={videoAnalytics.views.toLocaleString()} icon={<Eye size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
-                    <StatCard title="Avg Views/Video" value={videoAnalytics.avgViews.toLocaleString()} icon={<Activity size={24} color="#34C759" />} bg="rgba(52, 199, 89, 0.1)" />
+                    <StatCard title="Avg Views/Video" value={videoAnalytics.avgViews.toLocaleString()} icon={<Activity size={24} color="#f43f5e" />} bg="rgba(225, 29, 72, 0.12)" />
                     <StatCard title="Top Category" value={<span style={{textTransform:'capitalize'}}>{videoAnalytics.topCat}</span>} icon={<PieChart size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
                   </div>
 
@@ -1018,7 +1018,7 @@ export default function AdminDashboard({ user, onLogout }) {
                   <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
                     <StatCard title="Total Registered" value={userAnalytics.total} icon={<Users size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
                     <StatCard title="Premium Users" value={userAnalytics.premium} icon={<Star size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
-                    <StatCard title="Premium Ratio" value={`${userAnalytics.ratio}%`} icon={<Percent size={24} color="#34C759" />} bg="rgba(52, 199, 89, 0.1)" />
+                    <StatCard title="Premium Ratio" value={`${userAnalytics.ratio}%`} icon={<Percent size={24} color="#f43f5e" />} bg="rgba(225, 29, 72, 0.12)" />
                     <StatCard title="Admin Staff" value={userAnalytics.admins} icon={<ShieldCheck size={24} color="#ff3b30" />} bg="rgba(255, 59, 48, 0.1)" />
                   </div>
 
@@ -1068,7 +1068,7 @@ export default function AdminDashboard({ user, onLogout }) {
               {activeTab === "transactions" && (
                 <>
                   <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
-                    <StatCard title="Gross Revenue" value={`$${txAnalytics.revenue}`} icon={<TrendingUp size={24} color="#34C759" />} bg="rgba(52, 199, 89, 0.1)" />
+                    <StatCard title="Gross Revenue" value={`$${txAnalytics.revenue}`} icon={<TrendingUp size={24} color="#f43f5e" />} bg="rgba(225, 29, 72, 0.12)" />
                     <StatCard title="Pending Review" value={`$${txAnalytics.pendingRev}`} icon={<Clock size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
                     <StatCard title="Total Volume" value={txAnalytics.total} icon={<CreditCard size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
                     <StatCard title="Approval Rate" value={`${txAnalytics.approvalRate}%`} icon={<ShieldCheck size={24} color="#ff3b30" />} bg="rgba(255, 59, 48, 0.1)" />
@@ -1394,7 +1394,7 @@ const thStyle = { textAlign: "left", padding: "18px 20px", color: "#8e8e93", fon
 const trStyle = { borderBottom: "1px solid rgba(255,255,255,0.05)" };
 const tdStyle = { padding: "15px 20px", fontSize: "14px" };
 const badgeStyle = { padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "700" };
-const premiumBadge = { ...badgeStyle, background: "rgba(52, 199, 89, 0.1)", color: "#34C759" };
+const premiumBadge = { ...badgeStyle, background: "rgba(225, 29, 72, 0.15)", color: "#f43f5e" };
 const freeBadge = { ...badgeStyle, background: "rgba(255,255,255,0.05)", color: "#8e8e93" };
 const iconBtnStyle = { background: "rgba(255,255,255,0.05)", border: "none", color: "#fff", padding: "8px", borderRadius: "8px", cursor: "pointer", marginLeft: "5px" };
 const searchBarStyle = { display: "flex", alignItems: "center", gap: "10px", background: "rgba(255,255,255,0.05)", padding: "10px 16px", borderRadius: "8px", width: "250px" };

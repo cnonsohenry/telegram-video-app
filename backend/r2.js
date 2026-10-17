@@ -22,6 +22,7 @@ export const r2 = new S3Client({
 });
 
 export const ALLOWED_VIDEO_EXTENSIONS = ["mp4", "mov", "webm", "m4v", "mkv"];
+export const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 export const ALLOWED_VIDEO_MIMES = [
   "video/mp4",
   "video/quicktime",
@@ -45,6 +46,42 @@ const getMimeType = (extension) => {
   };
   return mimeMap[ext] || "video/mp4";
 };
+
+/**
+ * Uploads an image file (avatar, banner, KYC document/selfie) to Cloudflare R2.
+ * @param {string} filePath - Local path to the uploaded image file
+ * @param {string} folder - Folder prefix (e.g. 'profiles', 'kyc')
+ * @param {string} originalName - Original filename to preserve extension
+ * @returns {Promise<{ r2Key: string, staticUrl: string }>}
+ */
+export async function uploadImageToR2(filePath, folder = "profiles", originalName = "image.jpg") {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Upload file not found: ${filePath}`);
+  }
+
+  const safeFolder = (folder || "profiles").toLowerCase().replace(/[^a-z0-9_-]/g, "") || "profiles";
+  const extension = path.extname(originalName).replace(".", "").toLowerCase() || "jpg";
+  if (!ALLOWED_IMAGE_EXTENSIONS.includes(extension)) {
+    throw new Error(`Unsupported image format: .${extension}. Allowed formats: ${ALLOWED_IMAGE_EXTENSIONS.join(", ").toUpperCase()}`);
+  }
+
+  const uniqueId = `${Date.now()}_${Math.floor(10000 + Math.random() * 90000)}`;
+  const r2Key = `${safeFolder}/${uniqueId}.${extension}`;
+  const mimeType = getMimeType(extension);
+
+  const fileBuffer = fs.readFileSync(filePath);
+  await r2.send(new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: r2Key,
+    Body: fileBuffer,
+    ContentType: mimeType,
+  }));
+
+  return {
+    r2Key,
+    staticUrl: `${R2_PUBLIC_DOMAIN}/${r2Key}`
+  };
+}
 
 /**
  * Uploads a video file and generates its thumbnail, storing both in Cloudflare R2.

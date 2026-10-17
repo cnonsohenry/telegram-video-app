@@ -268,7 +268,7 @@ export default function FullscreenPlayer({ video, onClose, isDesktop }) {
             <div style={{ ...actionButtonsContainerStyle, opacity: showControls ? 1 : 0, pointerEvents: showControls ? "auto" : "none" }}>
               <button onClick={handleShare} style={actionButtonStyle}>
                 <div style={sideIconCircleStyle}>
-                  {copied ? <Check size={20} color="#4ade80" /> : <Share2 size={20} />}
+                  {copied ? <Check size={20} color="#f4f4f5" /> : <Share2 size={20} />}
                 </div>
                 <span style={actionLabelStyle}>{copied ? "Copied!" : "Share"}</span>
               </button>

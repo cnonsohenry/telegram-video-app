@@ -88,7 +88,7 @@ export default function ReportModal({ isOpen, onClose, video }) {
 
         {submitted ? (
           <div style={successContainer}>
-            <CheckCircle2 size={42} color="#00ba7c" />
+            <CheckCircle2 size={42} color="#f43f5e" />
             <h4 style={{ color: "#fff", fontSize: "17px", fontWeight: "700", marginTop: "12px", marginBottom: "6px" }}>
               Report Received
             </h4>

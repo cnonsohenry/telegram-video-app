@@ -219,7 +219,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
             title="Share or copy policy link"
             style={headerActionBtnStyle}
           >
-            {copied ? <Check size={16} color="#22c55e" /> : <Share2 size={16} />}
+            {copied ? <Check size={16} color="#f4f4f5" /> : <Share2 size={16} />}
           </button>
         </header>
       )}
@@ -373,7 +373,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
             {/* Sidebar Footer Card */}
             <div style={sidebarFooterBadgeStyle}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-                <ShieldCheck size={18} color="#22c55e" />
+                <ShieldCheck size={18} color="#f43f5e" />
                 <span style={{ fontSize: "12px", fontWeight: "700", color: "#ffffff" }}>
                   Verified & Compliant
                 </span>
@@ -408,8 +408,8 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
                 >
                   {copied ? (
                     <>
-                      <Check size={14} color="#22c55e" />
-                      <span style={{ color: "#22c55e" }}>Link Copied</span>
+                      <Check size={14} color="#f4f4f5" />
+                      <span style={{ color: "#f4f4f5" }}>Link Copied</span>
                     </>
                   ) : (
                     <>
@@ -439,7 +439,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
                 <Clock size={13} color="#9ca3af" />
                 <span>{activeTabDetails.readTime}</span>
               </div>
-              <div style={{ ...metaPillStyle, background: "rgba(34, 197, 94, 0.1)", color: "#4ade80", borderColor: "rgba(34, 197, 94, 0.2)" }}>
+              <div style={{ ...metaPillStyle, background: "rgba(225, 29, 72, 0.12)", color: "#f43f5e", borderColor: "rgba(225, 29, 72, 0.25)" }}>
                 <CheckCircle2 size={13} />
                 <span>Legally Binding</span>
               </div>

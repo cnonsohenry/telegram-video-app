@@ -384,11 +384,11 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
                 minLength={3}
                 maxLength={30}
                 required
-                statusColor={usernameStatus === "taken" ? "#ff3b30" : usernameStatus === "available" ? "#34C759" : null}
+                statusColor={usernameStatus === "taken" ? "#ff3b30" : usernameStatus === "available" ? "#00aff0" : null}
                 rightIcon={
                   <>
                     {usernameStatus === "checking" && <Loader2 size={16} color="#666" style={{ animation: "spin 1s linear infinite" }} />}
-                    {usernameStatus === "available" && <Check size={18} color="#34C759" />}
+                    {usernameStatus === "available" && <Check size={18} color="#00aff0" />}
                     {usernameStatus === "taken" && <X size={18} color="#ff3b30" />}
                   </>
                 }

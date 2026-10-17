@@ -593,6 +593,14 @@ export default function CreatorUploadModal({
                           backgroundColor: isVip ? "rgba(255, 215, 0, 0.08)" : "transparent"
                         }}
                         onClick={() => {
+                          const isVerifiedCreator = Boolean(
+                            user?.is_creator && (user?.kyc_status === "verified" || user?.is_verified || user?.role === "admin")
+                          );
+                          if (!isVerifiedCreator) {
+                            setShowAudienceMenu(false);
+                            showToast("Verify your email and Identity KYC to publish monetized VIP Subscribers posts.", "info");
+                            return;
+                          }
                           setIsVip(true);
                           setShowAudienceMenu(false);
                         }}
@@ -608,7 +616,7 @@ export default function CreatorUploadModal({
                             <span style={monetizedBadgeStyle}>VIP</span>
                           </div>
                           <div style={{ fontSize: "12px", color: "#71767b", marginTop: "2px" }}>
-                            Locked for paying members and subscribers
+                            {user?.is_creator ? "Locked for paying members and subscribers" : "Requires Creator Email & Identity KYC"}
                           </div>
                         </div>
                         {isVip && <Check size={16} color="#FFD700" />}

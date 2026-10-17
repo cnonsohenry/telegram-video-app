@@ -25,3 +25,22 @@ export const sendReactEmail = async (to, subject, ReactComponent) => {
     return { success: false, error: err.message };
   }
 };
+
+export const sendHtmlEmail = async (to, subject, htmlContent) => {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: "NaijaHomemade <noreply@notify.naijahomemade.com>",
+      to: [to],
+      subject: subject,
+      html: htmlContent,
+    });
+
+    if (error) throw new Error(error.message);
+
+    console.log(`✉️ HTML Email sent to ${to} [ID: ${data.id}]`);
+    return { success: true, messageId: data.id };
+  } catch (err) {
+    console.error(`❌ HTML Email Failed:`, err.message);
+    return { success: false, error: err.message };
+  }
+};

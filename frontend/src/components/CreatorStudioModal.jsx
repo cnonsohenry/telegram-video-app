@@ -261,7 +261,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                   {/* KPI Cards Grid */}
                   <div style={kpiGridStyle}>
                     <div style={kpiCardStyle}>
-                      <div style={kpiIconBox("rgba(0, 208, 132, 0.15)", "#00d084")}>
+                      <div style={kpiIconBox("rgba(225, 29, 72, 0.15)", "#f43f5e")}>
                         <DollarSign size={22} />
                       </div>
                       <span style={kpiLabelStyle}>Active Sub Revenue</span>
@@ -312,7 +312,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                       <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px", color: "#8e8e93", fontWeight: "700" }}>
                         Projected Monthly Recurring Revenue (MRR)
                       </span>
-                      <div style={{ fontSize: "24px", fontWeight: "900", color: "#00d084", marginTop: "4px" }}>
+                      <div style={{ fontSize: "24px", fontWeight: "900", color: "#f43f5e", marginTop: "4px" }}>
                         ${(stats.estimated_mrr ?? stats.estimated_mrr_ngn ?? 0).toLocaleString()} / month
                       </div>
                       <span style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px", display: "block" }}>
@@ -368,7 +368,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                                 </div>
                               </div>
                               <div style={{ textAlign: "right" }}>
-                                <span style={{ fontSize: "13px", fontWeight: "800", color: "#00d084" }}>
+                                <span style={{ fontSize: "13px", fontWeight: "800", color: "#f43f5e" }}>
                                   +${Number(t.amount || 0).toLocaleString()}
                                 </span>
                                 <span style={{ fontSize: "10px", color: "#777", display: "block" }}>
@@ -539,7 +539,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                                 </span>
                               </div>
                             </div>
-                            <div style={{ fontSize: "16px", fontWeight: "900", color: "#00d084" }}>
+                            <div style={{ fontSize: "16px", fontWeight: "900", color: "#f43f5e" }}>
                               +${Number(t.amount).toLocaleString()}
                             </div>
                           </div>
@@ -963,8 +963,8 @@ const runRateCardStyle = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  background: "linear-gradient(135deg, rgba(0, 208, 132, 0.08), rgba(0, 175, 240, 0.08))",
-  border: "1px solid rgba(0, 208, 132, 0.2)",
+  background: "linear-gradient(135deg, rgba(225, 29, 72, 0.08), rgba(244, 63, 94, 0.04))",
+  border: "1px solid rgba(225, 29, 72, 0.2)",
   borderRadius: "16px",
   padding: "20px 24px",
   flexWrap: "wrap",
@@ -975,8 +975,8 @@ const adjustRatesBtnStyle = {
   display: "flex",
   alignItems: "center",
   gap: "8px",
-  background: "#00d084",
-  color: "#000",
+  background: "#e11d48",
+  color: "#ffffff",
   border: "none",
   borderRadius: "14px",
   padding: "10px 18px",
@@ -1033,9 +1033,9 @@ const tipRowStyle = {
 };
 
 const activeBadgeStyle = {
-  background: "rgba(0, 208, 132, 0.15)",
-  color: "#00d084",
-  border: "1px solid rgba(0, 208, 132, 0.3)",
+  background: "rgba(225, 29, 72, 0.14)",
+  color: "#f43f5e",
+  border: "1px solid rgba(225, 29, 72, 0.3)",
   borderRadius: "10px",
   padding: "3px 10px",
   fontSize: "11px",
@@ -1178,10 +1178,10 @@ const successBannerStyle = {
   alignItems: "center",
   gap: "8px",
   padding: "10px 14px",
-  background: "rgba(0, 208, 132, 0.15)",
-  border: "1px solid rgba(0, 208, 132, 0.3)",
+  background: "rgba(255, 255, 255, 0.08)",
+  border: "1px solid rgba(255, 255, 255, 0.2)",
   borderRadius: "12px",
-  color: "#00d084",
+  color: "#f4f4f5",
   fontSize: "13px"
 };
 

@@ -158,6 +158,47 @@ async function initDatabase() {
         ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
         ALTER TABLE app_users ADD COLUMN IF NOT EXISTS location TEXT DEFAULT '';
         ALTER TABLE app_users ADD COLUMN IF NOT EXISTS website TEXT DEFAULT '';
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS kyc_status VARCHAR(20) DEFAULT 'none';
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS kyc_rejection_reason TEXT;
+        ALTER TABLE app_users ADD COLUMN IF NOT EXISTS kyc_verified_at TIMESTAMP;
+
+        UPDATE app_users SET email_verified = TRUE WHERE google_id IS NOT NULL OR is_managed = TRUE OR is_verified = TRUE;
+        UPDATE app_users SET kyc_status = 'verified' WHERE (is_managed = TRUE OR is_verified = TRUE) AND (kyc_status IS NULL OR kyc_status = 'none');
+      `);
+
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS email_verification_codes (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          email VARCHAR(255) NOT NULL,
+          code VARCHAR(10) NOT NULL,
+          expires_at TIMESTAMP NOT NULL,
+          used BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_email_verif_user ON email_verification_codes(user_id);
+
+        CREATE TABLE IF NOT EXISTS creator_kyc_requests (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE UNIQUE,
+          full_legal_name VARCHAR(150) NOT NULL,
+          date_of_birth DATE NOT NULL,
+          country VARCHAR(100) NOT NULL,
+          id_type VARCHAR(50) NOT NULL,
+          id_number VARCHAR(100),
+          id_front_url TEXT NOT NULL,
+          id_back_url TEXT,
+          selfie_url TEXT NOT NULL,
+          status VARCHAR(20) DEFAULT 'pending',
+          rejection_reason TEXT,
+          reviewed_by INTEGER,
+          reviewed_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_kyc_user ON creator_kyc_requests(user_id);
+        CREATE INDEX IF NOT EXISTS idx_kyc_status ON creator_kyc_requests(status);
       `);
 
       await pool.query(`

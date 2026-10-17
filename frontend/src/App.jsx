@@ -322,11 +322,16 @@ export default function App() {
         setIsCreatorOverVideo(false);
         viewingCreatorRef.current = null;
         setViewingCreator(null);
+        setCreatorAutoSubscribe(false);
         return;
       }
       if (state.creatorProfile && state.creatorProfile !== viewingCreatorRef.current) {
         viewingCreatorRef.current = state.creatorProfile;
         setViewingCreator(state.creatorProfile);
+        setCreatorAutoSubscribe(false);
+        return;
+      }
+      if (viewingCreatorRef.current && state.creatorProfile === viewingCreatorRef.current) {
         return;
       }
 
@@ -342,8 +347,12 @@ export default function App() {
         return;
       }
 
-      // 6. If search overlay was open, AppHeader's popstate listener closes it
-      if (state.searchOpen) {
+      // 6. If search overlay or profile follow list was open, their popstate listeners handle it
+      if (state.searchOpen || state.profileFollowList) {
+        if (state.tab && state.tab !== activeTabRef.current) {
+          activeTabRef.current = state.tab;
+          setActiveTab(state.tab);
+        }
         return;
       }
 
@@ -409,6 +418,9 @@ export default function App() {
       delete nextState.searchOpen;
       delete nextState.storyPlayer;
       delete nextState.commentModal;
+      delete nextState.profileFollowList;
+      delete nextState.creatorFollowList;
+      delete nextState.creatorFollowListUser;
       window.history.pushState(
         nextState,
         document.title,
@@ -448,10 +460,13 @@ export default function App() {
     setViewingCreator(username);
     viewingCreatorRef.current = username;
     const currentState = window.history.state || {};
-    const nextState = { ...currentState, creatorProfile: username };
+    const nextState = { ...currentState, creatorProfile: username, creatorPushed: true };
     delete nextState.searchOpen;
     delete nextState.storyPlayer;
     delete nextState.commentModal;
+    delete nextState.profileFollowList;
+    delete nextState.creatorFollowList;
+    delete nextState.creatorFollowListUser;
     window.history.pushState(
       nextState,
       document.title,
@@ -460,19 +475,22 @@ export default function App() {
   }, []);
 
   const handleCloseCreator = useCallback(() => {
+    if (window.history.state?.creatorPushed) {
+      window.history.back();
+      return;
+    }
     setIsCreatorOverVideo(false);
     viewingCreatorRef.current = null;
     setViewingCreator(null);
     setCreatorAutoSubscribe(false);
-    if (window.history.state?.creatorProfile) {
-      window.history.back();
-    } else {
-      const currentState = window.history.state || {};
-      delete currentState.creatorProfile;
-      const targetTab = currentState.tab || "home";
-      const targetUrl = targetTab === "home" ? "/" : `/?tab=${encodeURIComponent(targetTab)}`;
-      window.history.replaceState(currentState, document.title, targetUrl);
-    }
+    const currentState = { ...(window.history.state || {}) };
+    delete currentState.creatorProfile;
+    delete currentState.creatorPushed;
+    delete currentState.creatorFollowList;
+    delete currentState.creatorFollowListUser;
+    const targetTab = currentState.tab || "home";
+    const targetUrl = targetTab === "home" ? "/" : `/?tab=${encodeURIComponent(targetTab)}`;
+    window.history.replaceState(currentState, document.title, targetUrl);
   }, []);
 
   const refreshUser = useCallback(async () => {

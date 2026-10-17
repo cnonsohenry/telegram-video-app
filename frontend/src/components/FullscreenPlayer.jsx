@@ -945,7 +945,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   >
-                    {copied ? <Check size={20} color="#4ade80" /> : <Share2 size={20} color="#e7e9ea" />} 
+                    {copied ? <Check size={20} color="#f4f4f5" /> : <Share2 size={20} color="#e7e9ea" />} 
                     <span>{copied ? "Copied Link!" : "Share / Copy Link"}</span>
                   </button>
                   <button 
@@ -1477,7 +1477,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                         onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
                         onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                       >
-                         {copied ? <Check size={21} color="#4ade80" /> : <Share2 size={21} color="#fff" />}
+                         {copied ? <Check size={21} color="#f4f4f5" /> : <Share2 size={21} color="#fff" />}
                          <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
                       </button>
                     )}

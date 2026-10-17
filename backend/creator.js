@@ -11,10 +11,12 @@ import pool from "./db.js";
 import { authenticateToken, JWT_SECRET } from "./auth.js";
 import { 
   uploadVideoToR2, 
+  uploadImageToR2,
   generatePresignedUploadUrls, 
   deleteMediaFromR2, 
   verifyR2ObjectExists, 
   ALLOWED_VIDEO_EXTENSIONS, 
+  ALLOWED_IMAGE_EXTENSIONS,
   ALLOWED_VIDEO_MIMES, 
   R2_PUBLIC_DOMAIN 
 } from "./r2.js";
@@ -69,7 +71,7 @@ async function checkCreatorUploadQuota(userId, creator) {
       `Daily upload limit reached (${dailyCount}/${dailyLimit} videos in 24 hours). ` +
       (creator.is_verified 
         ? "Please wait until tomorrow to post more videos." 
-        : "Request creator verification in settings to increase your daily limit to 20 videos.")
+        : "Complete Creator Verification in settings to increase your daily limit to 20 videos.")
     );
     err.statusCode = 429;
     throw err;
@@ -111,7 +113,247 @@ const formatThumbnailUrl = (v, apiBaseUrl) => {
 };
 
 /* =======================================================
-   1. UPGRADE USER TO CREATOR
+   0A. UPLOAD IMAGE TO R2 (Avatars, Banners, KYC Documents)
+   POST /api/creator/upload-image
+======================================================= */
+router.post("/upload-image", authenticateToken, upload.single("image"), async (req, res) => {
+  const imageFile = req.file;
+  const rawFolder = String(req.body.folder || "avatars").toLowerCase().trim();
+  const allowedFolders = ["avatars", "banners", "kyc"];
+  const folder = allowedFolders.includes(rawFolder) ? rawFolder : "avatars";
+
+  if (!imageFile) {
+    return res.status(400).json({ error: "Please select an image file to upload." });
+  }
+
+  try {
+    const ext = path.extname(imageFile.originalname || "").toLowerCase().replace(".", "");
+    if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
+      if (fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({
+        error: `Unsupported image format: .${ext || "unknown"}. Allowed: JPG, PNG, WEBP.`
+      });
+    }
+
+    if (imageFile.size > 15 * 1024 * 1024) {
+      if (fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(400).json({ error: "Image file size must be under 15MB." });
+    }
+
+    const r2Res = await uploadImageToR2(imageFile.path, folder, imageFile.originalname);
+    if (fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+
+    return res.json({
+      success: true,
+      url: r2Res.url,
+      r2Key: r2Res.r2Key
+    });
+  } catch (err) {
+    console.error("[IMAGE UPLOAD ERROR]", err);
+    if (imageFile && fs.existsSync(imageFile.path)) {
+      try { fs.unlinkSync(imageFile.path); } catch (e) {}
+    }
+    return res.status(500).json({ error: err.message || "Failed to upload image" });
+  }
+});
+
+/* =======================================================
+   0B. GET KYC & EMAIL VERIFICATION STATUS
+   GET /api/creator/kyc/status
+======================================================= */
+router.get("/kyc/status", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userRes = await pool.query(
+      `SELECT id, email, username, COALESCE(email_verified, FALSE) as email_verified,
+              COALESCE(kyc_status, 'unverified') as kyc_status, kyc_rejection_reason, kyc_verified_at,
+              is_creator, is_verified
+       FROM app_users WHERE id = $1`,
+      [userId]
+    );
+    if (userRes.rows.length === 0) return res.status(404).json({ error: "User not found" });
+
+    const kycReqRes = await pool.query(
+      `SELECT id, full_name, date_of_birth, country, document_type, document_number,
+              id_front_url, id_back_url, selfie_url, status, rejection_reason, submitted_at, reviewed_at
+       FROM creator_kyc_requests
+       WHERE user_id = $1
+       ORDER BY submitted_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    const u = userRes.rows[0];
+    return res.json({
+      email: u.email,
+      email_verified: Boolean(u.email_verified),
+      kyc_status: u.kyc_status || "unverified",
+      kyc_rejection_reason: u.kyc_rejection_reason || null,
+      kyc_verified_at: u.kyc_verified_at || null,
+      is_creator: Boolean(u.is_creator),
+      is_verified: Boolean(u.is_verified),
+      request: kycReqRes.rows[0] || null
+    });
+  } catch (err) {
+    console.error("[KYC STATUS ERROR]", err);
+    return res.status(500).json({ error: "Failed to fetch KYC status" });
+  }
+});
+
+/* =======================================================
+   0C. SUBMIT IDENTITY KYC FOR CREATOR MONETIZATION
+   POST /api/creator/kyc/submit
+======================================================= */
+router.post("/kyc/submit", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const {
+    full_name,
+    date_of_birth,
+    country,
+    document_type,
+    document_number,
+    id_front_url,
+    id_back_url,
+    selfie_url
+  } = req.body;
+
+  try {
+    const userRes = await pool.query(
+      `SELECT id, username, email, COALESCE(email_verified, FALSE) as email_verified,
+              COALESCE(kyc_status, 'unverified') as kyc_status
+       FROM app_users WHERE id = $1`,
+      [userId]
+    );
+    if (userRes.rows.length === 0) return res.status(404).json({ error: "User not found" });
+    const user = userRes.rows[0];
+
+    if (!user.email_verified) {
+      return res.status(403).json({
+        error: "Please verify your email address first before submitting Identity KYC.",
+        requires_email_verification: true
+      });
+    }
+
+    const cleanName = String(full_name || "").trim();
+    if (cleanName.length < 3 || cleanName.length > 150) {
+      return res.status(400).json({ error: "Please enter your full legal name as shown on your ID." });
+    }
+
+    if (!date_of_birth) {
+      return res.status(400).json({ error: "Date of birth is required (must be 18+)." });
+    }
+    const dobDate = new Date(date_of_birth);
+    if (isNaN(dobDate.getTime())) {
+      return res.status(400).json({ error: "Invalid date of birth." });
+    }
+    const ageDiffMs = Date.now() - dobDate.getTime();
+    const ageYears = ageDiffMs / (1000 * 60 * 60 * 24 * 365.25);
+    if (ageYears < 18) {
+      return res.status(400).json({ error: "You must be at least 18 years old to verify as a Creator." });
+    }
+
+    const allowedDocs = ["national_id", "passport", "drivers_license", "voters_card"];
+    const cleanDocType = String(document_type || "national_id").toLowerCase().trim();
+    if (!allowedDocs.includes(cleanDocType)) {
+      return res.status(400).json({ error: "Invalid ID document type selected." });
+    }
+
+    const cleanDocNumber = String(document_number || "").trim().slice(0, 100);
+    if (cleanDocNumber.length < 4) {
+      return res.status(400).json({ error: "Please enter a valid government ID document number." });
+    }
+
+    const isValidMediaUrl = (u) => typeof u === "string" && (u.startsWith("https://") || u.startsWith("http://") || u.startsWith("/"));
+    if (!isValidMediaUrl(id_front_url)) {
+      return res.status(400).json({ error: "Please upload a clear photo of the front of your government ID." });
+    }
+    if (!isValidMediaUrl(selfie_url)) {
+      return res.status(400).json({ error: "Please upload a clear verification selfie photo." });
+    }
+
+    const cleanCountry = String(country || "Nigeria").trim().slice(0, 100);
+    const cleanBackUrl = isValidMediaUrl(id_back_url) ? id_back_url.slice(0, 500) : null;
+
+    const kycInsert = await pool.query(
+      `INSERT INTO creator_kyc_requests (
+         user_id, full_name, date_of_birth, country, document_type, document_number,
+         id_front_url, id_back_url, selfie_url, status, submitted_at, reviewed_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'verified', NOW(), NOW())
+       RETURNING *`,
+      [
+        userId,
+        cleanName,
+        date_of_birth,
+        cleanCountry,
+        cleanDocType,
+        cleanDocNumber,
+        id_front_url.slice(0, 500),
+        cleanBackUrl,
+        selfie_url.slice(0, 500)
+      ]
+    );
+
+    const updatedUserRes = await pool.query(
+      `UPDATE app_users
+       SET kyc_status = 'verified',
+           kyc_verified_at = NOW(),
+           kyc_rejection_reason = NULL,
+           is_verified = TRUE
+       WHERE id = $1
+       RETURNING id, email, username, avatar_url, role, settings, is_premium,
+                 is_creator, display_name, creator_bio, banner_url, creator_category,
+                 subscription_price, social_links, is_verified, location, website,
+                 email_verified, kyc_status, kyc_verified_at`,
+      [userId]
+    );
+
+    console.log(`[CREATOR KYC] User @${user.username} (ID ${userId}) completed Identity KYC verification!`);
+    return res.json({
+      success: true,
+      message: "Identity KYC verified! You can now activate Creator monetization and set your subscription price.",
+      kyc: kycInsert.rows[0],
+      user: updatedUserRes.rows[0]
+    });
+  } catch (err) {
+    console.error("[KYC SUBMIT ERROR]", err);
+    return res.status(500).json({ error: "Failed to submit Identity KYC verification" });
+  }
+});
+
+/* =======================================================
+   0D. REMOVE A FOLLOWER (Profile Owner Action)
+   DELETE /api/creator/followers/:followerId
+======================================================= */
+router.delete("/followers/:followerId", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const followerId = Number(req.params.followerId);
+  if (!followerId || isNaN(followerId)) {
+    return res.status(400).json({ error: "Invalid follower ID" });
+  }
+
+  try {
+    await pool.query(
+      `DELETE FROM creator_follows WHERE creator_id = $1 AND follower_id = $2`,
+      [userId, followerId]
+    );
+
+    const totalRes = await pool.query(
+      `SELECT COUNT(*) FROM creator_follows WHERE creator_id = $1`,
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      removed_follower_id: followerId,
+      followers_count: Number(totalRes.rows[0]?.count || 0)
+    });
+  } catch (err) {
+    console.error("[REMOVE FOLLOWER ERROR]", err);
+    return res.status(500).json({ error: "Failed to remove follower" });
+  }
+});
+
+/* =======================================================
+   1. UPGRADE USER TO CREATOR (Requires Email + Identity KYC)
    POST /api/creator/upgrade
 ======================================================= */
 router.post("/upgrade", authenticateToken, async (req, res) => {
@@ -136,6 +378,22 @@ router.post("/upgrade", authenticateToken, async (req, res) => {
     }
 
     const existing = userCheck.rows[0];
+    const isExempt = existing.role === "admin" || existing.is_managed === true;
+
+    if (!isExempt && !existing.email_verified) {
+      return res.status(403).json({
+        error: "You must verify your email address before upgrading to a Creator account.",
+        requires_email_verification: true
+      });
+    }
+
+    if (!isExempt && existing.kyc_status !== "verified" && !existing.is_verified) {
+      return res.status(403).json({
+        error: "Identity KYC verification is required to upgrade to Creator and monetize your profile.",
+        requires_kyc: true
+      });
+    }
+
     const finalDisplayName = (display_name ? String(display_name).trim().slice(0, 100) : null) || existing.display_name || existing.username;
     const finalCategory = (creator_category ? String(creator_category).trim().slice(0, 50) : null) || existing.creator_category || "Model & Creator";
     const finalBio = creator_bio !== undefined ? String(creator_bio).trim().slice(0, 500) : (existing.creator_bio || "");
@@ -152,7 +410,7 @@ router.post("/upgrade", authenticateToken, async (req, res) => {
       UPDATE app_users 
       SET is_creator = TRUE,
           role = CASE WHEN role = 'admin' THEN 'admin' ELSE 'creator' END,
-          is_verified = COALESCE(is_verified, FALSE),
+          is_verified = TRUE,
           display_name = $1,
           creator_category = $2,
           creator_bio = $3,
@@ -164,7 +422,8 @@ router.post("/upgrade", authenticateToken, async (req, res) => {
       WHERE id = $9
       RETURNING id, email, username, avatar_url, role, settings, is_premium,
                 is_creator, display_name, creator_bio, banner_url, creator_category, 
-                subscription_price, social_links, is_verified, location, website;
+                subscription_price, social_links, is_verified, location, website,
+                email_verified, kyc_status, kyc_verified_at;
     `;
 
     const result = await pool.query(updateQuery, [
@@ -179,7 +438,7 @@ router.post("/upgrade", authenticateToken, async (req, res) => {
       userId
     ]);
 
-    console.log(`[CREATOR] User @${existing.username} (ID ${userId}) upgraded to Creator!`);
+    console.log(`[CREATOR] User @${existing.username} (ID ${userId}) upgraded to verified Creator!`);
     res.json({ success: true, user: result.rows[0] });
   } catch (err) {
     console.error("[CREATOR UPGRADE ERROR]", err);
@@ -188,10 +447,10 @@ router.post("/upgrade", authenticateToken, async (req, res) => {
 });
 
 /* =======================================================
-   2. UPDATE CREATOR PROFILE
-   PATCH /api/creator/profile
+   2. UPDATE USER / CREATOR PROFILE
+   PATCH & PUT /api/creator/profile
 ======================================================= */
-router.patch("/profile", authenticateToken, async (req, res) => {
+const handleUpdateProfile = async (req, res) => {
   const {
     display_name,
     creator_bio,
@@ -209,11 +468,24 @@ router.patch("/profile", authenticateToken, async (req, res) => {
 
     const userCheck = await pool.query("SELECT * FROM app_users WHERE id = $1", [userId]);
     if (userCheck.rows.length === 0) return res.status(404).json({ error: "User not found" });
+    const existing = userCheck.rows[0];
 
     const cleanDisplayName = display_name !== undefined ? String(display_name).trim().slice(0, 100) : null;
     const cleanBio = creator_bio !== undefined ? String(creator_bio).trim().slice(0, 500) : null;
     const cleanCategory = creator_category !== undefined ? String(creator_category).trim().slice(0, 50) : null;
     const cleanPrice = subscription_price !== undefined ? Math.max(0, Math.min(10000000, Number(subscription_price) || 0)) : null;
+
+    // 🛑 Enforce Email + KYC verification if attempting to set a non-zero subscription price
+    if (cleanPrice !== null && cleanPrice > 0) {
+      const isExempt = existing.role === "admin" || existing.is_managed === true;
+      if (!isExempt && (!existing.email_verified || (existing.kyc_status !== "verified" && !existing.is_verified))) {
+        return res.status(403).json({
+          error: "You must verify your email and complete Identity KYC before setting a subscription price to monetize.",
+          requires_kyc: true
+        });
+      }
+    }
+
     const cleanAvatar = avatar_url && typeof avatar_url === "string" && (avatar_url.startsWith("http://") || avatar_url.startsWith("https://") || avatar_url.startsWith("/")) ? avatar_url.slice(0, 500) : null;
     const cleanBanner = banner_url && typeof banner_url === "string" && (banner_url.startsWith("http://") || banner_url.startsWith("https://") || banner_url.startsWith("/")) ? banner_url.slice(0, 500) : null;
     const cleanSocials = social_links && typeof social_links === "object" ? JSON.stringify(social_links) : null;
@@ -235,7 +507,8 @@ router.patch("/profile", authenticateToken, async (req, res) => {
       WHERE id = $10
       RETURNING id, email, username, avatar_url, role, settings, is_premium,
                 is_creator, display_name, creator_bio, banner_url, creator_category, 
-                subscription_price, social_links, is_verified, location, website;
+                subscription_price, social_links, is_verified, location, website,
+                email_verified, kyc_status, kyc_verified_at;
     `;
 
     const result = await pool.query(updateQuery, [
@@ -254,9 +527,12 @@ router.patch("/profile", authenticateToken, async (req, res) => {
     res.json({ success: true, user: result.rows[0] });
   } catch (err) {
     console.error("[CREATOR PROFILE UPDATE ERROR]", err);
-    res.status(500).json({ error: "Failed to update creator profile" });
+    res.status(500).json({ error: "Failed to update profile" });
   }
-});
+};
+
+router.patch("/profile", authenticateToken, handleUpdateProfile);
+router.put("/profile", authenticateToken, handleUpdateProfile);
 
 /* =======================================================
    2B. CREATOR STUDIO INSIGHTS & ANALYTICS
@@ -380,7 +656,7 @@ router.get("/studio/insights", authenticateToken, async (req, res) => {
 });
 
 /* =======================================================
-   2C. CREATOR CONTENT UPLOAD (Public & VIP / Premium)
+   2C. USER & CREATOR CONTENT UPLOAD (Public & VIP / Premium)
    POST /api/creator/upload
 ======================================================= */
 router.post("/upload", authenticateToken, upload.single("video"), async (req, res) => {
@@ -393,9 +669,10 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
   }
 
   try {
-    // 1. Fetch user & ensure creator access
+    // 1. Fetch user
     const userRes = await pool.query(
       `SELECT id, username, display_name, is_creator, role, is_verified, subscription_price,
+              COALESCE(email_verified, FALSE) as email_verified, COALESCE(kyc_status, 'unverified') as kyc_status,
               COALESCE(is_banned, FALSE) as is_banned, ban_reason
        FROM app_users WHERE id = $1`,
       [userId]
@@ -420,18 +697,7 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
       });
     }
 
-    // If user is not yet marked as creator, automatically activate creator status
-    if (!creator.is_creator) {
-      await pool.query(
-        `UPDATE app_users 
-         SET is_creator = TRUE, 
-             role = CASE WHEN role = 'admin' THEN 'admin' ELSE 'creator' END 
-         WHERE id = $1`,
-        [userId]
-      );
-    }
-
-    // 2. Ensure creator exists in users table to satisfy any joins or legacy references
+    // 2. Ensure uploader exists in users table to satisfy any joins or legacy references
     try {
       await pool.query(
         `INSERT INTO users (user_id, username, full_name)
@@ -447,12 +713,21 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
     // 3. Determine category (VIP / Premium vs Public Category)
     const isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
 
-    // 🛑 GUARD: Disallow publishing VIP Exclusive content if creator has not set a subscription price
-    if (isVip && Number(creator.subscription_price || 0) <= 0) {
-      if (fs.existsSync(videoFile.path)) fs.unlinkSync(videoFile.path);
-      return res.status(400).json({
-        error: "Please set your monthly VIP subscription price in Creator Studio before publishing VIP Exclusive content."
-      });
+    // 🛑 GUARD: Require verified Creator status + subscription price for VIP Exclusive content
+    if (isVip) {
+      const isVerifiedCreator = creator.role === "admin" || (creator.is_creator && (creator.kyc_status === "verified" || creator.is_verified));
+      if (!isVerifiedCreator) {
+        if (fs.existsSync(videoFile.path)) fs.unlinkSync(videoFile.path);
+        return res.status(403).json({
+          error: "Only verified Creators (Email + Identity KYC verified) can publish VIP Exclusive monetized videos."
+        });
+      }
+      if (Number(creator.subscription_price || 0) <= 0) {
+        if (fs.existsSync(videoFile.path)) fs.unlinkSync(videoFile.path);
+        return res.status(400).json({
+          error: "Please set your monthly VIP subscription price in Creator Studio before publishing VIP Exclusive content."
+        });
+      }
     }
 
     const allowedPublicCategories = ["community", "hotties", "amateur", "amateurs", "knacks", "baddies", "college", "trends", "shots", "general"];
@@ -546,9 +821,10 @@ router.post("/presigned-url", authenticateToken, async (req, res) => {
   const { filename, filetype, category, is_premium } = req.body;
 
   try {
-    // 1. Fetch user & verify creator
+    // 1. Fetch user
     const userRes = await pool.query(
       `SELECT id, username, display_name, is_creator, role, is_verified, subscription_price,
+              COALESCE(email_verified, FALSE) as email_verified, COALESCE(kyc_status, 'unverified') as kyc_status,
               COALESCE(is_banned, FALSE) as is_banned, ban_reason
        FROM app_users WHERE id = $1`,
       [userId]
@@ -574,24 +850,21 @@ router.post("/presigned-url", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Invalid video MIME type." });
     }
 
-    // Auto-activate creator status if not set
-    if (!creator.is_creator) {
-      await pool.query(
-        `UPDATE app_users 
-         SET is_creator = TRUE, 
-             role = CASE WHEN role = 'admin' THEN 'admin' ELSE 'creator' END 
-         WHERE id = $1`,
-        [userId]
-      );
-    }
-
     const isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
 
-    // Disallow publishing VIP Exclusive content if creator has not set a subscription price
-    if (isVip && Number(creator.subscription_price || 0) <= 0) {
-      return res.status(400).json({
-        error: "Please set your monthly VIP subscription price in Creator Studio before publishing VIP Exclusive content."
-      });
+    // Require verified Creator status + subscription price for VIP Exclusive content
+    if (isVip) {
+      const isVerifiedCreator = creator.role === "admin" || (creator.is_creator && (creator.kyc_status === "verified" || creator.is_verified));
+      if (!isVerifiedCreator) {
+        return res.status(403).json({
+          error: "Only verified Creators (Email + Identity KYC verified) can publish VIP Exclusive monetized videos."
+        });
+      }
+      if (Number(creator.subscription_price || 0) <= 0) {
+        return res.status(400).json({
+          error: "Please set your monthly VIP subscription price in Creator Studio before publishing VIP Exclusive content."
+        });
+      }
     }
 
     const safeCategory = isVip ? "premium" : "community";
@@ -791,7 +1064,7 @@ router.delete("/videos/:message_id", authenticateToken, async (req, res) => {
 });
 
 /* =======================================================
-   3. GET PUBLIC CREATOR PROFILE
+   3. GET PUBLIC USER / CREATOR PROFILE
    GET /api/creator/:username
 ======================================================= */
 router.get("/:username", optionalAuth, async (req, res) => {
@@ -801,9 +1074,10 @@ router.get("/:username", optionalAuth, async (req, res) => {
   try {
     // 1. Search in app_users
     let creatorQuery = await pool.query(
-      `SELECT id, username, avatar_url, role, is_premium,
+      `SELECT id, username, avatar_url, role, is_premium, settings,
               is_creator, is_managed, telegram_user_id, source_channel, display_name, creator_bio, banner_url, creator_category, 
-              subscription_price, social_links, is_verified, location, website, created_at
+              subscription_price, social_links, is_verified, location, website, created_at,
+              COALESCE(email_verified, FALSE) as email_verified, COALESCE(kyc_status, 'unverified') as kyc_status
        FROM app_users 
        WHERE LOWER(username) = LOWER($1) 
           OR LOWER(COALESCE(display_name, '')) = LOWER($1)
@@ -845,7 +1119,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
              )
              ON CONFLICT (telegram_user_id) DO UPDATE 
              SET is_creator = TRUE, is_managed = TRUE
-             RETURNING id, username, avatar_url, role, is_premium, is_creator, is_managed, telegram_user_id, display_name, creator_bio, banner_url, creator_category, subscription_price, social_links, is_verified, location, website, created_at`,
+             RETURNING id, username, avatar_url, role, is_premium, settings, is_creator, is_managed, telegram_user_id, display_name, creator_bio, banner_url, creator_category, subscription_price, social_links, is_verified, location, website, created_at`,
             [safeUname, displayName, `tg_${tgUser.user_id}@internal.naijahomemade.com`, tgUser.user_id, randPrice, `/api/avatar?user_id=${tgUser.user_id}`]
           );
           creator = insertRes.rows[0];
@@ -901,7 +1175,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
                )
                ON CONFLICT (telegram_user_id) DO UPDATE 
                SET is_creator = TRUE, is_managed = TRUE
-               RETURNING id, username, avatar_url, role, is_premium, is_creator, is_managed, telegram_user_id, display_name, creator_bio, banner_url, creator_category, subscription_price, social_links, is_verified, location, website, created_at`,
+               RETURNING id, username, avatar_url, role, is_premium, settings, is_creator, is_managed, telegram_user_id, display_name, creator_bio, banner_url, creator_category, subscription_price, social_links, is_verified, location, website, created_at`,
               [safeUname, row.uploader_name || username, `tg_${rawId}@internal.naijahomemade.com`, rawId, randPrice, row.uploader_id ? `/api/avatar?user_id=${row.uploader_id}` : "/assets/default-avatar.png"]
             );
             creator = insertRes.rows[0];
@@ -926,7 +1200,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
             };
           }
         } else {
-          return res.status(404).json({ error: "Creator not found" });
+          return res.status(404).json({ error: "User not found" });
         }
       }
     }
@@ -951,7 +1225,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
     // Default values
     if (!creator.display_name) creator.display_name = creator.username;
     if (!creator.banner_url) creator.banner_url = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80";
-    if (!creator.creator_category) creator.creator_category = "Creator";
+    if (!creator.creator_category) creator.creator_category = creator.is_creator ? "Creator" : "Community Member";
 
     // 2. Fetch Creator Stats
     let subCount = 0;
@@ -1003,14 +1277,21 @@ router.get("/:username", optionalAuth, async (req, res) => {
     const viewsCount = Number(statsRes.rows[0]?.views_count || 0);
     const likesCount = Number(statsRes.rows[0]?.likes_count || 0);
 
-    // 3. Determine followers and subscribers counts
+    // 3. Determine followers and following counts
     let followCount = 0;
+    let followingCount = 0;
     try {
-      const followRes = await pool.query(
-        "SELECT COUNT(*) FROM creator_follows WHERE creator_id = $1 OR ($2::BIGINT IS NOT NULL AND creator_id = $2::BIGINT)",
-        [creator.id, creator.telegram_user_id || null]
-      );
+      const [followRes, followingRes] = await Promise.all([
+        pool.query(
+          "SELECT COUNT(*) FROM creator_follows WHERE creator_id = $1 OR ($2::BIGINT IS NOT NULL AND creator_id = $2::BIGINT)",
+          [creator.id, creator.telegram_user_id || null]
+        ),
+        creator.id && Number(creator.id) !== 0
+          ? pool.query("SELECT COUNT(*) FROM creator_follows WHERE follower_id = $1", [creator.id])
+          : Promise.resolve({ rows: [{ count: 0 }] })
+      ]);
       followCount = Number(followRes.rows[0]?.count || 0);
+      followingCount = Number(followingRes.rows[0]?.count || 0);
     } catch (e) {}
 
     const totalFollowers = followCount;
@@ -1019,8 +1300,17 @@ router.get("/:username", optionalAuth, async (req, res) => {
     let isFollowing = false;
     let isSubscribed = false;
     let isOwner = false;
+    let reqUserRole = null;
 
     if (req.user) {
+      try {
+        const reqUserRes = await pool.query("SELECT id, username, role, is_premium, telegram_user_id FROM app_users WHERE id = $1", [req.user.id]);
+        if (reqUserRes.rows.length > 0) {
+          req.user = reqUserRes.rows[0];
+          reqUserRole = req.user.role;
+        }
+      } catch (e) {}
+
       const isReqUserOwner = Boolean(
         (creator.id && Number(req.user.id) === Number(creator.id)) ||
         (creator.telegram_user_id && req.user.telegram_user_id && String(req.user.telegram_user_id) === String(creator.telegram_user_id)) ||
@@ -1051,6 +1341,11 @@ router.get("/:username", optionalAuth, async (req, res) => {
         } catch (e) {}
       }
     }
+
+    const rawSettings = creator.settings && typeof creator.settings === "object" ? creator.settings : {};
+    const isPrivateProfile = Boolean(rawSettings.private_profile);
+    const hideFollowList = Boolean(rawSettings.hide_follow_list || rawSettings.private_profile);
+    const canViewFollowList = Boolean(isOwner || reqUserRole === "admin" || !hideFollowList);
 
     // 5. Fetch First 12 Videos (tab-aware)
     const tab = (req.query.tab || req.query.category || "").toLowerCase().trim();
@@ -1246,6 +1541,9 @@ router.get("/:username", optionalAuth, async (req, res) => {
     res.json({
       creator: {
         ...creator,
+        is_private_profile: isPrivateProfile,
+        hide_follow_list: hideFollowList,
+        can_view_follow_list: canViewFollowList,
         has_active_story: activeStories.length > 0,
         has_viewed_story: hasViewedStory,
         active_story: activeStory,
@@ -1254,6 +1552,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
         highlights: highlights,
         stats: {
           followers: totalFollowers,
+          following: followingCount,
           subscribers: subCount,
           posts: postsCount,
           likes: likesCount,
@@ -1268,6 +1567,230 @@ router.get("/:username", optionalAuth, async (req, res) => {
   } catch (err) {
     console.error("[GET CREATOR ERROR]", err);
     res.status(500).json({ error: "Failed to fetch creator profile" });
+  }
+});
+
+/* =======================================================
+   3.2. GET USER / CREATOR FOLLOWERS LIST
+   GET /api/creator/:username/followers
+======================================================= */
+router.get("/:username/followers", optionalAuth, async (req, res) => {
+  const { username } = req.params;
+  const search = String(req.query.q || "").trim().toLowerCase();
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+  const offset = Math.max(0, parseInt(req.query.offset) || 0);
+
+  try {
+    const targetRes = await pool.query(
+      `SELECT id, username, display_name, telegram_user_id, settings
+       FROM app_users
+       WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)`,
+      [username]
+    );
+
+    let target = targetRes.rows[0];
+    if (!target) {
+      const tgRes = await pool.query(
+        `SELECT user_id as id, username, full_name as display_name, user_id as telegram_user_id
+         FROM users WHERE LOWER(COALESCE(username, '')) = LOWER($1) OR LOWER(COALESCE(full_name, '')) = LOWER($1)`,
+        [username]
+      );
+      target = tgRes.rows[0];
+    }
+
+    if (!target) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const currentUserId = req.user?.id || null;
+    let isOwnerOrAdmin = false;
+    if (currentUserId) {
+      if (Number(currentUserId) === Number(target.id)) {
+        isOwnerOrAdmin = true;
+      } else {
+        const reqRes = await pool.query("SELECT role, username FROM app_users WHERE id = $1", [currentUserId]);
+        if (reqRes.rows[0]?.role === "admin" || (reqRes.rows[0]?.username && reqRes.rows[0].username.toLowerCase() === String(target.username || "").toLowerCase())) {
+          isOwnerOrAdmin = true;
+        }
+      }
+    }
+
+    const rawSettings = target.settings && typeof target.settings === "object" ? target.settings : {};
+    const isPrivateList = Boolean(rawSettings.private_profile || rawSettings.hide_follow_list);
+
+    if (isPrivateList && !isOwnerOrAdmin) {
+      return res.json({
+        is_private: true,
+        users: [],
+        total: 0,
+        message: "This account's followers list is private."
+      });
+    }
+
+    const params = [target.id, target.telegram_user_id || null, currentUserId];
+    let searchFilter = "";
+    if (search) {
+      params.push(`%${search.replace(/^@/, "")}%`);
+      searchFilter = `AND (LOWER(u.username) LIKE $${params.length} OR LOWER(COALESCE(u.display_name, '')) LIKE $${params.length})`;
+    }
+
+    params.push(limit, offset);
+    const limitIdx = params.length - 1;
+    const offsetIdx = params.length;
+
+    const listQuery = `
+      SELECT u.id, u.username, COALESCE(u.display_name, u.username) as display_name,
+             COALESCE(u.avatar_url, '/assets/default-avatar.png') as avatar_url,
+             COALESCE(u.is_verified, FALSE) as is_verified,
+             COALESCE(u.is_creator, FALSE) as is_creator,
+             u.creator_bio,
+             cf.created_at as followed_at,
+             CASE WHEN $3::INTEGER IS NOT NULL AND my_f.id IS NOT NULL THEN TRUE ELSE FALSE END as is_following
+      FROM creator_follows cf
+      JOIN app_users u ON cf.follower_id = u.id
+      LEFT JOIN creator_follows my_f ON (my_f.follower_id = $3::INTEGER AND my_f.creator_id = u.id)
+      WHERE (cf.creator_id = $1 OR ($2::BIGINT IS NOT NULL AND cf.creator_id = $2::BIGINT))
+        ${searchFilter}
+      ORDER BY cf.created_at DESC
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
+    `;
+
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM creator_follows cf
+      JOIN app_users u ON cf.follower_id = u.id
+      WHERE (cf.creator_id = $1 OR ($2::BIGINT IS NOT NULL AND cf.creator_id = $2::BIGINT))
+        ${search ? `AND (LOWER(u.username) LIKE $4 OR LOWER(COALESCE(u.display_name, '')) LIKE $4)` : ""}
+    `;
+
+    const countParams = search
+      ? [target.id, target.telegram_user_id || null, currentUserId, `%${search.replace(/^@/, "")}%`]
+      : [target.id, target.telegram_user_id || null];
+
+    const [listRes, countRes] = await Promise.all([
+      pool.query(listQuery, params),
+      pool.query(
+        search
+          ? `SELECT COUNT(*) as total FROM creator_follows cf JOIN app_users u ON cf.follower_id = u.id WHERE (cf.creator_id = $1 OR ($2::BIGINT IS NOT NULL AND cf.creator_id = $2::BIGINT)) AND (LOWER(u.username) LIKE $3 OR LOWER(COALESCE(u.display_name, '')) LIKE $3)`
+          : `SELECT COUNT(*) as total FROM creator_follows cf JOIN app_users u ON cf.follower_id = u.id WHERE (cf.creator_id = $1 OR ($2::BIGINT IS NOT NULL AND cf.creator_id = $2::BIGINT))`,
+        search ? [target.id, target.telegram_user_id || null, `%${search.replace(/^@/, "")}%`] : [target.id, target.telegram_user_id || null]
+      )
+    ]);
+
+    return res.json({
+      is_private: false,
+      users: listRes.rows,
+      total: Number(countRes.rows[0]?.total || 0)
+    });
+  } catch (err) {
+    console.error("[GET FOLLOWERS ERROR]", err);
+    return res.status(500).json({ error: "Failed to fetch followers list" });
+  }
+});
+
+/* =======================================================
+   3.3. GET USER / CREATOR FOLLOWING LIST
+   GET /api/creator/:username/following
+======================================================= */
+router.get("/:username/following", optionalAuth, async (req, res) => {
+  const { username } = req.params;
+  const search = String(req.query.q || "").trim().toLowerCase();
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 100);
+  const offset = Math.max(0, parseInt(req.query.offset) || 0);
+
+  try {
+    const targetRes = await pool.query(
+      `SELECT id, username, display_name, telegram_user_id, settings
+       FROM app_users
+       WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)`,
+      [username]
+    );
+
+    if (targetRes.rows.length === 0) {
+      return res.json({ is_private: false, users: [], total: 0 });
+    }
+
+    const target = targetRes.rows[0];
+    const currentUserId = req.user?.id || null;
+    let isOwnerOrAdmin = false;
+    if (currentUserId) {
+      if (Number(currentUserId) === Number(target.id)) {
+        isOwnerOrAdmin = true;
+      } else {
+        const reqRes = await pool.query("SELECT role, username FROM app_users WHERE id = $1", [currentUserId]);
+        if (reqRes.rows[0]?.role === "admin" || (reqRes.rows[0]?.username && reqRes.rows[0].username.toLowerCase() === String(target.username || "").toLowerCase())) {
+          isOwnerOrAdmin = true;
+        }
+      }
+    }
+
+    const rawSettings = target.settings && typeof target.settings === "object" ? target.settings : {};
+    const isPrivateList = Boolean(rawSettings.private_profile || rawSettings.hide_follow_list);
+
+    if (isPrivateList && !isOwnerOrAdmin) {
+      return res.json({
+        is_private: true,
+        users: [],
+        total: 0,
+        message: "This account's following list is private."
+      });
+    }
+
+    const params = [target.id, currentUserId];
+    let searchFilter = "";
+    if (search) {
+      params.push(`%${search.replace(/^@/, "")}%`);
+      searchFilter = `AND (LOWER(COALESCE(u.username, tu.username, '')) LIKE $${params.length} OR LOWER(COALESCE(u.display_name, tu.full_name, '')) LIKE $${params.length})`;
+    }
+
+    params.push(limit, offset);
+    const limitIdx = params.length - 1;
+    const offsetIdx = params.length;
+
+    const listQuery = `
+      SELECT COALESCE(u.id, tu.user_id, cf.creator_id) as id,
+             COALESCE(u.username, tu.username, 'user_' || cf.creator_id) as username,
+             COALESCE(u.display_name, tu.full_name, u.username, tu.username, 'Creator') as display_name,
+             CASE 
+               WHEN u.avatar_url IS NOT NULL AND u.avatar_url != '' THEN u.avatar_url
+               WHEN u.telegram_user_id IS NOT NULL THEN '/api/avatar?user_id=' || u.telegram_user_id
+               WHEN tu.user_id IS NOT NULL THEN '/api/avatar?user_id=' || tu.user_id
+               ELSE '/assets/default-avatar.png'
+             END as avatar_url,
+             COALESCE(u.is_verified, CASE WHEN tu.user_id IS NOT NULL THEN TRUE ELSE FALSE END) as is_verified,
+             COALESCE(u.is_creator, CASE WHEN tu.user_id IS NOT NULL THEN TRUE ELSE FALSE END) as is_creator,
+             u.creator_bio,
+             cf.created_at as followed_at,
+             CASE WHEN $2::INTEGER IS NOT NULL AND my_f.id IS NOT NULL THEN TRUE ELSE FALSE END as is_following
+      FROM creator_follows cf
+      LEFT JOIN app_users u ON (cf.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cf.creator_id = u.telegram_user_id))
+      LEFT JOIN users tu ON cf.creator_id = tu.user_id
+      LEFT JOIN creator_follows my_f ON (my_f.follower_id = $2::INTEGER AND my_f.creator_id = cf.creator_id)
+      WHERE cf.follower_id = $1
+        AND COALESCE(u.username, tu.username) IS NOT NULL
+        ${searchFilter}
+      ORDER BY cf.created_at DESC
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
+    `;
+
+    const [listRes, countRes] = await Promise.all([
+      pool.query(listQuery, params),
+      pool.query(
+        search
+          ? `SELECT COUNT(*) as total FROM creator_follows cf LEFT JOIN app_users u ON (cf.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cf.creator_id = u.telegram_user_id)) LEFT JOIN users tu ON cf.creator_id = tu.user_id WHERE cf.follower_id = $1 AND COALESCE(u.username, tu.username) IS NOT NULL AND (LOWER(COALESCE(u.username, tu.username, '')) LIKE $2 OR LOWER(COALESCE(u.display_name, tu.full_name, '')) LIKE $2)`
+          : `SELECT COUNT(*) as total FROM creator_follows cf LEFT JOIN app_users u ON (cf.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cf.creator_id = u.telegram_user_id)) LEFT JOIN users tu ON cf.creator_id = tu.user_id WHERE cf.follower_id = $1 AND COALESCE(u.username, tu.username) IS NOT NULL`,
+        search ? [target.id, `%${search.replace(/^@/, "")}%`] : [target.id]
+      )
+    ]);
+
+    return res.json({
+      is_private: false,
+      users: listRes.rows,
+      total: Number(countRes.rows[0]?.total || 0)
+    });
+  } catch (err) {
+    console.error("[GET FOLLOWING ERROR]", err);
+    return res.status(500).json({ error: "Failed to fetch following list" });
   }
 });
 

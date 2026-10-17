@@ -342,7 +342,7 @@ export default function PaywallModal({ onClose, user }) {
                     </div>
                   </div>
                   <button onClick={() => copyToClipboard(cryptoPaymentDetails.pay_amount, 'amount')} style={copyBtnStyle}>
-                    {copiedField === 'amount' ? <CheckCircle2 size={16} color="#34C759"/> : <Copy size={16} color="#fff"/>}
+                    {copiedField === 'amount' ? <CheckCircle2 size={16} color="#f4f4f5"/> : <Copy size={16} color="#fff"/>}
                   </button>
                 </div>
 
@@ -354,7 +354,7 @@ export default function PaywallModal({ onClose, user }) {
                     </div>
                   </div>
                   <button onClick={() => copyToClipboard(cryptoPaymentDetails.pay_address, 'address')} style={{...copyBtnStyle, flexShrink: 0}}>
-                    {copiedField === 'address' ? <CheckCircle2 size={16} color="#34C759"/> : <Copy size={16} color="#fff"/>}
+                    {copiedField === 'address' ? <CheckCircle2 size={16} color="#f4f4f5"/> : <Copy size={16} color="#fff"/>}
                   </button>
                 </div>
               </div>
@@ -394,7 +394,7 @@ export default function PaywallModal({ onClose, user }) {
 
           {verifyStatus === "success" && (
             <div style={{ textAlign: "center", padding: "30px 10px", margin: "auto" }}>
-              <CheckCircle2 size={64} color="#34C759" style={{ margin: "0 auto 20px auto" }} />
+              <CheckCircle2 size={64} color="#f43f5e" style={{ margin: "0 auto 20px auto" }} />
               <h2 style={titleStyle}>Payment Successful!</h2>
               <p style={subStyle}>Welcome to Premium. Refreshing your dashboard...</p>
             </div>
@@ -419,7 +419,7 @@ export default function PaywallModal({ onClose, user }) {
 
           <div style={footerStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#8e8e93", fontSize: "12px" }}>
-              <ShieldCheck size={14} color="#34C759" />
+              <ShieldCheck size={14} color="#f43f5e" />
               <span style={{ fontWeight: "600" }}>256-bit Secure</span>
             </div>
             <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>

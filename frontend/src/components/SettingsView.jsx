@@ -41,6 +41,7 @@ export default function SettingsView({
   
   // Privacy Toggles
   const [privateProfile, setPrivateProfile] = useState(Boolean(user?.settings?.private_profile));
+  const [hideFollowList, setHideFollowList] = useState(Boolean(user?.settings?.hide_follow_list));
   const [showLikes, setShowLikes] = useState(user?.settings?.show_likes !== false);
   const [allowTips, setAllowTips] = useState(user?.settings?.allow_tips !== false);
 
@@ -63,7 +64,7 @@ export default function SettingsView({
     try {
       const token = localStorage.getItem("token");
       if (!token) return;
-      await fetch(`${APP_CONFIG.apiUrl}/api/auth/settings`, {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/auth/settings`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -71,6 +72,12 @@ export default function SettingsView({
         },
         body: JSON.stringify({ settings: newSettings })
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings && onUpdateUser && user) {
+          onUpdateUser({ ...user, settings: data.settings });
+        }
+      }
     } catch (err) {
       console.error("Settings sync failed", err);
     }
@@ -104,7 +111,14 @@ export default function SettingsView({
     const next = !privateProfile;
     setPrivateProfile(next);
     syncSettingsToBackend({ private_profile: next });
-    showToast(next ? "Private account enabled" : "Public account enabled", "info");
+    showToast(next ? "Private account enabled (followers list hidden)" : "Public account enabled", "info");
+  };
+
+  const toggleHideFollowList = () => {
+    const next = !hideFollowList;
+    setHideFollowList(next);
+    syncSettingsToBackend({ hide_follow_list: next });
+    showToast(next ? "Followers & Following lists set to private" : "Followers & Following lists visible", "info");
   };
 
   const toggleShowLikes = () => {
@@ -189,7 +203,7 @@ export default function SettingsView({
                 )}
               </div>
               <div style={{ fontSize: "13px", color: "#8e8e93", marginTop: "2px" }}>
-                @{user?.username || "user"} · {user?.is_creator ? "Creator" : "Member"}
+                @{user?.username || "user"} · {user?.is_creator ? "Verified Creator" : "Social Profile"}
               </div>
             </div>
             <button 
@@ -205,8 +219,20 @@ export default function SettingsView({
 
           <div style={dividerStyle} />
 
-          {/* 🌟 CREATOR TOOLS (Minimal row-based list) */}
-          <div style={sectionLabelStyle}>Creator Tools</div>
+          {/* 🌟 CREATOR & CONTENT TOOLS */}
+          <div style={sectionLabelStyle}>Content & Creator Monetization</div>
+
+          <div style={settingsRowStyle} onClick={onOpenUpload}>
+            <Plus size={19} color="#8e8e93" />
+            <span style={rowLabelStyle}>Upload Video or Reel</span>
+            <ChevronRight size={16} color="#48484a" />
+          </div>
+
+          <div style={settingsRowStyle} onClick={onOpenFanView}>
+            <Eye size={19} color="#8e8e93" />
+            <span style={rowLabelStyle}>View Public Profile</span>
+            <ChevronRight size={16} color="#48484a" />
+          </div>
 
           {user?.is_creator ? (
             <>
@@ -219,7 +245,7 @@ export default function SettingsView({
 
               <div style={settingsRowStyle} onClick={onOpenCreatorStudio}>
                 <DollarSign size={19} color="#8e8e93" />
-                <span style={rowLabelStyle}>VIP Channel Pricing</span>
+                <span style={rowLabelStyle}>VIP Subscription Price</span>
                 <span style={rowValueStyle}>
                   {Number(user?.subscription_price) > 0 
                     ? `$${Number(user.subscription_price).toLocaleString()}/mo` 
@@ -227,24 +253,14 @@ export default function SettingsView({
                 </span>
                 <ChevronRight size={16} color="#48484a" />
               </div>
-
-              <div style={settingsRowStyle} onClick={onOpenFanView}>
-                <Eye size={19} color="#8e8e93" />
-                <span style={rowLabelStyle}>Fan View (Preview Profile)</span>
-                <ChevronRight size={16} color="#48484a" />
-              </div>
-
-              <div style={settingsRowStyle} onClick={onOpenUpload}>
-                <Plus size={19} color="#8e8e93" />
-                <span style={rowLabelStyle}>Upload Video or Reel</span>
-                <ChevronRight size={16} color="#48484a" />
-              </div>
             </>
           ) : (
             <div style={settingsRowStyle} onClick={onOpenBecomeCreator}>
-              <TrendingUp size={19} color="#8e8e93" />
-              <span style={rowLabelStyle}>Turn On Creator Mode</span>
-              <span style={{ fontSize: "13px", color: "#0095f6", fontWeight: "600" }}>Upgrade</span>
+              <ShieldCheck size={19} color="#f43f5e" />
+              <span style={rowLabelStyle}>Upgrade to Creator & Monetize</span>
+              <span style={{ fontSize: "12px", color: "#f43f5e", fontWeight: "700" }}>
+                {user?.kyc_status === "verified" ? "Activate" : "Verify Email & KYC"}
+              </span>
               <ChevronRight size={16} color="#48484a" />
             </div>
           )}
@@ -282,7 +298,7 @@ export default function SettingsView({
             <ShieldCheck size={19} color="#8e8e93" />
             <span style={rowLabelStyle}>Security</span>
             <span style={rowValueStyle}>Telegram OAuth</span>
-            <CheckCircle size={15} color="#00d084" />
+            <CheckCircle size={15} color="#00aff0" />
           </div>
 
           <div style={dividerStyle} />
@@ -451,9 +467,17 @@ export default function SettingsView({
             <div style={modalToggleRow}>
               <div>
                 <div style={{ fontSize: "14px", fontWeight: "600", color: "#fff" }}>Private Profile</div>
-                <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>Only approved followers can view saved/liked clips</div>
+                <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>Hide followers/following lists & saved clips from visitors</div>
               </div>
               <ToggleSwitch active={privateProfile} onClick={togglePrivateProfile} />
+            </div>
+
+            <div style={modalToggleRow}>
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: "600", color: "#fff" }}>Hide Followers & Following List</div>
+                <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>Only you can tap to view who follows you and who you follow</div>
+              </div>
+              <ToggleSwitch active={hideFollowList || privateProfile} onClick={toggleHideFollowList} />
             </div>
 
             <div style={modalToggleRow}>

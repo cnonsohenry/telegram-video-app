@@ -123,7 +123,7 @@ export default function Privacy() {
       {/* 🟢 CRITICAL: Dedicated Google API & OAuth 2.0 Policy Section */}
       <section>
         <h2 style={headerStyle}>5. Google API Services & OAuth 2.0 User Data Policy</h2>
-        <div style={{ ...highlightBox, borderColor: "#00a859" }}>
+        <div style={{ ...highlightBox, borderColor: "rgba(225, 29, 72, 0.3)" }}>
           <p style={{ margin: "0 0 12px 0", color: "#fff", fontWeight: "700", fontSize: "16px" }}>
             Google User Data Protection & Limited Use Disclosure
           </p>
@@ -137,7 +137,7 @@ export default function Privacy() {
             <li><strong>Data Sharing Restrictions:</strong> Google user data is only shared with trusted cloud infrastructure providers (e.g., our secure database hosting) strictly as required to provide you with the {brandName} service, and never for secondary purposes.</li>
           </ul>
           <p style={{ margin: "0", color: "#e7e9ea", fontStyle: "italic", borderTop: "1px solid #333", paddingTop: "10px" }}>
-            <strong>Mandatory Google Limited Use Compliance:</strong> {brandName}’s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" style={{ color: "#00e676", textDecoration: "underline" }}>Google API Services User Data Policy</a>, including the Limited Use requirements.
+            <strong>Mandatory Google Limited Use Compliance:</strong> {brandName}’s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" style={{ color: "#f43f5e", textDecoration: "underline" }}>Google API Services User Data Policy</a>, including the Limited Use requirements.
           </p>
         </div>
       </section>
@@ -174,7 +174,7 @@ export default function Privacy() {
           <ul style={{ paddingLeft: "20px", margin: "0 0 10px 0" }}>
             <li><strong>In-App Deletion:</strong> Navigate to <strong>Settings</strong> ➡️ <strong>Account</strong> ➡️ <strong>Delete Account</strong>.</li>
             <li><strong>Email Request:</strong> Send an email with the subject "Data Deletion Request" from your registered email address to <strong>{APP_CONFIG.supportEmail}</strong> or <strong>{dpoEmail}</strong>.</li>
-            <li><strong>Google Account Permissions:</strong> You can also instantly revoke {brandName}'s access directly via your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" style={{ color: "#00e676", textDecoration: "underline" }}>Google Account Security Permissions</a>.</li>
+            <li><strong>Google Account Permissions:</strong> You can also instantly revoke {brandName}'s access directly via your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" style={{ color: "#f43f5e", textDecoration: "underline" }}>Google Account Security Permissions</a>.</li>
           </ul>
           <p style={{ margin: "0", fontSize: "13px", color: "#aaa" }}>
             Upon receiving an account deletion request, your profile, authentication tokens, uploaded media, and activity logs are permanently expunged from our live databases within <strong>30 days</strong>.

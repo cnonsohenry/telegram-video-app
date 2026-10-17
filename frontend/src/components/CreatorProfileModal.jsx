@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   ArrowLeft, Share2, Heart, Lock, Grid3X3, 
   MapPin, Globe, Sparkles, Send, Play, Loader2, MessageCircle,
@@ -14,6 +14,7 @@ import CreatorSubscribeModal from "./CreatorSubscribeModal";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import StoryAvatar from "./StoryAvatar";
 import StoryHighlightsTray from "./StoryHighlightsTray";
+import FollowListModal from "./FollowListModal";
 import { promptLogin, showToast } from "../utils/toast";
 
 export default function CreatorProfileModal({ 
@@ -26,6 +27,7 @@ export default function CreatorProfileModal({
   onSubscriptionUpdated,
   onCommentClick
 }) {
+  const normalizedTarget = String(creatorUsername || "").toLowerCase().replace(/^@/, "").trim();
   const [creatorData, setCreatorData] = useState(null);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,16 @@ export default function CreatorProfileModal({
   const [activeTab, setActiveTab] = useState("posts");
   const [isFollowing, setIsFollowing] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followListTab, setFollowListTab] = useState(() => {
+    const st = window.history.state || {};
+    return (st.creatorFollowList && st.creatorFollowListUser === normalizedTarget) ? st.creatorFollowList : null;
+  });
+  const followListTabRef = useRef(followListTab);
+  useEffect(() => {
+    followListTabRef.current = followListTab;
+  }, [followListTab]);
+
   const [isFollowLoading, setIsFollowLoading] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribersCount, setSubscribersCount] = useState(0);
@@ -42,7 +54,7 @@ export default function CreatorProfileModal({
   const [optionsVideo, setOptionsVideo] = useState(null);
   const [reportedVideo, setReportedVideo] = useState(null);
   const [highlights, setHighlights] = useState([]);
-  const isAnyModalOpen = Boolean(showTipModal || showSubscribeModal || optionsVideo || reportedVideo);
+  const isAnyModalOpen = Boolean(showTipModal || showSubscribeModal || optionsVideo || reportedVideo || followListTab);
   const [tabVideos, setTabVideos] = useState({
     posts: [],
     reels: [],
@@ -76,6 +88,75 @@ export default function CreatorProfileModal({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  const handleOpenFollowList = useCallback((tab) => {
+    followListTabRef.current = tab;
+    setFollowListTab(tab);
+    const currentState = window.history.state || {};
+    if (!currentState.creatorFollowList || currentState.creatorFollowListUser !== normalizedTarget) {
+      window.history.pushState(
+        { ...currentState, creatorFollowList: tab, creatorFollowListUser: normalizedTarget },
+        document.title,
+        window.location.href
+      );
+    } else if (currentState.creatorFollowList !== tab) {
+      window.history.replaceState(
+        { ...currentState, creatorFollowList: tab, creatorFollowListUser: normalizedTarget },
+        document.title,
+        window.location.href
+      );
+    }
+  }, [normalizedTarget]);
+
+  const handleFollowListTabChange = useCallback((newTab) => {
+    followListTabRef.current = newTab;
+    setFollowListTab(newTab);
+    const currentState = window.history.state || {};
+    if (currentState.creatorFollowList && currentState.creatorFollowList !== newTab) {
+      window.history.replaceState(
+        { ...currentState, creatorFollowList: newTab, creatorFollowListUser: normalizedTarget },
+        document.title,
+        window.location.href
+      );
+    }
+  }, [normalizedTarget]);
+
+  const handleCloseFollowList = useCallback(() => {
+    followListTabRef.current = null;
+    setFollowListTab(null);
+    if (window.history.state?.creatorFollowList) {
+      window.history.back();
+    }
+  }, []);
+
+  useEffect(() => {
+    const syncFollowListFromHistory = (stateObj) => {
+      const st = stateObj || window.history.state || {};
+      if (
+        st.creatorFollowList &&
+        st.creatorFollowListUser === normalizedTarget &&
+        !st.videoPlayer &&
+        !st.storyPlayer
+      ) {
+        if (followListTabRef.current !== st.creatorFollowList) {
+          followListTabRef.current = st.creatorFollowList;
+          setFollowListTab(st.creatorFollowList);
+        }
+      } else if (followListTabRef.current) {
+        followListTabRef.current = null;
+        setFollowListTab(null);
+      }
+    };
+
+    syncFollowListFromHistory(window.history.state);
+
+    const handlePopState = (e) => {
+      syncFollowListFromHistory(e.state || {});
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [normalizedTarget]);
 
   const fetchTabVideos = useCallback(async (targetTab, targetPage = 1, isAppend = false) => {
     setTabLoading(prev => ({ ...prev, [targetTab]: true }));
@@ -143,6 +224,11 @@ export default function CreatorProfileModal({
           setIsFollowing(isFoll);
           setSubscribersCount(Number(data.creator.stats?.subscribers || 0));
           setFollowersCount(Number(data.creator.stats?.followers || 0));
+          setFollowingCount(Number(data.creator.stats?.following || 0));
+          const st = window.history.state || {};
+          const restoredTab = (st.creatorFollowList && st.creatorFollowListUser === normalizedTarget) ? st.creatorFollowList : null;
+          followListTabRef.current = restoredTab;
+          setFollowListTab(restoredTab);
           setHighlights(data.creator.highlights || []);
           setTabHasMore(prev => ({
             ...prev,
@@ -179,7 +265,7 @@ export default function CreatorProfileModal({
     return () => {
       isMounted = false;
     };
-  }, [creatorUsername]);
+  }, [creatorUsername, normalizedTarget]);
 
   useEffect(() => {
     if (!creatorData) return;
@@ -346,6 +432,7 @@ export default function CreatorProfileModal({
 
   const avatar = creatorData?.avatar_url || "/assets/default-avatar.png";
   const price = Number(creatorData?.subscription_price || 0);
+  const isMonetizedCreator = Boolean(creatorData?.is_creator) || price > 0;
   const cleanUname = String(creatorData?.username || creatorUsername || "").toLowerCase().replace(/^@/, "").trim();
   const isOwner = Boolean(
     creatorData?.is_owner || 
@@ -400,7 +487,7 @@ export default function CreatorProfileModal({
           {creatorData?.is_verified && <TwitterVerifiedBadge size={15} style={{ flexShrink: 0 }} />}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          {!creatorData?.is_owner && (
+          {!creatorData?.is_owner && isMonetizedCreator && creatorData?.allow_tips !== false && (
             <button 
               onClick={() => setShowTipModal(true)} 
               style={navBtnStyle} 
@@ -418,12 +505,12 @@ export default function CreatorProfileModal({
       {loading ? (
         <div style={loaderCenterStyle}>
           <Loader2 size={32} className="animate-spin" color="#0095f6" />
-          <span style={{ marginTop: "12px", color: "#8e8e93", fontSize: "14px" }}>Loading creator profile...</span>
+          <span style={{ marginTop: "12px", color: "#8e8e93", fontSize: "14px" }}>Loading profile...</span>
         </div>
       ) : error ? (
         <div style={errorCenterStyle}>
-          <span style={{ fontSize: "16px", color: "#fff", fontWeight: "700" }}>Creator Not Found</span>
-          <p style={{ color: "#8e8e93", fontSize: "13px", marginTop: "4px" }}>The requested creator could not be found or has not set up their profile yet.</p>
+          <span style={{ fontSize: "16px", color: "#fff", fontWeight: "700" }}>Profile Not Found</span>
+          <p style={{ color: "#8e8e93", fontSize: "13px", marginTop: "4px" }}>The requested account could not be found.</p>
           <button onClick={onClose} style={errorBackBtnStyle}>Back to Feed</button>
         </div>
       ) : (
@@ -467,24 +554,32 @@ export default function CreatorProfileModal({
                       </p>
                     )}
 
-                    {/* Line 3: Post, followers, likes count (replaces username) */}
+                    {/* Line 3: Followers, following, likes count */}
                     <div style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "8px",
+                      gap: "7px",
                       flexWrap: "wrap",
                       fontSize: "12.5px",
                       color: "#8e8e93",
-                      marginTop: "4px"
+                      marginTop: "5px"
                     }}>
-                      <span>
-                        <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(postsCount)}</strong>{" "}
-                        <span>posts</span>
-                      </span>
-                      <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                      <span>
+                      <span
+                        onClick={() => handleOpenFollowList("followers")}
+                        style={{ cursor: "pointer" }}
+                        title="View followers"
+                      >
                         <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
                         <span>followers</span>
+                      </span>
+                      <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                      <span
+                        onClick={() => handleOpenFollowList("following")}
+                        style={{ cursor: "pointer" }}
+                        title="View following"
+                      >
+                        <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
+                        <span>following</span>
                       </span>
                       <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
                       <span>
@@ -541,7 +636,7 @@ export default function CreatorProfileModal({
                   )}
                 </div>
 
-                {/* Links & Meta (Joined date removed) */}
+                {/* Links & Meta */}
                 {(creatorData?.website || creatorData?.location) && (
                   <div style={metaRowStyle}>
                     {creatorData?.website && (
@@ -602,24 +697,32 @@ export default function CreatorProfileModal({
                     </p>
                   )}
 
-                  {/* Line 3: Post, followers, likes count (replaces username) */}
+                  {/* Line 3: Followers, following, likes count */}
                   <div style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "18px",
+                    gap: "16px",
                     fontSize: "14px",
                     color: "#8e8e93",
                     marginTop: "6px",
                     marginBottom: "16px"
                   }}>
-                    <span>
-                      <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(postsCount)}</strong>{" "}
-                      <span>posts</span>
-                    </span>
-                    <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                    <span>
+                    <span
+                      onClick={() => handleOpenFollowList("followers")}
+                      style={{ cursor: "pointer" }}
+                      title="View followers"
+                    >
                       <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
                       <span>followers</span>
+                    </span>
+                    <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
+                    <span
+                      onClick={() => handleOpenFollowList("following")}
+                      style={{ cursor: "pointer" }}
+                      title="View following"
+                    >
+                      <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
+                      <span>following</span>
                     </span>
                     <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
                     <span>
@@ -661,7 +764,7 @@ export default function CreatorProfileModal({
                     )}
                   </div>
 
-                  {/* Links & Meta (Joined date removed) */}
+                  {/* Links & Meta */}
                   {(creatorData?.website || creatorData?.location) && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center", fontSize: "13px", color: "#8e8e93" }}>
                       {creatorData?.website && (
@@ -750,19 +853,21 @@ export default function CreatorProfileModal({
                 <Film size={isDesktop ? 16 : 22} />
                 {isDesktop && <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: "1px" }}>REELS</span>}
               </button>
-              <button 
-                onClick={() => setActiveTab("premium")} 
-                style={{ 
-                  ...tabBtnStyle, 
-                  borderTop: (isDesktop && activeTab === "premium") ? "1px solid #ffffff" : "none",
-                  borderBottom: (!isDesktop && activeTab === "premium") ? "2px solid #ffffff" : "none",
-                  opacity: activeTab === "premium" ? 1 : 0.4, 
-                  color: activeTab === "premium" ? "#ffffff" : "#a8a8a8" 
-                }}
-              >
-                <Lock size={isDesktop ? 16 : 22} />
-                {isDesktop && <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: "1px" }}>VIP EXCLUSIVE</span>}
-              </button>
+              {isMonetizedCreator && (
+                <button 
+                  onClick={() => setActiveTab("premium")} 
+                  style={{ 
+                    ...tabBtnStyle, 
+                    borderTop: (isDesktop && activeTab === "premium") ? "1px solid #ffffff" : "none",
+                    borderBottom: (!isDesktop && activeTab === "premium") ? "2px solid #ffffff" : "none",
+                    opacity: activeTab === "premium" ? 1 : 0.4, 
+                    color: activeTab === "premium" ? "#ffffff" : "#a8a8a8" 
+                  }}
+                >
+                  <Lock size={isDesktop ? 16 : 22} />
+                  {isDesktop && <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: "1px" }}>VIP EXCLUSIVE</span>}
+                </button>
+              )}
             </div>
 
             {/* 🌟 3-COLUMN INSTAGRAM SQUARE MEDIA GRID */}
@@ -956,6 +1061,36 @@ export default function CreatorProfileModal({
           isOpen={Boolean(reportedVideo)}
           video={reportedVideo}
           onClose={() => setReportedVideo(null)}
+        />
+      )}
+
+      {/* 👥 FOLLOWERS / FOLLOWING LIST MODAL */}
+      {followListTab && (
+        <FollowListModal
+          username={creatorData?.username || creatorUsername}
+          displayName={creatorData?.display_name || creatorUsername}
+          initialTab={followListTab}
+          followersCount={followersCount}
+          followingCount={followingCount}
+          currentUser={currentUser}
+          isOwner={isOwner}
+          onClose={handleCloseFollowList}
+          onTabChange={handleFollowListTabChange}
+          onSelectUser={(uname) => {
+            const cleanTarget = String(uname || "").replace(/^@/, "").trim();
+            if (!cleanTarget) return;
+            if (cleanTarget.toLowerCase() === cleanUname) {
+              handleCloseFollowList();
+              return;
+            }
+            followListTabRef.current = null;
+            setFollowListTab(null);
+            window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: { username: cleanTarget } }));
+          }}
+          onCountsChange={({ followersDelta = 0, followingDelta = 0 }) => {
+            if (followersDelta) setFollowersCount(prev => Math.max(0, prev + followersDelta));
+            if (followingDelta) setFollowingCount(prev => Math.max(0, prev + followingDelta));
+          }}
         />
       )}
 

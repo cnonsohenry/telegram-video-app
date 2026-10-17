@@ -100,7 +100,7 @@ function getPrivacyHtml() {
     <!-- CRITICAL: Mandatory Google API Services User Data Policy & Limited Use Disclosure -->
     <section>
       <h2 style="color: #fff; margin-top: 40px; margin-bottom: 15px; font-size: 20px; border-bottom: 1px solid #333; padding-bottom: 10px;">5. Google API Services & OAuth 2.0 User Data Policy</h2>
-      <div style="background: #1a1a1a; padding: 22px; border-radius: 8px; border: 1px solid #00a859; margin: 20px 0;">
+      <div style="background: #1a1a1a; padding: 22px; border-radius: 8px; border: 1px solid rgba(225, 29, 72, 0.3); margin: 20px 0;">
         <p style="margin: 0 0 12px 0; color: #fff; font-weight: 700; font-size: 16px;">
           Google User Data Protection & Limited Use Disclosure
         </p>
@@ -114,7 +114,7 @@ function getPrivacyHtml() {
           <li><strong>Data Sharing Restrictions:</strong> Google user data is only shared with trusted cloud infrastructure providers strictly as required to provide you with the Naijahomemade service, and never for secondary purposes.</li>
         </ul>
         <p style="margin: 0; color: #e7e9ea; font-style: italic; border-top: 1px solid #333; paddingTop: 10px;">
-          <strong>Mandatory Google Limited Use Compliance:</strong> Naijahomemade’s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" style="color: #00e676; text-decoration: underline;">Google API Services User Data Policy</a>, including the Limited Use requirements.
+          <strong>Mandatory Google Limited Use Compliance:</strong> Naijahomemade’s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" style="color: #f43f5e; text-decoration: underline;">Google API Services User Data Policy</a>, including the Limited Use requirements.
         </p>
       </div>
     </section>
@@ -151,7 +151,7 @@ function getPrivacyHtml() {
         <ul style="padding-left: 20px; margin: 0 0 10px 0;">
           <li><strong>In-App Deletion:</strong> Navigate to <strong>Settings</strong> ➡️ <strong>Account</strong> ➡️ <strong>Delete Account</strong>.</li>
           <li><strong>Email Request:</strong> Send an email with the subject "Data Deletion Request" from your registered email address to <strong>support@naijahomemade.com</strong> or <strong>dpo@naijahomemade.com</strong>.</li>
-          <li><strong>Google Account Permissions:</strong> You can also instantly revoke Naijahomemade's access directly via your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" style="color: #00e676; text-decoration: underline;">Google Account Security Permissions</a>.</li>
+          <li><strong>Google Account Permissions:</strong> You can also instantly revoke Naijahomemade's access directly via your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" style="color: #f43f5e; text-decoration: underline;">Google Account Security Permissions</a>.</li>
         </ul>
         <p style="margin: 0; font-size: 13px; color: #aaa;">
           Upon receiving an account deletion request, your profile, authentication tokens, uploaded media, and activity logs are permanently expunged from our live databases within <strong>30 days</strong>.

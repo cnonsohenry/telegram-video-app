@@ -85,127 +85,129 @@
       body.no-scroll { overflow: hidden; height: 100dvh; }
 
       #age-gate {
-        position: fixed; inset: 0;
-        display: flex; 
-        flex-direction: column; 
-        align-items: center; 
-        justify-content: center;
-        background: rgba(8, 12, 18, 0.86);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        z-index: 2147483647; 
-        transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-        padding: 24px; /* 🟢 Ensures the card NEVER touches the edges of the screen */
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        background: rgba(9, 9, 11, 0.94);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        z-index: 2147483647;
+        transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        padding: 16px;
         box-sizing: border-box;
-        text-align: center;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
       }
 
       #age-gate::before {
         content: '';
         position: absolute;
-        width: 300px; height: 300px;
-        background: rgba(255, 59, 48, 0.15);
-        filter: blur(80px);
+        top: 20%;
+        width: 320px;
+        height: 320px;
+        background: rgba(225, 29, 72, 0.12);
+        filter: blur(90px);
         border-radius: 50%;
         animation: float 6s infinite ease-in-out alternate;
+        pointer-events: none;
         z-index: 0;
       }
 
       @keyframes float {
-        0% { transform: scale(0.8) translate(0px, 0px); opacity: 0.5; }
-        100% { transform: scale(1.2) translate(0px, -20px); opacity: 1; }
+        0% { transform: scale(0.85) translate(0px, 0px); opacity: 0.4; }
+        100% { transform: scale(1.15) translate(0px, -15px); opacity: 0.8; }
       }
 
       .age-gate-content {
         position: relative;
         z-index: 1;
         width: 100%;
-        max-width: 420px; /* 🟢 Scaled down from 500px for a sleeker, centered look */
+        max-width: 390px;
+        margin: auto;
         box-sizing: border-box;
-        background: rgba(20, 20, 20, 0.65);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
+        background: #18181b;
         border: 1px solid rgba(255, 255, 255, 0.08);
-        border-top: 1px solid rgba(255, 255, 255, 0.15); 
         border-radius: 20px;
-        padding: 32px 24px; /* 🟢 Tighter padding to match smaller fonts */
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255,59,48,0.05);
+        padding: 24px 20px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+        text-align: center;
+      }
+
+      .age-gate-logo-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        margin-bottom: 14px;
+      }
+
+      .age-gate-logo-img {
+        width: 38px;
+        height: 38px;
+        border-radius: 9px;
+        box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25);
       }
 
       .logo-text { 
-        color: #ffffff; 
-        font-size: 18px; /* 🟢 Reduced from 28px */
+        color: #f4f4f5; 
+        font-size: 19px; 
         font-weight: 900; 
-        margin-bottom: 20px; 
-        letter-spacing: -0.5px; 
+        margin: 0; 
+        letter-spacing: -0.4px; 
       }
       .highlight { 
-        color: #ff3b30; 
-        text-shadow: 0 0 15px rgba(255, 59, 48, 0.6);
+        color: #e11d48; 
+      }
+
+      .age-gate-badge {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 800;
+        color: #f43f5e;
+        background: rgba(225, 29, 72, 0.14);
+        padding: 2px 8px;
+        border-radius: 5px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-bottom: 8px;
       }
 
       .age-gate-title {
-        font-size: 18px; /* 🟢 Reduced from 26px */
-        font-weight: 700;
-        margin: 0 0 6px 0;
+        font-size: 18px;
+        font-weight: 800;
+        color: #f4f4f5;
+        margin: 0 0 10px 0;
         letter-spacing: -0.3px;
       }
 
-      .age-gate-subtitle {
-        font-size: 11px; /* 🟢 Reduced from 14px */
-        font-weight: 700;
-        color: #ff3b30;
-        margin: 0 0 20px 0;
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
+      .age-gate-summary {
+        font-size: 12.5px;
+        line-height: 1.55;
+        color: #a1a1aa;
+        margin: 0 0 18px 0;
+        padding: 0 4px;
       }
 
-      .age-gate-text-box {
-        background: rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 12px;
-        padding: 16px; /* 🟢 Tighter spacing */
-        margin-bottom: 24px;
-        text-align: left; 
-      }
-
-      .age-gate-text-box p {
-        font-size: 13px; /* 🟢 Reduced from 15px */
-        line-height: 1.6;
-        color: #d1d5db;
-        margin: 0 0 12px 0;
-      }
-
-      .age-gate-list {
-        margin: 0;
-        padding-left: 20px;
-        color: #9ca3af;
-        font-size: 12.5px; /* 🟢 Reduced from 14px */
-        line-height: 1.6;
-      }
-
-      .age-gate-list li {
-        margin-bottom: 6px;
-      }
-
-      .age-gate-list strong {
-        color: #ffffff;
+      .age-gate-summary strong {
+        color: #f4f4f5;
       }
 
       .age-gate-buttons {
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        margin-bottom: 24px;
+        gap: 9px;
+        margin-bottom: 18px;
       }
 
       .btn-enter {
-        background: linear-gradient(135deg, #ff453a 0%, #d63328 100%);
-        color: #fff;
+        background: #e11d48;
+        color: #ffffff;
         border: none;
-        padding: 14px; /* 🟢 Reduced from 18px */
-        font-size: 14px; /* 🟢 Reduced from 16px */
+        padding: 13px 16px;
+        font-size: 14px;
         font-weight: 700;
         border-radius: 10px;
         cursor: pointer;
@@ -213,88 +215,72 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
-        box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.5);
-        animation: pulse-red 2s infinite cubic-bezier(0.66, 0, 0, 1);
-        transition: transform 0.2s, filter 0.2s;
+        box-shadow: 0 2px 14px rgba(225, 29, 72, 0.35);
+        transition: transform 0.15s, background-color 0.15s;
       }
 
       .btn-enter:hover { 
-        transform: translateY(-2px);
-        filter: brightness(1.1);
+        transform: translateY(-1px);
+        background: #be123c;
       }
 
-      @keyframes pulse-red {
-        to { box-shadow: 0 0 0 15px rgba(255, 59, 48, 0); }
-      }
-
-      .btn-enter img {
-        width: 18px; /* 🟢 Reduced icon size */
-        height: 18px;
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-      }
-
-      .btn-telegram {
-        background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%);
-        color: #fff;
-        border: 1px solid rgba(255,255,255,0.1);
-        padding: 13px; /* 🟢 Reduced from 16px */
-        font-size: 13px; /* 🟢 Reduced from 15px */
-        font-weight: 600;
-        border-radius: 10px;
-        cursor: pointer;
-        transition: all 0.2s;
+      .age-gate-sub-actions {
         display: flex;
-        align-items: center;
-        justify-content: center;
         gap: 8px;
       }
 
-      .btn-telegram:hover { 
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(42, 171, 238, 0.3);
-      }
-      
-      .btn-telegram svg {
-        width: 16px; /* 🟢 Reduced icon size */
-        height: 16px;
-        fill: currentColor;
-      }
-
-      .btn-learn-more {
-        background: rgba(255, 255, 255, 0.08);
-        color: #fff;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        padding: 13px;
-        font-size: 13px;
+      .btn-learn-more, .btn-telegram {
+        flex: 1;
+        background: #27272a;
+        color: #f4f4f5;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 11px;
+        font-size: 12.5px;
         font-weight: 600;
         border-radius: 10px;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: 6px;
         text-decoration: none;
-        transition: all 0.2s;
+        transition: background 0.15s, transform 0.15s;
+        box-sizing: border-box;
       }
 
-      .btn-learn-more:hover { 
-        background: rgba(255, 255, 255, 0.15);
-        transform: translateY(-2px);
+      .btn-learn-more:hover, .btn-telegram:hover { 
+        background: rgba(255, 255, 255, 0.12);
+        transform: translateY(-1px);
+      }
+
+      .btn-telegram svg {
+        width: 15px;
+        height: 15px;
+        fill: #38bdf8;
       }
 
       .age-gate-footer {
-        font-size: 11px; /* 🟢 Reduced from 12px */
-        color: #6b7280;
-        line-height: 1.6;
+        font-size: 11px;
+        color: #71717a;
+        line-height: 1.5;
         font-weight: 500;
       }
 
-      .age-gate-footer a { color: #9ca3af; text-decoration: none; border-bottom: 1px dotted #6b7280; transition: color 0.2s; }
-      .age-gate-footer a:hover { color: #fff; border-bottom-color: #fff; }
+      .age-gate-links {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 6px;
+      }
 
-      @media (min-width: 600px) {
-        .age-gate-buttons { flex-direction: row; }
-        .btn-enter, .btn-learn-more, .btn-telegram { flex: 1; }
+      .age-gate-footer a { 
+        color: #a1a1aa; 
+        text-decoration: none; 
+        transition: color 0.15s; 
+      }
+      .age-gate-footer a:hover { 
+        color: #f4f4f5; 
       }
 
       iframe[id^="container-"][style*="z-index: 2147483647"] {
@@ -314,50 +300,41 @@
   <body class="no-scroll">
     <div id="age-gate">
       <div class="age-gate-content">
-        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px;">
-          <img src="/logo-120.png" alt="NaijaHomemade Logo" style="width: 44px; height: 44px; border-radius: 10px; box-shadow: 0 4px 14px rgba(0,168,89,0.35);" />
-          <div class="logo-text" style="margin: 0; font-size: 20px;">Naija<span class="highlight">homemade</span></div>
+        <div class="age-gate-logo-wrap">
+          <img src="/logo-120.png" alt="NaijaHomemade Logo" class="age-gate-logo-img" />
+          <div class="logo-text">Naija<span class="highlight">homemade</span></div>
         </div>
 
-        <!-- Official App Overview for Google Reviewers & Users -->
-        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; text-align: left;">
-          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #00e676; font-weight: 700; margin-bottom: 4px;">About This Application</div>
-          <p style="font-size: 12px; color: #d1d5db; line-height: 1.5; margin: 0;">
-            NaijaHomemade is a premier African video creator platform and streaming community. Users can discover content, subscribe to verified creators, and interact securely.
-          </p>
-        </div>
-
-        <h1 class="age-gate-title">Age Restricted Content</h1>
-        <h2 class="age-gate-subtitle">Notice to Users</h2>
+        <div class="age-gate-badge">Adult Content</div>
+        <h1 class="age-gate-title">18+ Age Verification</h1>
         
-        <div class="age-gate-text-box">
-          <p>This platform contains age-restricted material intended for adults.</p>
-          <p style="margin-bottom: 6px; color: #fff; font-weight: 600;">By entering, you affirm that:</p>
-          <p>You are at least <strong>18 years of age</strong> (or age of majority in your jurisdiction).</p>
-          <p>You consent to viewing adult-oriented content.</p>
-        </div>
+        <p class="age-gate-summary">
+          NaijaHomemade is an adult creator and streaming platform. By entering, you confirm that you are at least <strong>18 years of age</strong> (or age of majority in your jurisdiction) and agree to view age-restricted material.
+        </p>
         
         <div class="age-gate-buttons">
           <button id="btn-enter" class="btn-enter">
-            <img src="/logo-120.png" alt="NH" style="width: 18px; height: 18px; border-radius: 4px;" />
             Enter Website (18+)
           </button>
-          <a href="/about" id="btn-learn-more" class="btn-learn-more">
-            Learn More / About
-          </a>
-          <button id="btn-telegram" class="btn-telegram">
-            <svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.94z"/></svg>
-            Join Telegram
-          </button>
+          
+          <div class="age-gate-sub-actions">
+            <a href="/about" id="btn-learn-more" class="btn-learn-more">
+              About Us
+            </a>
+            <button id="btn-telegram" class="btn-telegram">
+              <svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.94z"/></svg>
+              Telegram
+            </button>
+          </div>
         </div>
 
         <div class="age-gate-footer">
-          <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px;">
-            <a href="/privacy" style="color: #00e676; font-weight: 600; text-decoration: underline;">Privacy Policy</a> &bull;
-            <a href="/terms" style="color: #d1d5db; text-decoration: underline;">Terms of Service</a> &bull;
-            <a href="/about" style="color: #d1d5db; text-decoration: underline;">About Us</a>
+          <div class="age-gate-links">
+            <a href="/privacy">Privacy Policy</a> &bull;
+            <a href="/terms">Terms of Service</a> &bull;
+            <a href="/about">About Us</a>
           </div>
-          <span>Parental controls can be used to filter or block access to this site.</span><br>
+          <span>Parental controls can be used to filter or block access.</span><br>
           <span>&copy; NaijaHomemade.com, 2026. All rights reserved.</span>
         </div>
       </div>

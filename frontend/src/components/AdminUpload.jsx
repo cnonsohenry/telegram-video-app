@@ -1717,7 +1717,7 @@ export default function AdminUpload({ onClose }) {
 
             <button 
               type="submit" disabled={status === "uploading"}
-              style={{ ...buttonStyle, background: status === "uploading" ? "#333" : status === "success" ? "#4cd964" : status === "error" ? "#ff3b30" : "var(--primary-color)" }}
+              style={{ ...buttonStyle, background: status === "uploading" ? "#333" : status === "success" ? "#e11d48" : status === "error" ? "#ff3b30" : "var(--primary-color)" }}
             >
               {status === "uploading" ? <><Loader2 className="spin" size={18} /> Uploading...</> : status === "success" ? <><CheckCircle size={18} /> Complete!</> : status === "error" ? <><AlertCircle size={18} /> Failed.</> : "Upload Video"}
             </button>
@@ -1751,7 +1751,7 @@ export default function AdminUpload({ onClose }) {
 
             <button 
               type="submit" disabled={twitterStatus === "processing"}
-              style={{ ...buttonStyle, background: twitterStatus === "processing" ? "#333" : twitterStatus === "success" ? "#4cd964" : twitterStatus === "error" ? "#ff3b30" : "#1DA1F2" }}
+              style={{ ...buttonStyle, background: twitterStatus === "processing" ? "#333" : twitterStatus === "success" ? "#e11d48" : twitterStatus === "error" ? "#ff3b30" : "#1DA1F2" }}
             >
               {twitterStatus === "processing" ? <><Loader2 className="spin" size={18} /> Extracting & Uploading...</> : twitterStatus === "success" ? <><CheckCircle size={18} /> Successfully Imported!</> : twitterStatus === "error" ? <><AlertCircle size={18} /> Import Failed.</> : "Import Video"}
             </button>
@@ -1785,7 +1785,7 @@ export default function AdminUpload({ onClose }) {
 
             <button 
               type="submit" disabled={instagramStatus === "processing"}
-              style={{ ...buttonStyle, background: instagramStatus === "processing" ? "#333" : instagramStatus === "success" ? "#4cd964" : instagramStatus === "error" ? "#ff3b30" : "#E1306C" }}
+              style={{ ...buttonStyle, background: instagramStatus === "processing" ? "#333" : instagramStatus === "success" ? "#e11d48" : instagramStatus === "error" ? "#ff3b30" : "#E1306C" }}
             >
               {instagramStatus === "processing" ? <><Loader2 className="spin" size={18} /> Extracting & Uploading...</> : instagramStatus === "success" ? <><CheckCircle size={18} /> Successfully Imported!</> : instagramStatus === "error" ? <><AlertCircle size={18} /> Import Failed.</> : "Import Reel / Post"}
             </button>
@@ -1819,7 +1819,7 @@ export default function AdminUpload({ onClose }) {
 
             <button 
               type="submit" disabled={tiktokStatus === "processing"}
-              style={{ ...buttonStyle, background: tiktokStatus === "processing" ? "#333" : tiktokStatus === "success" ? "#4cd964" : tiktokStatus === "error" ? "#ff3b30" : "#ff0050" }}
+              style={{ ...buttonStyle, background: tiktokStatus === "processing" ? "#333" : tiktokStatus === "success" ? "#e11d48" : tiktokStatus === "error" ? "#ff3b30" : "#ff0050" }}
             >
               {tiktokStatus === "processing" ? <><Loader2 className="spin" size={18} /> Extracting & Uploading...</> : tiktokStatus === "success" ? <><CheckCircle size={18} /> Successfully Imported!</> : tiktokStatus === "error" ? <><AlertCircle size={18} /> Import Failed.</> : "Import TikTok Video"}
             </button>
@@ -1853,7 +1853,7 @@ export default function AdminUpload({ onClose }) {
 
             <button 
               type="submit" disabled={telegramStatus === "processing"}
-              style={{ ...buttonStyle, background: telegramStatus === "processing" ? "#333" : telegramStatus === "success" ? "#4cd964" : telegramStatus === "error" ? "#ff3b30" : "#0088cc" }}
+              style={{ ...buttonStyle, background: telegramStatus === "processing" ? "#333" : telegramStatus === "success" ? "#e11d48" : telegramStatus === "error" ? "#ff3b30" : "#0088cc" }}
             >
               {telegramStatus === "processing" ? <><Loader2 className="spin" size={18} /> Downloading & Forwarding...</> : telegramStatus === "success" ? <><CheckCircle size={18} /> Successfully Forwarded!</> : telegramStatus === "error" ? <><AlertCircle size={18} /> Import Failed.</> : "Forward Video"}
             </button>

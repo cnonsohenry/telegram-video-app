@@ -68,8 +68,8 @@ export const APP_CONFIG = {
 
   // 🟢 NEW: Crypto Payment Options (Controls the buttons on the paywall)
   cryptoOptions: [
-    { id: 'usdttrc20', label: 'USDT (TRC-20)', bg: '#26A17B', text: '#fff', span: 1 },
-    { id: 'usdtbsc', label: 'USDT (BSC)', bg: '#26A17B', text: '#fff', span: 1 },
+    { id: 'usdttrc20', label: 'USDT (TRC-20)', bg: '#27272a', text: '#fff', span: 1 },
+    { id: 'usdtbsc', label: 'USDT (BSC)', bg: '#27272a', text: '#fff', span: 1 },
     { id: 'btc', label: 'Bitcoin (BTC)', bg: '#F7931A', text: '#fff', span: 1 },
     { id: 'eth', label: 'Ethereum (ETH)', bg: '#627EEA', text: '#fff', span: 1 },
     { id: 'ltc', label: 'Litecoin (LTC)', bg: '#345D9D', text: '#fff', span: 1 },
