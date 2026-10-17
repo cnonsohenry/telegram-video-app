@@ -444,7 +444,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       delete newState.searchOpen;
       delete newState.albumOpen;
 
-      window.history.pushState(newState, document.title, `/?cat=${encodeURIComponent(catName)}`);
+      window.history.replaceState(newState, document.title, `/?cat=${encodeURIComponent(catName)}`);
     }
   }, [scrollToTop]);
 

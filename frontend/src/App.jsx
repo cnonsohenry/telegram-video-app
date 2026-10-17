@@ -154,7 +154,7 @@ export default function App() {
         targetUrl = `/?tab=${encodeURIComponent(tabName)}`;
       }
 
-      window.history.pushState(stateData, document.title, targetUrl);
+      window.history.replaceState(stateData, document.title, targetUrl);
     }
   }, []);
 
@@ -227,13 +227,16 @@ export default function App() {
       const currentState = window.history.state;
       const targetPath = `/v/${activeVideo.message_id}`;
 
-      // Only push a new history entry if this video is not already the active entry
-      if (!currentState?.videoPlayer || currentState?.messageId !== String(activeVideo.message_id)) {
-        const nextState = { ...(currentState || {}), videoPlayer: true, messageId: String(activeVideo.message_id) };
-        delete nextState.searchOpen;
-        delete nextState.storyPlayer;
-        delete nextState.commentModal;
+      // Only push a new history entry if videoPlayer was not already open.
+      // If videoPlayer was already active (swiped or clicked next video in player), use replaceState so hitting back once exits cleanly!
+      if (!currentState?.videoPlayer) {
         window.history.pushState(
+          nextState,
+          document.title,
+          targetPath
+        );
+      } else if (currentState?.messageId !== String(activeVideo.message_id)) {
+        window.history.replaceState(
           nextState,
           document.title,
           targetPath
