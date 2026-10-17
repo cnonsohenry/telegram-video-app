@@ -123,6 +123,7 @@ export default function App() {
       return;
     }
 
+    const prevTab = activeTabRef.current;
     activeTabRef.current = tabName;
     setActiveTab(tabName);
 
@@ -154,7 +155,27 @@ export default function App() {
         targetUrl = `/?tab=${encodeURIComponent(tabName)}`;
       }
 
-      window.history.replaceState(stateData, document.title, targetUrl);
+      // 🟢 Industry-Standard App Tab Navigation:
+      // 1. Moving from Home to any secondary tab (Explore, Profile, Admin):
+      //    Always PUSH so that pressing the phone Back button returns cleanly to Home!
+      // 2. Returning to Home from a secondary tab:
+      //    If the user arrived from Home, pop history to return to the Home root!
+      // 3. Switching between secondary tabs (e.g. Explore <-> Profile):
+      //    REPLACE state so secondary tabs do not build an infinite stack.
+      if (prevTab === "home") {
+        stateData.fromHome = true;
+        window.history.pushState(stateData, document.title, targetUrl);
+      } else if (tabName === "home") {
+        if (currentState.fromHome && window.history.length > 1) {
+          window.history.back();
+        } else {
+          delete stateData.fromHome;
+          window.history.replaceState(stateData, document.title, targetUrl);
+        }
+      } else {
+        stateData.fromHome = Boolean(currentState.fromHome);
+        window.history.replaceState(stateData, document.title, targetUrl);
+      }
     }
   }, []);
 
@@ -712,7 +733,7 @@ export default function App() {
     if (sharedVideoId) {
       setIsSharedVideoView(true);
       // Replace direct URL with '/' so browser back button returns to the home feed instead of leaving the site
-      window.history.replaceState({ page: 'home' }, document.title, "/");
+      window.history.replaceState({ tab: 'home' }, document.title, "/");
       window.history.pushState(
         { videoPlayer: true, messageId: String(sharedVideoId) },
         document.title,
