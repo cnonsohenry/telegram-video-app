@@ -8,6 +8,7 @@ import fs from "fs";
 import pkg from "pg";
 import https from "https";
 import crypto from "crypto";
+import { rateLimit } from "express-rate-limit";
 
 // 🟢 NEW: Imports for FFmpeg thumbnail extraction & JWT
 import { exec } from "child_process";
@@ -56,13 +57,58 @@ const API_SECRETS = [
 const agent = new https.Agent({ family: 4 });
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : ["http://localhost:5173"];
+// 🛡️ SECURITY: Strict CORS configuration (no wildcard bypass)
+const defaultAllowedOrigins = [
+  "https://naijahomemade.com",
+  "https://www.naijahomemade.com",
+  "https://videos.naijahomemade.com",
+  "http://localhost:5173",
+  "http://localhost:3000"
+];
+const envOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim()).filter(Boolean)
+  : [];
+const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envOrigins]));
+
 app.use(cors({
-  origin: allowedOrigins
+  origin: (origin, callback) => {
+    // Allow non-browser agents, curl, or same-origin requests with no Origin header
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true
 }));
+
+app.use(express.json({ limit: "5mb" }));
+
+// 🛡️ SECURITY: Dedicated Rate Limiters for Public & High-Frequency Endpoints
+export const commentLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 30, // max 30 comments per 5 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many comments submitted. Please wait 5 minutes before posting again." }
+});
+
+export const reportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // max 5 reports per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many report requests. Please wait a few minutes before submitting another report." }
+});
+
+export const shareLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 60, // max 60 shares per 5 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Share rate limit reached." }
+});
 
 /* =======================================================
    🟢 SEO MIDDLEWARE: CANONICALIZATION & DE-INDEXING
@@ -83,19 +129,21 @@ app.use((req, res, next) => {
 });
 
 /* =====================
-   SERVER MONITORING (SECURED)
+   SERVER MONITORING (SECURED & OPTIONAL)
 ===================== */
-app.use("/status", basicAuth({
-  users: { 'admin': process.env.ADMIN_PASSWORD },
-  challenge: true,
-  unauthorizedResponse: 'Access Denied: Admins Only'
-}));
+if (process.env.ENABLE_STATUS_MONITOR === "true" && process.env.ADMIN_PASSWORD) {
+  app.use("/status", basicAuth({
+    users: { 'admin': process.env.ADMIN_PASSWORD },
+    challenge: true,
+    unauthorizedResponse: 'Access Denied: Admins Only'
+  }));
 
-app.use(statusMonitor({
-  title: `${process.env.APP_NAME || 'Platform'} Server Status`,
-  path: '/status',
-  spans: [{ interval: 1, retention: 60 }, { interval: 5, retention: 60 }, { interval: 15, retention: 60 }]
-}));
+  app.use(statusMonitor({
+    title: `${process.env.APP_NAME || 'Platform'} Server Status`,
+    path: '/status',
+    spans: [{ interval: 1, retention: 60 }, { interval: 5, retention: 60 }, { interval: 15, retention: 60 }]
+  }));
+}
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) throw new Error("BOT_TOKEN is missing");
@@ -178,6 +226,7 @@ async function initDatabase() {
           created_at TIMESTAMP DEFAULT NOW()
         );
         CREATE INDEX IF NOT EXISTS idx_email_verif_user ON email_verification_codes(user_id);
+        ALTER TABLE email_verification_codes ADD COLUMN IF NOT EXISTS attempts INTEGER DEFAULT 0;
 
         CREATE TABLE IF NOT EXISTS creator_kyc_requests (
           id SERIAL PRIMARY KEY,
@@ -2344,9 +2393,10 @@ app.post("/api/interactions/save", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/interactions/share", async (req, res) => {
+app.post("/api/interactions/share", shareLimiter, async (req, res) => {
   try {
     const { message_id } = req.body;
+    if (!message_id) return res.status(400).json({ error: "Missing message_id" });
     await pool.query("UPDATE videos SET shares_count = shares_count + 1 WHERE message_id=$1", [message_id]);
     res.json({ success: true });
   } catch (err) {
@@ -2354,15 +2404,18 @@ app.post("/api/interactions/share", async (req, res) => {
   }
 });
 
-app.post("/api/comments", authenticateToken, async (req, res) => {
+app.post("/api/comments", authenticateToken, commentLimiter, async (req, res) => {
   try {
     const { message_id, content, parent_id } = req.body;
     const user_id = req.user.id;
 
     if (!content || !content.trim()) return res.status(400).json({ error: "Comment cannot be empty" });
+    let cleanContent = content.trim();
+    if (cleanContent.length > 1000) {
+      return res.status(400).json({ error: "Comment must be under 1,000 characters." });
+    }
 
     let parentIdVal = parent_id ? parseInt(parent_id, 10) : null;
-    let cleanContent = content.trim();
 
     // If no parent_id was explicitly provided, infer parent_id from leading @mention
     if (!parentIdVal && cleanContent.startsWith("@")) {
@@ -2481,8 +2534,8 @@ app.post("/api/comments/:comment_id/like", authenticateToken, async (req, res) =
   }
 });
 
-// 🟢 REPORT A VIDEO FOR ABUSE / COPYRIGHT / ILLEGAL CONTENT
-app.post("/api/videos/:message_id/report", async (req, res) => {
+// 🟢 REPORT A VIDEO FOR ABUSE / COPYRIGHT / ILLEGAL CONTENT (Deduplicated & Rate-Limited)
+app.post("/api/videos/:message_id/report", reportLimiter, async (req, res) => {
   try {
     const { message_id } = req.params;
     const { reason, details } = req.body;
@@ -2501,42 +2554,53 @@ app.post("/api/videos/:message_id/report", async (req, res) => {
       } catch (e) {}
     }
 
-    const reporterIp = req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "";
+    const rawIp = req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "";
+    const reporterIp = String(rawIp).split(",")[0].trim().slice(0, 50);
     const cleanReason = String(reason).trim().slice(0, 100);
     const cleanDetails = details ? String(details).trim().slice(0, 500) : "";
 
     // Verify video exists
-    const vidCheck = await pool.query("SELECT id, message_id FROM videos WHERE message_id = $1 LIMIT 1", [message_id]);
+    const vidCheck = await pool.query("SELECT id, message_id, flags_count FROM videos WHERE message_id = $1 LIMIT 1", [message_id]);
     if (vidCheck.rows.length === 0) {
       return res.status(404).json({ error: "Video not found." });
     }
 
-    // Insert report (prevent duplicate reporting by same user)
-    const reportRes = await pool.query(
-      `INSERT INTO video_reports (message_id, reporter_id, reporter_ip, reason, details, status)
-       VALUES ($1, $2, $3, $4, $5, 'pending')
-       ON CONFLICT (message_id, reporter_id) DO NOTHING
-       RETURNING id`,
-      [message_id, reporterId, String(reporterIp).slice(0, 50), cleanReason, cleanDetails]
+    // 🛑 ANTI-ABUSE DEDUPLICATION: Check if this user OR this IP has already reported this video
+    const dupCheck = await pool.query(
+      `SELECT id FROM video_reports 
+       WHERE message_id = $1 AND (
+         ($2::BIGINT IS NOT NULL AND reporter_id = $2::BIGINT) OR 
+         ($3::TEXT != '' AND reporter_ip = $3::TEXT AND created_at > NOW() - INTERVAL '30 days')
+       ) LIMIT 1`,
+      [message_id, reporterId, reporterIp]
     );
 
-    // If already reported by this user, return graceful message
-    if (reportRes.rowCount === 0 && reporterId) {
-      return res.json({ success: true, message: "You have already submitted a report for this video." });
+    if (dupCheck.rows.length > 0) {
+      return res.json({ success: true, message: "A report for this video has already been recorded and is under review." });
     }
 
-    // Increment flags_count on videos table
-    const updateRes = await pool.query(
-      `UPDATE videos 
-       SET flags_count = COALESCE(flags_count, 0) + 1,
-           status = CASE WHEN COALESCE(flags_count, 0) + 1 >= 5 THEN 'flagged' ELSE status END
-       WHERE message_id = $1 
-       RETURNING flags_count, status`,
-      [message_id]
+    // Insert unique report
+    await pool.query(
+      `INSERT INTO video_reports (message_id, reporter_id, reporter_ip, reason, details, status)
+       VALUES ($1, $2, $3, $4, $5, 'pending')`,
+      [message_id, reporterId, reporterIp, cleanReason, cleanDetails]
     );
 
-    if (updateRes.rows.length > 0 && updateRes.rows[0].flags_count >= 5) {
-      console.warn(`⚠️ [AUTO-MODERATION] Video ${message_id} reached ${updateRes.rows[0].flags_count} flags and was automatically hidden.`);
+    // 🛑 ANTI-CENSORSHIP GUARD: Only increment flags_count if reported by an AUTHENTICATED account
+    // This prevents anonymous bot IP rotation from suppressing community creator content
+    if (reporterId) {
+      const updateRes = await pool.query(
+        `UPDATE videos 
+         SET flags_count = COALESCE(flags_count, 0) + 1,
+             status = CASE WHEN COALESCE(flags_count, 0) + 1 >= 10 THEN 'flagged' ELSE status END
+         WHERE message_id = $1 
+         RETURNING flags_count, status`,
+        [message_id]
+      );
+
+      if (updateRes.rows.length > 0 && updateRes.rows[0].flags_count >= 10) {
+        console.warn(`⚠️ [AUTO-MODERATION] Video ${message_id} reached 10 authenticated flags and was flagged for review.`);
+      }
     }
 
     return res.json({ 
@@ -3102,40 +3166,50 @@ app.get('*', (req, res) => {
 });
 
 /* =======================================================
-   🛡️ AUTOMATED CLOUDFLARE R2 DATABASE BACKUPS
+   🛡️ ENCRYPTED CLOUDFLARE R2 DATABASE BACKUPS (AES-256-GCM)
 ======================================================= */
 async function backupDatabaseToR2() {
-  // Generate a clean, timezone-safe timestamp for the filename
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const fileName = `db-backup-${timestamp}.dump`;
   const localBackupPath = path.join(__dirname, fileName);
 
-  console.log(`📦 [DB BACKUP] Starting automated PostgreSQL backup...`);
+  console.log(`📦 [DB BACKUP] Starting automated encrypted PostgreSQL backup...`);
 
   try {
-    // 1. Execute pg_dump directly using your existing connection string
-    // -F c specifies "Custom" compressed format (best for pg_restore)
+    // 1. Execute pg_dump directly using existing connection string
     await execPromise(`pg_dump "${process.env.DATABASE_URL}" -F c -f "${localBackupPath}"`);
-    console.log(`✅ [DB BACKUP] Local dump successful. Pushing to R2...`);
+    console.log(`✅ [DB BACKUP] Local dump successful. Encrypting with AES-256-GCM...`);
 
-    // 2. Stream the backup file to Cloudflare R2
-    const fileStream = fs.createReadStream(localBackupPath);
-    const r2Key = `database_backups/${fileName}`;
+    // 2. Cryptographic Encryption: Derive 256-bit key from server secret
+    const secretSeed = process.env.BACKUP_ENCRYPTION_KEY || process.env.JWT_SECRET || "secure_backup_salt_naijahomemade_2026";
+    const encKey = crypto.createHash("sha256").update(secretSeed).digest();
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv("aes-256-gcm", encKey, iv);
+
+    const dumpBuffer = fs.readFileSync(localBackupPath);
+    const encrypted = Buffer.concat([cipher.update(dumpBuffer), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+
+    // Binary layout: [IV (16 bytes)] + [AuthTag (16 bytes)] + [Encrypted Dump]
+    const encryptedPayload = Buffer.concat([iv, authTag, encrypted]);
+
+    // High-entropy 192-bit unguessable path to prevent bucket scanning
+    const secureFolder = crypto.randomBytes(24).toString("hex");
+    const r2Key = `database_backups/${secureFolder}/${fileName}.enc`;
 
     await r2.send(new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
+      Bucket: process.env.R2_BACKUP_BUCKET || process.env.R2_BUCKET_NAME,
       Key: r2Key,
-      Body: fileStream,
-      // Application/octet-stream is standard for binary dump files
+      Body: encryptedPayload,
       ContentType: "application/octet-stream", 
     }));
 
-    console.log(`✅ [DB BACKUP] Securely uploaded to R2: ${r2Key}`);
+    console.log(`✅ [DB BACKUP] AES-256-GCM encrypted backup securely stored in R2: ${r2Key}`);
 
   } catch (error) {
     console.error(`❌ [DB BACKUP] Fatal backup error:`, error.message);
   } finally {
-    // 3. Bulletproof Cleanup: Always wipe the local file to prevent SSD bloat
+    // 3. Bulletproof Cleanup: Always wipe the local plain file to prevent SSD exposure
     if (fs.existsSync(localBackupPath)) {
       fs.unlinkSync(localBackupPath);
       console.log(`🧹 [DB BACKUP] Local temporary file removed.`);

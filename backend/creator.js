@@ -126,6 +126,15 @@ router.post("/upload-image", authenticateToken, upload.single("image"), async (r
     return res.status(400).json({ error: "Please select an image file to upload." });
   }
 
+  // 🛑 KYC UPLOAD GUARD: Require verified email before accepting identity document uploads
+  if (folder === "kyc") {
+    const userRes = await pool.query("SELECT email_verified FROM app_users WHERE id = $1", [req.user.id]);
+    if (!userRes.rows[0]?.email_verified) {
+      if (fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
+      return res.status(403).json({ error: "Please verify your email address before uploading Identity KYC documents." });
+    }
+  }
+
   try {
     const ext = path.extname(imageFile.originalname || "").toLowerCase().replace(".", "");
     if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
@@ -233,6 +242,20 @@ router.post("/kyc/submit", authenticateToken, async (req, res) => {
       });
     }
 
+    if (user.kyc_status === "verified") {
+      return res.status(400).json({ error: "Identity KYC is already verified for this account." });
+    }
+
+    // Prevent duplicate submissions within 5 minutes
+    const recentSub = await pool.query(
+      `SELECT id FROM creator_kyc_requests 
+       WHERE user_id = $1 AND submitted_at > NOW() - INTERVAL '5 minutes'`,
+      [userId]
+    );
+    if (recentSub.rows.length > 0) {
+      return res.status(429).json({ error: "A KYC verification was recently submitted. Please wait before submitting again." });
+    }
+
     const cleanName = String(full_name || "").trim();
     if (cleanName.length < 3 || cleanName.length > 150) {
       return res.status(400).json({ error: "Please enter your full legal name as shown on your ID." });
@@ -262,16 +285,42 @@ router.post("/kyc/submit", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Please enter a valid government ID document number." });
     }
 
-    const isValidMediaUrl = (u) => typeof u === "string" && (u.startsWith("https://") || u.startsWith("http://") || u.startsWith("/"));
-    if (!isValidMediaUrl(id_front_url)) {
-      return res.status(400).json({ error: "Please upload a clear photo of the front of your government ID." });
+    // 🛡️ SECURITY: Require authentic KYC files uploaded to our verified storage
+    const isValidKycMediaUrl = (u) => {
+      if (typeof u !== "string" || !u.trim()) return false;
+      const cleanUrl = u.trim();
+      try {
+        if (cleanUrl.startsWith("/kyc/")) return true;
+        const parsed = new URL(cleanUrl);
+        const allowedHosts = [
+          "videos.naijahomemade.com",
+          "bucket.naijahomemade.com",
+          "naijahomemade.com"
+        ];
+        if (R2_PUBLIC_DOMAIN) {
+          try {
+            allowedHosts.push(new URL(R2_PUBLIC_DOMAIN).hostname);
+          } catch (e) {}
+        }
+        const isAllowedHost = allowedHosts.includes(parsed.hostname) || parsed.hostname.endsWith(".r2.cloudflarestorage.com");
+        return isAllowedHost && parsed.pathname.includes("/kyc/");
+      } catch (e) {
+        return false;
+      }
+    };
+
+    if (!isValidKycMediaUrl(id_front_url)) {
+      return res.status(400).json({ error: "Please upload a valid front photo of your government ID." });
     }
-    if (!isValidMediaUrl(selfie_url)) {
-      return res.status(400).json({ error: "Please upload a clear verification selfie photo." });
+    if (!isValidKycMediaUrl(selfie_url)) {
+      return res.status(400).json({ error: "Please upload a valid verification selfie photo." });
     }
 
     const cleanCountry = String(country || "Nigeria").trim().slice(0, 100);
-    const cleanBackUrl = isValidMediaUrl(id_back_url) ? id_back_url.slice(0, 500) : null;
+    const cleanBackUrl = id_back_url ? (isValidKycMediaUrl(id_back_url) ? id_back_url.trim().slice(0, 500) : null) : null;
+    if (id_back_url && !cleanBackUrl) {
+      return res.status(400).json({ error: "Invalid document back photo URL provided." });
+    }
 
     const kycInsert = await pool.query(
       `INSERT INTO creator_kyc_requests (
@@ -2477,50 +2526,9 @@ router.post("/:username/subscribe", authenticateToken, async (req, res) => {
    POST /api/creator/:username/tip
 ======================================================= */
 router.post("/:username/tip", authenticateToken, async (req, res) => {
-  const { username } = req.params;
-  const { amount, message } = req.body;
-  const senderId = req.user.id;
-
-  const numericAmount = Number(amount);
-  if (!Number.isFinite(numericAmount) || numericAmount < 1 || numericAmount > 10000) {
-    return res.status(400).json({ error: "Invalid tip amount. Tips must be between $1 and $10,000." });
-  }
-
-  try {
-    let creatorRes = await pool.query(
-      "SELECT id, username, display_name FROM app_users WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)",
-      [username]
-    );
-
-    let creator = creatorRes.rows[0];
-    if (!creator) {
-      const tgRes = await pool.query(
-        "SELECT user_id as id, username, full_name as display_name FROM users WHERE LOWER(COALESCE(username, '')) = LOWER($1) OR LOWER(COALESCE(full_name, '')) = LOWER($1)",
-        [username]
-      );
-      creator = tgRes.rows[0];
-    }
-
-    if (!creator) return res.status(404).json({ error: "Creator not found" });
-
-    if (String(senderId) === String(creator.id)) {
-      return res.status(400).json({ error: "You cannot tip yourself" });
-    }
-
-    await pool.query(
-      "INSERT INTO creator_tips (sender_id, creator_id, amount, message) VALUES ($1, $2, $3, $4)",
-      [senderId, creator.id, numericAmount, message ? String(message).trim().slice(0, 300) : ""]
-    );
-
-    res.json({
-      success: true,
-      message: `Thank you for tipping ${creator.display_name || creator.username}! 🔥`,
-      tip: { amount: numericAmount, creator: creator.display_name || creator.username }
-    });
-  } catch (err) {
-    console.error("[CREATOR TIP ERROR]", err);
-    res.status(500).json({ error: "Failed to process tip" });
-  }
+  return res.status(400).json({
+    error: "Direct unpaid tips are disabled. All creator tips must be initiated via secure crypto payment checkout (/api/crypto/create)."
+  });
 });
 
 /* =======================================================

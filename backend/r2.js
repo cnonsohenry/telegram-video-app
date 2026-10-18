@@ -2,6 +2,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, Head
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { promisify } from "util";
 import { exec } from "child_process";
 import "dotenv/config";
@@ -65,8 +66,11 @@ export async function uploadImageToR2(filePath, folder = "profiles", originalNam
     throw new Error(`Unsupported image format: .${extension}. Allowed formats: ${ALLOWED_IMAGE_EXTENSIONS.join(", ").toUpperCase()}`);
   }
 
-  const uniqueId = `${Date.now()}_${Math.floor(10000 + Math.random() * 90000)}`;
-  const r2Key = `${safeFolder}/${uniqueId}.${extension}`;
+  // 🛡️ SECURITY: Cryptographically secure unguessable random tokens
+  const entropyToken = safeFolder === "kyc" 
+    ? crypto.randomBytes(32).toString("hex") 
+    : `${Date.now()}_${crypto.randomBytes(16).toString("hex")}`;
+  const r2Key = `${safeFolder}/${entropyToken}.${extension}`;
   const mimeType = getMimeType(extension);
 
   const fileBuffer = fs.readFileSync(filePath);
@@ -79,7 +83,8 @@ export async function uploadImageToR2(filePath, folder = "profiles", originalNam
 
   return {
     r2Key,
-    staticUrl: `${R2_PUBLIC_DOMAIN}/${r2Key}`
+    staticUrl: `${R2_PUBLIC_DOMAIN}/${r2Key}`,
+    url: `${R2_PUBLIC_DOMAIN}/${r2Key}`
   };
 }
 

@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { z } from "zod"; // 🟢 IMPORT ZOD
+import { rateLimit } from "express-rate-limit";
 import { sendReactEmail, sendHtmlEmail } from "./utils/mailer.js";
 import WelcomeEmail from "./emails/WelcomeEmail.jsx";
 import React from "react";
@@ -21,6 +22,39 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 export const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key_change_me";
 
 console.log(`[AUTH] System Start. Google Client ID: ${GOOGLE_CLIENT_ID ? "✅ Loaded" : "⚠️ MISSING"}`);
+
+// 🛡️ SECURITY: Rate Limiters for Authentication & OTP Verification
+export const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // max 10 failed/successful logins per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts. Please wait 15 minutes before trying again." }
+});
+
+export const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // max 5 account registrations per hour per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many accounts registered from this IP. Please wait an hour." }
+});
+
+export const otpSendLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // max 5 OTP requests per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many verification code requests. Please wait before requesting another." }
+});
+
+export const otpVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // max 10 verify attempts per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many verification attempts. Please wait 15 minutes." }
+});
 
 // 🟢 2. SECURITY MIDDLEWARE (Anti-Identity-Swap)
 router.use((req, res, next) => {
@@ -218,7 +252,7 @@ router.post("/google", async (req, res) => {
 });
 
 // 🟢 4. REGISTER (Email/Password)
-router.post("/register", async (req, res) => {
+router.post("/register", registerLimiter, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid input" });
@@ -279,7 +313,7 @@ router.post("/register", async (req, res) => {
 });
 
 // 🟢 5. LOGIN (Email/Password)
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid input" });
@@ -348,8 +382,8 @@ router.get("/me", authenticateToken, async (req, res) => {
   }
 });
 
-// 🟢 6B. SEND EMAIL VERIFICATION OTP CODE
-router.post("/send-email-verification", authenticateToken, async (req, res) => {
+// 🟢 6B. SEND EMAIL VERIFICATION OTP CODE (Rate-Limited & Secure)
+router.post("/send-email-verification", authenticateToken, otpSendLimiter, async (req, res) => {
   const userId = req.user.id;
   const customEmail = req.body?.email ? String(req.body.email).trim().toLowerCase() : null;
 
@@ -364,13 +398,13 @@ router.post("/send-email-verification", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Please provide a valid email address to verify." });
     }
 
-    // If user entered a new email address, check uniqueness and update their record
+    // 🛑 SECURITY FIX: Verify target email is not already taken by another account,
+    // but DO NOT update app_users.email yet! Email is only updated AFTER successful OTP verification.
     if (customEmail && customEmail !== user.email) {
       const checkDup = await pool.query("SELECT id FROM app_users WHERE LOWER(email) = LOWER($1) AND id != $2", [customEmail, userId]);
       if (checkDup.rows.length > 0) {
         return res.status(400).json({ error: "This email address is already linked to another account." });
       }
-      await pool.query("UPDATE app_users SET email = $1, email_verified = FALSE WHERE id = $2", [customEmail, userId]);
     } else if (user.email_verified) {
       return res.json({ success: true, already_verified: true, message: "Your email is already verified!" });
     }
@@ -389,8 +423,8 @@ router.post("/send-email-verification", authenticateToken, async (req, res) => {
     const code = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit OTP
 
     await pool.query(
-      `INSERT INTO email_verification_codes (user_id, email, code, expires_at)
-       VALUES ($1, $2, $3, NOW() + INTERVAL '15 minutes')`,
+      `INSERT INTO email_verification_codes (user_id, email, code, expires_at, attempts)
+       VALUES ($1, $2, $3, NOW() + INTERVAL '15 minutes', 0)`,
       [userId, targetEmail, code]
     );
 
@@ -425,8 +459,8 @@ router.post("/send-email-verification", authenticateToken, async (req, res) => {
   }
 });
 
-// 🟢 6C. VERIFY EMAIL OTP CODE
-router.post("/verify-email-code", authenticateToken, async (req, res) => {
+// 🟢 6C. VERIFY EMAIL OTP CODE (Lockout & Brute-Force Protected)
+router.post("/verify-email-code", authenticateToken, otpVerifyLimiter, async (req, res) => {
   const userId = req.user.id;
   const code = String(req.body?.code || "").trim();
 
@@ -436,27 +470,46 @@ router.post("/verify-email-code", authenticateToken, async (req, res) => {
 
   try {
     const codeRes = await pool.query(
-      `SELECT id, email FROM email_verification_codes
-       WHERE user_id = $1 AND code = $2 AND used = FALSE AND expires_at > NOW()
+      `SELECT id, email, code, COALESCE(attempts, 0) as attempts, expires_at 
+       FROM email_verification_codes
+       WHERE user_id = $1 AND used = FALSE AND expires_at > NOW()
        ORDER BY created_at DESC LIMIT 1`,
-      [userId, code]
+      [userId]
     );
 
     if (codeRes.rows.length === 0) {
-      return res.status(400).json({ error: "Invalid or expired verification code. Please check your code or request a new one." });
+      return res.status(400).json({ error: "No active verification code found or code has expired. Please request a new one." });
     }
 
-    await pool.query("UPDATE email_verification_codes SET used = TRUE WHERE id = $1", [codeRes.rows[0].id]);
+    const record = codeRes.rows[0];
+
+    // 🛑 LOCKOUT: Invalidate code after 5 failed attempts
+    if (record.attempts >= 5) {
+      await pool.query("UPDATE email_verification_codes SET used = TRUE WHERE id = $1", [record.id]);
+      return res.status(429).json({ error: "Too many failed attempts. This code has been invalidated for security. Please request a new code." });
+    }
+
+    // Compare code
+    if (record.code !== code) {
+      await pool.query("UPDATE email_verification_codes SET attempts = COALESCE(attempts, 0) + 1 WHERE id = $1", [record.id]);
+      const remainingAttempts = 5 - (record.attempts + 1);
+      return res.status(400).json({ 
+        error: `Invalid verification code. ${remainingAttempts > 0 ? `${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} remaining.` : 'Code has been invalidated.'}` 
+      });
+    }
+
+    // Code matched! Mark code as used and update user's email & email_verified
+    await pool.query("UPDATE email_verification_codes SET used = TRUE WHERE id = $1", [record.id]);
 
     const updatedUserRes = await pool.query(
       `UPDATE app_users 
-       SET email_verified = TRUE, email = COALESCE($1, email)
+       SET email_verified = TRUE, email = $1
        WHERE id = $2
        RETURNING id, email, username, avatar_url, role, settings, is_premium,
                  is_creator, display_name, creator_bio, banner_url, creator_category, 
                  subscription_price, social_links, is_verified, location, website,
                  email_verified, kyc_status, kyc_rejection_reason, kyc_verified_at`,
-      [codeRes.rows[0].email, userId]
+      [record.email, userId]
     );
 
     res.json({
