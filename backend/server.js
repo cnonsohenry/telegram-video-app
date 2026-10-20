@@ -1047,17 +1047,52 @@ app.get("/api/video", async (req, res) => {
 
     const video = dbRes.rows[0];
 
+    // 🟢 AUTHENTICATION & ACCESS CONTROL
+    let currentUser = null;
+    let isAdmin = false;
+
+    const authHeader = req.headers["authorization"];
+    const token = (authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null) || req.query.token;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded?.role === "admin") {
+          isAdmin = true;
+        }
+        if (decoded?.id) {
+          const userRes = await pool.query(
+            "SELECT id, username, role, is_premium, is_creator, telegram_user_id FROM app_users WHERE id = $1",
+            [decoded.id]
+          );
+          if (userRes.rows.length > 0) {
+            currentUser = userRes.rows[0];
+            if (currentUser.role === "admin") {
+              isAdmin = true;
+            }
+          }
+        }
+      } catch (jwtErr) {
+        console.warn("[AUTH] Token validation failed on video access:", jwtErr.message);
+      }
+    }
+
     // 🟢 ACCESS CONTROL: Protect Premium Videos from unauthorized access & direct scraping
     if (video.category === "premium") {
+      let isAuthorized = isAdmin; // Admins have universal platform playback access
+
       // 1. Resolve video's creator details (if uploader_id is present)
       let videoCreator = null;
       if (video.uploader_id) {
+        const uploaderStr = String(video.uploader_id).trim();
         const creatorRes = await pool.query(
           `SELECT id, username, telegram_user_id, role, is_creator, subscription_price 
            FROM app_users 
-           WHERE id = $1 OR (telegram_user_id IS NOT NULL AND telegram_user_id = $1)
+           WHERE id::text = $1 
+              OR (telegram_user_id IS NOT NULL AND telegram_user_id::text = $1)
+              OR (username IS NOT NULL AND LOWER(username) = LOWER($1))
            LIMIT 1`,
-          [video.uploader_id]
+          [uploaderStr]
         );
         if (creatorRes.rows.length > 0) {
           videoCreator = creatorRes.rows[0];
@@ -1071,86 +1106,59 @@ app.get("/api/video", async (req, res) => {
 
       const creatorFee = Number(videoCreator?.subscription_price || 0);
 
-      // If this video belongs to a creator who charges $0 (no fee set), allow free playback for everyone
-      let isAuthorized = !isOfficialSeries && creatorFee <= 0;
+      // 2. If this video belongs to a creator who charges $0 (no fee set), allow free playback for everyone
+      if (!isAuthorized && !isOfficialSeries && creatorFee <= 0) {
+        isAuthorized = true;
+      }
 
-      if (!isAuthorized) {
-        const authHeader = req.headers["authorization"];
-        const token = (authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null) || req.query.token;
+      // 3. Ownership check: Allow creators to watch their own videos
+      if (!isAuthorized && currentUser) {
+        const uploaderIdStr = video.uploader_id ? String(video.uploader_id).trim() : null;
+        const currentUserIdStr = String(currentUser.id);
+        const currentTgIdStr = currentUser.telegram_user_id ? String(currentUser.telegram_user_id) : null;
 
-        if (token) {
-          try {
-            const decoded = jwt.verify(token, JWT_SECRET);
-            const userId = decoded.id;
-
-            // Fetch requesting user's profile from app_users
-            const userRes = await pool.query(
-              "SELECT id, username, role, is_premium, is_creator, telegram_user_id FROM app_users WHERE id = $1",
-              [userId]
-            );
-
-            if (userRes.rows.length > 0) {
-              const currentUser = userRes.rows[0];
-
-              // 1. Admins have universal platform playback access
-              if (currentUser.role === "admin" || decoded.role === "admin") {
-                isAuthorized = true;
-              }
-
-              // 2. Ownership check: Allow creators to watch their own videos
-              if (!isAuthorized) {
-                const uploaderIdStr = video.uploader_id ? String(video.uploader_id) : null;
-                const currentUserIdStr = String(currentUser.id);
-                const currentTgIdStr = currentUser.telegram_user_id ? String(currentUser.telegram_user_id) : null;
-
-                if (uploaderIdStr && (uploaderIdStr === currentUserIdStr || (currentTgIdStr && uploaderIdStr === currentTgIdStr))) {
-                  isAuthorized = true;
-                } else if (videoCreator) {
-                  if (videoCreator.id === currentUser.id) {
-                    isAuthorized = true;
-                  } else if (videoCreator.telegram_user_id && currentTgIdStr && String(videoCreator.telegram_user_id) === currentTgIdStr) {
-                    isAuthorized = true;
-                  } else if (videoCreator.username && currentUser.username && videoCreator.username.toLowerCase() === currentUser.username.toLowerCase()) {
-                    isAuthorized = true;
-                  }
-                }
-              }
-
-              // 3. Platform VIP Check (Official NaijaHomemade VIP series)
-              if (!isAuthorized && currentUser.is_premium && isOfficialSeries) {
-                isAuthorized = true;
-              }
-
-              // 4. Active Creator Subscription Check
-              if (!isAuthorized) {
-                const uploaderTarget = video.uploader_id || "1881815190";
-                const targetUsername = videoCreator?.username || (!video.uploader_id ? "naijahomemade" : null);
-
-                const subCheck = await pool.query(
-                  `SELECT 1 FROM creator_subscriptions cs
-                   WHERE (cs.subscriber_id = $1 OR ($2::BIGINT IS NOT NULL AND cs.subscriber_id = $2::BIGINT))
-                     AND (
-                       cs.creator_id = $3::BIGINT
-                       OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $3::BIGINT OR id = $3::BIGINT)
-                       OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id = $3::BIGINT OR telegram_user_id = $3::BIGINT)
-                       ${targetUsername ? "OR cs.creator_id IN (SELECT id FROM app_users WHERE LOWER(username) = LOWER($4)) OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE LOWER(username) = LOWER($4) AND telegram_user_id IS NOT NULL)" : ""}
-                     )
-                     AND cs.status = 'active'
-                     AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
-                   LIMIT 1`,
-                  targetUsername 
-                    ? [currentUser.id, currentUser.telegram_user_id || null, uploaderTarget, targetUsername]
-                    : [currentUser.id, currentUser.telegram_user_id || null, uploaderTarget]
-                );
-
-                if (subCheck.rows.length > 0) {
-                  isAuthorized = true;
-                }
-              }
-            }
-          } catch (jwtErr) {
-            console.warn("[AUTH] Token validation failed on premium video access:", jwtErr.message);
+        if (uploaderIdStr && (uploaderIdStr === currentUserIdStr || (currentTgIdStr && uploaderIdStr === currentTgIdStr))) {
+          isAuthorized = true;
+        } else if (videoCreator) {
+          if (videoCreator.id === currentUser.id) {
+            isAuthorized = true;
+          } else if (videoCreator.telegram_user_id && currentTgIdStr && String(videoCreator.telegram_user_id) === currentTgIdStr) {
+            isAuthorized = true;
+          } else if (videoCreator.username && currentUser.username && videoCreator.username.toLowerCase() === currentUser.username.toLowerCase()) {
+            isAuthorized = true;
           }
+        }
+      }
+
+      // 4. Platform VIP Check (Official NaijaHomemade VIP series)
+      if (!isAuthorized && currentUser?.is_premium && isOfficialSeries) {
+        isAuthorized = true;
+      }
+
+      // 5. Active Creator Subscription Check
+      if (!isAuthorized && currentUser) {
+        const uploaderTarget = String(video.uploader_id || "1881815190").trim();
+        const targetUsername = videoCreator?.username || (!video.uploader_id ? "naijahomemade" : null);
+
+        const subCheck = await pool.query(
+          `SELECT 1 FROM creator_subscriptions cs
+           WHERE (cs.subscriber_id = $1 OR ($2::BIGINT IS NOT NULL AND cs.subscriber_id = $2::BIGINT))
+             AND (
+               cs.creator_id::text = $3 
+               OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id::text = $3 OR id::text = $3)
+               OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id::text = $3 OR telegram_user_id::text = $3)
+               ${targetUsername ? "OR cs.creator_id IN (SELECT id FROM app_users WHERE LOWER(username) = LOWER($4)) OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE LOWER(username) = LOWER($4) AND telegram_user_id IS NOT NULL)" : ""}
+             )
+             AND cs.status = 'active'
+             AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
+           LIMIT 1`,
+          targetUsername 
+            ? [currentUser.id, currentUser.telegram_user_id || null, uploaderTarget, targetUsername]
+            : [currentUser.id, currentUser.telegram_user_id || null, uploaderTarget]
+        );
+
+        if (subCheck.rows.length > 0) {
+          isAuthorized = true;
         }
       }
 
@@ -2234,15 +2242,15 @@ app.get("/api/interactions/state/:message_id", authenticateToken, async (req, re
     let isSubscribed = false;
     const videoRes = await pool.query("SELECT uploader_id FROM videos WHERE message_id = $1 LIMIT 1", [message_id]);
     if (videoRes.rows.length > 0 && videoRes.rows[0].uploader_id) {
-      const uploaderId = videoRes.rows[0].uploader_id;
+      const uploaderId = String(videoRes.rows[0].uploader_id).trim();
       const [followRes, subRes] = await Promise.all([
         pool.query(
           `SELECT 1 FROM creator_follows cf
            WHERE cf.follower_id = $1 
              AND (
-               cf.creator_id = $2::BIGINT 
-               OR cf.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2::BIGINT OR id = $2::BIGINT)
-               OR cf.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id = $2::BIGINT OR telegram_user_id = $2::BIGINT)
+               cf.creator_id::text = $2 
+               OR cf.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id::text = $2 OR id::text = $2)
+               OR cf.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id::text = $2 OR telegram_user_id::text = $2)
              )
            LIMIT 1`,
           [user_id, uploaderId]
@@ -2251,9 +2259,9 @@ app.get("/api/interactions/state/:message_id", authenticateToken, async (req, re
           `SELECT 1 FROM creator_subscriptions cs
            WHERE cs.subscriber_id = $1 
              AND (
-               cs.creator_id = $2::BIGINT 
-               OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id = $2::BIGINT OR id = $2::BIGINT)
-               OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id = $2::BIGINT OR telegram_user_id = $2::BIGINT)
+               cs.creator_id::text = $2 
+               OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id::text = $2 OR id::text = $2)
+               OR cs.creator_id IN (SELECT telegram_user_id FROM app_users WHERE id::text = $2 OR telegram_user_id::text = $2)
              )
              AND cs.status = 'active'
              AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
