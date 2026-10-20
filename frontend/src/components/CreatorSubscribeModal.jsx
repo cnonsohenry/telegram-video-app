@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { 
   X, CheckCircle2, ShieldCheck, Copy, QrCode, 
-  Loader2, Sparkles, ArrowLeft, Lock, Star, MessageCircle, AlertCircle
+  Loader2, Sparkles, ArrowLeft, Lock, Star, MessageCircle, AlertTriangle, ExternalLink
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import { promptLogin } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
+import { getNetworkBadge, getWalletDeepLink, getQrData, formatCountdown } from "../utils/cryptoHelpers";
 
 export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuccess }) {
   const handleSafeClose = useModalHistory(true, onClose, "creatorSubscribe");
@@ -14,8 +15,8 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
   const [generating, setGenerating] = useState(false);
   const [cryptoDetails, setCryptoDetails] = useState(null);
   const [copiedField, setCopiedField] = useState(null);
-  const [hasSentPayment, setHasSentPayment] = useState(false);
-  const [pollingStatus, setPollingStatus] = useState("pending");
+  const [pollingStatus, setPollingStatus] = useState("listening"); // "listening" | "confirming" | "success"
+  const [countdown, setCountdown] = useState(1200); // 20 minutes
   const [error, setError] = useState("");
 
   const rawPrice = Number(creator?.subscription_price || 0);
@@ -35,11 +36,18 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  if (!localStorage.getItem("token")) {
-    return null;
-  }
+  // 20-minute countdown timer once invoice is generated
+  useEffect(() => {
+    let timer;
+    if (cryptoDetails && countdown > 0 && pollingStatus !== "success") {
+      timer = setInterval(() => {
+        setCountdown((prev) => Math.max(0, prev - 1));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [cryptoDetails, countdown, pollingStatus]);
 
-  // Polling for blockchain confirmation
+  // Continuous automatic blockchain polling (checks every 5 seconds)
   useEffect(() => {
     let pollInterval;
     if (cryptoDetails?.order_id && pollingStatus !== "success") {
@@ -47,11 +55,17 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
         try {
           const res = await fetch(`${APP_CONFIG.apiUrl}/api/crypto/status/${cryptoDetails.order_id}`);
           const data = await res.json();
-          if (data.success && data.status === "APPROVED") {
-            setPollingStatus("success");
-            clearInterval(pollInterval);
-            if (onSubscribeSuccess) {
-              onSubscribeSuccess();
+
+          if (data.success) {
+            const st = String(data.status || "").toUpperCase();
+            if (st === "APPROVED" || st === "FINISHED" || st === "CONFIRMED") {
+              setPollingStatus("success");
+              clearInterval(pollInterval);
+              if (onSubscribeSuccess) {
+                onSubscribeSuccess();
+              }
+            } else if (st === "WAITING" || st === "CONFIRMING" || st === "SENDING") {
+              setPollingStatus("confirming");
             }
           }
         } catch (err) {
@@ -59,19 +73,23 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
         }
       };
 
-      // Poll every 8 seconds
-      pollInterval = setInterval(checkStatus, 8000);
-      if (hasSentPayment) {
-        checkStatus();
-      }
+      // Run immediately, then every 5 seconds
+      checkStatus();
+      pollInterval = setInterval(checkStatus, 5000);
     }
     return () => clearInterval(pollInterval);
-  }, [cryptoDetails, hasSentPayment, pollingStatus, onSubscribeSuccess]);
+  }, [cryptoDetails, pollingStatus, onSubscribeSuccess]);
+
+  if (!localStorage.getItem("token")) {
+    return null;
+  }
 
   const handleSelectCoin = async (coinId) => {
     setSelectedCoin(coinId);
     setGenerating(true);
     setError("");
+    setCountdown(1200);
+    setPollingStatus("listening");
 
     try {
       const token = localStorage.getItem("token");
@@ -108,10 +126,15 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
   };
 
   const copyToClipboard = (text, field) => {
-    navigator.clipboard.writeText(text);
+    if (!text) return;
+    navigator.clipboard.writeText(String(text));
     setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
+    setTimeout(() => setCopiedField(null), 2500);
   };
+
+  const networkInfo = cryptoDetails ? getNetworkBadge(cryptoDetails.pay_currency) : null;
+  const walletDeepLink = cryptoDetails ? getWalletDeepLink(cryptoDetails.pay_currency, cryptoDetails.pay_address, cryptoDetails.pay_amount) : "#";
+  const qrData = cryptoDetails ? getQrData(cryptoDetails.pay_currency, cryptoDetails.pay_address, cryptoDetails.pay_amount) : "";
 
   return (
     <div style={fullscreenContainerStyle}>
@@ -145,7 +168,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
       <div style={scrollAreaStyle}>
         <div style={innerContentStyle}>
           
-          {/* STATE 1: SUCCESS */}
+          {/* STATE 1: SUCCESS CELEBRATION */}
           {pollingStatus === "success" ? (
             <div style={successContainerStyle}>
               <div style={successIconStyle}>
@@ -176,10 +199,11 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
               </button>
             </div>
           ) : cryptoDetails ? (
-            /* STATE 2: CRYPTO INVOICE WITH QR & ADDRESS */
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            /* STATE 2: HIGH-CONVERTING CRYPTO CHECKOUT INVOICE */
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {error && <div style={errorBannerStyle}>{error}</div>}
 
+              {/* Creator Summary Pill */}
               <div style={invoiceHeaderCard}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <img 
@@ -189,44 +213,67 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                     onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                   />
                   <div>
-                    <div style={{ fontSize: "12px", color: "#8e8e93" }}>Subscribing to</div>
+                    <div style={{ fontSize: "11px", color: "#8e8e93", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      Subscribing to
+                    </div>
                     <div style={{ fontSize: "14px", fontWeight: "800", color: "#fff" }}>
                       @{creator?.username}
                     </div>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <span style={{ fontSize: "11px", color: "#8e8e93" }}>30 DAYS PASS</span>
-                  <div style={{ fontSize: "15px", fontWeight: "900", color: "#00aff0" }}>
+                  <span style={{ fontSize: "10px", color: "#8e8e93", fontWeight: "700" }}>30-DAY PASS</span>
+                  <div style={{ fontSize: "16px", fontWeight: "900", color: "#f43f5e" }}>
                     ${priceUsd} USD
                   </div>
                 </div>
               </div>
 
-              {/* Amount to Send Box */}
+              {/* Network Safety Badge */}
+              {networkInfo && (
+                <div style={{ ...networkAlertStyle, backgroundColor: networkInfo.bg, borderColor: `${networkInfo.color}33` }}>
+                  <AlertTriangle size={15} color={networkInfo.color} style={{ flexShrink: 0, marginTop: "1px" }} />
+                  <span style={{ color: "#f4f4f5", fontSize: "12px", lineHeight: "1.4" }}>
+                    {networkInfo.warning}
+                  </span>
+                </div>
+              )}
+
+              {/* Transfer Details Card */}
               <div style={transferDetailsBox}>
+                {/* Exact Amount */}
                 <div style={transferRowStyle}>
                   <div>
                     <span style={transferLabelStyle}>EXACT AMOUNT TO SEND</span>
                     <div style={transferAmountStyle}>
                       {cryptoDetails.pay_amount}{" "}
-                      <span style={{ color: "#f7931a", fontSize: "14px" }}>
+                      <span style={{ color: "#f7931a", fontSize: "14px", fontWeight: "800" }}>
                         {cryptoDetails.pay_currency?.toUpperCase()}
                       </span>
                     </div>
                   </div>
                   <button 
                     onClick={() => copyToClipboard(String(cryptoDetails.pay_amount), "amount")}
-                    style={copyBtnStyle}
+                    style={copiedField === "amount" ? copyBtnSuccessStyle : copyBtnStyle}
                     title="Copy amount"
                   >
-                    {copiedField === "amount" ? <CheckCircle2 size={16} color="#f4f4f5" /> : <Copy size={16} color="#fff" />}
+                    {copiedField === "amount" ? (
+                      <>
+                        <CheckCircle2 size={14} color="#10b981" />
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: "#10b981" }}>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} color="#f4f4f5" />
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: "#f4f4f5" }}>Copy</span>
+                      </>
+                    )}
                   </button>
                 </div>
 
-                {/* Wallet Address */}
-                <div style={{ ...transferRowStyle, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "12px", marginTop: "12px" }}>
-                  <div style={{ overflow: "hidden", paddingRight: "10px" }}>
+                {/* Deposit Address */}
+                <div style={{ ...transferRowStyle, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "14px", marginTop: "14px" }}>
+                  <div style={{ overflow: "hidden", paddingRight: "10px", flex: 1 }}>
                     <span style={transferLabelStyle}>DEPOSIT WALLET ADDRESS</span>
                     <div style={walletAddressStyle}>
                       {cryptoDetails.pay_address}
@@ -234,44 +281,76 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                   </div>
                   <button 
                     onClick={() => copyToClipboard(cryptoDetails.pay_address, "address")}
-                    style={{ ...copyBtnStyle, flexShrink: 0 }}
+                    style={copiedField === "address" ? copyBtnSuccessStyle : copyBtnStyle}
                     title="Copy wallet address"
                   >
-                    {copiedField === "address" ? <CheckCircle2 size={16} color="#f4f4f5" /> : <Copy size={16} color="#fff" />}
+                    {copiedField === "address" ? (
+                      <>
+                        <CheckCircle2 size={14} color="#10b981" />
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: "#10b981" }}>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} color="#f4f4f5" />
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: "#f4f4f5" }}>Copy</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
 
-              {/* QR Code */}
-              <div style={qrContainerStyle}>
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(cryptoDetails.pay_address)}&bgcolor=ffffff`} 
-                  alt="Deposit QR Code"
-                  style={qrImageStyle}
-                />
-                <span style={qrCaptionStyle}>Scan with your crypto wallet to pay</span>
-              </div>
-
-              {/* Status & Confirmation Trigger */}
-              {!hasSentPayment ? (
-                <button 
-                  onClick={() => setHasSentPayment(true)} 
-                  style={iHavePaidBtnStyle}
+              {/* 1-Tap "Open in Wallet" Button */}
+              {walletDeepLink !== "#" && (
+                <a 
+                  href={walletDeepLink} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  style={openWalletBtnStyle}
                 >
-                  I Have Sent Payment
-                </button>
-              ) : (
-                <div style={statusWaitingBox}>
-                  <Loader2 size={18} color="#f7931a" className="animate-spin" />
-                  <span style={{ fontSize: "13px", color: "#f7931a", fontWeight: "700" }}>
-                    Awaiting blockchain confirmation...
-                  </span>
-                </div>
+                  <ExternalLink size={16} color="#fff" />
+                  <span>Open in Crypto Wallet App</span>
+                </a>
               )}
 
-              <p style={securityNoticeStyle}>
-                🔒 Payments are processed securely via NOWPayments. Once confirmed on the blockchain, your VIP pass activates automatically.
-              </p>
+              {/* High-Resolution 220px QR Code */}
+              <div style={qrCardStyle}>
+                <div style={qrFrameStyle}>
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(qrData)}&bgcolor=ffffff`} 
+                    alt="Deposit QR Code"
+                    style={qrImageStyle}
+                  />
+                </div>
+                <span style={qrCaptionStyle}>
+                  Point any phone camera or wallet scanner at this code to pay
+                </span>
+              </div>
+
+              {/* Live Blockchain Radar Status (No Manual Button Needed) */}
+              <div style={radarContainerStyle}>
+                <div style={pollingStatus === "confirming" ? radarSpinnerStyle : radarDotGlowStyle}>
+                  {pollingStatus === "confirming" ? (
+                    <Loader2 size={18} color="#f59e0b" className="animate-spin" />
+                  ) : (
+                    <div style={radarDotStyle} />
+                  )}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={radarTitleStyle}>
+                    {pollingStatus === "confirming"
+                      ? "Payment Detected! Confirming on blockchain..."
+                      : "Live: Listening for blockchain deposit..."}
+                  </div>
+                  <div style={radarSubtitleStyle}>
+                    Rate locked for <b>{formatCountdown(countdown)}</b> • Activates automatically upon 1 confirmation
+                  </div>
+                </div>
+              </div>
+
+              <div style={securityRowStyle}>
+                <ShieldCheck size={14} color="#a1a1aa" />
+                <span>Automated instant activation • Verified 256-bit checkout</span>
+              </div>
             </div>
           ) : (
             /* STATE 3: CREATOR OVERVIEW & COIN SELECTION */
@@ -413,7 +492,7 @@ const scrollAreaStyle = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  padding: "20px 16px 40px",
+  padding: "16px 16px 40px",
   boxSizing: "border-box"
 };
 
@@ -429,7 +508,7 @@ const creatorBannerCardStyle = {
   alignItems: "center",
   gap: "14px",
   padding: "14px 16px",
-  background: "#1c1c1f",
+  background: "#18181b",
   borderRadius: "16px",
   border: "1px solid rgba(255, 255, 255, 0.08)"
 };
@@ -498,9 +577,9 @@ const loaderBoxStyle = {
   flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
-  background: "#1a1a1c",
+  background: "#18181b",
   borderRadius: "16px",
-  border: "1px solid #28282b"
+  border: "1px solid rgba(255, 255, 255, 0.08)"
 };
 
 const guaranteeRowStyle = {
@@ -517,9 +596,9 @@ const invoiceHeaderCard = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "12px 14px",
-  background: "#1c1c1f",
-  borderRadius: "12px",
+  padding: "12px 16px",
+  background: "#18181b",
+  borderRadius: "14px",
   border: "1px solid rgba(255, 255, 255, 0.08)"
 };
 
@@ -531,9 +610,18 @@ const creatorSmallAvatarStyle = {
   border: "1.5px solid #00aff0"
 };
 
+const networkAlertStyle = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "8px",
+  padding: "10px 14px",
+  borderRadius: "12px",
+  border: "1px solid"
+};
+
 const transferDetailsBox = {
   background: "#18181b",
-  border: "1px solid rgba(255, 255, 255, 0.1)",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
   borderRadius: "16px",
   padding: "16px"
 };
@@ -547,7 +635,7 @@ const transferRowStyle = {
 const transferLabelStyle = {
   fontSize: "10px",
   fontWeight: "800",
-  color: "#8e8e93",
+  color: "#a1a1aa",
   letterSpacing: "0.5px"
 };
 
@@ -569,66 +657,132 @@ const walletAddressStyle = {
 
 const copyBtnStyle = {
   background: "rgba(255, 255, 255, 0.08)",
-  border: "1px solid rgba(255, 255, 255, 0.15)",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
   borderRadius: "10px",
-  padding: "8px 12px",
+  padding: "8px 14px",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
-  justifyContent: "center",
-  transition: "all 0.2s ease"
+  gap: "6px",
+  flexShrink: 0,
+  transition: "all 0.15s ease"
 };
 
-const qrContainerStyle = {
+const copyBtnSuccessStyle = {
+  background: "rgba(16, 185, 129, 0.15)",
+  border: "1px solid rgba(16, 185, 129, 0.35)",
+  borderRadius: "10px",
+  padding: "8px 14px",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  flexShrink: 0
+};
+
+const openWalletBtnStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  background: "linear-gradient(135deg, #00aff0, #0088cc)",
+  color: "#fff",
+  borderRadius: "12px",
+  padding: "13px",
+  fontSize: "14px",
+  fontWeight: "800",
+  textDecoration: "none",
+  boxShadow: "0 4px 14px rgba(0, 175, 240, 0.25)"
+};
+
+const qrCardStyle = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  gap: "8px",
-  padding: "10px 0"
+  gap: "10px",
+  padding: "16px",
+  background: "#18181b",
+  borderRadius: "16px",
+  border: "1px solid rgba(255, 255, 255, 0.08)"
+};
+
+const qrFrameStyle = {
+  padding: "10px",
+  background: "#ffffff",
+  borderRadius: "16px",
+  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
+  display: "inline-block"
 };
 
 const qrImageStyle = {
-  width: "140px",
-  height: "140px",
-  borderRadius: "12px",
-  padding: "6px",
-  backgroundColor: "#fff"
+  width: "220px",
+  height: "220px",
+  display: "block"
 };
 
 const qrCaptionStyle = {
-  fontSize: "12px",
-  color: "#8e8e93"
+  fontSize: "11px",
+  color: "#a1a1aa",
+  textAlign: "center"
 };
 
-const iHavePaidBtnStyle = {
-  background: "linear-gradient(135deg, #00aff0, #0088cc)",
-  color: "#fff",
-  border: "none",
-  borderRadius: "14px",
-  padding: "14px",
-  fontWeight: "800",
-  fontSize: "14px",
-  cursor: "pointer",
-  boxShadow: "0 6px 18px rgba(0, 175, 240, 0.35)"
+const radarContainerStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  padding: "14px 16px",
+  background: "rgba(16, 185, 129, 0.06)",
+  border: "1px solid rgba(16, 185, 129, 0.2)",
+  borderRadius: "14px"
 };
 
-const statusWaitingBox = {
+const radarDotGlowStyle = {
+  width: "24px",
+  height: "24px",
+  borderRadius: "50%",
+  background: "rgba(16, 185, 129, 0.2)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: "10px",
-  padding: "12px",
-  borderRadius: "12px",
-  background: "rgba(247, 147, 26, 0.1)",
-  border: "1px solid rgba(247, 147, 26, 0.25)"
+  flexShrink: 0
 };
 
-const securityNoticeStyle = {
-  margin: "4px 0 0 0",
+const radarDotStyle = {
+  width: "10px",
+  height: "10px",
+  borderRadius: "50%",
+  backgroundColor: "#10b981",
+  boxShadow: "0 0 10px #10b981"
+};
+
+const radarSpinnerStyle = {
+  width: "24px",
+  height: "24px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0
+};
+
+const radarTitleStyle = {
+  fontSize: "13px",
+  fontWeight: "800",
+  color: "#f4f4f5"
+};
+
+const radarSubtitleStyle = {
   fontSize: "11px",
-  color: "#71717a",
-  lineHeight: "1.4",
-  textAlign: "center"
+  color: "#a1a1aa",
+  marginTop: "2px"
+};
+
+const securityRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  fontSize: "11px",
+  color: "#71717a"
 };
 
 const successContainerStyle = {

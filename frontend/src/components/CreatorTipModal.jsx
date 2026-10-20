@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { 
   X, Heart, CheckCircle2, Copy, QrCode, 
-  Loader2, Sparkles, ArrowLeft, ShieldCheck, DollarSign
+  Loader2, Sparkles, ArrowLeft, ShieldCheck, DollarSign, AlertTriangle, ExternalLink
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import useModalHistory from "../hooks/useModalHistory";
+import { getNetworkBadge, getWalletDeepLink, getQrData, formatCountdown } from "../utils/cryptoHelpers";
 
 const TIP_PRESETS = [
   { amountUsd: 3, label: "$3" },
@@ -24,8 +25,8 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
   const [generating, setGenerating] = useState(false);
   const [cryptoDetails, setCryptoDetails] = useState(null);
   const [copiedField, setCopiedField] = useState(null);
-  const [hasSentPayment, setHasSentPayment] = useState(false);
-  const [pollingStatus, setPollingStatus] = useState("pending");
+  const [pollingStatus, setPollingStatus] = useState("listening"); // "listening" | "confirming" | "success"
+  const [countdown, setCountdown] = useState(1200); // 20 minutes
   const [error, setError] = useState("");
 
   const effectiveAmountUsd = customAmount 
@@ -38,7 +39,18 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  // Polling for confirmation
+  // 20-minute countdown timer
+  useEffect(() => {
+    let timer;
+    if (cryptoDetails && countdown > 0 && pollingStatus !== "success") {
+      timer = setInterval(() => {
+        setCountdown((prev) => Math.max(0, prev - 1));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [cryptoDetails, countdown, pollingStatus]);
+
+  // Continuous automatic blockchain polling (every 5 seconds)
   useEffect(() => {
     let pollInterval;
     if (cryptoDetails?.order_id && pollingStatus !== "success") {
@@ -46,11 +58,16 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
         try {
           const res = await fetch(`${APP_CONFIG.apiUrl}/api/crypto/status/${cryptoDetails.order_id}`);
           const data = await res.json();
-          if (data.success && data.status === "APPROVED") {
-            setPollingStatus("success");
-            clearInterval(pollInterval);
-            if (onTipSuccess) {
-              onTipSuccess(effectiveAmountUsd);
+          if (data.success) {
+            const st = String(data.status || "").toUpperCase();
+            if (st === "APPROVED" || st === "FINISHED" || st === "CONFIRMED") {
+              setPollingStatus("success");
+              clearInterval(pollInterval);
+              if (onTipSuccess) {
+                onTipSuccess(effectiveAmountUsd);
+              }
+            } else if (st === "WAITING" || st === "CONFIRMING" || st === "SENDING") {
+              setPollingStatus("confirming");
             }
           }
         } catch (err) {
@@ -58,13 +75,11 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
         }
       };
 
-      pollInterval = setInterval(checkStatus, 8000);
-      if (hasSentPayment) {
-        checkStatus();
-      }
+      checkStatus();
+      pollInterval = setInterval(checkStatus, 5000);
     }
     return () => clearInterval(pollInterval);
-  }, [cryptoDetails, hasSentPayment, pollingStatus, effectiveAmountUsd, onTipSuccess]);
+  }, [cryptoDetails, pollingStatus, effectiveAmountUsd, onTipSuccess]);
 
   const handleSelectCoin = async (coinId) => {
     if (!effectiveAmountUsd || effectiveAmountUsd < 2) {
@@ -74,6 +89,8 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
 
     setGenerating(true);
     setError("");
+    setCountdown(1200);
+    setPollingStatus("listening");
 
     try {
       const token = localStorage.getItem("token");
@@ -110,10 +127,15 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
   };
 
   const copyToClipboard = (text, field) => {
-    navigator.clipboard.writeText(text);
+    if (!text) return;
+    navigator.clipboard.writeText(String(text));
     setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
+    setTimeout(() => setCopiedField(null), 2500);
   };
+
+  const networkInfo = cryptoDetails ? getNetworkBadge(cryptoDetails.pay_currency) : null;
+  const walletDeepLink = cryptoDetails ? getWalletDeepLink(cryptoDetails.pay_currency, cryptoDetails.pay_address, cryptoDetails.pay_amount) : "#";
+  const qrData = cryptoDetails ? getQrData(cryptoDetails.pay_currency, cryptoDetails.pay_address, cryptoDetails.pay_amount) : "";
 
   return (
     <div style={fullscreenContainerStyle}>
@@ -124,7 +146,6 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
             if (cryptoDetails && pollingStatus !== "success") {
               setCryptoDetails(null);
               setError("");
-              setHasSentPayment(false);
             } else {
               handleSafeClose();
             }
@@ -147,21 +168,21 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
       <div style={scrollAreaStyle}>
         <div style={innerContentStyle}>
           
-          {/* STATE 1: SUCCESS */}
+          {/* STATE 1: SUCCESS CELEBRATION */}
           {pollingStatus === "success" ? (
             <div style={successContainerStyle}>
               <div style={successIconStyle}>
-                <Sparkles size={40} color="#f43f5e" />
+                <Heart size={40} color="#f43f5e" fill="#f43f5e" />
               </div>
               <h3 style={successTitleStyle}>Tip Sent Successfully!</h3>
               <p style={successSubStyle}>
-                You sent a tip of <b>${effectiveAmountUsd} USD</b> to <b>{creator?.display_name || creator?.username}</b>. Thank you for supporting creators!
+                Your tip of <b>${effectiveAmountUsd} USD</b> has been confirmed on the blockchain and delivered to <b>@{creator?.username}</b>!
               </p>
               <div style={successCreatorCardStyle}>
                 <img 
                   src={creator?.avatar_url || "/assets/default-avatar.png"} 
                   alt={creator?.display_name} 
-                  style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover" }}
+                  style={{ width: "48px", height: "48px", borderRadius: "50%", objectFit: "cover" }}
                   onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                 />
                 <div>
@@ -169,7 +190,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                     {creator?.display_name || creator?.username}
                   </div>
                   <div style={{ fontSize: "12px", color: "#f43f5e", fontWeight: "700" }}>
-                    Tip Confirmed on Blockchain ✓
+                    Supporter Badge Unlocked 💖
                   </div>
                 </div>
               </div>
@@ -178,10 +199,11 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
               </button>
             </div>
           ) : cryptoDetails ? (
-            /* STATE 2: CRYPTO INVOICE WITH QR & ADDRESS */
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            /* STATE 2: HIGH-CONVERTING CRYPTO CHECKOUT INVOICE */
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {error && <div style={errorBannerStyle}>{error}</div>}
 
+              {/* Creator Pill */}
               <div style={invoiceHeaderCard}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <img 
@@ -191,44 +213,67 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                     onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                   />
                   <div>
-                    <div style={{ fontSize: "12px", color: "#8e8e93" }}>Tipping</div>
+                    <div style={{ fontSize: "11px", color: "#8e8e93", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      Tipping Creator
+                    </div>
                     <div style={{ fontSize: "14px", fontWeight: "800", color: "#fff" }}>
                       @{creator?.username}
                     </div>
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <span style={{ fontSize: "11px", color: "#8e8e93" }}>TIP AMOUNT</span>
-                  <div style={{ fontSize: "15px", fontWeight: "900", color: "#f91880" }}>
+                  <span style={{ fontSize: "10px", color: "#8e8e93", fontWeight: "700" }}>TIP AMOUNT</span>
+                  <div style={{ fontSize: "16px", fontWeight: "900", color: "#f43f5e" }}>
                     ${effectiveAmountUsd} USD
                   </div>
                 </div>
               </div>
 
-              {/* Amount Box */}
+              {/* Network Alert Badge */}
+              {networkInfo && (
+                <div style={{ ...networkAlertStyle, backgroundColor: networkInfo.bg, borderColor: `${networkInfo.color}33` }}>
+                  <AlertTriangle size={15} color={networkInfo.color} style={{ flexShrink: 0, marginTop: "1px" }} />
+                  <span style={{ color: "#f4f4f5", fontSize: "12px", lineHeight: "1.4" }}>
+                    {networkInfo.warning}
+                  </span>
+                </div>
+              )}
+
+              {/* Transfer Details Card */}
               <div style={transferDetailsBox}>
+                {/* Amount Row */}
                 <div style={transferRowStyle}>
                   <div>
-                    <span style={transferLabelStyle}>EXACT CRYPTO TO SEND</span>
+                    <span style={transferLabelStyle}>EXACT AMOUNT TO SEND</span>
                     <div style={transferAmountStyle}>
                       {cryptoDetails.pay_amount}{" "}
-                      <span style={{ color: "#f7931a", fontSize: "14px" }}>
+                      <span style={{ color: "#f7931a", fontSize: "14px", fontWeight: "800" }}>
                         {cryptoDetails.pay_currency?.toUpperCase()}
                       </span>
                     </div>
                   </div>
                   <button 
                     onClick={() => copyToClipboard(String(cryptoDetails.pay_amount), "amount")}
-                    style={copyBtnStyle}
+                    style={copiedField === "amount" ? copyBtnSuccessStyle : copyBtnStyle}
                     title="Copy amount"
                   >
-                    {copiedField === "amount" ? <CheckCircle2 size={16} color="#f4f4f5" /> : <Copy size={16} color="#fff" />}
+                    {copiedField === "amount" ? (
+                      <>
+                        <CheckCircle2 size={14} color="#10b981" />
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: "#10b981" }}>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} color="#f4f4f5" />
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: "#f4f4f5" }}>Copy</span>
+                      </>
+                    )}
                   </button>
                 </div>
 
-                {/* Wallet Address */}
-                <div style={{ ...transferRowStyle, borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "12px", marginTop: "12px" }}>
-                  <div style={{ overflow: "hidden", paddingRight: "10px" }}>
+                {/* Address Row */}
+                <div style={{ ...transferRowStyle, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "14px", marginTop: "14px" }}>
+                  <div style={{ overflow: "hidden", paddingRight: "10px", flex: 1 }}>
                     <span style={transferLabelStyle}>DEPOSIT WALLET ADDRESS</span>
                     <div style={walletAddressStyle}>
                       {cryptoDetails.pay_address}
@@ -236,132 +281,160 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                   </div>
                   <button 
                     onClick={() => copyToClipboard(cryptoDetails.pay_address, "address")}
-                    style={{ ...copyBtnStyle, flexShrink: 0 }}
+                    style={copiedField === "address" ? copyBtnSuccessStyle : copyBtnStyle}
                     title="Copy wallet address"
                   >
-                    {copiedField === "address" ? <CheckCircle2 size={16} color="#f4f4f5" /> : <Copy size={16} color="#fff" />}
+                    {copiedField === "address" ? (
+                      <>
+                        <CheckCircle2 size={14} color="#10b981" />
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: "#10b981" }}>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} color="#f4f4f5" />
+                        <span style={{ fontSize: "12px", fontWeight: "700", color: "#f4f4f5" }}>Copy</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
 
-              {/* QR Code */}
-              <div style={qrContainerStyle}>
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(cryptoDetails.pay_address)}&bgcolor=ffffff`} 
-                  alt="Deposit QR Code"
-                  style={qrImageStyle}
-                />
-                <span style={qrCaptionStyle}>Scan with your crypto wallet to send tip</span>
-              </div>
-
-              {/* Status button */}
-              {!hasSentPayment ? (
-                <button 
-                  onClick={() => setHasSentPayment(true)} 
-                  style={iHavePaidBtnStyle}
+              {/* 1-Tap "Open in Wallet" Button */}
+              {walletDeepLink !== "#" && (
+                <a 
+                  href={walletDeepLink} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  style={openWalletBtnStyle}
                 >
-                  I Have Sent Tip
-                </button>
-              ) : (
-                <div style={statusWaitingBox}>
-                  <Loader2 size={18} color="#f7931a" className="animate-spin" />
-                  <span style={{ fontSize: "13px", color: "#f7931a", fontWeight: "700" }}>
-                    Awaiting blockchain confirmation...
-                  </span>
-                </div>
+                  <ExternalLink size={16} color="#fff" />
+                  <span>Open in Crypto Wallet App</span>
+                </a>
               )}
 
-              <p style={securityNoticeStyle}>
-                🔒 100% of your tip goes directly to @{creator?.username} upon blockchain confirmation.
-              </p>
+              {/* 220px Crisp QR Code Card */}
+              <div style={qrCardStyle}>
+                <div style={qrFrameStyle}>
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(qrData)}&bgcolor=ffffff`} 
+                    alt="Deposit QR Code"
+                    style={qrImageStyle}
+                  />
+                </div>
+                <span style={qrCaptionStyle}>
+                  Point any phone camera or wallet scanner at this code to send tip
+                </span>
+              </div>
+
+              {/* Live Blockchain Radar Status */}
+              <div style={radarContainerStyle}>
+                <div style={pollingStatus === "confirming" ? radarSpinnerStyle : radarDotGlowStyle}>
+                  {pollingStatus === "confirming" ? (
+                    <Loader2 size={18} color="#f59e0b" className="animate-spin" />
+                  ) : (
+                    <div style={radarDotStyle} />
+                  )}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={radarTitleStyle}>
+                    {pollingStatus === "confirming"
+                      ? "Tip Detected! Confirming on blockchain..."
+                      : "Live: Listening for blockchain tip deposit..."}
+                  </div>
+                  <div style={radarSubtitleStyle}>
+                    Rate locked for <b>{formatCountdown(countdown)}</b> • 100% delivered to creator
+                  </div>
+                </div>
+              </div>
+
+              <div style={securityRowStyle}>
+                <ShieldCheck size={14} color="#a1a1aa" />
+                <span>100% direct creator tip • Instant automated delivery</span>
+              </div>
             </div>
           ) : (
             /* STATE 3: TIP SELECTION & COIN SELECTION */
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {error && <div style={errorBannerStyle}>{error}</div>}
+
               {/* Creator Card */}
-              <div style={creatorCardStyle}>
+              <div style={creatorBannerCardStyle}>
                 <img 
                   src={creator?.avatar_url || "/assets/default-avatar.png"} 
                   alt={creator?.display_name} 
-                  style={creatorAvatarStyle}
+                  style={creatorProfileAvatarStyle}
                   onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                 />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <span style={creatorNameStyle}>{creator?.display_name || creator?.username}</span>
-                    <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
+                    <TwitterVerifiedBadge size={15} style={{ flexShrink: 0 }} />
                   </div>
-                  <span style={creatorCategoryStyle}>{creator?.creator_category || "Creator"}</span>
+                  <span style={creatorMetaStyle}>Send a tip to support content creation</span>
                 </div>
               </div>
 
-              {error && <div style={errorBannerStyle}>{error}</div>}
-
-              {/* Preset Chips */}
-              <div style={fieldGroupStyle}>
-                <label style={labelStyle}>Select Tip Amount</label>
+              {/* Amount Selection */}
+              <div>
+                <span style={sectionLabelStyle}>Select Amount</span>
                 <div style={presetGridStyle}>
                   {TIP_PRESETS.map((p) => {
-                    const isSelected = selectedPreset?.amountUsd === p.amountUsd && !customAmount;
+                    const active = !customAmount && selectedPreset?.amountUsd === p.amountUsd;
                     return (
                       <button
-                        type="button"
                         key={p.amountUsd}
-                        onClick={() => { setSelectedPreset(p); setCustomAmount(""); }}
-                        style={{
-                          ...presetBtnStyle,
-                          borderColor: isSelected ? "#f91880" : "#333",
-                          background: isSelected ? "rgba(249, 24, 128, 0.15)" : "#1c1c1e",
-                          color: isSelected ? "#fff" : "#ccc"
+                        type="button"
+                        onClick={() => {
+                          setSelectedPreset(p);
+                          setCustomAmount("");
                         }}
+                        style={active ? presetBtnActiveStyle : presetBtnStyle}
                       >
                         {p.label}
                       </button>
                     );
                   })}
                 </div>
-              </div>
 
-              {/* Custom Amount Input */}
-              <div style={fieldGroupStyle}>
-                <label style={labelStyle}>Or Custom Amount ($)</label>
-                <div style={{ position: "relative" }}>
+                {/* Custom Amount */}
+                <div style={{ position: "relative", marginTop: "10px" }}>
                   <span style={currencySymbolStyle}>$</span>
                   <input
                     type="number"
-                    min={2}
-                    step={1}
-                    placeholder="e.g. 15"
+                    min="2"
+                    max="1000"
+                    placeholder="Other amount (min $2)"
                     value={customAmount}
-                    onChange={(e) => { setCustomAmount(e.target.value); setSelectedPreset(null); }}
-                    style={{ ...inputStyle, paddingLeft: "36px" }}
+                    onChange={(e) => {
+                      setCustomAmount(e.target.value);
+                      setSelectedPreset(null);
+                    }}
+                    style={customInputStyle}
                   />
                 </div>
               </div>
 
-              {/* Note / Message */}
-              <div style={fieldGroupStyle}>
-                <label style={labelStyle}>Note to Creator (Optional)</label>
+              {/* Optional Message */}
+              <div>
+                <span style={sectionLabelStyle}>Add a Note (Optional)</span>
                 <textarea
                   rows={2}
                   maxLength={200}
-                  placeholder="Add a compliment or private note with your tip..."
+                  placeholder={`Say something nice to @${creator?.username}...`}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   style={textareaStyle}
                 />
               </div>
 
-              {/* Crypto Coin Grid */}
-              <div style={fieldGroupStyle}>
-                <label style={labelStyle}>
-                  Select Crypto to Send ${effectiveAmountUsd} USD
-                </label>
+              {/* Cryptocurrency Grid */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <span style={sectionLabelStyle}>Choose Token to Pay</span>
 
                 {generating ? (
                   <div style={loaderBoxStyle}>
                     <Loader2 size={30} color="#f7931a" className="animate-spin" />
-                    <span style={{ fontSize: "13px", color: "#fff", fontWeight: "700", marginTop: "10px" }}>
+                    <span style={{ fontSize: "13px", color: "#fff", fontWeight: "700", marginTop: "8px" }}>
                       Generating Secure Tip Wallet...
                     </span>
                   </div>
@@ -386,10 +459,10 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
                 )}
               </div>
 
-              {/* Footer */}
+              {/* Guarantee */}
               <div style={guaranteeRowStyle}>
-                <ShieldCheck size={15} color="#f43f5e" />
-                <span>Powered by NOWPayments • Zero chargebacks • Instant payout</span>
+                <ShieldCheck size={16} color="#f43f5e" />
+                <span>100% of tips go directly to the creator • 256-bit checkout</span>
               </div>
             </div>
           )}
@@ -404,7 +477,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
 const fullscreenContainerStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 1000030,
+  zIndex: 1000035,
   backgroundColor: "#09090b",
   display: "flex",
   flexDirection: "column",
@@ -450,7 +523,7 @@ const scrollAreaStyle = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  padding: "20px 16px 40px",
+  padding: "16px 16px 40px",
   boxSizing: "border-box"
 };
 
@@ -461,50 +534,57 @@ const innerContentStyle = {
   flexDirection: "column"
 };
 
-const heartIconStyle = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "10px",
-  background: "linear-gradient(135deg, #f91880, var(--primary-color))",
+const creatorBannerCardStyle = {
   display: "flex",
   alignItems: "center",
-  justifyContent: "center"
+  gap: "14px",
+  padding: "14px 16px",
+  background: "#18181b",
+  borderRadius: "16px",
+  border: "1px solid rgba(255, 255, 255, 0.08)"
 };
 
-const titleStyle = { margin: 0, fontSize: "16px", fontWeight: "800", color: "#fff" };
-const subtitleStyle = { margin: "2px 0 0 0", fontSize: "12px", color: "#8e8e93" };
-const iconBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center" };
-const contentBodyStyle = { padding: "20px" };
-
-const creatorCardStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "12px",
-  padding: "12px 16px",
-  background: "#1c1c1e",
-  borderRadius: "14px",
-  border: "1px solid #2a2a2c"
-};
-
-const creatorAvatarStyle = {
-  width: "44px",
-  height: "44px",
+const creatorProfileAvatarStyle = {
+  width: "52px",
+  height: "52px",
   borderRadius: "50%",
   objectFit: "cover",
-  border: "2px solid #fff"
+  border: "2px solid #f43f5e"
 };
 
-const creatorNameStyle = { fontWeight: "700", fontSize: "14px", color: "#fff" };
-const creatorCategoryStyle = { fontSize: "11px", color: "#8e8e93" };
-const fieldGroupStyle = { display: "flex", flexDirection: "column", gap: "6px" };
-const labelStyle = { fontSize: "13px", fontWeight: "700", color: "#e5e5ea" };
+const creatorNameStyle = { fontWeight: "800", fontSize: "15px", color: "#fff" };
+const creatorMetaStyle = { fontSize: "12px", color: "#8e8e93", display: "block", marginTop: "2px" };
 
-const presetGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" };
-const presetBtnStyle = { border: "1px solid", borderRadius: "10px", padding: "10px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s" };
+const sectionLabelStyle = { fontSize: "12px", fontWeight: "800", color: "#fff", marginBottom: "6px", display: "block" };
 
-const currencySymbolStyle = { position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#888", fontWeight: "700" };
-const inputStyle = { width: "100%", background: "#1c1c1e", border: "1px solid #333", borderRadius: "12px", padding: "12px 14px", color: "#fff", fontSize: "14px", outline: "none", boxSizing: "border-box" };
-const textareaStyle = { width: "100%", background: "#1c1c1e", border: "1px solid #333", borderRadius: "12px", padding: "10px 14px", color: "#fff", fontSize: "13px", outline: "none", boxSizing: "border-box", resize: "none" };
+const presetGridStyle = { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" };
+
+const presetBtnStyle = {
+  padding: "12px 6px",
+  background: "#1c1c1f",
+  border: "1px solid rgba(255, 255, 255, 0.1)",
+  borderRadius: "12px",
+  color: "#fff",
+  fontSize: "14px",
+  fontWeight: "800",
+  cursor: "pointer"
+};
+
+const presetBtnActiveStyle = {
+  padding: "12px 6px",
+  background: "#f43f5e",
+  border: "1px solid #f43f5e",
+  borderRadius: "12px",
+  color: "#fff",
+  fontSize: "14px",
+  fontWeight: "800",
+  cursor: "pointer",
+  boxShadow: "0 4px 14px rgba(244, 63, 94, 0.35)"
+};
+
+const currencySymbolStyle = { position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#8e8e93", fontWeight: "700" };
+const customInputStyle = { width: "100%", background: "#18181b", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "12px", padding: "12px 14px 12px 30px", color: "#fff", fontSize: "14px", outline: "none", boxSizing: "border-box" };
+const textareaStyle = { width: "100%", background: "#18181b", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "12px", padding: "10px 14px", color: "#fff", fontSize: "13px", outline: "none", boxSizing: "border-box", resize: "none" };
 
 const cryptoGridStyle = {
   display: "grid",
@@ -532,9 +612,9 @@ const loaderBoxStyle = {
   flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
-  background: "#1a1a1c",
+  background: "#18181b",
   borderRadius: "14px",
-  border: "1px solid #28282b"
+  border: "1px solid rgba(255, 255, 255, 0.08)"
 };
 
 const guaranteeRowStyle = {
@@ -551,9 +631,9 @@ const invoiceHeaderCard = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "12px 14px",
-  background: "#1c1c1f",
-  borderRadius: "12px",
+  padding: "12px 16px",
+  background: "#18181b",
+  borderRadius: "14px",
   border: "1px solid rgba(255, 255, 255, 0.08)"
 };
 
@@ -562,12 +642,21 @@ const creatorSmallAvatarStyle = {
   height: "36px",
   borderRadius: "50%",
   objectFit: "cover",
-  border: "1.5px solid #f91880"
+  border: "1.5px solid #f43f5e"
+};
+
+const networkAlertStyle = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "8px",
+  padding: "10px 14px",
+  borderRadius: "12px",
+  border: "1px solid"
 };
 
 const transferDetailsBox = {
   background: "#18181b",
-  border: "1px solid rgba(255, 255, 255, 0.1)",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
   borderRadius: "16px",
   padding: "16px"
 };
@@ -581,7 +670,7 @@ const transferRowStyle = {
 const transferLabelStyle = {
   fontSize: "10px",
   fontWeight: "800",
-  color: "#8e8e93",
+  color: "#a1a1aa",
   letterSpacing: "0.5px"
 };
 
@@ -603,66 +692,132 @@ const walletAddressStyle = {
 
 const copyBtnStyle = {
   background: "rgba(255, 255, 255, 0.08)",
-  border: "1px solid rgba(255, 255, 255, 0.15)",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
   borderRadius: "10px",
-  padding: "8px 12px",
+  padding: "8px 14px",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
-  justifyContent: "center",
-  transition: "all 0.2s ease"
+  gap: "6px",
+  flexShrink: 0,
+  transition: "all 0.15s ease"
 };
 
-const qrContainerStyle = {
+const copyBtnSuccessStyle = {
+  background: "rgba(16, 185, 129, 0.15)",
+  border: "1px solid rgba(16, 185, 129, 0.35)",
+  borderRadius: "10px",
+  padding: "8px 14px",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  flexShrink: 0
+};
+
+const openWalletBtnStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  background: "linear-gradient(135deg, #f43f5e, #e11d48)",
+  color: "#fff",
+  borderRadius: "12px",
+  padding: "13px",
+  fontSize: "14px",
+  fontWeight: "800",
+  textDecoration: "none",
+  boxShadow: "0 4px 14px rgba(244, 63, 94, 0.25)"
+};
+
+const qrCardStyle = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  gap: "8px",
-  padding: "10px 0"
+  gap: "10px",
+  padding: "16px",
+  background: "#18181b",
+  borderRadius: "16px",
+  border: "1px solid rgba(255, 255, 255, 0.08)"
+};
+
+const qrFrameStyle = {
+  padding: "10px",
+  background: "#ffffff",
+  borderRadius: "16px",
+  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
+  display: "inline-block"
 };
 
 const qrImageStyle = {
-  width: "140px",
-  height: "140px",
-  borderRadius: "12px",
-  padding: "6px",
-  backgroundColor: "#fff"
+  width: "220px",
+  height: "220px",
+  display: "block"
 };
 
 const qrCaptionStyle = {
-  fontSize: "12px",
-  color: "#8e8e93"
+  fontSize: "11px",
+  color: "#a1a1aa",
+  textAlign: "center"
 };
 
-const iHavePaidBtnStyle = {
-  background: "linear-gradient(135deg, #f91880, var(--primary-color))",
-  color: "#fff",
-  border: "none",
-  borderRadius: "14px",
-  padding: "14px",
-  fontWeight: "800",
-  fontSize: "14px",
-  cursor: "pointer",
-  boxShadow: "0 6px 18px rgba(249, 24, 128, 0.35)"
+const radarContainerStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  padding: "14px 16px",
+  background: "rgba(16, 185, 129, 0.06)",
+  border: "1px solid rgba(16, 185, 129, 0.2)",
+  borderRadius: "14px"
 };
 
-const statusWaitingBox = {
+const radarDotGlowStyle = {
+  width: "24px",
+  height: "24px",
+  borderRadius: "50%",
+  background: "rgba(16, 185, 129, 0.2)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: "10px",
-  padding: "12px",
-  borderRadius: "12px",
-  background: "rgba(247, 147, 26, 0.1)",
-  border: "1px solid rgba(247, 147, 26, 0.25)"
+  flexShrink: 0
 };
 
-const securityNoticeStyle = {
-  margin: "4px 0 0 0",
+const radarDotStyle = {
+  width: "10px",
+  height: "10px",
+  borderRadius: "50%",
+  backgroundColor: "#10b981",
+  boxShadow: "0 0 10px #10b981"
+};
+
+const radarSpinnerStyle = {
+  width: "24px",
+  height: "24px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0
+};
+
+const radarTitleStyle = {
+  fontSize: "13px",
+  fontWeight: "800",
+  color: "#f4f4f5"
+};
+
+const radarSubtitleStyle = {
   fontSize: "11px",
-  color: "#71717a",
-  lineHeight: "1.4",
-  textAlign: "center"
+  color: "#a1a1aa",
+  marginTop: "2px"
+};
+
+const securityRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  fontSize: "11px",
+  color: "#71717a"
 };
 
 const successContainerStyle = {
