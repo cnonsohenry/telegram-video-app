@@ -1292,14 +1292,15 @@ router.get("/:username", optionalAuth, async (req, res) => {
       String(creator.username || "").toLowerCase() === "naijahomemade" ||
       String(username || "").toLowerCase() === "naijahomemade" ||
       String(creator.telegram_user_id) === "1881815190" ||
+      String(creator.telegram_user_id) === "-1004344719694" ||
       String(creator.id) === "458";
 
     if (isNaijaHomemade && !creator.telegram_user_id) {
-      creator.telegram_user_id = 1881815190;
+      creator.telegram_user_id = -1004344719694;
     }
 
     const legacyCondition = isNaijaHomemade 
-      ? "OR (LOWER(v.category) = 'premium' AND (v.uploader_id = 1881815190 OR v.uploader_id = 458 OR v.uploader_id IS NULL OR v.uploader_id = 0 OR (v.chat_id != 'internal' AND (v.cloudflare_id IS NULL OR NOT v.cloudflare_id LIKE 'r2:%'))))"
+      ? "OR (LOWER(v.category) = 'premium' AND (v.uploader_id = 1881815190 OR v.uploader_id = -1004344719694 OR v.uploader_id = 458 OR v.uploader_id IS NULL OR v.uploader_id = 0 OR (v.chat_id != 'internal' AND (v.cloudflare_id IS NULL OR NOT v.cloudflare_id LIKE 'r2:%'))))"
       : "";
 
     // Video & views stats
@@ -2263,14 +2264,15 @@ router.get("/:username/videos", async (req, res) => {
       String(username || "").toLowerCase() === "naijahomemade" ||
       String(creatorUsername || "").toLowerCase() === "naijahomemade" ||
       String(creatorTgId) === "1881815190" ||
+      String(creatorTgId) === "-1004344719694" ||
       String(creatorId) === "458";
 
     if (isNaijaHomemade && !creatorTgId) {
-      creatorTgId = 1881815190;
+      creatorTgId = -1004344719694;
     }
 
     const legacyCondition = isNaijaHomemade 
-      ? "OR (LOWER(v.category) = 'premium' AND (v.uploader_id = 1881815190 OR v.uploader_id = 458 OR v.uploader_id IS NULL OR v.uploader_id = 0 OR (v.chat_id != 'internal' AND (v.cloudflare_id IS NULL OR NOT v.cloudflare_id LIKE 'r2:%'))))"
+      ? "OR (LOWER(v.category) = 'premium' AND (v.uploader_id = 1881815190 OR v.uploader_id = -1004344719694 OR v.uploader_id = 458 OR v.uploader_id IS NULL OR v.uploader_id = 0 OR (v.chat_id != 'internal' AND (v.cloudflare_id IS NULL OR NOT v.cloudflare_id LIKE 'r2:%'))))"
       : "";
 
     let tabFilter = "";

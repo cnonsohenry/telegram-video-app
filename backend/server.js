@@ -622,7 +622,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     // Handle uploader ID (channel ID, user ID, or fallback)
     const rawUploaderId = uploader_id || req.query.uploader_id || req.body.admin_id;
     const numericUploaderId = rawUploaderId ? Number(rawUploaderId) : null;
-    const finalUploaderId = numericUploaderId || 1881815190;
+    const finalUploaderId = numericUploaderId || -1004344719694;
 
     const rawCategory = category || req.query.category;
     const safeCategory = rawCategory ? rawCategory.toLowerCase().trim() : "premium";
@@ -1557,8 +1557,8 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
   let uploaderName = v.uploader_name;
   let uploaderHandle = v.uploader_handle;
 
-  // Only fallback to @naijahomemade for legacy Telegram VIP videos or videos explicitly belonging to 1881815190
-  const isLegacyOrNaijaHomemade = String(v.uploader_id) === "1881815190" || (!isWebUpload && (!v.uploader_id || String(v.uploader_id) === "0"));
+  // Only fallback to @naijahomemade for legacy Telegram VIP videos or videos explicitly belonging to 1881815190 or -1004344719694
+  const isLegacyOrNaijaHomemade = String(v.uploader_id) === "1881815190" || String(v.uploader_id) === "-1004344719694" || (!isWebUpload && (!v.uploader_id || String(v.uploader_id) === "0"));
 
   if (isPremium && isLegacyOrNaijaHomemade) {
     if (!uploaderHandle || uploaderHandle === "creator" || uploaderHandle === "Member") {

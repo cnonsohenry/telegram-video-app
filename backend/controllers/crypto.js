@@ -214,7 +214,7 @@ export const fulfillCryptoOrder = async (pool, orderId) => {
       await client.query(`UPDATE app_users SET is_premium = TRUE WHERE id = $1`, [tx.app_user_id]);
       try {
         const mainCreator = await client.query(
-          "SELECT id FROM app_users WHERE telegram_user_id = 1881815190 OR LOWER(username) = 'naijahomemade' LIMIT 1"
+          "SELECT id FROM app_users WHERE telegram_user_id IN (1881815190, -1004344719694) OR LOWER(username) = 'naijahomemade' LIMIT 1"
         );
         if (mainCreator.rows.length > 0) {
           await client.query(

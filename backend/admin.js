@@ -245,7 +245,7 @@ router.put("/user/:id", authenticateToken, isAdmin, async (req, res) => {
     if (is_premium !== undefined) {
       try {
         const mainCreator = await pool.query(
-          "SELECT id FROM app_users WHERE telegram_user_id = 1881815190 OR LOWER(username) = 'naijahomemade' LIMIT 1"
+          "SELECT id FROM app_users WHERE telegram_user_id IN (1881815190, -1004344719694) OR LOWER(username) = 'naijahomemade' LIMIT 1"
         );
         if (mainCreator.rows.length > 0) {
           if (is_premium === true) {
