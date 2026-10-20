@@ -66,15 +66,15 @@ export const APP_CONFIG = {
     { id: 'life_time', label: 'LifeTime', price: 250, priceText: '$250', priceUsd: 250, textUsd: '$250' }
   ],
 
-  // 🟢 NEW: Crypto Payment Options (Controls the buttons on the paywall)
+  // 🟢 Crypto Payment Options (Sleek dark aesthetics blending with modal)
   cryptoOptions: [
-    { id: 'usdttrc20', label: 'USDT (TRC-20)', bg: '#27272a', text: '#fff', span: 1 },
-    { id: 'usdtbsc', label: 'USDT (BSC)', bg: '#27272a', text: '#fff', span: 1 },
-    { id: 'btc', label: 'Bitcoin (BTC)', bg: '#F7931A', text: '#fff', span: 1 },
-    { id: 'eth', label: 'Ethereum (ETH)', bg: '#627EEA', text: '#fff', span: 1 },
-    { id: 'ltc', label: 'Litecoin (LTC)', bg: '#345D9D', text: '#fff', span: 1 },
-    { id: 'bnbbsc', label: 'BNB (BSC)', bg: '#F3BA2F', text: '#000', span: 1 },
-    { id: 'ton', label: 'Toncoin (TON)', bg: '#0098EA', text: '#fff', span: 2 } // spans 2 columns at the bottom
+    { id: 'usdttrc20', label: 'USDT (TRC-20)', badge: 'TRC20', bg: '#202024', text: '#f4f4f5', span: 1 },
+    { id: 'usdtbsc', label: 'USDT (BSC)', badge: 'BEP20', bg: '#202024', text: '#f4f4f5', span: 1 },
+    { id: 'btc', label: 'Bitcoin (BTC)', badge: 'BTC', bg: '#202024', text: '#f4f4f5', span: 1 },
+    { id: 'eth', label: 'Ethereum (ETH)', badge: 'ETH', bg: '#202024', text: '#f4f4f5', span: 1 },
+    { id: 'ltc', label: 'Litecoin (LTC)', badge: 'LTC', bg: '#202024', text: '#f4f4f5', span: 1 },
+    { id: 'bnbbsc', label: 'BNB (BSC)', badge: 'BSC', bg: '#202024', text: '#f4f4f5', span: 1 },
+    { id: 'ton', label: 'Toncoin (TON)', badge: 'TON', bg: '#202024', text: '#f4f4f5', span: 2 } // spans 2 columns at the bottom
   ],
 
   // 🟢 NEW: Admin Upload Destinations & IDs

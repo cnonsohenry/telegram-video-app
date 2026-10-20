@@ -2627,6 +2627,7 @@ const FALLBACK_THUMB_SVG = Buffer.from(
 // 🟢 In-memory caches to eliminate redundant network & DB roundtrips under high concurrency
 const existingR2Thumbs = new Set();
 const avatarUrlCache = new Map(); // identifier -> { targetUrl, expiresAt }
+const avatarBufferCache = new Map(); // identifier -> { buffer, expiresAt }
 
 app.get("/api/thumbnail", async (req, res) => {
   const { chat_id, message_id } = req.query;
@@ -2751,7 +2752,18 @@ const handleAvatarRequest = async (req, res) => {
 
     const cleanStr = String(rawId).trim();
 
-    // 🟢 1. Fast-Path: In-memory cache hit (1 hour TTL)
+    // 🟢 0. Ultra Fast-Path: In-memory image buffer cache hit (< 1ms instant delivery)
+    const cachedBuf = avatarBufferCache.get(cleanStr.toLowerCase());
+    if (cachedBuf && cachedBuf.expiresAt > Date.now()) {
+      res.set({
+        "Content-Type": "image/jpeg",
+        "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable", 
+        "Access-Control-Allow-Origin": "*"
+      });
+      return res.send(cachedBuf.buffer);
+    }
+
+    // 🟢 1. Fast-Path: In-memory redirect cache hit (1 hour TTL)
     const cached = avatarUrlCache.get(cleanStr);
     if (cached && cached.expiresAt > Date.now()) {
       res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" });
@@ -2840,13 +2852,22 @@ const handleAvatarRequest = async (req, res) => {
 
     const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId }, timeout: 5000 });
     const imageRes = await axios.get(`${TELEGRAM_FILE_API}/${fileRes.data.result.file_path}`, { responseType: "arraybuffer", timeout: 6000 });
-    
+    const imageBuffer = Buffer.from(imageRes.data);
+
+    // Cache image buffer in memory for 24 hours under all known aliases
+    const bufferEntry = { buffer: imageBuffer, expiresAt: Date.now() + 86400000 };
+    avatarBufferCache.set(cleanStr.toLowerCase(), bufferEntry);
+    if (numericId !== null) avatarBufferCache.set(String(numericId), bufferEntry);
+    if (userRow?.telegram_user_id) avatarBufferCache.set(String(userRow.telegram_user_id), bufferEntry);
+    if (userRow?.username) avatarBufferCache.set(userRow.username.toLowerCase(), bufferEntry);
+    if (userRow?.source_channel) avatarBufferCache.set(userRow.source_channel.toLowerCase(), bufferEntry);
+
     res.set({
       "Content-Type": "image/jpeg",
       "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable", 
       "Access-Control-Allow-Origin": "*"
     });
-    return res.send(Buffer.from(imageRes.data));
+    return res.send(imageBuffer);
   } catch (err) {
     // Ultimate Failsafe: Never show a broken image icon
     res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable" });

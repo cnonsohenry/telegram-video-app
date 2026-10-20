@@ -182,7 +182,9 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                 <img 
                   src={creator?.avatar_url || "/assets/default-avatar.png"} 
                   alt={creator?.display_name} 
-                  style={{ width: "48px", height: "48px", borderRadius: "50%", objectFit: "cover" }}
+                  loading="eager"
+                  decoding="async"
+                  style={{ width: "48px", height: "48px", borderRadius: "50%", objectFit: "cover", backgroundColor: "#27272a" }}
                   onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                 />
                 <div>
@@ -209,6 +211,8 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                   <img 
                     src={creator?.avatar_url || "/assets/default-avatar.png"} 
                     alt={creator?.display_name}
+                    loading="eager"
+                    decoding="async"
                     style={creatorSmallAvatarStyle}
                     onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                   />
@@ -307,7 +311,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                   rel="noopener noreferrer" 
                   style={openWalletBtnStyle}
                 >
-                  <ExternalLink size={16} color="#fff" />
+                  <ExternalLink size={16} color="#a1a1aa" />
                   <span>Open in Crypto Wallet App</span>
                 </a>
               )}
@@ -348,7 +352,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
               </div>
 
               <div style={securityRowStyle}>
-                <ShieldCheck size={14} color="#a1a1aa" />
+                <ShieldCheck size={14} color="#10b981" />
                 <span>Automated instant activation • Verified 256-bit checkout</span>
               </div>
             </div>
@@ -362,6 +366,8 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                 <img 
                   src={creator?.avatar_url || "/assets/default-avatar.png"} 
                   alt={creator?.display_name} 
+                  loading="eager"
+                  decoding="async"
                   style={creatorProfileAvatarStyle}
                   onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                 />
@@ -370,7 +376,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                     <span style={creatorNameStyle}>{creator?.display_name || creator?.username}</span>
                     <TwitterVerifiedBadge size={15} style={{ flexShrink: 0 }} />
                   </div>
-                  <span style={creatorMetaStyle}>@{creator?.username} • {creator?.creator_category || "Creator"}</span>
+                  <span style={creatorMetaStyle}>@{creator?.username}</span>
                   <div style={priceTagStyle}>
                     ${priceUsd}/mo
                   </div>
@@ -379,6 +385,10 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
 
               {/* Perks List */}
               <div style={perksContainerStyle}>
+                <div style={perkItemStyle}>
+                  <ShieldCheck size={16} color="#00aff0" />
+                  <span>100% Ad-Free VIP experience across all creator content</span>
+                </div>
                 <div style={perkItemStyle}>
                   <Lock size={16} color="#00aff0" />
                   <span>Full access to private photos, drops, and uncensored full videos</span>
@@ -389,7 +399,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                 </div>
                 <div style={perkItemStyle}>
                   <Star size={16} color="#00aff0" />
-                  <span>VIP badge on all comments and live updates for 30 days</span>
+                  <span>VIP badge on comments and instant Telegram leak updates</span>
                 </div>
               </div>
 
@@ -416,12 +426,11 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                         onClick={() => handleSelectCoin(coin.id)}
                         style={{
                           ...cryptoBtnStyle,
-                          background: coin.bg,
-                          color: coin.text,
                           gridColumn: coin.span === 2 ? "span 2" : "auto"
                         }}
                       >
-                        {coin.label}
+                        <span>{coin.label}</span>
+                        <span style={cryptoCoinBadgeStyle}>{coin.badge || "CRYPTO"}</span>
                       </button>
                     ))}
                   </div>
@@ -430,7 +439,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
 
               {/* Guarantee Footer */}
               <div style={guaranteeRowStyle}>
-                <ShieldCheck size={16} color="#f43f5e" />
+                <ShieldCheck size={16} color="#10b981" />
                 <span>Instant blockchain activation • 256-bit secure checkout</span>
               </div>
             </div>
@@ -518,7 +527,8 @@ const creatorProfileAvatarStyle = {
   height: "56px",
   borderRadius: "50%",
   objectFit: "cover",
-  border: "2px solid #00aff0"
+  border: "2px solid #00aff0",
+  backgroundColor: "#27272a"
 };
 
 const creatorNameStyle = { fontWeight: "800", fontSize: "15px", color: "#fff" };
@@ -558,17 +568,31 @@ const cryptoGridStyle = {
 };
 
 const cryptoBtnStyle = {
-  padding: "13px 12px",
-  borderRadius: "12px",
-  fontWeight: "800",
-  fontSize: "13px",
-  cursor: "pointer",
-  border: "none",
-  transition: "transform 0.15s ease, opacity 0.2s ease",
   display: "flex",
   alignItems: "center",
-  justifyContent: "center",
-  textAlign: "center"
+  justifyContent: "space-between",
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: "12px",
+  background: "#202024",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
+  color: "#f4f4f5",
+  fontSize: "13px",
+  fontWeight: "700",
+  cursor: "pointer",
+  transition: "all 0.15s ease",
+  boxSizing: "border-box"
+};
+
+const cryptoCoinBadgeStyle = {
+  fontSize: "10px",
+  fontWeight: "800",
+  letterSpacing: "0.5px",
+  padding: "3px 6px",
+  borderRadius: "6px",
+  background: "rgba(255, 255, 255, 0.06)",
+  border: "1px solid rgba(255, 255, 255, 0.1)",
+  color: "#a1a1aa"
 };
 
 const loaderBoxStyle = {
@@ -607,7 +631,8 @@ const creatorSmallAvatarStyle = {
   height: "36px",
   borderRadius: "50%",
   objectFit: "cover",
-  border: "1.5px solid #00aff0"
+  border: "1.5px solid #00aff0",
+  backgroundColor: "#27272a"
 };
 
 const networkAlertStyle = {
@@ -685,14 +710,16 @@ const openWalletBtnStyle = {
   alignItems: "center",
   justifyContent: "center",
   gap: "8px",
-  background: "linear-gradient(135deg, #00aff0, #0088cc)",
-  color: "#fff",
+  background: "#27272a",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
+  color: "#f4f4f5",
   borderRadius: "12px",
-  padding: "13px",
-  fontSize: "14px",
-  fontWeight: "800",
+  padding: "12px 16px",
+  fontSize: "13px",
+  fontWeight: "700",
   textDecoration: "none",
-  boxShadow: "0 4px 14px rgba(0, 175, 240, 0.25)"
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
+  transition: "all 0.15s ease"
 };
 
 const qrCardStyle = {

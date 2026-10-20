@@ -260,20 +260,22 @@ export default function PaywallModal({ onClose, user }) {
               </div>
 
               <div style={benefitsListStyle}>
-                <Benefit text="No ads, ever." />
-                <Benefit text="Access to the VIP Telegram Hub." />
-                <Benefit text="Full-length uncensored videos." />
+                <Benefit text="100% Ad-Free uninterrupted viewing." />
+                <Benefit text="Exclusive 4K Ultra HD homegrown videos." />
+                <Benefit text="Instant access to VIP Telegram Hub & leaks." />
+                <Benefit text="Full-length uncensored drops & downloads." />
+                <Benefit text="Priority creator direct chat access." />
               </div>
 
               <div style={actionColumnStyle}>
-                <button onClick={() => handleMethodSelect('crypto')} style={{...payButtonStyle, background: "#F7931A", color: "#000", boxShadow: "0 4px 15px rgba(247, 147, 26, 0.3)"}}>
-                  <Bitcoin size={20} color="#000" />
-                  Pay with Crypto
+                <button onClick={() => handleMethodSelect('crypto')} style={payMethodCryptoBtnStyle}>
+                  <Bitcoin size={20} color="#f59e0b" />
+                  <span>Pay with Crypto</span>
                 </button>
 
-                <button onClick={() => handleMethodSelect('transfer')} style={{...payButtonStyle, background: "#1a1a1a", border: "1px solid #333", color: "#fff"}}>
-                  <CreditCard size={20} color="#fff" />
-                  Pay with Bank Transfer
+                <button onClick={() => handleMethodSelect('transfer')} style={payMethodTransferBtnStyle}>
+                  <CreditCard size={20} color="#38bdf8" />
+                  <span>Pay with Bank Transfer</span>
                 </button>
               </div>
             </div>
@@ -333,19 +335,18 @@ export default function PaywallModal({ onClose, user }) {
                <h3 style={{color: "#fff", textAlign: "center", marginBottom: "15px", marginTop: "0", fontSize: "18px"}}>Select Cryptocurrency</h3>
                
                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                 {/* 🟢 THE FIX: Dynamic Crypto Buttons from Config */}
+                 {/* 🟢 Sleek dark buttons blending with modal aesthetics */}
                  {APP_CONFIG.cryptoOptions.map((coin) => (
                    <button 
                      key={coin.id}
                      onClick={() => generateCryptoAddress(coin.id)} 
                      style={{
                        ...cryptoGridButtonStyle, 
-                       background: coin.bg, 
-                       color: coin.text,
                        gridColumn: coin.span === 2 ? "span 2" : "auto"
                      }}
                    >
-                      {coin.label}
+                     <span>{coin.label}</span>
+                     <span style={cryptoCoinBadgeStyle}>{coin.badge || "CRYPTO"}</span>
                    </button>
                  ))}
                </div>
@@ -502,7 +503,7 @@ export default function PaywallModal({ onClose, user }) {
               </div>
 
               <div style={securityRowStyle}>
-                <ShieldCheck size={14} color="#a1a1aa" />
+                <ShieldCheck size={14} color="#10b981" />
                 <span>Automated instant activation • Verified 256-bit checkout</span>
               </div>
             </div>
@@ -522,7 +523,7 @@ export default function PaywallModal({ onClose, user }) {
 
           {verifyStatus === "success" && (
             <div style={{ textAlign: "center", padding: "30px 10px", margin: "auto" }}>
-              <CheckCircle2 size={64} color="#f43f5e" style={{ margin: "0 auto 20px auto" }} />
+              <CheckCircle2 size={64} color="#10b981" style={{ margin: "0 auto 20px auto" }} />
               <h2 style={titleStyle}>Payment Successful!</h2>
               <p style={subStyle}>Welcome to Premium. Refreshing your dashboard...</p>
             </div>
@@ -547,7 +548,7 @@ export default function PaywallModal({ onClose, user }) {
 
           <div style={footerStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#8e8e93", fontSize: "12px" }}>
-              <ShieldCheck size={14} color="#f43f5e" />
+              <ShieldCheck size={14} color="#10b981" />
               <span style={{ fontWeight: "600" }}>256-bit Secure</span>
             </div>
             <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
@@ -682,7 +683,69 @@ const copyBtnSuccessStyle = {
   flexShrink: 0
 };
 
-const cryptoGridButtonStyle = { display: "flex", alignItems: "center", justifyContent: "center", width: "100%", padding: "12px 10px", borderRadius: "10px", color: "#fff", border: "none", fontSize: "14px", fontWeight: "700", cursor: "pointer", transition: "transform 0.2s" };
+const cryptoGridButtonStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: "12px",
+  background: "#202024",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
+  color: "#f4f4f5",
+  fontSize: "13px",
+  fontWeight: "700",
+  cursor: "pointer",
+  transition: "all 0.15s ease",
+  boxSizing: "border-box"
+};
+
+const cryptoCoinBadgeStyle = {
+  fontSize: "10px",
+  fontWeight: "800",
+  letterSpacing: "0.5px",
+  padding: "3px 6px",
+  borderRadius: "6px",
+  background: "rgba(255, 255, 255, 0.06)",
+  border: "1px solid rgba(255, 255, 255, 0.1)",
+  color: "#a1a1aa"
+};
+
+const payMethodCryptoBtnStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "10px",
+  width: "100%",
+  padding: "15px",
+  borderRadius: "14px",
+  background: "#202024",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
+  color: "#f4f4f5",
+  fontSize: "15px",
+  fontWeight: "800",
+  cursor: "pointer",
+  transition: "all 0.15s ease",
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)"
+};
+
+const payMethodTransferBtnStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "10px",
+  width: "100%",
+  padding: "15px",
+  borderRadius: "14px",
+  background: "#202024",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
+  color: "#f4f4f5",
+  fontSize: "15px",
+  fontWeight: "800",
+  cursor: "pointer",
+  transition: "all 0.15s ease",
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)"
+};
 
 const invoiceHeaderCard = {
   display: "flex",
@@ -737,14 +800,16 @@ const openWalletBtnStyle = {
   alignItems: "center",
   justifyContent: "center",
   gap: "8px",
-  background: "linear-gradient(135deg, #f7931a, #e67e22)",
-  color: "#fff",
+  background: "#27272a",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
+  color: "#f4f4f5",
   borderRadius: "12px",
-  padding: "13px",
-  fontSize: "14px",
-  fontWeight: "800",
+  padding: "12px 16px",
+  fontSize: "13px",
+  fontWeight: "700",
   textDecoration: "none",
-  boxShadow: "0 4px 14px rgba(247, 147, 26, 0.25)"
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
+  transition: "all 0.15s ease"
 };
 
 const qrCardStyle = {
