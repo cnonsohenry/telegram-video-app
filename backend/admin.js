@@ -485,7 +485,7 @@ export async function migrateLegacyVipToCreator(poolInstance) {
     const targetCreatorRes = await db.query(
       `SELECT id, username, telegram_user_id, subscription_price 
        FROM app_users 
-       WHERE telegram_user_id = 1881815190 
+       WHERE telegram_user_id IN (1881815190, -1004344719694)
           OR LOWER(username) = 'naijahomemade'
        ORDER BY id ASC
        LIMIT 1`
@@ -496,11 +496,11 @@ export async function migrateLegacyVipToCreator(poolInstance) {
       const insRes = await db.query(
         `INSERT INTO app_users (
            username, display_name, email, is_creator, is_managed, 
-           telegram_user_id, creator_category, subscription_price, is_verified, 
+           telegram_user_id, source_channel, creator_category, subscription_price, is_verified, 
            banner_url, creator_bio, avatar_url
          ) VALUES (
-           'naijahomemade', 'Naija Homemade Series', 'tg_1881815190@internal.naijahomemade.com',
-           TRUE, TRUE, 1881815190, 'Official VIP', 15, TRUE,
+           'naijahomemade', 'Naija Homemade Series', 'tg_naijahomemade@internal.naijahomemade.com',
+           TRUE, TRUE, -1004344719694, '-1004344719694', 'Official VIP', 15, TRUE,
            'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
            'Official Naija Homemade VIP channel. All exclusive premium drops and uncut releases.',
            'https://naijahomemade.com/assets/default-avatar.png'
@@ -516,7 +516,8 @@ export async function migrateLegacyVipToCreator(poolInstance) {
         `UPDATE app_users 
          SET is_creator = TRUE, 
              is_managed = TRUE, 
-             telegram_user_id = 1881815190,
+             telegram_user_id = -1004344719694,
+             source_channel = '-1004344719694',
              display_name = COALESCE(display_name, 'Naija Homemade Series'),
              creator_category = COALESCE(creator_category, 'Official VIP'),
              subscription_price = CASE WHEN subscription_price IS NULL OR subscription_price = 0 THEN 15 ELSE subscription_price END,
@@ -526,27 +527,27 @@ export async function migrateLegacyVipToCreator(poolInstance) {
       );
     }
 
-    // 1b. Ensure Telegram user 1881815190 exists in users table so JOINs succeed
+    // 1b. Ensure Telegram channel -1004344719694 exists in users table so JOINs succeed
     await db.query(
       `INSERT INTO users (user_id, username, full_name)
-       VALUES (1881815190, 'naijahomemade', 'Naija Homemade Series')
+       VALUES (-1004344719694, 'naijahomemade', 'Naija Homemade Series')
        ON CONFLICT (user_id) DO UPDATE 
        SET username = 'naijahomemade', full_name = 'Naija Homemade Series'`
     );
 
-    // 2. Move legacy Telegram VIP videos to @naijahomemade (Telegram ID 1881815190)
+    // 2. Move legacy Telegram VIP videos to @naijahomemade (Channel ID -1004344719694)
     // CRITICAL: NEVER overwrite web creator uploads (chat_id = 'internal' or cloudflare_id starting with 'r2:')
     // and NEVER overwrite videos that already have a valid uploader assigned!
     const vidsUpdateRes = await db.query(
       `UPDATE videos 
-       SET uploader_id = '1881815190' 
+       SET uploader_id = '-1004344719694' 
        WHERE LOWER(category) = 'premium' 
          AND (chat_id IS NULL OR chat_id != 'internal')
          AND (cloudflare_id IS NULL OR NOT cloudflare_id LIKE 'r2:%')
-         AND (uploader_id IS NULL OR uploader_id = 0 OR uploader_id = 458)`
+         AND (uploader_id IS NULL OR uploader_id = 0 OR uploader_id = 458 OR uploader_id = 1881815190)`
     );
     const videosMoved = vidsUpdateRes.rowCount || 0;
-    console.log(`[MIGRATE VIP] Reassigned ${videosMoved} unassigned legacy premium videos to @naijahomemade (1881815190).`);
+    console.log(`[MIGRATE VIP] Reassigned ${videosMoved} unassigned legacy premium videos to @naijahomemade (-1004344719694).`);
 
     // 3. Move all existing VIP/Premium users into creator_subscriptions for @naijahomemade
     const subsRes = await db.query(

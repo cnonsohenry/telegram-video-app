@@ -1295,7 +1295,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       String(creator.telegram_user_id) === "-1004344719694" ||
       String(creator.id) === "458";
 
-    if (isNaijaHomemade && !creator.telegram_user_id) {
+    if (isNaijaHomemade) {
       creator.telegram_user_id = -1004344719694;
     }
 
@@ -2267,7 +2267,7 @@ router.get("/:username/videos", async (req, res) => {
       String(creatorTgId) === "-1004344719694" ||
       String(creatorId) === "458";
 
-    if (isNaijaHomemade && !creatorTgId) {
+    if (isNaijaHomemade) {
       creatorTgId = -1004344719694;
     }
 
