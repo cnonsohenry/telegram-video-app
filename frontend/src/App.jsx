@@ -18,7 +18,7 @@ import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
 import { APP_CONFIG } from "./config";
 import { isUserSubscribedToCreator, getVideoCreatorHandle, isUserAdExempt } from "./utils/subscription";
-import { triggerSmartlinkIfEligible, syncVipAdFreeState } from "./utils/adManager";
+import { triggerSmartlinkIfEligible, syncVipAdFreeState, suppressAdsPostLogin } from "./utils/adManager";
 import { showToast, promptLogin } from "./utils/toast";
 
 export default function App() {
@@ -797,6 +797,7 @@ export default function App() {
     localStorage.setItem("token", userToken);
     setToken(userToken);
     setUser(userData);
+    suppressAdsPostLogin(30);
     if (userData.settings?.theme) applyTheme(userData.settings.theme);
     window.dispatchEvent(new CustomEvent("refreshUser", { detail: userData }));
 
@@ -813,6 +814,9 @@ export default function App() {
 
   const onLogout = useCallback(() => {
     localStorage.removeItem("token");
+    localStorage.removeItem("post_login_ad_free");
+    localStorage.removeItem("last_login_timestamp");
+    localStorage.removeItem("vip_ad_free");
     setToken(null);
     setUser(null);
     handleTabSwitch("home", true);
@@ -1120,9 +1124,13 @@ export default function App() {
       {/* 🟢 TOP-LEVEL AUTH MODAL (ALWAYS ON TOP OF PLAYERS AND MODALS) */}
       {showAuthModal && !isLoggedIn && (
         createPortal(
-          <div style={{ position: "fixed", inset: 0, zIndex: 1000350 }}>
+          <div 
+            style={{ position: "fixed", inset: 0, zIndex: 1000350 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <AuthForm 
               onLoginSuccess={(u, t) => {
+                suppressAdsPostLogin(30);
                 onLoginSuccess(u, t);
                 handleCloseAuthModal();
               }} 

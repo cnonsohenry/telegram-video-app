@@ -15,6 +15,7 @@ import { isUserAdExempt } from "./subscription";
 import { adReturnWatcher } from "./adReturnWatcher";
 
 const DEFAULT_SMARTLINK_URL = "https://www.effectivegatecpm.com/wmmi5uv2w5?key=23fa23a9f5a389595c81f702d570419b";
+export const POST_LOGIN_GRACE_MINUTES = 30;
 
 export function getSmartlinkUrl() {
   return APP_CONFIG?.ads?.smartlinkUrl || DEFAULT_SMARTLINK_URL;
@@ -30,6 +31,47 @@ export function getMinCooldownMs() {
 }
 
 /**
+ * Checks whether the user is currently within an ad-free grace window after logging in.
+ * Prevents any ads, popunders, or smartlinks from ruining the onboarding/login trust experience.
+ */
+export function isPostLoginAdGraceActive() {
+  try {
+    const isFlagged = localStorage.getItem("post_login_ad_free") === "true";
+    const lastLogin = parseInt(localStorage.getItem("last_login_timestamp") || "0", 10);
+    const graceMs = POST_LOGIN_GRACE_MINUTES * 60 * 1000;
+    if (isFlagged || (!isNaN(lastLogin) && lastLogin > 0 && (Date.now() - lastLogin) < graceMs)) {
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+/**
+ * Suppress all ads, popunders, and smartlinks immediately upon user authentication.
+ * Enforces a post-login immunity window (default 30 mins) and resets ad triggers.
+ */
+export function suppressAdsPostLogin(durationMinutes = POST_LOGIN_GRACE_MINUTES) {
+  try {
+    const now = Date.now();
+    localStorage.setItem("last_login_timestamp", now.toString());
+    localStorage.setItem("post_login_ad_free", "true");
+    localStorage.setItem("last_smartlink_timestamp", now.toString());
+    localStorage.setItem("last_ad_timestamp", now.toString());
+    localStorage.setItem("ad_frequency_counter", "0");
+    localStorage.setItem("vip_ad_free", "true");
+
+    if (window.popMagic) {
+      try {
+        window.popMagic.config.capping_enabled = true;
+        window.popMagic.open_count = 999999;
+      } catch (e) {}
+    }
+  } catch (e) {
+    console.warn("[AD MANAGER] Failed to set post-login ad suppression:", e);
+  }
+}
+
+/**
  * Check if the user is eligible for an ad and triggers the smartlink if so.
  * Returns true if an ad was displayed, false if skipped.
  */
@@ -39,19 +81,24 @@ export async function triggerSmartlinkIfEligible(user) {
     return false;
   }
 
-  // 2. Increment global video watch count
+  // 2. Post-Login Ad Immunity (Never fire an ad right after signing in with Google or Email!)
+  if (isPostLoginAdGraceActive()) {
+    return false;
+  }
+
+  // 3. Increment global video watch count
   const rawCount = parseInt(localStorage.getItem("ad_frequency_counter") || "0", 10);
   const currentCount = isNaN(rawCount) ? 0 : rawCount;
   const nextCount = currentCount + 1;
   localStorage.setItem("ad_frequency_counter", nextCount.toString());
 
-  // 3. Frequency check (e.g. video #6, #12, #18)
+  // 4. Frequency check (e.g. video #6, #12, #18)
   const frequency = getAdFrequency();
   if (nextCount < frequency || nextCount % frequency !== 0) {
     return false;
   }
 
-  // 4. Cooldown time check (prevents rapid-fire popups if browsing quickly)
+  // 5. Cooldown time check (prevents rapid-fire popups if browsing quickly)
   const lastSmartlinkTime = parseInt(localStorage.getItem("last_smartlink_timestamp") || "0", 10);
   const lastGlobalAdTime = parseInt(localStorage.getItem("last_ad_timestamp") || "0", 10);
   const lastAdTime = Math.max(lastSmartlinkTime, lastGlobalAdTime);
@@ -61,7 +108,7 @@ export async function triggerSmartlinkIfEligible(user) {
     return false;
   }
 
-  // 5. Eligible! Record timestamp, mark mutual exclusion flag, and open smartlink
+  // 6. Eligible! Record timestamp, mark mutual exclusion flag, and open smartlink
   localStorage.setItem("last_smartlink_timestamp", now.toString());
   localStorage.setItem("last_ad_timestamp", now.toString());
   sessionStorage.setItem("just_saw_smartlink", "true");
@@ -86,13 +133,18 @@ export function shouldPlayVastAd(user) {
     return false;
   }
 
-  // 2. Strict Mutual Exclusion: If a Smartlink just opened on this video click, skip VAST!
+  // 2. Post-Login Ad Immunity
+  if (isPostLoginAdGraceActive()) {
+    return false;
+  }
+
+  // 3. Strict Mutual Exclusion: If a Smartlink just opened on this video click, skip VAST!
   if (sessionStorage.getItem("just_saw_smartlink") === "true") {
     sessionStorage.removeItem("just_saw_smartlink");
     return false;
   }
 
-  // 3. Grace period check: hook users with initial free videos
+  // 4. Grace period check: hook users with initial free videos
   const rawCount = parseInt(localStorage.getItem("ad_frequency_counter") || "0", 10);
   const currentCount = isNaN(rawCount) ? 0 : rawCount;
   const initialFree = Number(APP_CONFIG?.ads?.initialFreeVideos) || 2;
@@ -140,6 +192,10 @@ export function getVastConfig() {
  * Directly opens the smartlink in a new tab or via Telegram WebApp
  */
 export function openSmartlink() {
+  if (isPostLoginAdGraceActive()) {
+    console.log("[AD MANAGER] Suppressed openSmartlink during post-login grace");
+    return;
+  }
   const adUrl = getSmartlinkUrl();
 
   if (window.Telegram?.WebApp?.openLink) {
@@ -161,7 +217,9 @@ export const openRewardedAd = openSmartlink;
  */
 export function syncVipAdFreeState(user) {
   const isExempt = isUserAdExempt(user);
-  if (isExempt) {
+  const isGraceActive = isPostLoginAdGraceActive();
+  
+  if (isExempt || isGraceActive) {
     localStorage.setItem("vip_ad_free", "true");
     if (window.popMagic) {
       try {
@@ -172,5 +230,5 @@ export function syncVipAdFreeState(user) {
   } else {
     localStorage.removeItem("vip_ad_free");
   }
-  return isExempt;
+  return isExempt || isGraceActive;
 }

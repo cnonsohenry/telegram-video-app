@@ -5,6 +5,7 @@ import { Eye, EyeOff, Loader2, Check, X, AlertCircle, Sparkles } from "lucide-re
 import { APP_CONFIG } from "../config";
 // 🟢 IMPORT LegalFooter
 import LegalFooter from "./LegalFooter";
+import { suppressAdsPostLogin } from "../utils/adManager";
 
 const CREATOR_CATEGORIES = [
   "Model & Glamour",
@@ -203,6 +204,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
       if (!res.ok) throw new Error(data.error || "Google login failed");
       
       isSucceeded.current = true;
+      suppressAdsPostLogin(30);
       onLoginSuccess(data.user, data.token);
     } catch (err) {
       if (!isSucceeded.current) setError(err.message);
@@ -252,6 +254,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
       if (!res.ok) throw new Error(data.error || "Authentication failed");
 
       isSucceeded.current = true;
+      suppressAdsPostLogin(30);
       onLoginSuccess(data.user, data.token);
     } catch (err) {
       if (!isSucceeded.current) setError(err.message);
@@ -301,7 +304,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
     formData.password.length < 6;
 
   return (
-    <div style={loginContainerStyle}>
+    <div style={loginContainerStyle} onClick={(e) => e.stopPropagation()}>
       
       {/* Top Bar with Close Button */}
       <div style={topBarStyle}>
@@ -470,6 +473,9 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
               <div 
                 ref={googleSignInRef}
                 id="googleSignInDiv" 
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 style={{ width: "100%", display: "flex", justifyContent: "center", minHeight: "45px", marginBottom: "20px" }}
               ></div>
             </>
