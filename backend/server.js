@@ -3117,7 +3117,7 @@ app.use((req, res, next) => {
           '@id': `${frontendUrl}/#organization`,
           name: appName,
           url: frontendUrl,
-          logo: `${frontendUrl}/logo-512.png`
+          logo: `${frontendUrl}/logo-512.png?v=3`
         }
       ]
     };
@@ -3125,7 +3125,7 @@ app.use((req, res, next) => {
     const seoTags = buildSeoTags({
       pageTitle,
       description,
-      thumbUrl: `${frontendUrl}/logo-512.png`,
+      thumbUrl: `${frontendUrl}/logo-512.png?v=3`,
       canonicalUrl,
       appName,
       schema,
