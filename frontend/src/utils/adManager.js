@@ -47,6 +47,48 @@ export function isPostLoginAdGraceActive() {
 }
 
 /**
+ * Close any ad popunder or popup windows that were opened by script earlier in the session.
+ * Eliminates the issue where the browser defaults to an ad tab after Google OAuth closes.
+ */
+export function closeOpenedAdWindows() {
+  try {
+    if (typeof window !== "undefined" && window.__openedAdWindows && Array.isArray(window.__openedAdWindows)) {
+      window.__openedAdWindows.forEach(win => {
+        try {
+          if (win && !win.closed && typeof win.close === "function") {
+            win.close();
+          }
+        } catch (e) {}
+      });
+      window.__openedAdWindows = [];
+    }
+  } catch (e) {}
+}
+
+/**
+ * Aggressively refocuses the current website window across multiple animation frames.
+ * Ensures the website tab regains focus immediately after Google OAuth popup closes.
+ */
+export function refocusWebsiteWindow() {
+  try {
+    if (typeof window !== "undefined" && typeof window.focus === "function") {
+      window.focus();
+    }
+  } catch (e) {}
+  if (typeof window !== "undefined") {
+    [50, 150, 300, 600, 1200].forEach(delay => {
+      setTimeout(() => {
+        try {
+          if (typeof window.focus === "function") {
+            window.focus();
+          }
+        } catch (e) {}
+      }, delay);
+    });
+  }
+}
+
+/**
  * Suppress all ads, popunders, and smartlinks immediately upon user authentication.
  * Enforces a post-login immunity window (default 30 mins) and resets ad triggers.
  */
@@ -60,10 +102,18 @@ export function suppressAdsPostLogin(durationMinutes = POST_LOGIN_GRACE_MINUTES)
     localStorage.setItem("ad_frequency_counter", "0");
     localStorage.setItem("vip_ad_free", "true");
 
+    // 1. Close any previously opened ad tabs so browser cannot default to them
+    closeOpenedAdWindows();
+
+    // 2. Reclaim window focus immediately
+    refocusWebsiteWindow();
+
+    // 3. Neutralize in-memory popMagic
     if (window.popMagic) {
       try {
         window.popMagic.config.capping_enabled = true;
         window.popMagic.open_count = 999999;
+        window.popMagic.shouldShow = function() { return false; };
       } catch (e) {}
     }
   } catch (e) {
@@ -203,7 +253,13 @@ export function openSmartlink() {
       try_instant_view: false,
     });
   } else {
-    window.open(adUrl, "_blank");
+    try {
+      const win = window.open(adUrl, "_blank");
+      if (win) {
+        window.__openedAdWindows = window.__openedAdWindows || [];
+        window.__openedAdWindows.push(win);
+      }
+    } catch (e) {}
   }
 }
 

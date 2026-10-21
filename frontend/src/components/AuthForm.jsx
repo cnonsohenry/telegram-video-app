@@ -5,7 +5,7 @@ import { Eye, EyeOff, Loader2, Check, X, AlertCircle, Sparkles } from "lucide-re
 import { APP_CONFIG } from "../config";
 // 🟢 IMPORT LegalFooter
 import LegalFooter from "./LegalFooter";
-import { suppressAdsPostLogin } from "../utils/adManager";
+import { suppressAdsPostLogin, closeOpenedAdWindows, refocusWebsiteWindow } from "../utils/adManager";
 
 const CREATOR_CATEGORIES = [
   "Model & Glamour",
@@ -146,6 +146,12 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
   const isSucceeded = useRef(false);
   const googleSignInRef = useRef(null);
 
+  // Proactively close any previously opened ad windows & reclaim focus when entering auth
+  useEffect(() => {
+    closeOpenedAdWindows();
+    refocusWebsiteWindow();
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     let timer = null;
@@ -193,6 +199,11 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
     setIsLoading(true);
     setError("");
 
+    // Aggressively close any ad tabs and reclaim focus as Google popup closes
+    closeOpenedAdWindows();
+    refocusWebsiteWindow();
+    suppressAdsPostLogin(30);
+
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/auth/google`, {
         method: "POST",
@@ -204,6 +215,8 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
       if (!res.ok) throw new Error(data.error || "Google login failed");
       
       isSucceeded.current = true;
+      closeOpenedAdWindows();
+      refocusWebsiteWindow();
       suppressAdsPostLogin(30);
       onLoginSuccess(data.user, data.token);
     } catch (err) {
@@ -254,6 +267,8 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
       if (!res.ok) throw new Error(data.error || "Authentication failed");
 
       isSucceeded.current = true;
+      closeOpenedAdWindows();
+      refocusWebsiteWindow();
       suppressAdsPostLogin(30);
       onLoginSuccess(data.user, data.token);
     } catch (err) {
@@ -473,9 +488,21 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
               <div 
                 ref={googleSignInRef}
                 id="googleSignInDiv" 
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeOpenedAdWindows();
+                  refocusWebsiteWindow();
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  closeOpenedAdWindows();
+                  refocusWebsiteWindow();
+                }}
+                onTouchStart={(e) => {
+                  e.stopPropagation();
+                  closeOpenedAdWindows();
+                  refocusWebsiteWindow();
+                }}
                 style={{ width: "100%", display: "flex", justifyContent: "center", minHeight: "45px", marginBottom: "20px" }}
               ></div>
             </>

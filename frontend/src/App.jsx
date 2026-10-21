@@ -18,7 +18,7 @@ import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
 
 import { APP_CONFIG } from "./config";
 import { isUserSubscribedToCreator, getVideoCreatorHandle, isUserAdExempt } from "./utils/subscription";
-import { triggerSmartlinkIfEligible, syncVipAdFreeState, suppressAdsPostLogin } from "./utils/adManager";
+import { triggerSmartlinkIfEligible, syncVipAdFreeState, suppressAdsPostLogin, closeOpenedAdWindows, refocusWebsiteWindow } from "./utils/adManager";
 import { showToast, promptLogin } from "./utils/toast";
 
 export default function App() {
@@ -797,6 +797,8 @@ export default function App() {
     localStorage.setItem("token", userToken);
     setToken(userToken);
     setUser(userData);
+    closeOpenedAdWindows();
+    refocusWebsiteWindow();
     suppressAdsPostLogin(30);
     if (userData.settings?.theme) applyTheme(userData.settings.theme);
     window.dispatchEvent(new CustomEvent("refreshUser", { detail: userData }));
