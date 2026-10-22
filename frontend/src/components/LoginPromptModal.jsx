@@ -1,19 +1,11 @@
 import { createPortal } from "react-dom";
-import { useEffect } from "react";
 import { 
   X, Heart, MessageCircle, Bookmark, UserPlus, Crown, Lock, ArrowRight, Sparkles 
 } from "lucide-react";
 import useModalHistory from "../hooks/useModalHistory";
-import { closeOpenedAdWindows } from "../utils/adManager";
 
 export default function LoginPromptModal({ isOpen, action = "continue", onClose, onLogin }) {
   const handleSafeClose = useModalHistory(isOpen, onClose, "loginPrompt");
-
-  useEffect(() => {
-    if (isOpen) {
-      closeOpenedAdWindows();
-    }
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
