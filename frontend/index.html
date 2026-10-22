@@ -442,25 +442,27 @@
               while (window.__openedAdWindows.length > 0) {
                 var win = window.__openedAdWindows.shift();
                 try {
-                  if (win && !win.closed) {
-                    win.close();
-                  }
+                  win.close();
                 } catch(e) {}
               }
             }
             if (window.__exoClickWindow) {
               try {
-                if (!window.__exoClickWindow.closed) {
-                  window.__exoClickWindow.close();
-                }
+                window.__exoClickWindow.close();
               } catch(e) {}
               window.__exoClickWindow = null;
+            }
+            if (window.__lastSmartlinkWindow) {
+              try {
+                window.__lastSmartlinkWindow.close();
+              } catch(e) {}
+              window.__lastSmartlinkWindow = null;
             }
           } catch(e) {}
         };
 
         window.open = function(url, target, features) {
-          var isAdUrl = typeof url === "string" && /pemsrv|magsrv|adsco\.re|effectivegatecpm|exoclick/i.test(url);
+          var isAdUrl = typeof url === "string" && /auctionr|pemsrv|magsrv|adsco\.re|effectivegatecpm|exoclick/i.test(url);
           if (typeof url === "string" && (target === "_self" || target === "_top" || !target)) {
             if (isAdUrl) {
               var w = originalOpen.call(window, url, "_blank", features);

@@ -146,6 +146,13 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
   const googleSignInRef = useRef(null);
 
   useEffect(() => {
+    // 🟢 Immediately close any background ad tabs (ExoClick/Smartlink) so they never steal focus
+    if (typeof window !== "undefined" && window.__closeAdWindows) {
+      window.__closeAdWindows();
+    }
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
     let timer = null;
 

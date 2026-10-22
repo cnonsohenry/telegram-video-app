@@ -67,8 +67,13 @@ export async function triggerSmartlinkIfEligible(user) {
   sessionStorage.setItem("just_saw_smartlink", "true");
 
   try {
-    openSmartlink();
+    const adWin = openSmartlink();
     await adReturnWatcher();
+    if (adWin) {
+      try {
+        adWin.close();
+      } catch (e) {}
+    }
     return true;
   } catch (err) {
     console.warn("[AD MANAGER] Error during ad display:", err);
@@ -149,8 +154,11 @@ export function openSmartlink() {
   } else {
     try {
       const w = window.open(adUrl, "_blank");
-      if (w && typeof window !== "undefined" && window.__openedAdWindows) {
-        window.__openedAdWindows.push(w);
+      if (w && typeof window !== "undefined") {
+        window.__lastSmartlinkWindow = w;
+        if (window.__openedAdWindows) {
+          window.__openedAdWindows.push(w);
+        }
       }
       return w;
     } catch (e) {
