@@ -146,13 +146,6 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
   const googleSignInRef = useRef(null);
 
   useEffect(() => {
-    // 🟢 Immediately close any background ad tabs (ExoClick/Smartlink) so they never steal focus
-    if (typeof window !== "undefined" && window.__closeAdWindows) {
-      window.__closeAdWindows();
-    }
-  }, []);
-
-  useEffect(() => {
     let isMounted = true;
     let timer = null;
 
@@ -182,12 +175,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
               theme: "outline", 
               size: "large", 
               shape: "pill", 
-              width: "310",
-              click_listener: () => {
-                if (typeof window !== "undefined" && window.__closeAdWindows) {
-                  window.__closeAdWindows();
-                }
-              }
+              width: "310"
             }
           );
         }
@@ -215,15 +203,6 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
     setIsLoading(true);
     setError("");
 
-    // 🟢 Close any background ad window immediately as the Google popup completes
-    if (typeof window !== "undefined" && window.__closeAdWindows) {
-      window.__closeAdWindows();
-    }
-
-    try {
-      window.focus();
-    } catch (e) {}
-
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/auth/google`, {
         method: "POST",
@@ -235,10 +214,6 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
       if (!res.ok) throw new Error(data.error || "Google login failed");
       
       isSucceeded.current = true;
-      if (typeof window !== "undefined" && window.__closeAdWindows) {
-        window.__closeAdWindows();
-      }
-      try { window.focus(); } catch (e) {}
       onLoginSuccess(data.user, data.token);
     } catch (err) {
       if (!isSucceeded.current) setError(err.message);
@@ -250,10 +225,6 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSucceeded.current) return;
-
-    if (typeof window !== "undefined" && window.__closeAdWindows) {
-      window.__closeAdWindows();
-    }
 
     const isCreatingAccount = authTab === "creator" || isRegistering;
 
@@ -510,25 +481,6 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
               <div 
                 ref={googleSignInRef}
                 id="googleSignInDiv" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (typeof window !== "undefined" && window.__closeAdWindows) {
-                    window.__closeAdWindows();
-                  }
-                  try { window.focus(); } catch (err) {}
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  if (typeof window !== "undefined" && window.__closeAdWindows) {
-                    window.__closeAdWindows();
-                  }
-                }}
-                onTouchStart={(e) => {
-                  e.stopPropagation();
-                  if (typeof window !== "undefined" && window.__closeAdWindows) {
-                    window.__closeAdWindows();
-                  }
-                }}
                 style={{ width: "100%", display: "flex", justifyContent: "center", minHeight: "45px", marginBottom: "20px" }}
               ></div>
             </>

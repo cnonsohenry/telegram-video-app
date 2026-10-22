@@ -67,13 +67,8 @@ export async function triggerSmartlinkIfEligible(user) {
   sessionStorage.setItem("just_saw_smartlink", "true");
 
   try {
-    const adWin = openSmartlink();
+    openSmartlink();
     await adReturnWatcher();
-    if (adWin) {
-      try {
-        adWin.close();
-      } catch (e) {}
-    }
     return true;
   } catch (err) {
     console.warn("[AD MANAGER] Error during ad display:", err);
@@ -153,15 +148,7 @@ export function openSmartlink() {
     });
   } else {
     try {
-      const targetName = "naijahomemade_ad";
-      const w = window.open(adUrl, targetName);
-      if (w && typeof window !== "undefined") {
-        window.__lastSmartlinkWindow = w;
-        if (window.__openedAdWindows) {
-          window.__openedAdWindows.push(w);
-        }
-      }
-      return w;
+      return window.open(adUrl, "_blank");
     } catch (e) {
       console.warn("[AD MANAGER] openSmartlink error:", e);
     }

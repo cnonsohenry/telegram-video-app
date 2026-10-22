@@ -804,9 +804,6 @@ export default function App() {
   }, []);
 
   const onLoginSuccess = (userData, userToken) => {
-    if (typeof window !== "undefined" && window.__closeAdWindows) {
-      window.__closeAdWindows();
-    }
     localStorage.setItem("token", userToken);
     setToken(userToken);
     setUser(userData);

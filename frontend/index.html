@@ -431,70 +431,20 @@
       });
     </script>
 
-    <!-- Defensive Protection against Ad Back-Button Hijacking & Focus Tracker -->
+    <!-- Defensive Protection against Ad Back-Button Hijacking -->
     <script type="application/javascript">
       (function() {
         var originalOpen = window.open;
-        window.__openedAdWindows = window.__openedAdWindows || [];
-        window.__closeAdWindows = function() {
-          try {
-            if (window.__openedAdWindows && Array.isArray(window.__openedAdWindows)) {
-              while (window.__openedAdWindows.length > 0) {
-                var win = window.__openedAdWindows.shift();
-                try {
-                  win.close();
-                } catch(e) {}
-              }
-            }
-            if (window.__exoClickWindow) {
-              try {
-                window.__exoClickWindow.close();
-              } catch(e) {}
-              window.__exoClickWindow = null;
-            }
-            if (window.__lastSmartlinkWindow) {
-              try {
-                window.__lastSmartlinkWindow.close();
-              } catch(e) {}
-              window.__lastSmartlinkWindow = null;
-            }
-            try {
-              var namedWin = originalOpen.call(window, "", "naijahomemade_ad");
-              if (namedWin) {
-                namedWin.close();
-              }
-            } catch(e) {}
-          } catch(e) {}
-        };
-
-        // 🟢 Automatically clean up background ad tabs as soon as the user returns to the website
-        document.addEventListener("visibilitychange", function() {
-          if (document.visibilityState === "visible") {
-            setTimeout(function() {
-              if (window.__closeAdWindows) window.__closeAdWindows();
-            }, 500);
-          }
-        });
-        window.addEventListener("focus", function() {
-          setTimeout(function() {
-            if (window.__closeAdWindows) window.__closeAdWindows();
-          }, 500);
-        });
+        window.__closeAdWindows = function() {};
 
         window.open = function(url, target, features) {
           var isAdUrl = typeof url === "string" && /auctionr|pemsrv|magsrv|adsco\.re|effectivegatecpm|exoclick/i.test(url);
           if (typeof url === "string" && (target === "_self" || target === "_top" || !target)) {
             if (isAdUrl) {
-              var w = originalOpen.call(window, url, "_blank", features);
-              if (w) window.__openedAdWindows.push(w);
-              return w;
+              return originalOpen.call(window, url, "_blank", features);
             }
           }
-          var win = originalOpen.apply(window, arguments);
-          if (isAdUrl && win) {
-            window.__openedAdWindows.push(win);
-          }
-          return win;
+          return originalOpen.apply(window, arguments);
         };
       })();
     </script>
