@@ -84,6 +84,7 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 
 // 🛡️ SECURITY: Dedicated Rate Limiters for Public & High-Frequency Endpoints
 export const commentLimiter = rateLimit({

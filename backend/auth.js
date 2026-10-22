@@ -184,70 +184,90 @@ export const getUserFollowersCount = async (userId, telegramUserId = null) => {
   }
 };
 
-// 🟢 3. GOOGLE LOGIN
+// Helper to process and upsert Google OAuth user
+async function processGoogleIdToken(token) {
+  const ticket = await googleClient.verifyIdToken({
+    idToken: token,
+    audience: GOOGLE_CLIENT_ID,
+  });
+  
+  const payload = ticket.getPayload();
+  const { email, name, picture, sub: googleId } = payload;
+
+  let baseUsername = (name || email.split('@')[0])
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 30);
+  if (!baseUsername || baseUsername.length < 3) baseUsername = `user_${Date.now().toString().slice(-6)}`;
+
+  let finalUsername = baseUsername;
+  const existingUser = await pool.query("SELECT id, username FROM app_users WHERE email = $1", [email]);
+  if (existingUser.rows.length > 0) {
+    finalUsername = existingUser.rows[0].username;
+  } else {
+    const usernameCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [finalUsername]);
+    if (usernameCheck.rows.length > 0) {
+      finalUsername = `${baseUsername.slice(0, 24)}_${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+  }
+
+  const userQuery = await pool.query(
+    `INSERT INTO app_users (email, username, display_name, avatar_url, google_id, email_verified) 
+     VALUES ($1, $2, $3, $4, $5, TRUE) 
+     ON CONFLICT (email) DO UPDATE 
+     SET avatar_url = COALESCE(EXCLUDED.avatar_url, app_users.avatar_url), 
+         google_id = COALESCE(app_users.google_id, EXCLUDED.google_id),
+         email_verified = TRUE
+     RETURNING id, email, username, avatar_url, role, settings, is_premium,
+               is_creator, display_name, creator_bio, banner_url, creator_category, 
+               subscription_price, social_links, is_verified, location, website,
+               email_verified, kyc_status, kyc_rejection_reason, kyc_verified_at, telegram_user_id`,
+    [email, finalUsername, name || finalUsername, picture, googleId]
+  );
+
+  const user = userQuery.rows[0];
+  const [userSubs, userFolls, followersCnt] = await Promise.all([
+    getUserSubscriptions(user.id),
+    getUserFollows(user.id),
+    getUserFollowersCount(user.id, user.telegram_user_id)
+  ]);
+  user.subscriptions = userSubs;
+  user.follows = userFolls;
+  user.followers_count = followersCnt;
+  user.following_count = userFolls.length;
+  const appToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "30d" });
+
+  return { token: appToken, user };
+}
+
+// 🟢 3. GOOGLE LOGIN (JSON / Popup / FedCM)
 router.post("/google", async (req, res) => {
   const parsed = googleSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error?.issues?.[0]?.message || "Invalid input" });
   }
 
-  const { token } = parsed.data;
-
   try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: GOOGLE_CLIENT_ID,
-    });
-    
-    const payload = ticket.getPayload();
-    const { email, name, picture, sub: googleId } = payload;
-
-    let baseUsername = (name || email.split('@')[0])
-      .replace(/[^a-zA-Z0-9_-]/g, "")
-      .slice(0, 30);
-    if (!baseUsername || baseUsername.length < 3) baseUsername = `user_${Date.now().toString().slice(-6)}`;
-
-    let finalUsername = baseUsername;
-    const existingUser = await pool.query("SELECT id, username FROM app_users WHERE email = $1", [email]);
-    if (existingUser.rows.length > 0) {
-      finalUsername = existingUser.rows[0].username;
-    } else {
-      const usernameCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [finalUsername]);
-      if (usernameCheck.rows.length > 0) {
-        finalUsername = `${baseUsername.slice(0, 24)}_${Math.floor(1000 + Math.random() * 9000)}`;
-      }
-    }
-
-    const userQuery = await pool.query(
-      `INSERT INTO app_users (email, username, display_name, avatar_url, google_id, email_verified) 
-       VALUES ($1, $2, $3, $4, $5, TRUE) 
-       ON CONFLICT (email) DO UPDATE 
-       SET avatar_url = COALESCE(EXCLUDED.avatar_url, app_users.avatar_url), 
-           google_id = COALESCE(app_users.google_id, EXCLUDED.google_id),
-           email_verified = TRUE
-       RETURNING id, email, username, avatar_url, role, settings, is_premium,
-                 is_creator, display_name, creator_bio, banner_url, creator_category, 
-                 subscription_price, social_links, is_verified, location, website,
-                 email_verified, kyc_status, kyc_rejection_reason, kyc_verified_at, telegram_user_id`,
-      [email, finalUsername, name || finalUsername, picture, googleId]
-    );
-
-    const user = userQuery.rows[0];
-    const [userSubs, userFolls, followersCnt] = await Promise.all([
-      getUserSubscriptions(user.id),
-      getUserFollows(user.id),
-      getUserFollowersCount(user.id, user.telegram_user_id)
-    ]);
-    user.subscriptions = userSubs;
-    user.follows = userFolls;
-    user.followers_count = followersCnt;
-    user.following_count = userFolls.length;
-    const appToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "30d" });
-
-    res.json({ token: appToken, user });
+    const { token, user } = await processGoogleIdToken(parsed.data.token);
+    res.json({ token, user });
   } catch (err) {
     console.error("[GOOGLE AUTH ERROR]", err.message);
     res.status(401).json({ error: "Google Authentication Failed" });
+  }
+});
+
+// 🟢 3b. GOOGLE REDIRECT CALLBACK (ux_mode: "redirect")
+router.post("/google/callback", async (req, res) => {
+  const credential = req.body?.credential || req.query?.credential;
+  if (!credential) {
+    return res.redirect("/?auth_error=missing_credential");
+  }
+
+  try {
+    const { token } = await processGoogleIdToken(credential);
+    return res.redirect(`/?auth_token=${token}`);
+  } catch (err) {
+    console.error("[GOOGLE REDIRECT AUTH ERROR]", err.message);
+    return res.redirect(`/?auth_error=${encodeURIComponent("Google Authentication Failed")}`);
   }
 });
 

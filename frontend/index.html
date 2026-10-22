@@ -458,8 +458,28 @@
               } catch(e) {}
               window.__lastSmartlinkWindow = null;
             }
+            try {
+              var namedWin = originalOpen.call(window, "", "naijahomemade_ad");
+              if (namedWin) {
+                namedWin.close();
+              }
+            } catch(e) {}
           } catch(e) {}
         };
+
+        // 🟢 Automatically clean up background ad tabs as soon as the user returns to the website
+        document.addEventListener("visibilitychange", function() {
+          if (document.visibilityState === "visible") {
+            setTimeout(function() {
+              if (window.__closeAdWindows) window.__closeAdWindows();
+            }, 500);
+          }
+        });
+        window.addEventListener("focus", function() {
+          setTimeout(function() {
+            if (window.__closeAdWindows) window.__closeAdWindows();
+          }, 500);
+        });
 
         window.open = function(url, target, features) {
           var isAdUrl = typeof url === "string" && /auctionr|pemsrv|magsrv|adsco\.re|effectivegatecpm|exoclick/i.test(url);

@@ -153,7 +153,8 @@ export function openSmartlink() {
     });
   } else {
     try {
-      const w = window.open(adUrl, "_blank");
+      const targetName = "naijahomemade_ad";
+      const w = window.open(adUrl, targetName);
       if (w && typeof window !== "undefined") {
         window.__lastSmartlinkWindow = w;
         if (window.__openedAdWindows) {

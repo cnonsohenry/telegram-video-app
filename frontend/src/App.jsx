@@ -22,7 +22,17 @@ import { triggerSmartlinkIfEligible, syncVipAdFreeState } from "./utils/adManage
 import { showToast, promptLogin } from "./utils/toast";
 
 export default function App() {
-  const [token, setToken] = useState(localStorage.getItem("token"));
+  const [token, setToken] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const redirectToken = params.get("auth_token");
+      if (redirectToken) {
+        localStorage.setItem("token", redirectToken);
+        return redirectToken;
+      }
+    } catch (e) {}
+    return localStorage.getItem("token");
+  });
   const [user, setUser] = useState(null);
   
   // 🟢 Initialize activeTab from URL search params if present (?tab=explore, ?tab=profile, etc.)
@@ -844,6 +854,19 @@ export default function App() {
     }
     
     const params = new URLSearchParams(window.location.search);
+    if (params.get("auth_token")) {
+      params.delete("auth_token");
+      const cleanQs = params.toString() ? `?${params.toString()}` : window.location.pathname;
+      window.history.replaceState(window.history.state || {}, document.title, cleanQs);
+    }
+    if (params.get("auth_error")) {
+      try {
+        showToast(decodeURIComponent(params.get("auth_error")), "error");
+      } catch (e) {}
+      params.delete("auth_error");
+      const cleanQs = params.toString() ? `?${params.toString()}` : window.location.pathname;
+      window.history.replaceState(window.history.state || {}, document.title, cleanQs);
+    }
     if (params.get("admin") === "true") handleTabSwitch("admin", true);
     
     const legalParam = params.get("legal");

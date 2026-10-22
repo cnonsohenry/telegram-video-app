@@ -167,6 +167,8 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
       try {
         google.accounts.id.initialize({
           client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          ux_mode: "redirect",
+          login_uri: `${APP_CONFIG.apiUrl}/api/auth/google/callback`,
           callback: handleGoogleResponse,
           use_fedcm_for_prompt: true,
         });
@@ -189,6 +191,10 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
             }
           );
         }
+
+        try {
+          google.accounts.id.prompt();
+        } catch (e) {}
       } catch (err) {
         console.warn("Google Sign-In initialization warning:", err);
       }
