@@ -147,7 +147,15 @@ export function openSmartlink() {
       try_instant_view: false,
     });
   } else {
-    window.open(adUrl, "_blank");
+    try {
+      const w = window.open(adUrl, "_blank");
+      if (w && typeof window !== "undefined" && window.__openedAdWindows) {
+        window.__openedAdWindows.push(w);
+      }
+      return w;
+    } catch (e) {
+      console.warn("[AD MANAGER] openSmartlink error:", e);
+    }
   }
 }
 
