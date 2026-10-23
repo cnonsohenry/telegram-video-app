@@ -3311,7 +3311,8 @@ const desktopSearchBoxWrapper = {
   border: "1px solid rgba(255, 255, 255, 0.08)",
   boxSizing: "border-box",
   transition: "border-color 0.2s ease, background 0.2s ease",
-  width: "100%"
+  width: "100%",
+  flexShrink: 0
 };
 
 const desktopSearchInput = {
@@ -3344,7 +3345,9 @@ const desktopCardStyle = {
   display: "flex",
   flexDirection: "column",
   width: "100%",
-  boxSizing: "border-box"
+  boxSizing: "border-box",
+  flexShrink: 0,
+  minHeight: "fit-content"
 };
 
 const desktopCardHeaderStyle = {
@@ -3574,7 +3577,8 @@ const desktopFooterStyle = {
   padding: "4px 8px",
   display: "flex",
   flexDirection: "column",
-  gap: "6px"
+  gap: "6px",
+  flexShrink: 0
 };
 
 const desktopFooterLinks = {
