@@ -4,7 +4,7 @@ import {
   Clock, RefreshCw, UploadCloud, Video, Search, Edit3, Trash2, ChevronUp, ChevronDown, X, AlertTriangle, Menu,
   PlayCircle, Eye, PieChart, Activity, Star, Percent, Sparkles, CheckCircle, Heart, ExternalLink, DollarSign,
   Flag, ShieldAlert, BarChart3, Database, Layers, ArrowUpRight, Check,
-  Radio, Music, Calendar, Play
+  Radio, Music, Calendar, Play, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowRightLeft
 } from "lucide-react";
 import AdminUpload from "./AdminUpload"; 
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge"; 
@@ -48,6 +48,7 @@ export default function AdminDashboard({ user, onLogout }) {
   const [storyCreatorFilter, setStoryCreatorFilter] = useState("all");
   const [storySearchTerm, setStorySearchTerm] = useState("");
   const [storiesPage, setStoriesPage] = useState(1);
+  const [storiesLimit, setStoriesLimit] = useState(15);
   const [storiesData, setStoriesData] = useState({ stories: [], total: 0, total_pages: 1 });
   const [storiesLoading, setStoriesLoading] = useState(false);
   const [viewersModalData, setViewersModalData] = useState(null); // { type: 'story'|'creator', item, viewers: [], loading: boolean }
@@ -55,6 +56,12 @@ export default function AdminDashboard({ user, onLogout }) {
   const [viewerSearchFilter, setViewerSearchFilter] = useState("");
   const [creatorStorySearch, setCreatorStorySearch] = useState("");
   const [creatorStorySort, setCreatorStorySort] = useState("views_24h"); // "views_24h" | "views_7d" | "views_30d" | "total_views" | "unique_viewers"
+  const [creatorStoryPage, setCreatorStoryPage] = useState(1);
+  const [creatorStoryLimit, setCreatorStoryLimit] = useState(10);
+  const [storyFeedPage, setStoryFeedPage] = useState(1);
+  const [storyFeedLimit, setStoryFeedLimit] = useState(10);
+  const [viewersModalPage, setViewersModalPage] = useState(1);
+  const [viewersModalLimit, setViewersModalLimit] = useState(10);
 
   // Lists & Server-side Paginated Data
   const [usersData, setUsersData] = useState({ users: [], total: 0, total_pages: 1 });
@@ -120,7 +127,7 @@ export default function AdminDashboard({ user, onLogout }) {
         setStoriesLoading(true);
         const [analyticsRes, storiesRes] = await Promise.all([
           fetch(`${baseUrl}/api/admin/story-analytics`, { headers }),
-          fetch(`${baseUrl}/api/admin/stories?page=${storiesPage}&limit=${ITEMS_PER_PAGE}&status=${storyFilter}${storyCreatorFilter !== 'all' ? `&creator=${encodeURIComponent(storyCreatorFilter)}` : ''}${storySearchTerm ? `&search=${encodeURIComponent(storySearchTerm)}` : ''}`, { headers })
+          fetch(`${baseUrl}/api/admin/stories?page=${storiesPage}&limit=${storiesLimit}&status=${storyFilter}${storyCreatorFilter !== 'all' ? `&creator=${encodeURIComponent(storyCreatorFilter)}` : ''}${storySearchTerm ? `&search=${encodeURIComponent(storySearchTerm)}` : ''}`, { headers })
         ]);
         if (analyticsRes.ok) {
           setStoryAnalytics(await analyticsRes.json());
@@ -218,7 +225,7 @@ export default function AdminDashboard({ user, onLogout }) {
       const statusParam = storyFilter !== "all" ? `&status=${storyFilter}` : "";
       const creatorParam = storyCreatorFilter !== "all" ? `&creator=${encodeURIComponent(storyCreatorFilter)}` : "";
       const searchParam = storySearchTerm.trim() ? `&search=${encodeURIComponent(storySearchTerm.trim())}` : "";
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/stories?page=${storiesPage}&limit=${ITEMS_PER_PAGE}${statusParam}${creatorParam}${searchParam}`, { headers });
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/stories?page=${storiesPage}&limit=${storiesLimit}${statusParam}${creatorParam}${searchParam}`, { headers });
       if (res.ok) {
         const data = await res.json();
         setStoriesData({
@@ -236,12 +243,13 @@ export default function AdminDashboard({ user, onLogout }) {
     if (activeTab === "stories") {
       fetchStoriesCatalogOnly();
     }
-  }, [storiesPage, storyFilter, storyCreatorFilter]);
+  }, [storiesPage, storiesLimit, storyFilter, storyCreatorFilter]);
 
   // Viewers Modal Openers
   const handleOpenStoryViewers = async (story) => {
     setViewersModalData({ type: 'story', item: story, viewers: [], loading: true });
     setViewerSearchFilter("");
+    setViewersModalPage(1);
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/stories/${story.id}/viewers`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -263,6 +271,7 @@ export default function AdminDashboard({ user, onLogout }) {
     const uname = creator.creator_username || creator.username;
     setViewersModalData({ type: 'creator', item: creator, viewers: [], loading: true });
     setViewerSearchFilter("");
+    setViewersModalPage(1);
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators/${uname}/story-viewers`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -354,6 +363,222 @@ export default function AdminDashboard({ user, onLogout }) {
       return 0;
     });
   }, [storyAnalytics, creatorStorySearch, creatorStorySort]);
+
+  // Story Creators Pagination
+  const totalCreatorStoryPages = Math.max(1, Math.ceil(filteredStoryCreators.length / creatorStoryLimit));
+  const paginatedStoryCreators = useMemo(() => {
+    const start = (creatorStoryPage - 1) * creatorStoryLimit;
+    return filteredStoryCreators.slice(start, start + creatorStoryLimit);
+  }, [filteredStoryCreators, creatorStoryPage, creatorStoryLimit]);
+
+  useEffect(() => {
+    setCreatorStoryPage(1);
+  }, [creatorStorySearch, creatorStorySort, creatorStoryLimit]);
+
+  // Story Feed Pagination
+  const recentStoryViews = storyAnalytics?.recent_views || [];
+  const totalFeedPages = Math.max(1, Math.ceil(recentStoryViews.length / storyFeedLimit));
+  const paginatedRecentViews = useMemo(() => {
+    const start = (storyFeedPage - 1) * storyFeedLimit;
+    return recentStoryViews.slice(start, start + storyFeedLimit);
+  }, [recentStoryViews, storyFeedPage, storyFeedLimit]);
+
+  // Viewers Modal Pagination & Filtering
+  const filteredModalViewers = useMemo(() => {
+    if (!viewersModalData?.viewers) return [];
+    if (!viewerSearchFilter.trim()) return viewersModalData.viewers;
+    const q = viewerSearchFilter.toLowerCase();
+    return viewersModalData.viewers.filter(v => 
+      (v.username || "").toLowerCase().includes(q) ||
+      (v.display_name || "").toLowerCase().includes(q) ||
+      (v.email || "").toLowerCase().includes(q)
+    );
+  }, [viewersModalData, viewerSearchFilter]);
+
+  const totalModalViewersPages = Math.max(1, Math.ceil(filteredModalViewers.length / viewersModalLimit));
+  const paginatedModalViewers = useMemo(() => {
+    const start = (viewersModalPage - 1) * viewersModalLimit;
+    return filteredModalViewers.slice(start, start + viewersModalLimit);
+  }, [filteredModalViewers, viewersModalPage, viewersModalLimit]);
+
+  useEffect(() => {
+    setViewersModalPage(1);
+  }, [viewerSearchFilter, viewersModalLimit]);
+
+  // Smooth Horizontal Scrolling Support on Tables (Wheel & Buttons)
+  const handleTableWheel = (e) => {
+    const container = e.currentTarget;
+    if (container.scrollWidth > container.clientWidth) {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        const atLeft = container.scrollLeft <= 0;
+        const atRight = Math.ceil(container.scrollLeft + container.clientWidth) >= container.scrollWidth;
+        if ((e.deltaY > 0 && !atRight) || (e.deltaY < 0 && !atLeft)) {
+          e.preventDefault();
+          container.scrollLeft += e.deltaY;
+        }
+      }
+    }
+  };
+
+  const scrollTable = (containerId, direction) => {
+    const el = document.getElementById(containerId);
+    if (el) {
+      el.scrollBy({ left: direction === 'left' ? -350 : 350, behavior: 'smooth' });
+    }
+  };
+
+  const renderTableScrollControls = (tableContainerId, totalCols = 10) => (
+    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+      <span style={{ fontSize: "11px", color: "#71717a", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+        <ArrowRightLeft size={12} color="#71717a" />
+        <span className="hide-on-mobile">{totalCols} cols • Scroll</span>
+      </span>
+      <button
+        type="button"
+        onClick={() => scrollTable(tableContainerId, 'left')}
+        style={tableNavBtnStyle}
+        title="Scroll table left"
+      >
+        <ChevronLeft size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => scrollTable(tableContainerId, 'right')}
+        style={tableNavBtnStyle}
+        title="Scroll table right"
+      >
+        <ChevronRight size={14} />
+      </button>
+    </div>
+  );
+
+  // Executive Reusable Pagination Component
+  const renderPagination = ({
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage,
+    onPageChange,
+    onLimitChange,
+    limitOptions = [10, 20, 50],
+    itemLabel = "items"
+  }) => {
+    if (totalItems === 0) return null;
+
+    const startItem = Math.min((currentPage - 1) * itemsPerPage + 1, totalItems);
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+    const getPageNumbers = () => {
+      if (totalPages <= 5) {
+        return Array.from({ length: totalPages }, (_, i) => i + 1);
+      }
+      if (currentPage <= 3) {
+        return [1, 2, 3, 4, '...', totalPages];
+      }
+      if (currentPage >= totalPages - 2) {
+        return [1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+      }
+      return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+    };
+
+    const pageNumbers = getPageNumbers();
+
+    return (
+      <div style={paginationStyle}>
+        {/* Left: Range text & Limit selector */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <span style={pageTextStyle}>
+            Showing <strong style={{ color: "#f4f4f5" }}>{startItem.toLocaleString()}</strong> to <strong style={{ color: "#f4f4f5" }}>{endItem.toLocaleString()}</strong> of <strong style={{ color: "#f4f4f5" }}>{totalItems.toLocaleString()}</strong> {itemLabel}
+          </span>
+
+          {onLimitChange && (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "11px", color: "#71717a" }}>Per page:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  onLimitChange(Number(e.target.value));
+                  onPageChange(1);
+                }}
+                style={{
+                  background: "#27272a",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "6px",
+                  color: "#f4f4f5",
+                  padding: "3px 8px",
+                  fontSize: "11px",
+                  outline: "none",
+                  cursor: "pointer"
+                }}
+              >
+                {limitOptions.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Controls */}
+        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          <button
+            disabled={currentPage === 1}
+            onClick={() => onPageChange(1)}
+            style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}
+            title="First page"
+          >
+            <ChevronsLeft size={13} />
+          </button>
+          <button
+            disabled={currentPage === 1}
+            onClick={() => onPageChange(currentPage - 1)}
+            style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}
+            title="Previous page"
+          >
+            <ChevronLeft size={13} />
+          </button>
+
+          {pageNumbers.map((p, idx) => (
+            p === '...' ? (
+              <span key={`ellipsis-${idx}`} style={{ color: "#71717a", padding: "0 4px", fontSize: "12px" }}>…</span>
+            ) : (
+              <button
+                key={`page-${p}`}
+                onClick={() => onPageChange(p)}
+                style={{
+                  ...pageBtnStyle,
+                  background: currentPage === p ? "#f43f5e" : "#27272a",
+                  color: currentPage === p ? "#fff" : "#a1a1aa",
+                  fontWeight: currentPage === p ? "700" : "500",
+                  padding: "4px 10px",
+                  minWidth: "28px"
+                }}
+              >
+                {p}
+              </button>
+            )
+          ))}
+
+          <button
+            disabled={currentPage >= totalPages}
+            onClick={() => onPageChange(currentPage + 1)}
+            style={currentPage >= totalPages ? pageBtnDisabledStyle : pageBtnStyle}
+            title="Next page"
+          >
+            <ChevronRight size={13} />
+          </button>
+          <button
+            disabled={currentPage >= totalPages}
+            onClick={() => onPageChange(totalPages)}
+            style={currentPage >= totalPages ? pageBtnDisabledStyle : pageBtnStyle}
+            title="Last page"
+          >
+            <ChevronsRight size={13} />
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   // Creator Actions
   const handleToggleVerify = async (creator) => {
@@ -646,11 +871,62 @@ export default function AdminDashboard({ user, onLogout }) {
   const topCreators = statsData?.top_creators || [];
 
   return (
-    <div style={dashboardContainerStyle}>
+    <div style={dashboardContainerStyle} className="admin-dashboard-root">
       <style>{`
         .hamburger-btn, .mobile-close-btn { display: none; background: transparent; border: none; color: #f4f4f5; cursor: pointer; padding: 0; }
         .mobile-overlay { display: none; }
         
+        /* Custom visible horizontal & vertical scrollbars for Admin Dashboard */
+        .admin-dashboard-root ::-webkit-scrollbar {
+          display: block !important;
+          width: 8px !important;
+          height: 10px !important;
+        }
+
+        .admin-dashboard-root ::-webkit-scrollbar-track {
+          background: #18181b !important;
+          border-radius: 6px !important;
+        }
+
+        .admin-dashboard-root ::-webkit-scrollbar-thumb {
+          background: #3f3f46 !important;
+          border-radius: 6px !important;
+          border: 2px solid #18181b !important;
+        }
+
+        .admin-dashboard-root ::-webkit-scrollbar-thumb:hover {
+          background: #71717a !important;
+        }
+
+        .admin-table-scroll {
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          width: 100% !important;
+          scrollbar-width: thin !important;
+          scrollbar-color: #52525b #121214 !important;
+        }
+
+        .admin-table-scroll::-webkit-scrollbar {
+          display: block !important;
+          height: 11px !important;
+        }
+
+        .admin-table-scroll::-webkit-scrollbar-track {
+          background: #121214 !important;
+          border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+          border-radius: 0 0 14px 14px !important;
+        }
+
+        .admin-table-scroll::-webkit-scrollbar-thumb {
+          background: #52525b !important;
+          border-radius: 6px !important;
+          border: 2px solid #121214 !important;
+        }
+
+        .admin-table-scroll::-webkit-scrollbar-thumb:hover {
+          background: #a1a1aa !important;
+        }
+
         @media (max-width: 900px) {
           .admin-sidebar { position: fixed !important; left: -100%; transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1); z-index: 999999; height: 100dvh; box-shadow: 10px 0 40px rgba(0,0,0,0.8); }
           .admin-sidebar.open { left: 0; }
@@ -780,8 +1056,8 @@ export default function AdminDashboard({ user, onLogout }) {
                 </h3>
                 {globalSearchResults.users?.length > 0 && (
                   <div style={{ ...tableContainerStyle, marginBottom: "30px" }}>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={tableStyle}>
+                    <div className="admin-table-scroll" onWheel={handleTableWheel} style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+                      <table style={{ ...tableStyle, minWidth: "850px" }}>
                         <thead>
                           <tr>
                             <th style={thStyle}>Username</th>
@@ -816,8 +1092,8 @@ export default function AdminDashboard({ user, onLogout }) {
                 </h3>
                 {globalSearchResults.videos?.length > 0 && (
                   <div style={{ ...tableContainerStyle, marginBottom: "30px" }}>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={tableStyle}>
+                    <div className="admin-table-scroll" onWheel={handleTableWheel} style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+                      <table style={{ ...tableStyle, minWidth: "850px" }}>
                         <thead>
                           <tr>
                             <th style={thStyle}>Preview</th>
@@ -857,8 +1133,8 @@ export default function AdminDashboard({ user, onLogout }) {
                       <Sparkles size={16} color="#a1a1aa" /> Creators ({globalSearchResults.creators.length})
                     </h3>
                     <div style={{ ...tableContainerStyle, marginBottom: "30px" }}>
-                      <div style={{ overflowX: "auto" }}>
-                        <table style={tableStyle}>
+                      <div className="admin-table-scroll" onWheel={handleTableWheel} style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+                        <table style={{ ...tableStyle, minWidth: "850px" }}>
                           <thead>
                             <tr>
                               <th style={thStyle}>Creator</th>
@@ -1146,8 +1422,8 @@ export default function AdminDashboard({ user, onLogout }) {
                       </button>
                     </div>
 
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={tableStyle}>
+                    <div className="admin-table-scroll" onWheel={handleTableWheel} style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+                      <table style={{ ...tableStyle, minWidth: "850px" }}>
                         <thead>
                           <tr>
                             <th style={thStyle}>Rank & Creator</th>
@@ -1295,47 +1571,57 @@ export default function AdminDashboard({ user, onLogout }) {
                     <div>
                       {/* Search & Sort Bar */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#18181b", border: "1px solid rgba(255,255,255,0.08)", padding: "7px 12px", borderRadius: "8px", width: "280px" }}>
-                          <Search size={14} color="#71717a" />
-                          <input 
-                            type="text" 
-                            placeholder="Filter creators by handle or name..." 
-                            value={creatorStorySearch} 
-                            onChange={(e) => setCreatorStorySearch(e.target.value)} 
-                            style={{ background: "transparent", border: "none", color: "#f4f4f5", outline: "none", width: "100%", fontSize: "12px" }}
-                          />
-                          {creatorStorySearch && <X size={12} color="#71717a" style={{ cursor: "pointer" }} onClick={() => setCreatorStorySearch("")} />}
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#18181b", border: "1px solid rgba(255,255,255,0.08)", padding: "7px 12px", borderRadius: "8px", width: "260px" }}>
+                            <Search size={14} color="#71717a" />
+                            <input 
+                              type="text" 
+                              placeholder="Filter creators by handle or name..." 
+                              value={creatorStorySearch} 
+                              onChange={(e) => setCreatorStorySearch(e.target.value)} 
+                              style={{ background: "transparent", border: "none", color: "#f4f4f5", outline: "none", width: "100%", fontSize: "12px" }}
+                            />
+                            {creatorStorySearch && <X size={12} color="#71717a" style={{ cursor: "pointer" }} onClick={() => setCreatorStorySearch("")} />}
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "12px", color: "#71717a", fontWeight: "600" }}>Sort Primary:</span>
+                            <select
+                              value={creatorStorySort}
+                              onChange={(e) => setCreatorStorySort(e.target.value)}
+                              style={{
+                                background: "#18181b",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                borderRadius: "8px",
+                                color: "#f4f4f5",
+                                padding: "6px 12px",
+                                fontSize: "12px",
+                                outline: "none"
+                              }}
+                            >
+                              <option value="views_24h">Today's Views (24h)</option>
+                              <option value="views_7d">This Week's Views (7d)</option>
+                              <option value="views_30d">This Month's Views (30d)</option>
+                              <option value="total_views">All-Time Story Views</option>
+                              <option value="unique_viewers">Unique Viewers Base</option>
+                              <option value="active_stories">Active Stories Live</option>
+                            </select>
+                          </div>
                         </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontSize: "12px", color: "#71717a", fontWeight: "600" }}>Sort Primary Metric:</span>
-                          <select
-                            value={creatorStorySort}
-                            onChange={(e) => setCreatorStorySort(e.target.value)}
-                            style={{
-                              background: "#18181b",
-                              border: "1px solid rgba(255,255,255,0.08)",
-                              borderRadius: "8px",
-                              color: "#f4f4f5",
-                              padding: "6px 12px",
-                              fontSize: "12px",
-                              outline: "none"
-                            }}
-                          >
-                            <option value="views_24h">Today's Views (24h)</option>
-                            <option value="views_7d">This Week's Views (7d)</option>
-                            <option value="views_30d">This Month's Views (30d)</option>
-                            <option value="total_views">All-Time Story Views</option>
-                            <option value="unique_viewers">Unique Viewers Base</option>
-                            <option value="active_stories">Active Stories Live</option>
-                          </select>
-                        </div>
+                        {/* Horizontal Table Scroll Controls */}
+                        {renderTableScrollControls("creator-story-table-container", 10)}
                       </div>
 
                       {/* Creators Story Analytics Table */}
                       <div style={tableContainerStyle}>
-                        <div style={{ overflowX: "auto" }}>
-                          <table style={tableStyle}>
+                        <div 
+                          id="creator-story-table-container"
+                          className="admin-table-scroll" 
+                          onWheel={handleTableWheel}
+                          style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}
+                        >
+                          <table style={{ ...tableStyle, minWidth: "1100px" }}>
                             <thead>
                               <tr>
                                 <th style={thStyle}>Creator Profile</th>
@@ -1351,14 +1637,14 @@ export default function AdminDashboard({ user, onLogout }) {
                               </tr>
                             </thead>
                             <tbody>
-                              {filteredStoryCreators.length === 0 ? (
+                              {paginatedStoryCreators.length === 0 ? (
                                 <tr>
                                   <td colSpan={10} style={{ ...tdStyle, textAlign: "center", padding: "40px", color: "#71717a" }}>
                                     No creator matches found.
                                   </td>
                                 </tr>
                               ) : (
-                                filteredStoryCreators.map((c, i) => (
+                                paginatedStoryCreators.map((c, i) => (
                                   <tr key={c.creator_username || i} style={trStyle}>
                                     <td style={tdStyle}>
                                       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1452,6 +1738,18 @@ export default function AdminDashboard({ user, onLogout }) {
                             </tbody>
                           </table>
                         </div>
+
+                        {/* Pagination Bar */}
+                        {renderPagination({
+                          currentPage: creatorStoryPage,
+                          totalPages: totalCreatorStoryPages,
+                          totalItems: filteredStoryCreators.length,
+                          itemsPerPage: creatorStoryLimit,
+                          onPageChange: setCreatorStoryPage,
+                          onLimitChange: setCreatorStoryLimit,
+                          limitOptions: [10, 20, 50],
+                          itemLabel: "creators"
+                        })}
                       </div>
                     </div>
                   )}
@@ -1525,15 +1823,23 @@ export default function AdminDashboard({ user, onLogout }) {
                           </div>
                         </div>
 
-                        <div style={{ fontSize: "12px", color: "#71717a" }}>
-                          Showing {(storiesData.stories || []).length} of {storiesData.total.toLocaleString()} stories
+                        <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+                          <div style={{ fontSize: "12px", color: "#71717a" }}>
+                            Total: <strong style={{ color: "#f4f4f5" }}>{storiesData.total.toLocaleString()}</strong> stories
+                          </div>
+                          {renderTableScrollControls("catalog-story-table-container", 9)}
                         </div>
                       </div>
 
                       {/* Stories Catalog Table */}
                       <div style={tableContainerStyle}>
-                        <div style={{ overflowX: "auto" }}>
-                          <table style={tableStyle}>
+                        <div 
+                          id="catalog-story-table-container"
+                          className="admin-table-scroll" 
+                          onWheel={handleTableWheel}
+                          style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}
+                        >
+                          <table style={{ ...tableStyle, minWidth: "1150px" }}>
                             <thead>
                               <tr>
                                 <th style={thStyle}>Story Preview</th>
@@ -1671,13 +1977,17 @@ export default function AdminDashboard({ user, onLogout }) {
                             </tbody>
                           </table>
                         </div>
-                        {storiesData.total_pages > 1 && (
-                          <div style={paginationStyle}>
-                            <button disabled={storiesPage === 1} onClick={() => setStoriesPage(p => p - 1)} style={storiesPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                            <span style={pageTextStyle}>Page {storiesPage} of {storiesData.total_pages}</span>
-                            <button disabled={storiesPage === storiesData.total_pages} onClick={() => setStoriesPage(p => p + 1)} style={storiesPage === storiesData.total_pages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
-                          </div>
-                        )}
+                        {/* Rich Pagination Bar */}
+                        {renderPagination({
+                          currentPage: storiesPage,
+                          totalPages: storiesData.total_pages,
+                          totalItems: storiesData.total,
+                          itemsPerPage: storiesLimit,
+                          onPageChange: setStoriesPage,
+                          onLimitChange: setStoriesLimit,
+                          limitOptions: [10, 15, 25, 50],
+                          itemLabel: "stories"
+                        })}
                       </div>
                     </div>
                   )}
@@ -1697,10 +2007,18 @@ export default function AdminDashboard({ user, onLogout }) {
                             Live stream of registered member watch events across all creator status reels.
                           </p>
                         </div>
+
+                        {/* Horizontal Table Scroll Controls */}
+                        {renderTableScrollControls("feed-story-table-container", 7)}
                       </div>
 
-                      <div style={{ overflowX: "auto" }}>
-                        <table style={tableStyle}>
+                      <div 
+                        id="feed-story-table-container"
+                        className="admin-table-scroll" 
+                        onWheel={handleTableWheel}
+                        style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}
+                      >
+                        <table style={{ ...tableStyle, minWidth: "1000px" }}>
                           <thead>
                             <tr>
                               <th style={thStyle}>Viewer Member</th>
@@ -1713,7 +2031,14 @@ export default function AdminDashboard({ user, onLogout }) {
                             </tr>
                           </thead>
                           <tbody>
-                            {(storyAnalytics?.recent_views || []).map(rv => (
+                            {paginatedRecentViews.length === 0 ? (
+                              <tr>
+                                <td colSpan={7} style={{ ...tdStyle, textAlign: "center", padding: "40px", color: "#71717a" }}>
+                                  No live story view telemetry recorded yet.
+                                </td>
+                              </tr>
+                            ) : (
+                              paginatedRecentViews.map(rv => (
                               <tr key={rv.view_id} style={trStyle}>
                                 <td style={tdStyle}>
                                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1785,10 +2110,22 @@ export default function AdminDashboard({ user, onLogout }) {
                                   </button>
                                 </td>
                               </tr>
-                            ))}
+                            )))}
                           </tbody>
                         </table>
                       </div>
+
+                      {/* Pagination Bar */}
+                      {renderPagination({
+                        currentPage: storyFeedPage,
+                        totalPages: totalFeedPages,
+                        totalItems: recentStoryViews.length,
+                        itemsPerPage: storyFeedLimit,
+                        onPageChange: setStoryFeedPage,
+                        onLimitChange: setStoryFeedLimit,
+                        limitOptions: [10, 20, 30],
+                        itemLabel: "views"
+                      })}
                     </div>
                   )}
                 </div>
@@ -1829,8 +2166,8 @@ export default function AdminDashboard({ user, onLogout }) {
                     </div>
                   ) : (
                     <div style={tableContainerStyle}>
-                      <div style={{ overflowX: "auto" }}>
-                        <table style={tableStyle}>
+                      <div className="admin-table-scroll" onWheel={handleTableWheel} style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+                        <table style={{ ...tableStyle, minWidth: "1000px" }}>
                           <thead>
                             <tr>
                               <th style={thStyle}>Reported Item</th>
@@ -2045,8 +2382,8 @@ export default function AdminDashboard({ user, onLogout }) {
 
                   {/* Creators Table */}
                   <div style={tableContainerStyle}>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={tableStyle}>
+                    <div className="admin-table-scroll" onWheel={handleTableWheel} style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+                      <table style={{ ...tableStyle, minWidth: "1050px" }}>
                         <thead>
                           <tr>
                             <th onClick={() => handleSort('display_name')} style={{ ...thStyle, cursor: "pointer" }}>
@@ -2201,13 +2538,14 @@ export default function AdminDashboard({ user, onLogout }) {
                         </tbody>
                       </table>
                     </div>
-                    {totalCreatorPages > 1 && (
-                      <div style={paginationStyle}>
-                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                        <span style={pageTextStyle}>Page {currentPage} of {totalCreatorPages}</span>
-                        <button disabled={currentPage === totalCreatorPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalCreatorPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
-                      </div>
-                    )}
+                    {renderPagination({
+                      currentPage,
+                      totalPages: totalCreatorPages,
+                      totalItems: processedCreators.length,
+                      itemsPerPage: ITEMS_PER_PAGE,
+                      onPageChange: setCurrentPage,
+                      itemLabel: "creators"
+                    })}
                   </div>
                 </>
               )}
@@ -2264,8 +2602,8 @@ export default function AdminDashboard({ user, onLogout }) {
                   </div>
 
                   <div style={tableContainerStyle}>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={tableStyle}>
+                    <div className="admin-table-scroll" onWheel={handleTableWheel} style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+                      <table style={{ ...tableStyle, minWidth: "1050px" }}>
                         <thead>
                           <tr>
                             <th style={thStyle}>Preview</th>
@@ -2301,13 +2639,14 @@ export default function AdminDashboard({ user, onLogout }) {
                         </tbody>
                       </table>
                     </div>
-                    {videosData.total_pages > 1 && (
-                      <div style={paginationStyle}>
-                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                        <span style={pageTextStyle}>Page {currentPage} of {videosData.total_pages}</span>
-                        <button disabled={currentPage === videosData.total_pages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === videosData.total_pages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
-                      </div>
-                    )}
+                    {renderPagination({
+                      currentPage,
+                      totalPages: videosData.total_pages,
+                      totalItems: videosData.total,
+                      itemsPerPage: ITEMS_PER_PAGE,
+                      onPageChange: setCurrentPage,
+                      itemLabel: "clips"
+                    })}
                   </div>
                 </>
               )}
@@ -2323,8 +2662,8 @@ export default function AdminDashboard({ user, onLogout }) {
                   </div>
 
                   <div style={tableContainerStyle}>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={tableStyle}>
+                    <div className="admin-table-scroll" onWheel={handleTableWheel} style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+                      <table style={{ ...tableStyle, minWidth: "1050px" }}>
                         <thead>
                           <tr>
                             <th onClick={() => handleSort('username')} style={{ ...thStyle, cursor: "pointer" }}>Username <SortIcon columnKey="username" /></th>
@@ -2354,13 +2693,14 @@ export default function AdminDashboard({ user, onLogout }) {
                         </tbody>
                       </table>
                     </div>
-                    {usersData.total_pages > 1 && (
-                      <div style={paginationStyle}>
-                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                        <span style={pageTextStyle}>Page {currentPage} of {usersData.total_pages}</span>
-                        <button disabled={currentPage === usersData.total_pages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === usersData.total_pages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
-                      </div>
-                    )}
+                    {renderPagination({
+                      currentPage,
+                      totalPages: usersData.total_pages,
+                      totalItems: usersData.total,
+                      itemsPerPage: ITEMS_PER_PAGE,
+                      onPageChange: setCurrentPage,
+                      itemLabel: "users"
+                    })}
                   </div>
                 </>
               )}
@@ -2455,8 +2795,8 @@ export default function AdminDashboard({ user, onLogout }) {
                   </div>
 
                   <div style={tableContainerStyle}>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={tableStyle}>
+                    <div className="admin-table-scroll" onWheel={handleTableWheel} style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
+                      <table style={{ ...tableStyle, minWidth: "1050px" }}>
                         <thead>
                           <tr>
                             <th onClick={() => handleSort('username')} style={{ ...thStyle, cursor: "pointer" }}>User <SortIcon columnKey="username" /></th>
@@ -2499,13 +2839,14 @@ export default function AdminDashboard({ user, onLogout }) {
                         </tbody>
                       </table>
                     </div>
-                    {txData.total_pages > 1 && (
-                      <div style={paginationStyle}>
-                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                        <span style={pageTextStyle}>Page {currentPage} of {txData.total_pages}</span>
-                        <button disabled={currentPage === txData.total_pages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === txData.total_pages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
-                      </div>
-                    )}
+                    {renderPagination({
+                      currentPage,
+                      totalPages: txData.total_pages,
+                      totalItems: txData.total,
+                      itemsPerPage: ITEMS_PER_PAGE,
+                      onPageChange: setCurrentPage,
+                      itemLabel: "orders"
+                    })}
                   </div>
                 </>
               )}
@@ -2576,71 +2917,95 @@ export default function AdminDashboard({ user, onLogout }) {
             <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px" }}>
               {viewersModalData.loading ? (
                 <div style={{ padding: "40px", textAlign: "center" }}><RefreshCw size={28} color="#f43f5e" style={{ animation: "spin 1s linear infinite" }} /></div>
-              ) : viewersModalData.viewers.length === 0 ? (
+              ) : filteredModalViewers.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 20px", color: "#71717a", fontSize: "13px" }}>
-                  No views recorded yet for this story.
+                  {viewerSearchFilter ? "No matching viewers found." : "No views recorded yet for this story."}
                 </div>
               ) : (
-                viewersModalData.viewers
-                  .filter(v => {
-                    if (!viewerSearchFilter.trim()) return true;
-                    const q = viewerSearchFilter.toLowerCase();
-                    return (v.username || "").toLowerCase().includes(q) || (v.display_name || "").toLowerCase().includes(q) || (v.email || "").toLowerCase().includes(q);
-                  })
-                  .map(v => (
-                    <div 
-                      key={v.view_id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        background: "#27272a",
-                        borderRadius: "8px",
-                        padding: "10px 12px",
-                        border: "1px solid rgba(255,255,255,0.04)"
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <img 
-                          src={v.avatar_url || '/assets/default-avatar.png'} 
-                          alt="" 
-                          style={{ width: "34px", height: "34px", borderRadius: "50%", objectFit: "cover" }}
-                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                        />
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span style={{ fontWeight: "700", color: "#f4f4f5", fontSize: "13px" }}>
-                              {v.display_name || v.username || "Anonymous"}
-                            </span>
-                            {v.is_premium ? (
-                              <span style={{ ...premiumBadge, fontSize: "9px", padding: "1px 5px" }}>VIP</span>
-                            ) : (
-                              <span style={{ ...freeBadge, fontSize: "9px", padding: "1px 5px" }}>FREE</span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: "11px", color: "#71717a" }}>
-                            {v.email || `@${v.username}`}
-                          </div>
-                          {v.sound_title && (
-                            <div style={{ fontSize: "10px", color: "#a1a1aa", marginTop: "2px" }}>
-                              Story: {v.sound_title}
-                            </div>
+                paginatedModalViewers.map(v => (
+                  <div 
+                    key={v.view_id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "#27272a",
+                      borderRadius: "8px",
+                      padding: "10px 12px",
+                      border: "1px solid rgba(255,255,255,0.04)"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <img 
+                        src={v.avatar_url || '/assets/default-avatar.png'} 
+                        alt="" 
+                        style={{ width: "34px", height: "34px", borderRadius: "50%", objectFit: "cover" }}
+                        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                      />
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ fontWeight: "700", color: "#f4f4f5", fontSize: "13px" }}>
+                            {v.display_name || v.username || "Anonymous"}
+                          </span>
+                          {v.is_premium ? (
+                            <span style={{ ...premiumBadge, fontSize: "9px", padding: "1px 5px" }}>VIP</span>
+                          ) : (
+                            <span style={{ ...freeBadge, fontSize: "9px", padding: "1px 5px" }}>FREE</span>
                           )}
                         </div>
-                      </div>
-
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#f4f4f5" }}>
-                          {formatRelativeTime(v.viewed_at)}
+                        <div style={{ fontSize: "11px", color: "#71717a" }}>
+                          {v.email || `@${v.username}`}
                         </div>
-                        <div style={{ fontSize: "10px", color: "#71717a", marginTop: "1px" }}>
-                          {new Date(v.viewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
+                        {v.sound_title && (
+                          <div style={{ fontSize: "10px", color: "#a1a1aa", marginTop: "2px" }}>
+                            Story: {v.sound_title}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))
+
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "11px", fontWeight: "700", color: "#f4f4f5" }}>
+                        {formatRelativeTime(v.viewed_at)}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#71717a", marginTop: "1px" }}>
+                        {new Date(v.viewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
+
+            {/* Modal Pagination */}
+            {filteredModalViewers.length > viewersModalLimit && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "12px", marginTop: "10px" }}>
+                <span style={{ fontSize: "11px", color: "#71717a" }}>
+                  Showing {Math.min((viewersModalPage - 1) * viewersModalLimit + 1, filteredModalViewers.length)} - {Math.min(viewersModalPage * viewersModalLimit, filteredModalViewers.length)} of {filteredModalViewers.length} viewers
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <button
+                    disabled={viewersModalPage === 1}
+                    onClick={() => setViewersModalPage(p => p - 1)}
+                    style={viewersModalPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}
+                    title="Previous"
+                  >
+                    <ChevronLeft size={13} />
+                  </button>
+                  <span style={{ fontSize: "11px", color: "#f4f4f5", fontWeight: "700", padding: "0 4px" }}>
+                    {viewersModalPage} / {totalModalViewersPages}
+                  </span>
+                  <button
+                    disabled={viewersModalPage >= totalModalViewersPages}
+                    onClick={() => setViewersModalPage(p => p + 1)}
+                    style={viewersModalPage >= totalModalViewersPages ? pageBtnDisabledStyle : pageBtnStyle}
+                    title="Next"
+                  >
+                    <ChevronRight size={13} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3231,14 +3596,15 @@ const EngagementCard = ({ title, count, icon }) => (
 // Executive Calm Dark Styles
 // -------------------------------------------------------------
 const dashboardContainerStyle = { display: "flex", height: "100dvh", width: "100vw", background: "#09090b", color: "#f4f4f5", position: "absolute", zIndex: 999999, top: 0, left: 0, fontFamily: "system-ui, -apple-system, sans-serif" };
-const sidebarStyle = { width: "260px", background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.06)", padding: "24px 18px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
+const sidebarStyle = { width: "260px", background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.06)", padding: "24px 18px", display: "flex", flexDirection: "column", justifyContent: "space-between", flexShrink: 0 };
 const logoStyle = { margin: 0, fontSize: "18px", fontWeight: "900", letterSpacing: "-0.5px", color: "#f4f4f5" };
-const mainContentStyle = { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" };
-const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 30px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#09090b" };
-const contentAreaStyle = { flex: 1, overflowY: "auto", padding: "30px", background: "#09090b" };
+const mainContentStyle = { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", minWidth: 0, width: "100%" };
+const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 30px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#09090b", minWidth: 0 };
+const contentAreaStyle = { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "30px", background: "#09090b", minWidth: 0, width: "100%" };
 const gridStatsStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" };
 const cardContainerStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "22px" };
-const tableContainerStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", overflow: "hidden" };
+const tableContainerStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", overflow: "hidden", position: "relative" };
+const tableNavBtnStyle = { background: "#27272a", border: "1px solid rgba(255,255,255,0.08)", color: "#f4f4f5", padding: "5px 8px", borderRadius: "6px", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease" };
 const tableStyle = { width: "100%", borderCollapse: "collapse" };
 const thStyle = { textAlign: "left", padding: "14px 18px", color: "#71717a", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", borderBottom: "1px solid rgba(255,255,255,0.06)", userSelect: "none", whiteSpace: "nowrap" };
 const trStyle = { borderBottom: "1px solid rgba(255,255,255,0.04)" };

@@ -59,9 +59,46 @@ input, textarea, [contenteditable="true"], .selectable-text {
   contain-intrinsic-size: 1000px;
 }
 
-/* Hide scrollbars for a native app feel but keep functionality */
+/* Hide scrollbars for a native app feel but keep functionality in consumer app */
 ::-webkit-scrollbar {
   display: none;
+}
+
+/* 🟢 RESTORE SLEEK VISIBLE SCROLLBARS FOR ADMIN DASHBOARD */
+.admin-dashboard-root ::-webkit-scrollbar,
+.admin-table-scroll::-webkit-scrollbar,
+.admin-scroll-visible::-webkit-scrollbar {
+  display: block !important;
+  width: 10px !important;
+  height: 10px !important;
+}
+
+.admin-dashboard-root ::-webkit-scrollbar-track,
+.admin-table-scroll::-webkit-scrollbar-track,
+.admin-scroll-visible::-webkit-scrollbar-track {
+  background: #18181b !important;
+  border-radius: 6px !important;
+}
+
+.admin-dashboard-root ::-webkit-scrollbar-thumb,
+.admin-table-scroll::-webkit-scrollbar-thumb,
+.admin-scroll-visible::-webkit-scrollbar-thumb {
+  background: #3f3f46 !important;
+  border-radius: 6px !important;
+  border: 2px solid #18181b !important;
+}
+
+.admin-dashboard-root ::-webkit-scrollbar-thumb:hover,
+.admin-table-scroll::-webkit-scrollbar-thumb:hover,
+.admin-scroll-visible::-webkit-scrollbar-thumb:hover {
+  background: #71717a !important;
+}
+
+.admin-dashboard-root,
+.admin-table-scroll,
+.admin-scroll-visible {
+  scrollbar-width: thin !important;
+  scrollbar-color: #3f3f46 #18181b !important;
 }
 
 /* 🟢 5. THE AD ZAPPER (CSS SHIELD) */
