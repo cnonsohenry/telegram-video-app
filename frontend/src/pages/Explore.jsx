@@ -775,19 +775,19 @@ const DesktopRightSidebar = ({
         )}
       </div>
 
-      {/* 2. Trends For You Card */}
-      <div style={desktopCardStyle}>
+      {/* 2. Trends For You (Open Section) */}
+      <section style={desktopCardStyle}>
         <div style={desktopCardHeaderStyle}>
           <h3 style={desktopCardTitleStyle}>Trends for you</h3>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
           {trendingTopics.map((item) => (
             <div
               key={item.topic}
               onClick={() => onSelectTopic(item.catId)}
               style={desktopTrendItemStyle}
-              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"}
               onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
             >
               <span style={desktopTrendSublabel}>{item.category}</span>
@@ -796,10 +796,13 @@ const DesktopRightSidebar = ({
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* 3. Trending Highlights (Mini Video Cards) */}
-      <div style={desktopCardStyle}>
+      {/* Subtle Divider */}
+      <div style={desktopSectionDivider} />
+
+      {/* 3. Trending Highlights (Open Section) */}
+      <section style={desktopCardStyle}>
         <div style={desktopCardHeaderStyle}>
           <h3 style={desktopCardTitleStyle}>Highlights</h3>
           {onRefreshHighlights && (
@@ -827,11 +830,11 @@ const DesktopRightSidebar = ({
           )}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
           {highlightsLoading && highlights.length === 0 ? (
             [...Array(3)].map((_, i) => (
               <div key={i} style={desktopHighlightSkeleton}>
-                <div style={{ width: "68px", height: "82px", borderRadius: "8px", background: "#222" }} />
+                <div style={{ width: "74px", height: "94px", borderRadius: "8px", background: "#222" }} />
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
                   <div style={{ width: "80%", height: "14px", background: "#222", borderRadius: "4px" }} />
                   <div style={{ width: "50%", height: "12px", background: "#222", borderRadius: "4px" }} />
@@ -852,7 +855,7 @@ const DesktopRightSidebar = ({
                   onVideoClick(v);
                 }}
                 style={desktopHighlightCardStyle}
-                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"}
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
               >
                 <div style={desktopHighlightThumbBox}>
@@ -886,16 +889,19 @@ const DesktopRightSidebar = ({
               </div>
             ))
           ) : (
-            <p style={{ color: "#71767b", fontSize: "13px", padding: "14px 16px", margin: 0 }}>
+            <p style={{ color: "#71767b", fontSize: "13px", padding: "10px 4px", margin: 0 }}>
               No highlights right now.
             </p>
           )}
         </div>
-      </div>
+      </section>
 
-      {/* 4. Top Creators ("Who to follow" - Discover Creators Page Style) */}
+      {/* Subtle Divider */}
+      {featuredCreators.length > 0 && <div style={desktopSectionDivider} />}
+
+      {/* 4. Top Creators (Open Section - Discover Creators Page Style) */}
       {featuredCreators.length > 0 && (
-        <div style={desktopCardStyle}>
+        <section style={desktopCardStyle}>
           <div style={desktopCardHeaderStyle}>
             <h3 style={desktopCardTitleStyle}>Top Creators</h3>
             <button
@@ -933,18 +939,18 @@ const DesktopRightSidebar = ({
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: "14px",
-                    padding: "20px 22px",
+                    gap: "12px",
+                    padding: "16px 2px 18px 2px",
                     borderBottom: cIdx < 2 ? "1px solid rgba(255, 255, 255, 0.08)" : "none",
                     cursor: "pointer",
-                    transition: "background 0.15s ease"
+                    transition: "opacity 0.15s ease",
+                    boxSizing: "border-box",
+                    width: "100%"
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)"}
-                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                   onClick={() => onCreatorClick(uname)}
                 >
                   {/* Top Row: Avatar + Info */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", width: "100%", minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%", minWidth: 0 }}>
                     <div style={{ flexShrink: 0 }}>
                       <StoryAvatar
                         username={uname}
@@ -956,7 +962,7 @@ const DesktopRightSidebar = ({
                       />
                     </div>
 
-                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" }}>
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
                       {/* Name + Verified */}
                       <div style={{ display: "inline-flex", alignItems: "center", gap: "3px", minWidth: 0 }}>
                         <span style={{
@@ -983,16 +989,16 @@ const DesktopRightSidebar = ({
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          lineHeight: "1.35",
-                          marginTop: "2px",
-                          marginBottom: "2px"
+                          lineHeight: "1.3",
+                          marginTop: "1px",
+                          marginBottom: "1px"
                         }} title={creator.creator_bio}>
                           {creator.creator_bio}
                         </span>
                       )}
 
                       {/* Handle & Followers */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "12px", color: "#71767b", lineHeight: "1.2" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11.5px", color: "#71767b", lineHeight: "1.2" }}>
                         <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           @{uname}
                         </span>
@@ -1010,12 +1016,13 @@ const DesktopRightSidebar = ({
                     <div style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(4, 1fr)",
-                      gap: "5px",
+                      gap: "4px",
                       width: "100%",
                       borderRadius: "8px",
                       overflow: "hidden",
-                      marginTop: "6px",
-                      marginBottom: "4px"
+                      marginTop: "4px",
+                      marginBottom: "2px",
+                      boxSizing: "border-box"
                     }}>
                       {sampleVideos.slice(0, 4).map((video, vIdx) => {
                         const totalThumbs = Math.min(sampleVideos.length, 4);
@@ -1092,14 +1099,14 @@ const DesktopRightSidebar = ({
                   )}
 
                   {/* Action Row: Follow & VIP Subscribe Buttons */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%", marginTop: "6px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%", marginTop: "2px" }}>
                     <button
                       type="button"
                       style={{
                         flex: 1,
-                        height: "36px",
-                        borderRadius: "18px",
-                        fontSize: "13px",
+                        height: "34px",
+                        borderRadius: "17px",
+                        fontSize: "12.5px",
                         fontWeight: "700",
                         cursor: "pointer",
                         display: "flex",
@@ -1127,9 +1134,9 @@ const DesktopRightSidebar = ({
                         type="button"
                         style={{
                           flex: 1,
-                          height: "36px",
-                          borderRadius: "18px",
-                          fontSize: "13px",
+                          height: "34px",
+                          borderRadius: "17px",
+                          fontSize: "12.5px",
                           fontWeight: "700",
                           cursor: "pointer",
                           display: "flex",
@@ -1161,7 +1168,7 @@ const DesktopRightSidebar = ({
               <span>Show more</span>
             </button>
           </div>
-        </div>
+        </section>
       )}
 
       {/* 5. Twitter-style Mini Legal Footer */}
@@ -2786,8 +2793,8 @@ export default function Explore({
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 10px; }
-        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 10px; }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.32); }
       `}</style>
     </div>
   );
@@ -3250,17 +3257,17 @@ const desktopSearchClearBtn = {
 };
 
 const desktopRightRailStyle = {
-  flex: "1 1 390px",
-  minWidth: "370px",
-  maxWidth: "460px",
+  flex: "1 1 380px",
+  minWidth: "350px",
+  maxWidth: "440px",
   height: "100vh",
   overflowY: "auto",
   position: "sticky",
   top: 0,
-  padding: "20px 22px 60px 22px",
+  padding: "16px 18px 120px 18px",
   display: "flex",
   flexDirection: "column",
-  gap: "22px",
+  gap: "24px",
   boxSizing: "border-box"
 };
 
@@ -3268,12 +3275,12 @@ const desktopSearchBoxWrapper = {
   display: "flex",
   alignItems: "center",
   gap: "10px",
-  padding: "12px 18px",
+  padding: "10px 16px",
   borderRadius: "9999px",
-  background: "var(--bg-color, #09090b)",
+  background: "rgba(255, 255, 255, 0.05)",
   border: "1px solid rgba(255, 255, 255, 0.10)",
   boxSizing: "border-box",
-  transition: "border-color 0.2s ease",
+  transition: "border-color 0.2s ease, background 0.2s ease",
   width: "100%"
 };
 
@@ -3300,26 +3307,34 @@ const desktopSearchInputClearBtn = {
 };
 
 const desktopCardStyle = {
-  background: "var(--bg-color, #09090b)",
-  borderRadius: "16px",
-  border: "1px solid rgba(255, 255, 255, 0.08)",
-  overflow: "hidden",
+  background: "transparent",
+  border: "none",
+  borderRadius: "0",
+  overflow: "visible",
   display: "flex",
   flexDirection: "column",
   width: "100%",
   boxSizing: "border-box"
 };
 
+const desktopSectionDivider = {
+  height: "1px",
+  backgroundColor: "rgba(255, 255, 255, 0.08)",
+  margin: "4px 0",
+  width: "100%"
+};
+
 const desktopCardHeaderStyle = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "16px 20px 14px 20px",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.08)"
+  padding: "0 2px 10px 2px",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+  marginBottom: "6px"
 };
 
 const desktopCardTitleStyle = {
-  fontSize: "18px",
+  fontSize: "17.5px",
   fontWeight: "800",
   color: "#ffffff",
   margin: 0,
@@ -3329,10 +3344,11 @@ const desktopCardTitleStyle = {
 const desktopTrendItemStyle = {
   display: "flex",
   flexDirection: "column",
-  padding: "15px 20px",
+  padding: "10px 8px",
+  borderRadius: "8px",
   cursor: "pointer",
   transition: "background 0.15s ease",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
+  borderBottom: "none"
 };
 
 const desktopTrendSublabel = {
@@ -3356,18 +3372,19 @@ const desktopTrendPosts = {
 
 const desktopHighlightCardStyle = {
   display: "flex",
-  gap: "14px",
-  padding: "16px 20px",
+  gap: "12px",
+  padding: "10px 8px",
+  borderRadius: "8px",
   cursor: "pointer",
   transition: "background 0.15s ease",
   alignItems: "center",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
+  borderBottom: "none"
 };
 
 const desktopHighlightThumbBox = {
-  width: "82px",
-  height: "102px",
-  borderRadius: "10px",
+  width: "74px",
+  height: "94px",
+  borderRadius: "8px",
   overflow: "hidden",
   background: "#111",
   flexShrink: 0,
@@ -3419,7 +3436,7 @@ const desktopHighlightCaption = {
   color: "#ffffff",
   fontSize: "13.5px",
   fontWeight: "600",
-  margin: "0 0 6px 0",
+  margin: "0 0 5px 0",
   lineHeight: "1.4",
   display: "-webkit-box",
   WebkitLineClamp: 2,
@@ -3437,8 +3454,8 @@ const desktopHighlightMeta = {
 
 const desktopHighlightSkeleton = {
   display: "flex",
-  gap: "14px",
-  padding: "16px 20px",
+  gap: "12px",
+  padding: "10px 8px",
   alignItems: "center"
 };
 
@@ -3523,15 +3540,14 @@ const desktopCardShowMoreBtn = {
   display: "flex",
   alignItems: "center",
   gap: "6px",
-  padding: "16px 20px",
+  padding: "12px 6px",
   background: "none",
   border: "none",
-  borderTop: "1px solid rgba(255, 255, 255, 0.08)",
   color: "var(--primary-color, #f43f5e)",
   fontSize: "14px",
   fontWeight: "700",
   cursor: "pointer",
-  transition: "background 0.15s ease",
+  transition: "opacity 0.15s ease",
   textAlign: "left"
 };
 
