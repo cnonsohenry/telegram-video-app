@@ -203,25 +203,25 @@ const InstagramSuggestedCreators = ({ creators, onCreatorClick, onSeeAll, user }
                 <X size={13} />
               </button>
 
-              {/* Center Avatar with Story Ring */}
+              {/* Center Avatar with Story Ring (Big Instagram Suggested Accounts Style) */}
               <div style={igAvatarContainer}>
                 <StoryAvatar
                   username={uname}
                   avatarUrl={creator.avatar_url}
                   displayName={creator.display_name || uname}
-                  size={60}
-                  borderWidth={2.5}
+                  size={84}
+                  borderWidth={2.8}
                   onClick={() => onCreatorClick && onCreatorClick(uname)}
                 />
               </div>
 
-              {/* Display Name */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", minWidth: 0 }}>
+              {/* Display Name + Twitter Verified Badge */}
+              <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "2.5px", width: "100%", minWidth: 0, marginTop: "2px" }}>
                 <span style={igDisplayName} title={creator.display_name || uname}>
                   {creator.display_name || uname}
                 </span>
                 {creator.is_verified && (
-                  <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
+                  <TwitterVerifiedBadge size={13.5} style={{ flexShrink: 0 }} />
                 )}
               </div>
 
@@ -869,60 +869,259 @@ const DesktopRightSidebar = ({
         </div>
       </div>
 
-      {/* 4. Top Creators ("Who to follow") */}
+      {/* 4. Top Creators ("Who to follow" - Discover Creators Page Style) */}
       {featuredCreators.length > 0 && (
         <div style={desktopCardStyle}>
           <div style={desktopCardHeaderStyle}>
             <h3 style={desktopCardTitleStyle}>Top Creators</h3>
+            <button
+              type="button"
+              onClick={onOpenDiscover}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--primary-color, #f43f5e)",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+                padding: "2px 6px"
+              }}
+            >
+              See all
+            </button>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {featuredCreators.slice(0, 3).map((creator) => {
+            {featuredCreators.slice(0, 3).map((creator, cIdx) => {
               const uname = creator.username;
               const isFollowing = followingMap[uname] !== undefined 
                 ? followingMap[uname] 
                 : Boolean(creator.is_following);
               const isLoading = Boolean(loadingMap[uname]);
+              const sampleVideos = Array.isArray(creator.sample_videos) ? creator.sample_videos : [];
+              const creatorPrice = creator.subscription_price !== undefined ? Number(creator.subscription_price) : 0;
+              const hasFee = creatorPrice > 0;
+              const isSubscribed = Boolean(creator.is_subscribed || (user && isUserSubscribedToCreator(user, { uploader_handle: uname })));
 
               return (
                 <div
                   key={`side-c-${uname}`}
-                  onClick={() => onCreatorClick(uname)}
-                  style={desktopSideCreatorRow}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    padding: "14px 16px",
+                    borderBottom: cIdx < 2 ? "1px solid rgba(255, 255, 255, 0.06)" : "none",
+                    cursor: "pointer",
+                    transition: "background 0.15s ease"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)"}
                   onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                  onClick={() => onCreatorClick(uname)}
                 >
-                  <StoryAvatar
-                    username={uname}
-                    avatarUrl={creator.avatar_url}
-                    displayName={creator.display_name || uname}
-                    size={40}
-                    borderWidth={2}
-                    onClick={() => onCreatorClick && onCreatorClick(uname)}
-                  />
-
-                  <div style={desktopSideCreatorInfo}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span style={desktopSideCreatorName}>{creator.display_name || uname}</span>
-                      {creator.is_verified && <TwitterVerifiedBadge size={13} style={{ flexShrink: 0 }} />}
+                  {/* Top Row: Avatar + Info */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%", minWidth: 0 }}>
+                    <div style={{ flexShrink: 0 }}>
+                      <StoryAvatar
+                        username={uname}
+                        avatarUrl={creator.avatar_url}
+                        displayName={creator.display_name || uname}
+                        size={46}
+                        borderWidth={2}
+                        onClick={() => onCreatorClick && onCreatorClick(uname)}
+                      />
                     </div>
-                    <span style={desktopSideCreatorHandle}>@{uname}</span>
+
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                      {/* Name + Verified */}
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "3px", minWidth: 0 }}>
+                        <span style={{
+                          fontSize: "14.5px",
+                          fontWeight: "800",
+                          color: "#ffffff",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          lineHeight: "1.2"
+                        }}>
+                          {creator.display_name || uname}
+                        </span>
+                        {creator.is_verified && (
+                          <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
+                        )}
+                      </div>
+
+                      {/* Bio line (1 line truncated with ellipsis) */}
+                      {creator.creator_bio && (
+                        <span style={{
+                          fontSize: "11.5px",
+                          color: "#8e8e93",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          lineHeight: "1.2"
+                        }} title={creator.creator_bio}>
+                          {creator.creator_bio}
+                        </span>
+                      )}
+
+                      {/* Handle & Followers */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11.5px", color: "#71767b", lineHeight: "1.2" }}>
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          @{uname}
+                        </span>
+                        {creator.followers_count > 0 && (
+                          <span style={{ flexShrink: 0 }}>
+                            &middot; {Number(creator.followers_count).toLocaleString()} {creator.followers_count === 1 ? "follower" : "followers"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    style={isFollowing ? desktopSideFollowingBtn : desktopSideFollowBtn}
-                    onClick={(e) => handleSideFollowToggle(e, creator)}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : isFollowing ? (
-                      "Following"
-                    ) : (
-                      "Follow"
+                  {/* Middle Row: 4 Thumbnails (Discover Page Style) */}
+                  {sampleVideos.length > 0 && (
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(4, 1fr)",
+                      gap: "3px",
+                      width: "100%",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      marginTop: "2px"
+                    }}>
+                      {sampleVideos.slice(0, 4).map((video, vIdx) => {
+                        const totalThumbs = Math.min(sampleVideos.length, 4);
+                        const isFirst = vIdx === 0;
+                        const isLast = vIdx === totalThumbs - 1;
+
+                        let thumbRadius = "0px";
+                        if (totalThumbs === 1) thumbRadius = "8px";
+                        else if (isFirst) thumbRadius = "8px 0 0 8px";
+                        else if (isLast) thumbRadius = "0 8px 8px 0";
+
+                        return (
+                          <div
+                            key={video.id || vIdx}
+                            style={{
+                              position: "relative",
+                              aspectRatio: "3/4",
+                              overflow: "hidden",
+                              backgroundColor: "#1c1c1f",
+                              borderRadius: thumbRadius,
+                              cursor: "pointer"
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onVideoClick) onVideoClick(video);
+                            }}
+                          >
+                            <img
+                              src={video.thumbnail_url}
+                              alt=""
+                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              loading="lazy"
+                            />
+                            <div style={{
+                              position: "absolute",
+                              inset: 0,
+                              background: "linear-gradient(to top, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 55%)",
+                              pointerEvents: "none"
+                            }} />
+                            <div style={{
+                              position: "absolute",
+                              bottom: "4px",
+                              left: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              color: "#ffffff",
+                              fontSize: "9px",
+                              fontWeight: "600",
+                              pointerEvents: "none"
+                            }}>
+                              <Play size={8} fill="#ffffff" strokeWidth={0} style={{ marginRight: "2px" }} />
+                              {Number(video.views || 0).toLocaleString()}
+                            </div>
+                            {(video.is_premium || video.category === "premium") && (
+                              <span style={{
+                                position: "absolute",
+                                top: "3px",
+                                right: "3px",
+                                backgroundColor: "rgba(255, 180, 0, 0.9)",
+                                color: "#000000",
+                                fontSize: "7.5px",
+                                fontWeight: "800",
+                                padding: "1px 3px",
+                                borderRadius: "2px",
+                                pointerEvents: "none"
+                              }}>
+                                VIP
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Action Row: Follow & VIP Subscribe Buttons */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", marginTop: "2px" }}>
+                    <button
+                      type="button"
+                      style={{
+                        flex: 1,
+                        height: "32px",
+                        borderRadius: "16px",
+                        fontSize: "12.5px",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.15s ease",
+                        border: isFollowing ? "1px solid rgba(255, 255, 255, 0.12)" : "none",
+                        backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.08)" : "#e4e4e7",
+                        color: isFollowing ? "#a1a1aa" : "#09090b"
+                      }}
+                      onClick={(e) => handleSideFollowToggle(e, creator)}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : isFollowing ? (
+                        "Following"
+                      ) : (
+                        "Follow"
+                      )}
+                    </button>
+
+                    {hasFee && (
+                      <button
+                        type="button"
+                        style={{
+                          flex: 1,
+                          height: "32px",
+                          borderRadius: "16px",
+                          fontSize: "12.5px",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          transition: "all 0.15s ease",
+                          border: isSubscribed ? "1px solid rgba(225, 29, 72, 0.3)" : "none",
+                          backgroundColor: isSubscribed ? "rgba(225, 29, 72, 0.14)" : "var(--primary-color, #e11d48)",
+                          color: isSubscribed ? "#f43f5e" : "#ffffff"
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCreatorClick(uname);
+                        }}
+                      >
+                        <span>VIP ${creatorPrice}/mo</span>
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </div>
               );
             })}
@@ -2701,7 +2900,7 @@ const desktopContainerStyle = {
 const desktopInnerWrapperStyle = {
   display: "flex",
   width: "100%",
-  maxWidth: "1260px",
+  maxWidth: "1340px",
   height: "100vh",
   position: "relative"
 };
@@ -3011,13 +3210,14 @@ const desktopSearchClearBtn = {
 };
 
 const desktopRightRailStyle = {
-  width: "350px",
+  flex: 1,
+  minWidth: "350px",
+  maxWidth: "420px",
   height: "100vh",
   overflowY: "auto",
   position: "sticky",
   top: 0,
-  flexShrink: 0,
-  padding: "16px 18px 24px 18px",
+  padding: "16px 20px 24px 20px",
   display: "flex",
   flexDirection: "column",
   gap: "16px",
@@ -3030,10 +3230,11 @@ const desktopSearchBoxWrapper = {
   gap: "10px",
   padding: "10px 16px",
   borderRadius: "9999px",
-  background: "#202327",
-  border: "1px solid transparent",
+  background: "var(--bg-color, #09090b)",
+  border: "1px solid rgba(255, 255, 255, 0.10)",
   boxSizing: "border-box",
-  transition: "border-color 0.2s ease"
+  transition: "border-color 0.2s ease",
+  width: "100%"
 };
 
 const desktopSearchInput = {
@@ -3059,20 +3260,22 @@ const desktopSearchInputClearBtn = {
 };
 
 const desktopCardStyle = {
-  background: "#16181c",
+  background: "var(--bg-color, #09090b)",
   borderRadius: "16px",
-  border: "1px solid var(--border-color)",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
   overflow: "hidden",
   display: "flex",
-  flexDirection: "column"
+  flexDirection: "column",
+  width: "100%",
+  boxSizing: "border-box"
 };
 
 const desktopCardHeaderStyle = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "14px 16px 10px 16px",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.05)"
+  padding: "14px 16px 12px 16px",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
 };
 
 const desktopCardTitleStyle = {
@@ -3282,6 +3485,7 @@ const desktopCardShowMoreBtn = {
   padding: "14px 16px",
   background: "none",
   border: "none",
+  borderTop: "1px solid rgba(255, 255, 255, 0.06)",
   color: "#ffffff",
   fontSize: "14px",
   fontWeight: "600",
@@ -3412,14 +3616,14 @@ const igScrollTrack = {
 
 const igCardBox = {
   position: "relative",
-  flex: "0 0 156px",
-  width: "156px",
-  minWidth: "156px",
-  maxWidth: "156px",
-  background: "#161616",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
+  flex: "0 0 174px",
+  width: "174px",
+  minWidth: "174px",
+  maxWidth: "174px",
+  background: "var(--bg-color, #09090b)",
+  border: "1px solid rgba(255, 255, 255, 0.10)",
   borderRadius: "14px",
-  padding: "18px 12px 14px 12px",
+  padding: "16px 10px 14px 10px",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
@@ -3450,19 +3654,19 @@ const igDismissBtn = {
 
 const igAvatarContainer = {
   position: "relative",
-  width: "84px",
-  height: "84px",
-  marginBottom: "12px",
+  width: "90px",
+  height: "90px",
+  marginBottom: "6px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center"
 };
 
 const igAvatarRing = {
-  width: "84px",
-  height: "84px",
+  width: "90px",
+  height: "90px",
   borderRadius: "50%",
-  padding: "2.5px",
+  padding: "2.8px",
   background: "rgba(255, 255, 255, 0.16)",
   boxSizing: "border-box",
   display: "flex",
@@ -3497,11 +3701,11 @@ const igDisplayName = {
   fontWeight: "700",
   color: "#ffffff",
   textAlign: "center",
-  width: "100%",
+  maxWidth: "calc(100% - 18px)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
-  lineHeight: "1.3"
+  lineHeight: "1.25"
 };
 
 const igHandleName = {
@@ -3512,12 +3716,12 @@ const igHandleName = {
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
-  marginTop: "2px"
+  marginTop: "1px"
 };
 
 const igFollowBtn = {
   width: "100%",
-  marginTop: "14px",
+  marginTop: "12px",
   padding: "7px 0",
   borderRadius: "8px",
   fontSize: "13px",
@@ -3534,7 +3738,7 @@ const igFollowBtn = {
 
 const igFollowingBtn = {
   width: "100%",
-  marginTop: "14px",
+  marginTop: "12px",
   padding: "6px 0",
   borderRadius: "8px",
   fontSize: "13px",

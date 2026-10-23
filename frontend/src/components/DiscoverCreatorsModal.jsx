@@ -734,7 +734,7 @@ const avatarContainerStyle = {
   width: "54px",
   height: "54px",
   flexShrink: 0,
-  marginRight: "12px"
+  marginRight: "9px"
 };
 
 const avatarRingStyle = {
@@ -783,7 +783,7 @@ const creatorInfoStyle = {
 const nameRowStyle = {
   display: "flex",
   alignItems: "center",
-  gap: "6px",
+  gap: "3px",
   minWidth: 0,
   lineHeight: "1.2"
 };
