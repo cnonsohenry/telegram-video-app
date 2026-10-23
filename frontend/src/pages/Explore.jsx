@@ -447,14 +447,11 @@ const DesktopLeftSidebar = ({
           style={desktopBrandHeaderStyle}
           title="NaijaHomemade"
         >
-          <div style={desktopBrandLogoCircle}>
-            <Flame size={18} color="#000000" />
-          </div>
           <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-            <span style={{ fontSize: "19px", fontWeight: "900", color: "#ffffff", letterSpacing: "-0.4px" }}>
+            <span style={{ fontSize: "20px", fontWeight: "900", color: "#ffffff", letterSpacing: "-0.4px" }}>
               Naija
             </span>
-            <span style={{ fontSize: "19px", fontWeight: "900", color: "#ffffff", letterSpacing: "-0.4px", opacity: 0.85 }}>
+            <span style={{ fontSize: "20px", fontWeight: "900", color: "var(--primary-color, #f43f5e)", letterSpacing: "-0.4px" }}>
               homemade
             </span>
           </div>
@@ -1150,7 +1147,7 @@ export default function Explore({
   const lastScrollY = useRef(0);
   const isFirstMount = useRef(true);
 
-  const shouldHideUI = isUIHidden && !isDesktop;
+  const shouldHideUI = isUIHidden;
 
   // 🟢 Window Resize Listener
   useEffect(() => {
@@ -1159,10 +1156,10 @@ export default function Explore({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // 🟢 Split Footer Broadcast Effects (Hide footer on mobile scroll OR always hide on desktop)
+  // 🟢 Split Footer Broadcast Effects (Hide footer on scroll for both mobile and desktop)
   useEffect(() => {
-    if (setHideFooter) setHideFooter(shouldHideUI || isDesktop);
-  }, [shouldHideUI, isDesktop, setHideFooter]);
+    if (setHideFooter) setHideFooter(shouldHideUI);
+  }, [shouldHideUI, setHideFooter]);
 
   useEffect(() => {
     return () => {
@@ -2297,11 +2294,20 @@ export default function Explore({
             {/* 2. MIDDLE COLUMN: Main Feed */}
             <div 
               ref={isDesktop ? scrollContainerRef : null}
-              style={desktopCenterRailStyle}
+              style={{
+                ...desktopCenterRailStyle,
+                paddingBottom: "80px"
+              }}
               className="custom-scrollbar"
             >
               {/* Desktop Sticky Header */}
-              <div style={desktopHeaderStickyStyle}>
+              <div style={{
+                ...desktopHeaderStickyStyle,
+                transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)",
+                opacity: shouldHideUI ? 0 : 1,
+                pointerEvents: shouldHideUI ? "none" : "auto",
+                transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease"
+              }}>
                 <div style={desktopHeaderTopStyle}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <span style={desktopHeaderTitleStyle}>

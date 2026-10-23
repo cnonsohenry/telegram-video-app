@@ -61,7 +61,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const currentCategory = APP_CONFIG.categories[activeTab];
   const isDesktop = windowWidth > 1024;
   
-  const shouldHideUI = isUIHidden && !isDesktop;
+  const shouldHideUI = isUIHidden;
   const fetchLimit = isDesktop ? 15 : 12;
   
   const categoryForFetch = currentCategory === "trends" 
@@ -780,8 +780,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     <div style={{ background: "var(--bg-color)", minHeight: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
       
       <div style={{
-        position: isDesktop ? "relative" : "absolute",
+        position: isDesktop ? "fixed" : "absolute",
         top: 0, left: 0, right: 0,
+        height: isDesktop ? "70px" : "auto",
         zIndex: 1000,
         transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
         transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)",
@@ -843,7 +844,15 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       <div style={{ display: "flex", flex: 1, position: "relative" }}>
         
         {isDesktop && (
-          <div style={{ width: "80px", flexShrink: 0, position: "sticky", top: "70px", height: "calc(100vh - 70px)", zIndex: 110 }}>
+          <div style={{
+            width: "80px",
+            flexShrink: 0,
+            position: "sticky",
+            top: shouldHideUI ? "0px" : "70px",
+            height: shouldHideUI ? "100vh" : "calc(100vh - 70px)",
+            zIndex: 110,
+            transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+          }}>
             <nav 
               onMouseEnter={() => setIsSidebarHovered(true)}
               onMouseLeave={() => setIsSidebarHovered(false)}
@@ -875,15 +884,15 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
               touchAction: "pan-y", 
               overscrollBehaviorY: "contain", 
               overflowAnchor: "none",
-              height: isDesktop ? "calc(100vh - 70px)" : "100vh", 
+              height: "100vh", 
               overflowY: "auto", 
               paddingBottom: "0px", // 🟢 Fixed: No more shrinking scroll space
             }}>
               <div style={{ 
-                 paddingTop: isDesktop ? "30px" : "115px", 
+                 paddingTop: isDesktop ? "90px" : "115px", 
                  paddingLeft: isDesktop ? "25px" : "15px",
                  paddingRight: isDesktop ? "25px" : "15px",
-                 paddingBottom: "30px"
+                 paddingBottom: "80px"
               }}>
                  
                  {activeGroup && (
@@ -984,7 +993,15 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         </div>
 
         {isDesktop && (
-          <aside style={suggestedSidebarRail} className="custom-scrollbar">
+          <aside
+            style={{
+              ...suggestedSidebarRail,
+              top: shouldHideUI ? "0px" : "70px",
+              height: shouldHideUI ? "100vh" : "calc(100vh - 70px)",
+              transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+            }}
+            className="custom-scrollbar"
+          >
             <SuggestedSidebar 
               suggestions={sidebarSuggestions}
               loading={loading} 

@@ -956,7 +956,7 @@ export default function App() {
           position: 'relative',
           width: '100%',
           height: '100%',
-          paddingBottom: shouldShowFooter ? "70px" : "0",
+          paddingBottom: "0px",
         }}
       > 
         <div style={{ 
@@ -1033,8 +1033,14 @@ export default function App() {
         />
       )}
 
-      {shouldShowFooter && (
-        <nav style={navStyle}>
+      {activeTab !== "admin" && !activeVideo && !showPaywall && !activeCommentVideo && (activeTab !== "profile" || isLoggedIn) && (
+        <nav style={{
+          ...navStyle,
+          transform: isFooterVisible ? "translateY(0)" : "translateY(100%)",
+          opacity: isFooterVisible ? 1 : 0,
+          pointerEvents: isFooterVisible ? "auto" : "none",
+          transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease"
+        }}>
           <button 
             onClick={() => handleTabSwitch("home")} 
             style={{...btnStyle, color: activeTab === 'home' ? '#f4f4f5' : '#71717a'}}
