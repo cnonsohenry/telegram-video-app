@@ -1335,4 +1335,287 @@ router.post("/reports/:id/ban-creator", authenticateToken, isAdmin, async (req, 
   }
 });
 
+// 🟢 16. STORY VIEWS & STATUS INTELLIGENCE (Executive Story Analytics)
+router.get("/story-analytics", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const [summaryRes, creatorsRes, recentViewsRes] = await Promise.all([
+      // 1. High-level aggregates
+      pool.query(`
+        SELECT 
+          COUNT(*) as total_views,
+          COUNT(*) FILTER (WHERE viewed_at >= NOW() - INTERVAL '24 hours') as views_24h,
+          COUNT(*) FILTER (WHERE viewed_at >= NOW() - INTERVAL '7 days') as views_7d,
+          COUNT(*) FILTER (WHERE viewed_at >= NOW() - INTERVAL '30 days') as views_30d,
+          COUNT(DISTINCT user_id) as unique_viewers_total,
+          COUNT(DISTINCT user_id) FILTER (WHERE viewed_at >= NOW() - INTERVAL '24 hours') as unique_viewers_24h
+        FROM creator_story_views
+      `),
+      // 2. Creator story breakdown (Day, Week, Month, All-time)
+      pool.query(`
+        SELECT 
+          cs.creator_id,
+          cs.username as creator_username,
+          COALESCE(u.display_name, cs.username) as display_name,
+          u.avatar_url,
+          COALESCE(u.creator_category, 'Creator') as creator_category,
+          COALESCE(u.is_verified, false) as is_verified,
+          COALESCE(u.is_managed, false) as is_managed,
+          COUNT(DISTINCT cs.id)::int as total_stories_posted,
+          COUNT(DISTINCT cs.id) FILTER (WHERE cs.expires_at > NOW() AND cs.is_active = true)::int as active_stories,
+          COUNT(csv.id)::int as total_views,
+          COUNT(csv.id) FILTER (WHERE csv.viewed_at >= NOW() - INTERVAL '24 hours')::int as views_24h,
+          COUNT(csv.id) FILTER (WHERE csv.viewed_at >= NOW() - INTERVAL '7 days')::int as views_7d,
+          COUNT(csv.id) FILTER (WHERE csv.viewed_at >= NOW() - INTERVAL '30 days')::int as views_30d,
+          COUNT(DISTINCT csv.user_id)::int as unique_viewers,
+          MAX(cs.created_at) as last_story_at
+        FROM creator_stories cs
+        LEFT JOIN app_users u ON cs.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cs.creator_id = u.telegram_user_id) OR LOWER(u.username) = LOWER(cs.username)
+        LEFT JOIN creator_story_views csv ON csv.story_id = cs.id
+        GROUP BY cs.creator_id, cs.username, u.display_name, u.avatar_url, u.creator_category, u.is_verified, u.is_managed
+        ORDER BY total_views DESC
+      `),
+      // 3. Recent 30 live view events stream
+      pool.query(`
+        SELECT 
+          csv.id as view_id,
+          csv.story_id,
+          csv.viewed_at,
+          u.id as user_id,
+          u.username as viewer_username,
+          u.display_name as viewer_display_name,
+          u.email as viewer_email,
+          u.avatar_url as viewer_avatar_url,
+          u.is_premium as viewer_is_premium,
+          cs.creator_id,
+          COALESCE(cs.username, cu.username) as creator_username,
+          COALESCE(cu.display_name, cs.username) as creator_display_name,
+          cs.sound_title,
+          cs.video_url,
+          cs.thumbnail_url,
+          cs.duration,
+          CASE WHEN cs.expires_at > NOW() AND cs.is_active = true THEN true ELSE false END as is_currently_active
+        FROM creator_story_views csv
+        LEFT JOIN app_users u ON csv.user_id = u.id
+        JOIN creator_stories cs ON csv.story_id = cs.id
+        LEFT JOIN app_users cu ON cs.creator_id = cu.id OR (cu.telegram_user_id IS NOT NULL AND cs.creator_id = cu.telegram_user_id)
+        ORDER BY csv.viewed_at DESC
+        LIMIT 30
+      `)
+    ]);
+
+    const storiesCountRes = await pool.query(`
+      SELECT 
+        COUNT(*)::int as total_stories,
+        COUNT(*) FILTER (WHERE expires_at > NOW() AND is_active = true)::int as active_stories,
+        COUNT(DISTINCT creator_id) FILTER (WHERE expires_at > NOW() AND is_active = true)::int as active_creators
+      FROM creator_stories
+    `);
+
+    const summary = summaryRes.rows[0];
+    const storiesCount = storiesCountRes.rows[0];
+
+    res.json({
+      summary: {
+        total_views: parseInt(summary.total_views || 0),
+        views_24h: parseInt(summary.views_24h || 0),
+        views_7d: parseInt(summary.views_7d || 0),
+        views_30d: parseInt(summary.views_30d || 0),
+        unique_viewers_total: parseInt(summary.unique_viewers_total || 0),
+        unique_viewers_24h: parseInt(summary.unique_viewers_24h || 0),
+        total_stories_count: parseInt(storiesCount.total_stories || 0),
+        active_stories_count: parseInt(storiesCount.active_stories || 0),
+        active_creators_count: parseInt(storiesCount.active_creators || 0),
+        avg_views_per_story: storiesCount.total_stories > 0 
+          ? (parseInt(summary.total_views || 0) / parseInt(storiesCount.total_stories)).toFixed(1)
+          : 0
+      },
+      creators: creatorsRes.rows,
+      recent_views: recentViewsRes.rows
+    });
+  } catch (err) {
+    console.error("[ADMIN STORY ANALYTICS ERROR]", err);
+    res.status(500).json({ error: "Failed to fetch story analytics" });
+  }
+});
+
+// 🟢 17. GET DETAILED STORIES (With Status, Remaining Time, View Counts & Pagination)
+router.get("/stories", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(10, parseInt(req.query.limit) || 25));
+    const offset = (page - 1) * limit;
+    const status = req.query.status; // 'active' | 'expired' | 'all'
+    const creator = req.query.creator ? req.query.creator.trim() : null;
+    const search = req.query.search ? req.query.search.trim() : null;
+
+    let whereClauses = [];
+    let params = [];
+    let idx = 1;
+
+    if (status === 'active') {
+      whereClauses.push(`cs.expires_at > NOW() AND cs.is_active = true`);
+    } else if (status === 'expired') {
+      whereClauses.push(`(cs.expires_at <= NOW() OR cs.is_active = false)`);
+    }
+
+    if (creator) {
+      whereClauses.push(`(LOWER(cs.username) = LOWER($${idx}) OR LOWER(u.username) = LOWER($${idx}))`);
+      params.push(creator);
+      idx++;
+    }
+
+    if (search) {
+      whereClauses.push(`(cs.username ILIKE $${idx} OR cs.sound_title ILIKE $${idx} OR u.display_name ILIKE $${idx})`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const countRes = await pool.query(`
+      SELECT COUNT(*) 
+      FROM creator_stories cs
+      LEFT JOIN app_users u ON cs.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cs.creator_id = u.telegram_user_id) OR LOWER(u.username) = LOWER(cs.username)
+      ${whereSql}
+    `, params);
+    const total = parseInt(countRes.rows[0].count);
+
+    const storiesRes = await pool.query(`
+      SELECT 
+        cs.id,
+        cs.creator_id,
+        COALESCE(cs.username, u.username) as username,
+        COALESCE(u.display_name, cs.username) as display_name,
+        u.avatar_url,
+        COALESCE(u.is_verified, false) as is_verified,
+        cs.video_url,
+        cs.thumbnail_url,
+        cs.duration,
+        cs.sound_title,
+        cs.created_at,
+        cs.expires_at,
+        cs.is_active,
+        CASE WHEN cs.expires_at > NOW() AND cs.is_active = true THEN true ELSE false END as is_currently_active,
+        GREATEST(0, EXTRACT(EPOCH FROM (cs.expires_at - NOW())))::int as seconds_remaining,
+        (SELECT COUNT(*)::int FROM creator_story_views csv WHERE csv.story_id = cs.id) as view_count,
+        (SELECT COUNT(*)::int FROM creator_story_views csv WHERE csv.story_id = cs.id AND csv.viewed_at >= NOW() - INTERVAL '24 hours') as views_24h,
+        (SELECT COUNT(DISTINCT user_id)::int FROM creator_story_views csv WHERE csv.story_id = cs.id) as unique_viewers
+      FROM creator_stories cs
+      LEFT JOIN app_users u ON cs.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cs.creator_id = u.telegram_user_id) OR LOWER(u.username) = LOWER(cs.username)
+      ${whereSql}
+      ORDER BY cs.created_at DESC
+      LIMIT $${idx} OFFSET $${idx + 1}
+    `, [...params, limit, offset]);
+
+    res.json({
+      stories: storiesRes.rows,
+      total,
+      page,
+      limit,
+      total_pages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    console.error("[ADMIN STORIES LIST ERROR]", err);
+    res.status(500).json({ error: "Failed to fetch stories" });
+  }
+});
+
+// 🟢 18. GET STORY VIEWERS (List of Users Who Watched a Specific Story)
+router.get("/stories/:id/viewers", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const storyId = req.params.id;
+
+    // Fetch story info
+    const storyQuery = await pool.query(`
+      SELECT 
+        cs.id,
+        cs.creator_id,
+        COALESCE(cs.username, u.username) as username,
+        COALESCE(u.display_name, cs.username) as display_name,
+        u.avatar_url,
+        u.is_verified,
+        cs.video_url,
+        cs.thumbnail_url,
+        cs.duration,
+        cs.sound_title,
+        cs.created_at,
+        cs.expires_at,
+        CASE WHEN cs.expires_at > NOW() AND cs.is_active = true THEN true ELSE false END as is_currently_active,
+        (SELECT COUNT(*)::int FROM creator_story_views csv WHERE csv.story_id = cs.id) as total_views,
+        (SELECT COUNT(DISTINCT user_id)::int FROM creator_story_views csv WHERE csv.story_id = cs.id) as unique_viewers
+      FROM creator_stories cs
+      LEFT JOIN app_users u ON cs.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cs.creator_id = u.telegram_user_id) OR LOWER(u.username) = LOWER(cs.username)
+      WHERE cs.id = $1
+    `, [storyId]);
+
+    if (storyQuery.rows.length === 0) {
+      return res.status(404).json({ error: "Story not found" });
+    }
+
+    const viewersQuery = await pool.query(`
+      SELECT 
+        csv.id as view_id,
+        csv.story_id,
+        csv.viewed_at,
+        u.id as user_id,
+        u.username,
+        u.display_name,
+        u.email,
+        u.avatar_url,
+        u.role,
+        u.is_premium
+      FROM creator_story_views csv
+      LEFT JOIN app_users u ON csv.user_id = u.id
+      WHERE csv.story_id = $1
+      ORDER BY csv.viewed_at DESC
+    `, [storyId]);
+
+    res.json({
+      story: storyQuery.rows[0],
+      viewers: viewersQuery.rows
+    });
+  } catch (err) {
+    console.error("[ADMIN STORY VIEWERS ERROR]", err);
+    res.status(500).json({ error: "Failed to fetch story viewers" });
+  }
+});
+
+// 🟢 19. GET CREATOR STORY VIEWERS (All Users Who Watched Any Story by a Creator)
+router.get("/creators/:username/story-viewers", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const viewersQuery = await pool.query(`
+      SELECT 
+        csv.id as view_id,
+        csv.story_id,
+        csv.viewed_at,
+        cs.sound_title,
+        cs.created_at as story_created_at,
+        cs.duration,
+        u.id as user_id,
+        u.username,
+        u.display_name,
+        u.email,
+        u.avatar_url,
+        u.role,
+        u.is_premium
+      FROM creator_story_views csv
+      JOIN creator_stories cs ON csv.story_id = cs.id
+      LEFT JOIN app_users u ON csv.user_id = u.id
+      WHERE LOWER(cs.username) = LOWER($1)
+      ORDER BY csv.viewed_at DESC
+      LIMIT 100
+    `, [username]);
+
+    res.json({
+      creator: username,
+      viewers: viewersQuery.rows
+    });
+  } catch (err) {
+    console.error("[ADMIN CREATOR STORY VIEWERS ERROR]", err);
+    res.status(500).json({ error: "Failed to fetch creator story viewers" });
+  }
+});
+
 export default router;

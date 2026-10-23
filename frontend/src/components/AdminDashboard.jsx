@@ -3,7 +3,8 @@ import {
   LayoutDashboard, Users, CreditCard, LogOut, TrendingUp, ShieldCheck, 
   Clock, RefreshCw, UploadCloud, Video, Search, Edit3, Trash2, ChevronUp, ChevronDown, X, AlertTriangle, Menu,
   PlayCircle, Eye, PieChart, Activity, Star, Percent, Sparkles, CheckCircle, Heart, ExternalLink, DollarSign,
-  Flag, ShieldAlert, BarChart3, Database, Layers, ArrowUpRight, Check
+  Flag, ShieldAlert, BarChart3, Database, Layers, ArrowUpRight, Check,
+  Radio, Music, Calendar, Play
 } from "lucide-react";
 import AdminUpload from "./AdminUpload"; 
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge"; 
@@ -39,6 +40,21 @@ export default function AdminDashboard({ user, onLogout }) {
   const [chartTimeframe, setChartTimeframe] = useState("30"); // "7", "14", "30"
   const [chartMetric, setChartMetric] = useState("signups"); // "signups", "uploads", "stories", "revenue"
   const [selectedCategoryDetail, setSelectedCategoryDetail] = useState(null);
+
+  // Story Intelligence State
+  const [storyAnalytics, setStoryAnalytics] = useState(null);
+  const [storySubTab, setStorySubTab] = useState("creators"); // "creators" | "catalog" | "feed"
+  const [storyFilter, setStoryFilter] = useState("all"); // "all" | "active" | "expired"
+  const [storyCreatorFilter, setStoryCreatorFilter] = useState("all");
+  const [storySearchTerm, setStorySearchTerm] = useState("");
+  const [storiesPage, setStoriesPage] = useState(1);
+  const [storiesData, setStoriesData] = useState({ stories: [], total: 0, total_pages: 1 });
+  const [storiesLoading, setStoriesLoading] = useState(false);
+  const [viewersModalData, setViewersModalData] = useState(null); // { type: 'story'|'creator', item, viewers: [], loading: boolean }
+  const [storyPreviewModal, setStoryPreviewModal] = useState(null); // story to preview
+  const [viewerSearchFilter, setViewerSearchFilter] = useState("");
+  const [creatorStorySearch, setCreatorStorySearch] = useState("");
+  const [creatorStorySort, setCreatorStorySort] = useState("views_24h"); // "views_24h" | "views_7d" | "views_30d" | "total_views" | "unique_viewers"
 
   // Lists & Server-side Paginated Data
   const [usersData, setUsersData] = useState({ users: [], total: 0, total_pages: 1 });
@@ -100,6 +116,19 @@ export default function AdminDashboard({ user, onLogout }) {
         if (!res.ok) throw new Error("Failed to load dashboard statistics");
         const data = await res.json();
         setStatsData(data);
+      } else if (activeTab === "stories") {
+        setStoriesLoading(true);
+        const [analyticsRes, storiesRes] = await Promise.all([
+          fetch(`${baseUrl}/api/admin/story-analytics`, { headers }),
+          fetch(`${baseUrl}/api/admin/stories?page=${storiesPage}&limit=${ITEMS_PER_PAGE}&status=${storyFilter}${storyCreatorFilter !== 'all' ? `&creator=${encodeURIComponent(storyCreatorFilter)}` : ''}${storySearchTerm ? `&search=${encodeURIComponent(storySearchTerm)}` : ''}`, { headers })
+        ]);
+        if (analyticsRes.ok) {
+          setStoryAnalytics(await analyticsRes.json());
+        }
+        if (storiesRes.ok) {
+          setStoriesData(await storiesRes.json());
+        }
+        setStoriesLoading(false);
       } else if (activeTab === "creators") {
         const res = await fetch(`${baseUrl}/api/admin/creators`, { headers });
         if (res.ok) {
@@ -182,6 +211,75 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   }, [currentPage, videoCategoryFilter, txCurrencyFilter, txStatusFilter]);
 
+  // Story catalog page/filter reload
+  const fetchStoriesCatalogOnly = async () => {
+    try {
+      const headers = { 'Authorization': `Bearer ${localStorage.getItem("token")}` };
+      const statusParam = storyFilter !== "all" ? `&status=${storyFilter}` : "";
+      const creatorParam = storyCreatorFilter !== "all" ? `&creator=${encodeURIComponent(storyCreatorFilter)}` : "";
+      const searchParam = storySearchTerm.trim() ? `&search=${encodeURIComponent(storySearchTerm.trim())}` : "";
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/stories?page=${storiesPage}&limit=${ITEMS_PER_PAGE}${statusParam}${creatorParam}${searchParam}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setStoriesData({
+          stories: data.stories || [],
+          total: data.total || 0,
+          total_pages: data.total_pages || 1
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load stories catalog:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "stories") {
+      fetchStoriesCatalogOnly();
+    }
+  }, [storiesPage, storyFilter, storyCreatorFilter]);
+
+  // Viewers Modal Openers
+  const handleOpenStoryViewers = async (story) => {
+    setViewersModalData({ type: 'story', item: story, viewers: [], loading: true });
+    setViewerSearchFilter("");
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/stories/${story.id}/viewers`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setViewersModalData({ type: 'story', item: data.story || story, viewers: data.viewers || [], loading: false });
+      } else {
+        showToast("Failed to fetch story viewers", "error");
+        setViewersModalData(null);
+      }
+    } catch (err) {
+      showToast("Error loading viewers: " + err.message, "error");
+      setViewersModalData(null);
+    }
+  };
+
+  const handleOpenCreatorStoryViewers = async (creator) => {
+    const uname = creator.creator_username || creator.username;
+    setViewersModalData({ type: 'creator', item: creator, viewers: [], loading: true });
+    setViewerSearchFilter("");
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators/${uname}/story-viewers`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setViewersModalData({ type: 'creator', item: creator, viewers: data.viewers || [], loading: false });
+      } else {
+        showToast("Failed to fetch creator viewers", "error");
+        setViewersModalData(null);
+      }
+    } catch (err) {
+      showToast("Error loading creator viewers: " + err.message, "error");
+      setViewersModalData(null);
+    }
+  };
+
   // Sorting helper
   const handleSort = (key) => {
     let direction = 'asc';
@@ -236,6 +334,26 @@ export default function AdminDashboard({ user, onLogout }) {
     const totalTips = creatorStats?.total_tips_ngn || creatorsList.reduce((sum, c) => sum + (Number(c.tips_total) || 0), 0);
     return { total, verified, managed, totalSubs, totalSubRev, totalTips };
   }, [creatorsList, creatorStats]);
+
+  // Sorted & Filtered Story Creators
+  const filteredStoryCreators = useMemo(() => {
+    if (!storyAnalytics?.creators) return [];
+    let list = storyAnalytics.creators.filter(c => {
+      if (!creatorStorySearch.trim()) return true;
+      const q = creatorStorySearch.toLowerCase();
+      return (c.creator_username || "").toLowerCase().includes(q) || (c.display_name || "").toLowerCase().includes(q) || (c.creator_category || "").toLowerCase().includes(q);
+    });
+
+    return list.sort((a, b) => {
+      if (creatorStorySort === "views_24h") return (b.views_24h || 0) - (a.views_24h || 0);
+      if (creatorStorySort === "views_7d") return (b.views_7d || 0) - (a.views_7d || 0);
+      if (creatorStorySort === "views_30d") return (b.views_30d || 0) - (a.views_30d || 0);
+      if (creatorStorySort === "total_views") return (b.total_views || 0) - (a.total_views || 0);
+      if (creatorStorySort === "unique_viewers") return (b.unique_viewers || 0) - (a.unique_viewers || 0);
+      if (creatorStorySort === "active_stories") return (b.active_stories || 0) - (a.active_stories || 0);
+      return 0;
+    });
+  }, [storyAnalytics, creatorStorySearch, creatorStorySort]);
 
   // Creator Actions
   const handleToggleVerify = async (creator) => {
@@ -568,6 +686,13 @@ export default function AdminDashboard({ user, onLogout }) {
           
           <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "6px" }}>
             <SidebarBtn active={activeTab === "overview" && !searchQuery} onClick={() => handleTabSwitch("overview")} icon={<LayoutDashboard size={18} />} label="Overview & Charts" />
+            <SidebarBtn 
+              active={activeTab === "stories" && !searchQuery} 
+              onClick={() => handleTabSwitch("stories")} 
+              icon={<Radio size={18} />} 
+              label="Story Intelligence" 
+              badge={overview.active_stories > 0 ? `${overview.active_stories} Live` : null} 
+            />
             <SidebarBtn active={activeTab === "creators" && !searchQuery} onClick={() => handleTabSwitch("creators")} icon={<Sparkles size={18} />} label="Creators & Funnels" />
             <SidebarBtn active={activeTab === "videos" && !searchQuery} onClick={() => handleTabSwitch("videos")} icon={<Video size={18} />} label="Content Library" count={overview.total_videos} />
             <SidebarBtn active={activeTab === "users" && !searchQuery} onClick={() => handleTabSwitch("users")} icon={<Users size={18} />} label="User Accounts" count={overview.total_users} />
@@ -608,7 +733,7 @@ export default function AdminDashboard({ user, onLogout }) {
             </button>
             <div>
               <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: "#f4f4f5", letterSpacing: "-0.5px", textTransform: "capitalize" }}>
-                {searchQuery ? "Global Database Search" : activeTab === "overview" ? "Executive Dashboard" : activeTab}
+                {searchQuery ? "Global Database Search" : activeTab === "overview" ? "Executive Dashboard" : activeTab === "stories" ? "Story Views & Status Intelligence" : activeTab}
               </h1>
             </div>
             
@@ -777,7 +902,7 @@ export default function AdminDashboard({ user, onLogout }) {
                 )}
               </div>
             ) : <div style={centerFlex}><p style={{ color: "#71717a" }}>No results found.</p></div>
-          ) : loading && !statsData ? (
+          ) : loading && !statsData && !storyAnalytics ? (
             <div style={centerFlex}><RefreshCw size={36} color="#f43f5e" style={{ animation: "spin 1s linear infinite" }} /></div>
           ) : (
             <>
@@ -1096,6 +1221,576 @@ export default function AdminDashboard({ user, onLogout }) {
                     </div>
                   </div>
 
+                </div>
+              )}
+
+              {/* 🟢 STORY VIEWS & STATUS INTELLIGENCE TAB */}
+              {activeTab === "stories" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                  {/* Row 1: Story Pulse KPIs */}
+                  <div style={gridStatsStyle}>
+                    <StatCard 
+                      title="Total Story Views" 
+                      value={(storyAnalytics?.summary?.total_views || 0).toLocaleString()} 
+                      subtitle={`${(storyAnalytics?.summary?.views_30d || 0).toLocaleString()} in rolling 30 days`}
+                      icon={<Eye size={20} color="#f43f5e" />} 
+                      bg="rgba(225, 29, 72, 0.12)" 
+                    />
+                    <StatCard 
+                      title="Today's Views (24h)" 
+                      value={(storyAnalytics?.summary?.views_24h || 0).toLocaleString()} 
+                      subtitle={`${storyAnalytics?.summary?.unique_viewers_24h || 0} unique viewers active today`}
+                      icon={<TrendingUp size={20} color="#34d399" />} 
+                      bg="rgba(52, 211, 153, 0.12)" 
+                    />
+                    <StatCard 
+                      title="Weekly Views (7d)" 
+                      value={(storyAnalytics?.summary?.views_7d || 0).toLocaleString()} 
+                      subtitle={`7-day rolling story engagement`}
+                      icon={<Calendar size={20} color="#38bdf8" />} 
+                      bg="rgba(56, 189, 248, 0.12)" 
+                    />
+                    <StatCard 
+                      title="Live Active Stories" 
+                      value={`${storyAnalytics?.summary?.active_stories_count || 0} Stories`} 
+                      subtitle={`Across ${storyAnalytics?.summary?.active_creators_count || 0} creators (Avg ${storyAnalytics?.summary?.avg_views_per_story || 0} views/story)`}
+                      icon={<Radio size={20} color="#fbbf24" />} 
+                      bg="rgba(251, 191, 36, 0.12)" 
+                    />
+                  </div>
+
+                  {/* Subtab Navigator */}
+                  <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "12px", flexWrap: "wrap" }}>
+                    {[
+                      { id: "creators", label: "Creator Performance (Day / Week / Month)", icon: <Users size={15} /> },
+                      { id: "catalog", label: `Story Catalog & Real-Time Status (${storiesData.total || 0})`, icon: <PlayCircle size={15} /> },
+                      { id: "feed", label: `Live Viewers Telemetry Feed (${storyAnalytics?.recent_views?.length || 0})`, icon: <Activity size={15} /> }
+                    ].map(st => (
+                      <button
+                        key={st.id}
+                        onClick={() => setStorySubTab(st.id)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          padding: "8px 16px",
+                          borderRadius: "8px",
+                          fontSize: "13px",
+                          fontWeight: "700",
+                          border: "1px solid",
+                          borderColor: storySubTab === st.id ? "rgba(244, 63, 94, 0.4)" : "rgba(255,255,255,0.08)",
+                          background: storySubTab === st.id ? "rgba(244, 63, 94, 0.12)" : "#18181b",
+                          color: storySubTab === st.id ? "#f43f5e" : "#a1a1aa",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease"
+                        }}
+                      >
+                        {st.icon} {st.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* SUBTAB 1: CREATOR STORY VIEWS (DAY / WEEK / MONTH) */}
+                  {storySubTab === "creators" && (
+                    <div>
+                      {/* Search & Sort Bar */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#18181b", border: "1px solid rgba(255,255,255,0.08)", padding: "7px 12px", borderRadius: "8px", width: "280px" }}>
+                          <Search size={14} color="#71717a" />
+                          <input 
+                            type="text" 
+                            placeholder="Filter creators by handle or name..." 
+                            value={creatorStorySearch} 
+                            onChange={(e) => setCreatorStorySearch(e.target.value)} 
+                            style={{ background: "transparent", border: "none", color: "#f4f4f5", outline: "none", width: "100%", fontSize: "12px" }}
+                          />
+                          {creatorStorySearch && <X size={12} color="#71717a" style={{ cursor: "pointer" }} onClick={() => setCreatorStorySearch("")} />}
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "12px", color: "#71717a", fontWeight: "600" }}>Sort Primary Metric:</span>
+                          <select
+                            value={creatorStorySort}
+                            onChange={(e) => setCreatorStorySort(e.target.value)}
+                            style={{
+                              background: "#18181b",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: "8px",
+                              color: "#f4f4f5",
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              outline: "none"
+                            }}
+                          >
+                            <option value="views_24h">Today's Views (24h)</option>
+                            <option value="views_7d">This Week's Views (7d)</option>
+                            <option value="views_30d">This Month's Views (30d)</option>
+                            <option value="total_views">All-Time Story Views</option>
+                            <option value="unique_viewers">Unique Viewers Base</option>
+                            <option value="active_stories">Active Stories Live</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Creators Story Analytics Table */}
+                      <div style={tableContainerStyle}>
+                        <div style={{ overflowX: "auto" }}>
+                          <table style={tableStyle}>
+                            <thead>
+                              <tr>
+                                <th style={thStyle}>Creator Profile</th>
+                                <th style={thStyle}>Category</th>
+                                <th style={thStyle}>Stories Status</th>
+                                <th style={{ ...thStyle, color: "#34d399" }}>Today (24h)</th>
+                                <th style={{ ...thStyle, color: "#38bdf8" }}>Week (7d)</th>
+                                <th style={{ ...thStyle, color: "#fbbf24" }}>Month (30d)</th>
+                                <th style={thStyle}>Total Views</th>
+                                <th style={thStyle}>Unique Viewers</th>
+                                <th style={thStyle}>Last Story</th>
+                                <th style={thStyle}>Viewers List</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredStoryCreators.length === 0 ? (
+                                <tr>
+                                  <td colSpan={10} style={{ ...tdStyle, textAlign: "center", padding: "40px", color: "#71717a" }}>
+                                    No creator matches found.
+                                  </td>
+                                </tr>
+                              ) : (
+                                filteredStoryCreators.map((c, i) => (
+                                  <tr key={c.creator_username || i} style={trStyle}>
+                                    <td style={tdStyle}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                        <img 
+                                          src={c.avatar_url || '/assets/default-avatar.png'} 
+                                          alt="" 
+                                          style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(255,255,255,0.08)" }}
+                                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                        />
+                                        <div>
+                                          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                            <span style={{ fontWeight: "700", color: "#f4f4f5", fontSize: "13px" }}>{c.display_name || c.creator_username}</span>
+                                            {c.is_verified && <TwitterVerifiedBadge size={13} />}
+                                          </div>
+                                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                                            <span style={{ fontSize: "11px", color: "#71717a" }}>@{c.creator_username}</span>
+                                            {c.is_managed ? (
+                                              <span style={{ background: "rgba(56, 189, 248, 0.12)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.25)", borderRadius: "4px", padding: "1px 5px", fontSize: "9px", fontWeight: "800" }}>
+                                                TELEGRAM
+                                              </span>
+                                            ) : (
+                                              <span style={{ background: "rgba(244, 63, 94, 0.12)", color: "#f43f5e", border: "1px solid rgba(244, 63, 94, 0.25)", borderRadius: "4px", padding: "1px 5px", fontSize: "9px", fontWeight: "800" }}>
+                                                WEB
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <span style={{ background: "#27272a", color: "#a1a1aa", borderRadius: "6px", padding: "2px 8px", fontSize: "11px", fontWeight: "700" }}>
+                                        {c.creator_category || "Creator"}
+                                      </span>
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <div style={{ fontSize: "12px", color: "#f4f4f5", fontWeight: "600" }}>
+                                        {c.total_stories_posted || 0} total
+                                      </div>
+                                      <div style={{ fontSize: "11px", marginTop: "2px" }}>
+                                        {c.active_stories > 0 ? (
+                                          <span style={{ color: "#34d399", fontWeight: "700" }}>● {c.active_stories} Active Live</span>
+                                        ) : (
+                                          <span style={{ color: "#71717a" }}>0 active</span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <span style={{ background: "rgba(52, 211, 153, 0.12)", color: "#34d399", border: "1px solid rgba(52, 211, 153, 0.25)", borderRadius: "6px", padding: "3px 8px", fontSize: "12px", fontWeight: "800" }}>
+                                        {(c.views_24h || 0).toLocaleString()}
+                                      </span>
+                                    </td>
+                                    <td style={{ ...tdStyle, fontWeight: "700", color: "#38bdf8" }}>
+                                      {(c.views_7d || 0).toLocaleString()}
+                                    </td>
+                                    <td style={{ ...tdStyle, fontWeight: "700", color: "#fbbf24" }}>
+                                      {(c.views_30d || 0).toLocaleString()}
+                                    </td>
+                                    <td style={{ ...tdStyle, fontWeight: "800", color: "#f4f4f5" }}>
+                                      {(c.total_views || 0).toLocaleString()}
+                                    </td>
+                                    <td style={{ ...tdStyle, color: "#a1a1aa", fontWeight: "600" }}>
+                                      {(c.unique_viewers || 0).toLocaleString()} users
+                                    </td>
+                                    <td style={{ ...tdStyle, color: "#71717a", fontSize: "11px", whiteSpace: "nowrap" }}>
+                                      {formatRelativeTime(c.last_story_at)}
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <button
+                                        onClick={() => handleOpenCreatorStoryViewers(c)}
+                                        style={{
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          gap: "6px",
+                                          background: "#27272a",
+                                          border: "1px solid rgba(255,255,255,0.08)",
+                                          color: "#f4f4f5",
+                                          padding: "5px 10px",
+                                          borderRadius: "6px",
+                                          fontSize: "11px",
+                                          fontWeight: "700",
+                                          cursor: "pointer"
+                                        }}
+                                        title="View list of all users who watched this creator's stories"
+                                      >
+                                        <Users size={13} color="#f43f5e" /> Viewers
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB 2: STORY CATALOG & REAL-TIME STATUS */}
+                  {storySubTab === "catalog" && (
+                    <div>
+                      {/* Filter Bar */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                          {/* Status Filter */}
+                          <div style={{ display: "flex", background: "#18181b", borderRadius: "8px", padding: "3px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                            {[
+                              { id: "all", label: "All Stories" },
+                              { id: "active", label: `Active Only (${storyAnalytics?.summary?.active_stories_count || 0})` },
+                              { id: "expired", label: "Expired" }
+                            ].map(sf => (
+                              <button
+                                key={sf.id}
+                                onClick={() => { setStoryFilter(sf.id); setStoriesPage(1); }}
+                                style={{
+                                  border: "none",
+                                  background: storyFilter === sf.id ? "rgba(244, 63, 94, 0.15)" : "transparent",
+                                  color: storyFilter === sf.id ? "#f43f5e" : "#a1a1aa",
+                                  padding: "5px 12px",
+                                  borderRadius: "6px",
+                                  fontSize: "12px",
+                                  fontWeight: "700",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                {sf.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Creator Filter Dropdown */}
+                          <select
+                            value={storyCreatorFilter}
+                            onChange={(e) => { setStoryCreatorFilter(e.target.value); setStoriesPage(1); }}
+                            style={{
+                              background: "#18181b",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: "8px",
+                              color: "#f4f4f5",
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              outline: "none"
+                            }}
+                          >
+                            <option value="all">All Creators</option>
+                            {(storyAnalytics?.creators || []).map(c => (
+                              <option key={c.creator_username} value={c.creator_username}>
+                                @{c.creator_username} ({c.active_stories || 0} active)
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* Search Input */}
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#18181b", padding: "5px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                            <Search size={14} color="#71717a" />
+                            <input
+                              type="text"
+                              placeholder="Search track anthem or handle..."
+                              value={storySearchTerm}
+                              onChange={(e) => setStorySearchTerm(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { setStoriesPage(1); fetchStoriesCatalogOnly(); } }}
+                              style={{ background: "transparent", border: "none", color: "#f4f4f5", fontSize: "12px", outline: "none", width: "180px" }}
+                            />
+                            {storySearchTerm && <X size={12} color="#71717a" style={{ cursor: "pointer" }} onClick={() => { setStorySearchTerm(""); setStoriesPage(1); }} />}
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: "12px", color: "#71717a" }}>
+                          Showing {(storiesData.stories || []).length} of {storiesData.total.toLocaleString()} stories
+                        </div>
+                      </div>
+
+                      {/* Stories Catalog Table */}
+                      <div style={tableContainerStyle}>
+                        <div style={{ overflowX: "auto" }}>
+                          <table style={tableStyle}>
+                            <thead>
+                              <tr>
+                                <th style={thStyle}>Story Preview</th>
+                                <th style={thStyle}>Creator</th>
+                                <th style={thStyle}>Real-Time Status & Lifecycle</th>
+                                <th style={thStyle}>Music Anthem</th>
+                                <th style={thStyle}>Duration</th>
+                                <th style={thStyle}>Views</th>
+                                <th style={thStyle}>Unique Viewers</th>
+                                <th style={thStyle}>Created At</th>
+                                <th style={thStyle}>Viewers Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(storiesData.stories || []).map(s => {
+                                const isActive = s.is_currently_active;
+                                return (
+                                  <tr key={s.id} style={trStyle}>
+                                    <td style={tdStyle}>
+                                      <div 
+                                        onClick={() => setStoryPreviewModal(s)}
+                                        style={{ 
+                                          width: "48px", 
+                                          height: "64px", 
+                                          borderRadius: "6px", 
+                                          background: "#27272a", 
+                                          position: "relative", 
+                                          overflow: "hidden", 
+                                          cursor: "pointer",
+                                          border: isActive ? "1.5px solid #34d399" : "1px solid rgba(255,255,255,0.08)"
+                                        }}
+                                        title="Click to preview vertical reel video"
+                                      >
+                                        <img 
+                                          src={s.thumbnail_url || '/assets/default-avatar.png'} 
+                                          alt="" 
+                                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                        />
+                                        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                          <Play size={16} color="#fff" fill="#fff" />
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                        <img 
+                                          src={s.avatar_url || '/assets/default-avatar.png'} 
+                                          alt="" 
+                                          style={{ width: "30px", height: "30px", borderRadius: "50%", objectFit: "cover" }}
+                                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                        />
+                                        <div>
+                                          <div style={{ fontWeight: "700", color: "#f4f4f5", fontSize: "13px", display: "flex", alignItems: "center", gap: "4px" }}>
+                                            {s.display_name || s.username}
+                                            {s.is_verified && <TwitterVerifiedBadge size={12} />}
+                                          </div>
+                                          <div style={{ fontSize: "11px", color: "#71717a" }}>@{s.username}</div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td style={tdStyle}>
+                                      {isActive ? (
+                                        <div>
+                                          <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "rgba(52, 211, 153, 0.12)", color: "#34d399", border: "1px solid rgba(52, 211, 153, 0.25)", borderRadius: "6px", padding: "2px 8px", fontSize: "11px", fontWeight: "800" }}>
+                                            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399", display: "inline-block" }} />
+                                            ACTIVE
+                                          </span>
+                                          <div style={{ fontSize: "11px", color: "#34d399", marginTop: "3px", fontWeight: "600" }}>
+                                            {formatTimeRemaining(s.seconds_remaining)}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#27272a", color: "#71717a", borderRadius: "6px", padding: "2px 8px", fontSize: "11px", fontWeight: "700" }}>
+                                            EXPIRED
+                                          </span>
+                                          <div style={{ fontSize: "11px", color: "#71717a", marginTop: "3px" }}>
+                                            {new Date(s.expires_at).toLocaleDateString()}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={{ ...tdStyle, maxWidth: "220px" }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                        <Music size={13} color="#f43f5e" style={{ flexShrink: 0 }} />
+                                        <span style={{ fontSize: "12px", color: "#f4f4f5", fontWeight: "600", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {s.sound_title || "Original Audio"}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td style={{ ...tdStyle, color: "#a1a1aa", fontSize: "12px" }}>
+                                      {s.duration || 0}s
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <div style={{ fontWeight: "800", color: "#f4f4f5", fontSize: "13px" }}>
+                                        {(s.view_count || 0).toLocaleString()} views
+                                      </div>
+                                      {s.views_24h > 0 && (
+                                        <div style={{ fontSize: "11px", color: "#34d399", fontWeight: "600" }}>
+                                          +{s.views_24h} today
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={{ ...tdStyle, color: "#a1a1aa", fontWeight: "600" }}>
+                                      {(s.unique_viewers || 0).toLocaleString()} users
+                                    </td>
+                                    <td style={{ ...tdStyle, color: "#71717a", fontSize: "11px", whiteSpace: "nowrap" }}>
+                                      {new Date(s.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <button
+                                        onClick={() => handleOpenStoryViewers(s)}
+                                        style={{
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          gap: "6px",
+                                          background: "#27272a",
+                                          border: "1px solid rgba(255,255,255,0.08)",
+                                          color: "#f4f4f5",
+                                          padding: "5px 10px",
+                                          borderRadius: "6px",
+                                          fontSize: "11px",
+                                          fontWeight: "700",
+                                          cursor: "pointer"
+                                        }}
+                                        title="Inspect list of users who watched this story"
+                                      >
+                                        <Eye size={13} color="#38bdf8" /> Viewers ({s.view_count || 0})
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {storiesData.total_pages > 1 && (
+                          <div style={paginationStyle}>
+                            <button disabled={storiesPage === 1} onClick={() => setStoriesPage(p => p - 1)} style={storiesPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
+                            <span style={pageTextStyle}>Page {storiesPage} of {storiesData.total_pages}</span>
+                            <button disabled={storiesPage === storiesData.total_pages} onClick={() => setStoriesPage(p => p + 1)} style={storiesPage === storiesData.total_pages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB 3: LIVE VIEWERS TELEMETRY FEED */}
+                  {storySubTab === "feed" && (
+                    <div style={cardContainerStyle}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <Activity size={18} color="#34d399" />
+                            <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "#f4f4f5" }}>
+                              Real-Time Platform Story Views Feed
+                            </h3>
+                          </div>
+                          <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#71717a" }}>
+                            Live stream of registered member watch events across all creator status reels.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={tableStyle}>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>Viewer Member</th>
+                              <th style={thStyle}>Tier</th>
+                              <th style={thStyle}>Story Creator</th>
+                              <th style={thStyle}>Soundtrack Anthem</th>
+                              <th style={thStyle}>Story State</th>
+                              <th style={thStyle}>Time Watched</th>
+                              <th style={thStyle}>Story Link</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(storyAnalytics?.recent_views || []).map(rv => (
+                              <tr key={rv.view_id} style={trStyle}>
+                                <td style={tdStyle}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                    <img 
+                                      src={rv.viewer_avatar_url || '/assets/default-avatar.png'} 
+                                      alt="" 
+                                      style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
+                                      onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                    />
+                                    <div>
+                                      <div style={{ fontWeight: "700", color: "#f4f4f5", fontSize: "13px" }}>
+                                        {rv.viewer_display_name || rv.viewer_username || "Registered User"}
+                                      </div>
+                                      <div style={{ fontSize: "11px", color: "#71717a" }}>
+                                        {rv.viewer_email || `@${rv.viewer_username}`}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td style={tdStyle}>
+                                  {rv.viewer_is_premium ? (
+                                    <span style={premiumBadge}>VIP Member</span>
+                                  ) : (
+                                    <span style={freeBadge}>Standard</span>
+                                  )}
+                                </td>
+                                <td style={tdStyle}>
+                                  <span style={{ fontWeight: "700", color: "#f4f4f5" }}>
+                                    @{rv.creator_username}
+                                  </span>
+                                </td>
+                                <td style={{ ...tdStyle, maxWidth: "200px" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                    <Music size={12} color="#f43f5e" style={{ flexShrink: 0 }} />
+                                    <span style={{ fontSize: "12px", color: "#a1a1aa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {rv.sound_title || "Audio"}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td style={tdStyle}>
+                                  {rv.is_currently_active ? (
+                                    <span style={{ background: "rgba(52, 211, 153, 0.12)", color: "#34d399", border: "1px solid rgba(52, 211, 153, 0.25)", borderRadius: "4px", padding: "1px 6px", fontSize: "10px", fontWeight: "800" }}>
+                                      ACTIVE
+                                    </span>
+                                  ) : (
+                                    <span style={{ background: "#27272a", color: "#71717a", borderRadius: "4px", padding: "1px 6px", fontSize: "10px", fontWeight: "700" }}>
+                                      EXPIRED
+                                    </span>
+                                  )}
+                                </td>
+                                <td style={{ ...tdStyle, color: "#f4f4f5", fontSize: "12px", whiteSpace: "nowrap" }}>
+                                  <div style={{ fontWeight: "600" }}>{formatRelativeTime(rv.viewed_at)}</div>
+                                  <div style={{ fontSize: "10px", color: "#71717a" }}>
+                                    {new Date(rv.viewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                  </div>
+                                </td>
+                                <td style={tdStyle}>
+                                  <button
+                                    onClick={() => setStoryPreviewModal({
+                                      video_url: rv.video_url,
+                                      sound_title: rv.sound_title,
+                                      username: rv.creator_username,
+                                      display_name: rv.creator_display_name
+                                    })}
+                                    style={{ ...iconBtnStyle, color: "#38bdf8" }}
+                                    title="Preview Story Video"
+                                  >
+                                    <Play size={13} fill="#38bdf8" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1670,7 +2365,7 @@ export default function AdminDashboard({ user, onLogout }) {
                 </>
               )}
 
-              {/* 🟢 TRANSACTIONS TAB: TRUE SPLIT USD CRYPTO & NGN BANK */}
+              {/* 🟢 TRANSACTIONS TAB */}
               {activeTab === "transactions" && (
                 <>
                   <div style={{ ...gridStatsStyle, marginBottom: "24px" }}>
@@ -1818,6 +2513,168 @@ export default function AdminDashboard({ user, onLogout }) {
           )}
         </div>
       </div>
+
+      {/* STORY VIEWERS INSPECTOR MODAL */}
+      {viewersModalData && (
+        <div style={modalOverlayStyle}>
+          <div style={{ ...modalBoxStyle, maxWidth: "560px", maxHeight: "88vh", display: "flex", flexDirection: "column" }}>
+            <div style={modalHeaderStyle}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Users size={18} color="#f43f5e" />
+                  <h2 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#f4f4f5" }}>
+                    {viewersModalData.type === 'story' ? `Story Viewers Log (#${viewersModalData.item.id})` : `All Story Viewers (@${viewersModalData.item.creator_username || viewersModalData.item.username})`}
+                  </h2>
+                </div>
+                {viewersModalData.type === 'story' && viewersModalData.item.sound_title && (
+                  <div style={{ fontSize: "12px", color: "#a1a1aa", marginTop: "3px", display: "flex", alignItems: "center", gap: "5px" }}>
+                    <Music size={12} color="#f43f5e" /> {viewersModalData.item.sound_title}
+                  </div>
+                )}
+              </div>
+              <X size={20} cursor="pointer" onClick={() => setViewersModalData(null)} color="#71717a" />
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div style={{ display: "flex", gap: "12px", background: "#27272a", borderRadius: "8px", padding: "10px 14px", marginBottom: "14px" }}>
+              <div>
+                <div style={{ fontSize: "10px", color: "#71717a", textTransform: "uppercase", fontWeight: "700" }}>Total Views</div>
+                <div style={{ fontSize: "16px", fontWeight: "800", color: "#f4f4f5" }}>
+                  {(viewersModalData.viewers || []).length}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "10px", color: "#71717a", textTransform: "uppercase", fontWeight: "700" }}>Unique Viewers</div>
+                <div style={{ fontSize: "16px", fontWeight: "800", color: "#34d399" }}>
+                  {new Set((viewersModalData.viewers || []).map(v => v.user_id)).size} users
+                </div>
+              </div>
+              {viewersModalData.type === 'story' && viewersModalData.item.expires_at && (
+                <div>
+                  <div style={{ fontSize: "10px", color: "#71717a", textTransform: "uppercase", fontWeight: "700" }}>Status</div>
+                  <div style={{ fontSize: "12px", fontWeight: "700", marginTop: "2px", color: viewersModalData.item.is_currently_active ? "#34d399" : "#71717a" }}>
+                    {viewersModalData.item.is_currently_active ? "● ACTIVE LIVE" : "● EXPIRED"}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Filter Search */}
+            <div style={{ marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px", background: "#27272a", padding: "7px 12px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <Search size={14} color="#71717a" />
+              <input
+                type="text"
+                placeholder="Search viewers by name, @handle or email..."
+                value={viewerSearchFilter}
+                onChange={(e) => setViewerSearchFilter(e.target.value)}
+                style={{ background: "transparent", border: "none", color: "#f4f4f5", outline: "none", width: "100%", fontSize: "12px" }}
+              />
+              {viewerSearchFilter && <X size={12} color="#71717a" style={{ cursor: "pointer" }} onClick={() => setViewerSearchFilter("")} />}
+            </div>
+
+            {/* Viewers List */}
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px" }}>
+              {viewersModalData.loading ? (
+                <div style={{ padding: "40px", textAlign: "center" }}><RefreshCw size={28} color="#f43f5e" style={{ animation: "spin 1s linear infinite" }} /></div>
+              ) : viewersModalData.viewers.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "#71717a", fontSize: "13px" }}>
+                  No views recorded yet for this story.
+                </div>
+              ) : (
+                viewersModalData.viewers
+                  .filter(v => {
+                    if (!viewerSearchFilter.trim()) return true;
+                    const q = viewerSearchFilter.toLowerCase();
+                    return (v.username || "").toLowerCase().includes(q) || (v.display_name || "").toLowerCase().includes(q) || (v.email || "").toLowerCase().includes(q);
+                  })
+                  .map(v => (
+                    <div 
+                      key={v.view_id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        background: "#27272a",
+                        borderRadius: "8px",
+                        padding: "10px 12px",
+                        border: "1px solid rgba(255,255,255,0.04)"
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <img 
+                          src={v.avatar_url || '/assets/default-avatar.png'} 
+                          alt="" 
+                          style={{ width: "34px", height: "34px", borderRadius: "50%", objectFit: "cover" }}
+                          onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                        />
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontWeight: "700", color: "#f4f4f5", fontSize: "13px" }}>
+                              {v.display_name || v.username || "Anonymous"}
+                            </span>
+                            {v.is_premium ? (
+                              <span style={{ ...premiumBadge, fontSize: "9px", padding: "1px 5px" }}>VIP</span>
+                            ) : (
+                              <span style={{ ...freeBadge, fontSize: "9px", padding: "1px 5px" }}>FREE</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#71717a" }}>
+                            {v.email || `@${v.username}`}
+                          </div>
+                          {v.sound_title && (
+                            <div style={{ fontSize: "10px", color: "#a1a1aa", marginTop: "2px" }}>
+                              Story: {v.sound_title}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#f4f4f5" }}>
+                          {formatRelativeTime(v.viewed_at)}
+                        </div>
+                        <div style={{ fontSize: "10px", color: "#71717a", marginTop: "1px" }}>
+                          {new Date(v.viewed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STORY VIDEO PLAYER PREVIEW MODAL */}
+      {storyPreviewModal && (
+        <div style={modalOverlayStyle}>
+          <div style={{ ...modalBoxStyle, maxWidth: "400px", padding: "16px", background: "#09090b" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <div>
+                <div style={{ fontWeight: "800", color: "#f4f4f5", fontSize: "14px" }}>
+                  @{storyPreviewModal.username} Story Reel
+                </div>
+                {storyPreviewModal.sound_title && (
+                  <div style={{ fontSize: "11px", color: "#a1a1aa", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <Music size={11} color="#f43f5e" /> {storyPreviewModal.sound_title}
+                  </div>
+                )}
+              </div>
+              <X size={20} cursor="pointer" onClick={() => setStoryPreviewModal(null)} color="#71717a" />
+            </div>
+
+            <div style={{ width: "100%", maxHeight: "72vh", borderRadius: "10px", overflow: "hidden", background: "#000", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <video 
+                src={storyPreviewModal.video_url} 
+                controls 
+                autoPlay 
+                playsInline
+                style={{ width: "100%", maxHeight: "72vh", objectFit: "contain" }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Item Edit Modal */}
       {editingItem && (
@@ -2273,6 +3130,31 @@ function CategoryDistributionBar({ categories = [], totalVideos = 1, onSelectCat
 }
 
 // -------------------------------------------------------------
+// Helper Formatters
+// -------------------------------------------------------------
+function formatTimeRemaining(seconds) {
+  if (!seconds || seconds <= 0) return "Expired";
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  if (hrs > 0) return `${hrs}h ${mins}m left`;
+  return `${mins}m left`;
+}
+
+function formatRelativeTime(dateString) {
+  if (!dateString) return "";
+  const now = new Date();
+  const past = new Date(dateString);
+  const diffSec = Math.floor((now - past) / 1000);
+  if (diffSec < 60) return "Just now";
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  const days = Math.floor(diffSec / 86400);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return past.toLocaleDateString();
+}
+
+// -------------------------------------------------------------
 // Sub-Components & Rows
 // -------------------------------------------------------------
 const SidebarBtn = ({ active, onClick, icon, label, count, badge }) => (
@@ -2377,7 +3259,7 @@ const uploadBtnStyle = { display: "flex", alignItems: "center", gap: "6px", back
 const centerFlex = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "300px" };
 const errorScreenStyle = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100dvh", width: "100vw", background: "#09090b", color: "#f43f5e", position: "absolute", zIndex: 999999, top: 0, left: 0 };
 const goBackBtnStyle = { background: "#f4f4f5", color: "#09090b", padding: "10px 24px", borderRadius: "8px", border: "none", fontWeight: "700", cursor: "pointer", fontSize: "14px" };
-const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999999 };
+const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999999 };
 const modalBoxStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "14px", padding: "22px", width: "100%", maxWidth: "420px", margin: "0 15px", boxShadow: "0 10px 40px rgba(0,0,0,0.9)" };
 const modalHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" };
 const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "5px", marginBottom: "14px" };
