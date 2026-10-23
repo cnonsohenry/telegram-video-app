@@ -775,154 +775,45 @@ const DesktopRightSidebar = ({
         )}
       </div>
 
-      {/* 2. Trends For You (Open Section) */}
-      <section style={desktopCardStyle}>
+      {/* 2. Top Creators ("Who to follow" - FIRST with just 1 card) */}
+      <div style={desktopCardStyle}>
         <div style={desktopCardHeaderStyle}>
-          <h3 style={desktopCardTitleStyle}>Trends for you</h3>
+          <h3 style={desktopCardTitleStyle}>Top Creator</h3>
+          <button
+            type="button"
+            onClick={onOpenDiscover}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--primary-color, #f43f5e)",
+              fontSize: "13px",
+              fontWeight: "700",
+              cursor: "pointer",
+              padding: "2px 4px"
+            }}
+          >
+            See all
+          </button>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          {trendingTopics.map((item) => (
-            <div
-              key={item.topic}
-              onClick={() => onSelectTopic(item.catId)}
-              style={desktopTrendItemStyle}
-              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-            >
-              <span style={desktopTrendSublabel}>{item.category}</span>
-              <span style={desktopTrendTitle}>{item.topic}</span>
-              <span style={desktopTrendPosts}>{item.posts}</span>
+        {featuredCreators.length === 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "8px 16px 16px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ width: "52px", height: "52px", borderRadius: "50%", background: "#222", flexShrink: 0 }} />
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ width: "60%", height: "14px", background: "#222", borderRadius: "4px" }} />
+                <div style={{ width: "40%", height: "11px", background: "#222", borderRadius: "4px" }} />
+              </div>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Subtle Divider */}
-      <div style={desktopSectionDivider} />
-
-      {/* 3. Trending Highlights (Open Section) */}
-      <section style={desktopCardStyle}>
-        <div style={desktopCardHeaderStyle}>
-          <h3 style={desktopCardTitleStyle}>Highlights</h3>
-          {onRefreshHighlights && (
-            <button
-              type="button"
-              onClick={onRefreshHighlights}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#71767b",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "4px",
-                borderRadius: "50%",
-                transition: "color 0.2s ease"
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.color = "#ffffff"}
-              onMouseLeave={(e) => e.currentTarget.style.color = "#71767b"}
-              title="Refresh highlights"
-            >
-              <RefreshCw size={14} className={highlightsLoading ? "animate-spin" : ""} />
-            </button>
-          )}
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          {highlightsLoading && highlights.length === 0 ? (
-            [...Array(3)].map((_, i) => (
-              <div key={i} style={desktopHighlightSkeleton}>
-                <div style={{ width: "74px", height: "94px", borderRadius: "8px", background: "#222" }} />
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <div style={{ width: "80%", height: "14px", background: "#222", borderRadius: "4px" }} />
-                  <div style={{ width: "50%", height: "12px", background: "#222", borderRadius: "4px" }} />
-                </div>
-              </div>
-            ))
-          ) : highlights.length > 0 ? (
-            highlights.slice(0, 4).map((v, i) => (
-              <div
-                key={`hl-${v.message_id || v.id}-${i}`}
-                onClick={() => {
-                  const isPrem = v.category === "premium" || v.is_premium;
-                  const isUnl = !isPrem || isUserSubscribedToCreator(user, v);
-                  if (!isUnl && !localStorage.getItem("token")) {
-                    promptLogin("subscribe");
-                    return;
-                  }
-                  onVideoClick(v);
-                }}
-                style={desktopHighlightCardStyle}
-                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"}
-                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-              >
-                <div style={desktopHighlightThumbBox}>
-                  <img src={v.thumbnail_url} alt="" style={desktopHighlightThumbImg} />
-                  <div style={desktopHighlightPlayOverlay}>
-                    <Play size={12} fill="#fff" strokeWidth={0} />
-                  </div>
-                  {v.category === "premium" && (
-                    <div style={desktopHighlightVipTag}>VIP</div>
-                  )}
-                </div>
-
-                <div style={desktopHighlightInfo}>
-                  <p style={desktopHighlightCaption}>
-                    {v.caption || APP_CONFIG.defaultCaption}
-                  </p>
-                  <div style={desktopHighlightMeta}>
-                    <span style={{ color: "#8e8e93", fontWeight: "600" }}>
-                      {getPostDisplayName(v)}
-                    </span>
-                    {v.created_at && (
-                      <>
-                        <span>&middot;</span>
-                        <span>{formatTwitterDate(v.created_at)}</span>
-                      </>
-                    )}
-                    <span>&middot;</span>
-                    <span>{Number(v.views || 0).toLocaleString()} views</span>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p style={{ color: "#71767b", fontSize: "13px", padding: "10px 4px", margin: 0 }}>
-              No highlights right now.
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* Subtle Divider */}
-      {featuredCreators.length > 0 && <div style={desktopSectionDivider} />}
-
-      {/* 4. Top Creators (Open Section - Discover Creators Page Style) */}
-      {featuredCreators.length > 0 && (
-        <section style={desktopCardStyle}>
-          <div style={desktopCardHeaderStyle}>
-            <h3 style={desktopCardTitleStyle}>Top Creators</h3>
-            <button
-              type="button"
-              onClick={onOpenDiscover}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--primary-color, #f43f5e)",
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-                padding: "2px 6px"
-              }}
-            >
-              See all
-            </button>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4px" }}>
+              {[...Array(4)].map((_, i) => (
+                <div key={i} style={{ aspectRatio: "3/4", background: "#222", borderRadius: "6px" }} />
+              ))}
+            </div>
           </div>
-
+        ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {featuredCreators.slice(0, 3).map((creator, cIdx) => {
+            {featuredCreators.slice(0, 1).map((creator) => {
               const uname = creator.username;
               const isFollowing = followingMap[uname] !== undefined 
                 ? followingMap[uname] 
@@ -940,10 +831,8 @@ const DesktopRightSidebar = ({
                     display: "flex",
                     flexDirection: "column",
                     gap: "12px",
-                    padding: "16px 2px 18px 2px",
-                    borderBottom: cIdx < 2 ? "1px solid rgba(255, 255, 255, 0.08)" : "none",
+                    padding: "4px 16px 14px 16px",
                     cursor: "pointer",
-                    transition: "opacity 0.15s ease",
                     boxSizing: "border-box",
                     width: "100%"
                   }}
@@ -1011,7 +900,7 @@ const DesktopRightSidebar = ({
                     </div>
                   </div>
 
-                  {/* Middle Row: 4 Thumbnails (Discover Page Style with generous breathing room) */}
+                  {/* Middle Row: 4 Thumbnails (Discover Page Style) */}
                   {sampleVideos.length > 0 && (
                     <div style={{
                       display: "grid",
@@ -1164,12 +1053,133 @@ const DesktopRightSidebar = ({
               type="button"
               onClick={onOpenDiscover}
               style={desktopCardShowMoreBtn}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
             >
-              <span>Show more</span>
+              <span>Show more creators</span>
+              <ChevronRight size={15} />
             </button>
           </div>
-        </section>
-      )}
+        )}
+      </div>
+
+      {/* 3. Trending Highlights (Mini Video Cards) */}
+      <div style={desktopCardStyle}>
+        <div style={desktopCardHeaderStyle}>
+          <h3 style={desktopCardTitleStyle}>Highlights</h3>
+          {onRefreshHighlights && (
+            <button
+              type="button"
+              onClick={onRefreshHighlights}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#71767b",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "4px",
+                borderRadius: "50%",
+                transition: "color 0.2s ease"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = "#ffffff"}
+              onMouseLeave={(e) => e.currentTarget.style.color = "#71767b"}
+              title="Refresh highlights"
+            >
+              <RefreshCw size={14} className={highlightsLoading ? "animate-spin" : ""} />
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {highlightsLoading && highlights.length === 0 ? (
+            [...Array(3)].map((_, i) => (
+              <div key={i} style={desktopHighlightSkeleton}>
+                <div style={{ width: "68px", height: "86px", borderRadius: "8px", background: "#222" }} />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ width: "80%", height: "14px", background: "#222", borderRadius: "4px" }} />
+                  <div style={{ width: "50%", height: "12px", background: "#222", borderRadius: "4px" }} />
+                </div>
+              </div>
+            ))
+          ) : highlights.length > 0 ? (
+            highlights.slice(0, 3).map((v, i) => (
+              <div
+                key={`hl-${v.message_id || v.id}-${i}`}
+                onClick={() => {
+                  const isPrem = v.category === "premium" || v.is_premium;
+                  const isUnl = !isPrem || isUserSubscribedToCreator(user, v);
+                  if (!isUnl && !localStorage.getItem("token")) {
+                    promptLogin("subscribe");
+                    return;
+                  }
+                  onVideoClick(v);
+                }}
+                style={desktopHighlightCardStyle}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                <div style={desktopHighlightThumbBox}>
+                  <img src={v.thumbnail_url} alt="" style={desktopHighlightThumbImg} />
+                  <div style={desktopHighlightPlayOverlay}>
+                    <Play size={12} fill="#fff" strokeWidth={0} />
+                  </div>
+                  {v.category === "premium" && (
+                    <div style={desktopHighlightVipTag}>VIP</div>
+                  )}
+                </div>
+
+                <div style={desktopHighlightInfo}>
+                  <p style={desktopHighlightCaption}>
+                    {v.caption || APP_CONFIG.defaultCaption}
+                  </p>
+                  <div style={desktopHighlightMeta}>
+                    <span style={{ color: "#8e8e93", fontWeight: "600" }}>
+                      {getPostDisplayName(v)}
+                    </span>
+                    {v.created_at && (
+                      <>
+                        <span>&middot;</span>
+                        <span>{formatTwitterDate(v.created_at)}</span>
+                      </>
+                    )}
+                    <span>&middot;</span>
+                    <span>{Number(v.views || 0).toLocaleString()} views</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p style={{ color: "#71767b", fontSize: "13px", padding: "14px 16px", margin: 0 }}>
+              No highlights right now.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* 4. Trends For You Card (LAST) */}
+      <div style={desktopCardStyle}>
+        <div style={desktopCardHeaderStyle}>
+          <h3 style={desktopCardTitleStyle}>Trends for you</h3>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {trendingTopics.map((item) => (
+            <div
+              key={item.topic}
+              onClick={() => onSelectTopic(item.catId)}
+              style={desktopTrendItemStyle}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+            >
+              <span style={desktopTrendSublabel}>{item.category}</span>
+              <span style={desktopTrendTitle}>{item.topic}</span>
+              <span style={desktopTrendPosts}>{item.posts}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* 5. Twitter-style Mini Legal Footer */}
       <footer style={desktopFooterStyle}>
@@ -1186,6 +1196,9 @@ const DesktopRightSidebar = ({
     </aside>
   );
 };
+
+// 🟢 Fast in-memory cache for instant featured creators display
+let memoryCachedFeatured = null;
 
 // 🟢 EXPLORE COMPONENT
 export default function Explore({ 
@@ -1245,7 +1258,20 @@ export default function Explore({
   const [searchFollowingLoading, setSearchFollowingLoading] = useState({});
 
   // 🟢 CREATOR & MODAL STATES
-  const [featuredCreators, setFeaturedCreators] = useState([]);
+  const [featuredCreators, setFeaturedCreators] = useState(() => {
+    if (memoryCachedFeatured && memoryCachedFeatured.length > 0) return memoryCachedFeatured;
+    try {
+      const saved = sessionStorage.getItem("cached_featured_creators");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryCachedFeatured = parsed;
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
   const [suggestedIndex, setSuggestedIndex] = useState(() => Math.floor(Math.random() * 4) + 2);
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -1361,6 +1387,10 @@ export default function Explore({
             const email = String(c.email || "").toLowerCase();
             return !email.includes("@gmail.com") && !email.includes("@yahoo.com") && !email.includes("@hotmail.com");
           });
+          memoryCachedFeatured = tgOnly;
+          try {
+            sessionStorage.setItem("cached_featured_creators", JSON.stringify(tgOnly));
+          } catch (e) {}
           setFeaturedCreators(tgOnly);
         }
       }
@@ -3267,7 +3297,7 @@ const desktopRightRailStyle = {
   padding: "16px 18px 120px 18px",
   display: "flex",
   flexDirection: "column",
-  gap: "24px",
+  gap: "16px",
   boxSizing: "border-box"
 };
 
@@ -3277,8 +3307,8 @@ const desktopSearchBoxWrapper = {
   gap: "10px",
   padding: "10px 16px",
   borderRadius: "9999px",
-  background: "rgba(255, 255, 255, 0.05)",
-  border: "1px solid rgba(255, 255, 255, 0.10)",
+  background: "#16181c",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
   boxSizing: "border-box",
   transition: "border-color 0.2s ease, background 0.2s ease",
   width: "100%"
@@ -3307,34 +3337,25 @@ const desktopSearchInputClearBtn = {
 };
 
 const desktopCardStyle = {
-  background: "transparent",
-  border: "none",
-  borderRadius: "0",
-  overflow: "visible",
+  background: "#16181c",
+  borderRadius: "16px",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
+  overflow: "hidden",
   display: "flex",
   flexDirection: "column",
   width: "100%",
   boxSizing: "border-box"
 };
 
-const desktopSectionDivider = {
-  height: "1px",
-  backgroundColor: "rgba(255, 255, 255, 0.08)",
-  margin: "4px 0",
-  width: "100%"
-};
-
 const desktopCardHeaderStyle = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "0 2px 10px 2px",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-  marginBottom: "6px"
+  padding: "14px 16px 10px 16px"
 };
 
 const desktopCardTitleStyle = {
-  fontSize: "17.5px",
+  fontSize: "18px",
   fontWeight: "800",
   color: "#ffffff",
   margin: 0,
@@ -3344,11 +3365,9 @@ const desktopCardTitleStyle = {
 const desktopTrendItemStyle = {
   display: "flex",
   flexDirection: "column",
-  padding: "10px 8px",
-  borderRadius: "8px",
+  padding: "11px 16px",
   cursor: "pointer",
-  transition: "background 0.15s ease",
-  borderBottom: "none"
+  transition: "background 0.15s ease"
 };
 
 const desktopTrendSublabel = {
@@ -3373,17 +3392,15 @@ const desktopTrendPosts = {
 const desktopHighlightCardStyle = {
   display: "flex",
   gap: "12px",
-  padding: "10px 8px",
-  borderRadius: "8px",
+  padding: "10px 16px",
   cursor: "pointer",
   transition: "background 0.15s ease",
-  alignItems: "center",
-  borderBottom: "none"
+  alignItems: "center"
 };
 
 const desktopHighlightThumbBox = {
-  width: "74px",
-  height: "94px",
+  width: "68px",
+  height: "86px",
   borderRadius: "8px",
   overflow: "hidden",
   background: "#111",
@@ -3455,7 +3472,7 @@ const desktopHighlightMeta = {
 const desktopHighlightSkeleton = {
   display: "flex",
   gap: "12px",
-  padding: "10px 8px",
+  padding: "10px 16px",
   alignItems: "center"
 };
 
@@ -3540,15 +3557,17 @@ const desktopCardShowMoreBtn = {
   display: "flex",
   alignItems: "center",
   gap: "6px",
-  padding: "12px 6px",
+  padding: "14px 16px",
   background: "none",
   border: "none",
+  borderTop: "1px solid rgba(255, 255, 255, 0.05)",
   color: "var(--primary-color, #f43f5e)",
   fontSize: "14px",
-  fontWeight: "700",
+  fontWeight: "600",
   cursor: "pointer",
-  transition: "opacity 0.15s ease",
-  textAlign: "left"
+  transition: "background 0.15s ease",
+  textAlign: "left",
+  width: "100%"
 };
 
 const desktopFooterStyle = {
