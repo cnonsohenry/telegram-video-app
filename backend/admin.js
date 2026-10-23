@@ -23,24 +23,224 @@ export const isAdmin = async (req, res, next) => {
   }
 };
 
-// 🟢 2. DASHBOARD STATS (The Overview)
+// 🟢 2. DASHBOARD STATS (Comprehensive Platform Intelligence)
 router.get("/stats", authenticateToken, isAdmin, async (req, res) => {
   try {
-    const totalUsers = await pool.query("SELECT COUNT(*) FROM app_users");
-    const premiumUsers = await pool.query("SELECT COUNT(*) FROM app_users WHERE is_premium = true");
-    
-    // 🟢 FIX 1: Use 'expected_amount' which matches your server.js schema
-    const totalRevenue = await pool.query("SELECT SUM(expected_amount) FROM transactions WHERE status = 'APPROVED'");
-    
-    // 🟢 FIX 2: Includes 'PENDING' since that is the default status in your schema
-    const pendingCrypto = await pool.query("SELECT COUNT(*) FROM transactions WHERE status = 'WAITING' OR status = 'PENDING'");
+    const [
+      usersRes,
+      premiumRes,
+      creatorsCountRes,
+      videosRes,
+      engagementRes,
+      storiesRes,
+      reportsRes,
+      txUSDApprovedRes,
+      txNGNApprovedRes,
+      txUSDPendingRes,
+      txNGNPendingRes,
+      subsRes,
+      catsRes,
+      storageRes,
+      timeSeriesRes,
+      topCreatorsRes
+    ] = await Promise.all([
+      // 1. Users
+      pool.query("SELECT COUNT(*) FROM app_users"),
+      pool.query("SELECT COUNT(*) FROM app_users WHERE is_premium = true"),
+      pool.query(`
+        SELECT 
+          COUNT(*) FILTER (WHERE is_creator = true OR is_managed = true) as total_creators,
+          COUNT(*) FILTER (WHERE is_managed = true) as managed_creators,
+          COUNT(*) FILTER (WHERE (is_creator = true OR is_managed = true) AND (is_managed IS FALSE OR is_managed IS NULL)) as web_creators
+        FROM app_users
+      `),
+      // 2. Videos & Views
+      pool.query("SELECT COUNT(*) as total_videos, COALESCE(SUM(views), 0)::bigint as total_views FROM videos"),
+      // 3. Engagement
+      pool.query(`
+        SELECT 
+          (SELECT COUNT(*) FROM likes) as likes,
+          (SELECT COUNT(*) FROM comments) as comments,
+          (SELECT COUNT(*) FROM saves) as saves,
+          (SELECT COUNT(*) FROM creator_follows) as follows
+      `),
+      // 4. 24h Stories
+      pool.query(`
+        SELECT 
+          COUNT(*) as total_stories,
+          COUNT(*) FILTER (WHERE expires_at > NOW() AND is_active = true) as active_stories,
+          COUNT(DISTINCT creator_id) FILTER (WHERE expires_at > NOW() AND is_active = true) as active_creators
+        FROM creator_stories
+      `),
+      // 5. Reports
+      pool.query("SELECT COUNT(*) FROM video_reports WHERE status = 'pending'"),
+      // 6. USD Transactions Approved (< 1000)
+      pool.query("SELECT COUNT(*), COALESCE(SUM(expected_amount), 0)::float as sum FROM transactions WHERE status = 'APPROVED' AND expected_amount < 1000"),
+      // 7. NGN Transactions Approved (>= 1000)
+      pool.query("SELECT COUNT(*), COALESCE(SUM(expected_amount), 0)::float as sum FROM transactions WHERE status = 'APPROVED' AND expected_amount >= 1000"),
+      // 8. USD Crypto Transactions Pending (< 1000)
+      pool.query("SELECT COUNT(*), COALESCE(SUM(expected_amount), 0)::float as sum FROM transactions WHERE (status = 'PENDING' OR status = 'WAITING') AND expected_amount < 1000"),
+      // 9. NGN Bank Transactions Pending (>= 1000)
+      pool.query("SELECT COUNT(*), COALESCE(SUM(expected_amount), 0)::float as sum FROM transactions WHERE (status = 'PENDING' OR status = 'WAITING') AND expected_amount >= 1000"),
+      // 10. Subscriptions
+      pool.query("SELECT COUNT(*) FROM creator_subscriptions WHERE status = 'active' AND (expires_at IS NULL OR expires_at > NOW())"),
+      // 11. Categories
+      pool.query("SELECT category, COUNT(*) as count, COALESCE(SUM(views), 0)::bigint as views FROM videos GROUP BY category ORDER BY count DESC"),
+      // 12. Storage distribution
+      pool.query(`
+        SELECT 
+          CASE 
+            WHEN cloudflare_id LIKE 'r2:%' THEN 'r2' 
+            WHEN cloudflare_id IS NOT NULL AND cloudflare_id != 'none' THEN 'stream' 
+            ELSE 'telegram' 
+          END as storage_type, 
+          COUNT(*) 
+        FROM videos 
+        GROUP BY 1
+      `),
+      // 13. 30-day gapless time-series
+      pool.query(`
+        WITH days AS (
+          SELECT generate_series(
+            DATE_TRUNC('day', NOW() - INTERVAL '29 days'),
+            DATE_TRUNC('day', NOW()),
+            '1 day'::interval
+          )::date AS day
+        ),
+        u AS (
+          SELECT DATE(created_at) as day, COUNT(*) as signups 
+          FROM app_users 
+          WHERE created_at >= NOW() - INTERVAL '30 days' 
+          GROUP BY 1
+        ),
+        v AS (
+          SELECT DATE(created_at) as day, COUNT(*) as uploads 
+          FROM videos 
+          WHERE created_at >= NOW() - INTERVAL '30 days' 
+          GROUP BY 1
+        ),
+        t AS (
+          SELECT DATE(created_at) as day, 
+                 COUNT(*) FILTER (WHERE status = 'APPROVED') as approved_tx,
+                 COALESCE(SUM(expected_amount) FILTER (WHERE status = 'APPROVED' AND expected_amount < 1000), 0) as usd_rev,
+                 COALESCE(SUM(expected_amount) FILTER (WHERE status = 'APPROVED' AND expected_amount >= 1000), 0) as ngn_rev
+          FROM transactions 
+          WHERE created_at >= NOW() - INTERVAL '30 days' 
+          GROUP BY 1
+        ),
+        s AS (
+          SELECT DATE(created_at) as day, COUNT(*) as stories_count
+          FROM creator_stories 
+          WHERE created_at >= NOW() - INTERVAL '30 days' 
+          GROUP BY 1
+        )
+        SELECT 
+          TO_CHAR(d.day, 'YYYY-MM-DD') as date,
+          TO_CHAR(d.day, 'Mon DD') as label,
+          COALESCE(u.signups, 0)::int as signups,
+          COALESCE(v.uploads, 0)::int as uploads,
+          COALESCE(t.approved_tx, 0)::int as approved_tx,
+          COALESCE(t.usd_rev, 0)::float as usd_rev,
+          COALESCE(t.ngn_rev, 0)::float as ngn_rev,
+          COALESCE(s.stories_count, 0)::int as stories
+        FROM days d
+        LEFT JOIN u ON d.day = u.day
+        LEFT JOIN v ON d.day = v.day
+        LEFT JOIN t ON d.day = t.day
+        LEFT JOIN s ON d.day = s.day
+        ORDER BY d.day ASC
+      `),
+      // 14. Top creators
+      pool.query(`
+        SELECT 
+          u.id, 
+          u.username, 
+          COALESCE(u.display_name, u.username) as display_name,
+          u.avatar_url,
+          COALESCE(u.creator_category, 'Creator') as creator_category,
+          COALESCE(u.is_verified, false) as is_verified,
+          COALESCE(u.is_managed, false) as is_managed,
+          COALESCE(SUM(v.views), 0)::bigint as total_views,
+          COUNT(v.id)::int as total_posts,
+          (SELECT COUNT(*) FROM creator_subscriptions cs WHERE (cs.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cs.creator_id = u.telegram_user_id)) AND cs.status = 'active')::int as active_subs,
+          (SELECT COUNT(*) FROM creator_follows cf WHERE cf.creator_id = u.id)::int as followers_count
+        FROM app_users u
+        LEFT JOIN videos v ON (v.uploader_id = u.id OR (u.telegram_user_id IS NOT NULL AND v.uploader_id = u.telegram_user_id))
+        WHERE u.is_creator = true OR u.is_managed = true
+        GROUP BY u.id
+        ORDER BY total_views DESC
+        LIMIT 8
+      `)
+    ]);
+
+    const totalUsers = parseInt(usersRes.rows[0].count);
+    const premiumUsers = parseInt(premiumRes.rows[0].count);
+    const creatorsInfo = creatorsCountRes.rows[0];
+    const videosInfo = videosRes.rows[0];
+    const engagementInfo = engagementRes.rows[0];
+    const storiesInfo = storiesRes.rows[0];
+    const pendingReportsCount = parseInt(reportsRes.rows[0].count);
+
+    const approvedUsd = parseFloat(txUSDApprovedRes.rows[0].sum || 0);
+    const approvedUsdCount = parseInt(txUSDApprovedRes.rows[0].count);
+    const approvedNgn = parseFloat(txNGNApprovedRes.rows[0].sum || 0);
+    const approvedNgnCount = parseInt(txNGNApprovedRes.rows[0].count);
+
+    const pendingUsd = parseFloat(txUSDPendingRes.rows[0].sum || 0);
+    const pendingUsdCount = parseInt(txUSDPendingRes.rows[0].count);
+    const pendingNgn = parseFloat(txNGNPendingRes.rows[0].sum || 0);
+    const pendingNgnCount = parseInt(txNGNPendingRes.rows[0].count);
+
+    const activeSubsCount = parseInt(subsRes.rows[0].count);
+
+    const storageMap = { r2: 0, stream: 0, telegram: 0 };
+    for (const r of storageRes.rows) {
+      storageMap[r.storage_type] = parseInt(r.count);
+    }
 
     res.json({
-      total_users: parseInt(totalUsers.rows[0].count),
-      premium_users: parseInt(premiumUsers.rows[0].count),
-      // Send it back as total_revenue_usd so the React dashboard accepts it perfectly
-      total_revenue_usd: parseFloat(totalRevenue.rows[0].sum || 0).toFixed(2),
-      pending_crypto_orders: parseInt(pendingCrypto.rows[0].count)
+      // Backwards-compatible top-level keys
+      total_users: totalUsers,
+      premium_users: premiumUsers,
+      total_revenue_usd: approvedUsd.toFixed(2),
+      pending_crypto_orders: pendingUsdCount,
+
+      overview: {
+        total_users: totalUsers,
+        premium_users: premiumUsers,
+        total_creators: parseInt(creatorsInfo.total_creators || 0),
+        managed_creators: parseInt(creatorsInfo.managed_creators || 0),
+        web_creators: parseInt(creatorsInfo.web_creators || 0),
+        total_videos: parseInt(videosInfo.total_videos || 0),
+        total_views: parseInt(videosInfo.total_views || 0),
+        total_likes: parseInt(engagementInfo.likes || 0),
+        total_comments: parseInt(engagementInfo.comments || 0),
+        total_saves: parseInt(engagementInfo.saves || 0),
+        total_follows: parseInt(engagementInfo.follows || 0),
+        total_stories: parseInt(storiesInfo.total_stories || 0),
+        active_stories: parseInt(storiesInfo.active_stories || 0),
+        active_story_creators: parseInt(storiesInfo.active_creators || 0),
+        pending_reports: pendingReportsCount
+      },
+      financials: {
+        approved_usd: approvedUsd,
+        approved_usd_count: approvedUsdCount,
+        approved_ngn: approvedNgn,
+        approved_ngn_count: approvedNgnCount,
+        pending_crypto_usd: pendingUsd,
+        pending_crypto_count: pendingUsdCount,
+        pending_bank_ngn: pendingNgn,
+        pending_bank_count: pendingNgnCount,
+        active_subscriptions: activeSubsCount
+      },
+      categories: catsRes.rows.map(c => ({
+        category: c.category || "uncategorized",
+        count: parseInt(c.count || 0),
+        views: parseInt(c.views || 0)
+      })),
+      storage: storageMap,
+      time_series: timeSeriesRes.rows,
+      top_creators: topCreatorsRes.rows
     });
   } catch (err) {
     console.error("[ADMIN STATS ERROR]", err);
@@ -48,27 +248,100 @@ router.get("/stats", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// 🟢 3. GET ALL USERS
+// 🟢 3. GET ALL USERS (With Pagination, Search & Tier Filter)
 router.get("/users", authenticateToken, isAdmin, async (req, res) => {
   try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(10, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+    const search = req.query.search ? req.query.search.trim() : null;
+    const tier = req.query.tier; // 'premium' | 'free'
+    const role = req.query.role; // 'admin' | 'user'
+
+    let whereClauses = [];
+    let params = [];
+    let idx = 1;
+
+    if (search) {
+      whereClauses.push(`(username ILIKE $${idx} OR email ILIKE $${idx})`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+
+    if (tier === 'premium') {
+      whereClauses.push(`is_premium = true`);
+    } else if (tier === 'free') {
+      whereClauses.push(`(is_premium IS FALSE OR is_premium IS NULL)`);
+    }
+
+    if (role) {
+      whereClauses.push(`role = $${idx}`);
+      params.push(role);
+      idx++;
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const countRes = await pool.query(`SELECT COUNT(*) FROM app_users ${whereSql}`, params);
+    const total = parseInt(countRes.rows[0].count);
+
     const users = await pool.query(`
-      SELECT id, username, email, role, is_premium, created_at 
+      SELECT id, username, email, role, is_premium, is_banned, ban_reason, created_at 
       FROM app_users 
+      ${whereSql}
       ORDER BY created_at DESC 
-      LIMIT 100
-    `);
-    res.json(users.rows);
+      LIMIT $${idx} OFFSET $${idx + 1}
+    `, [...params, limit, offset]);
+
+    res.json({
+      users: users.rows,
+      total,
+      page,
+      limit,
+      total_pages: Math.ceil(total / limit)
+    });
   } catch (err) {
     console.error("[ADMIN USERS ERROR]", err);
     res.status(500).json({ error: "Failed to fetch users" });
   }
 });
 
-// 🟢 4. GET RECENT TRANSACTIONS
+// 🟢 4. GET TRANSACTIONS (With Pagination & Currency Split)
 router.get("/transactions", authenticateToken, isAdmin, async (req, res) => {
   try {
-    // 🟢 FIX 3: Use 'app_user_id' for the JOIN (matches server.js)
-    // 🟢 FIX 4: Alias expected_amount -> amount, and provide a fallback for payment_method so React doesn't crash!
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(10, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+    const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
+    const currency = req.query.currency; // 'USD' | 'NGN'
+
+    let whereClauses = [];
+    let params = [];
+    let idx = 1;
+
+    if (status) {
+      if (status === 'APPROVED') {
+        whereClauses.push(`t.status = 'APPROVED'`);
+      } else if (status === 'PENDING') {
+        whereClauses.push(`(t.status = 'PENDING' OR t.status = 'WAITING')`);
+      } else {
+        whereClauses.push(`t.status = $${idx}`);
+        params.push(status);
+        idx++;
+      }
+    }
+
+    if (currency === 'USD') {
+      whereClauses.push(`t.expected_amount < 1000`);
+    } else if (currency === 'NGN') {
+      whereClauses.push(`t.expected_amount >= 1000`);
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const countRes = await pool.query(`SELECT COUNT(*) FROM transactions t ${whereSql}`, params);
+    const total = parseInt(countRes.rows[0].count);
+
     const tx = await pool.query(`
       SELECT 
         t.*, 
@@ -78,47 +351,88 @@ router.get("/transactions", authenticateToken, isAdmin, async (req, res) => {
         u.email 
       FROM transactions t
       LEFT JOIN app_users u ON t.app_user_id = u.id
+      ${whereSql}
       ORDER BY t.created_at DESC 
-      LIMIT 50
-    `);
-    res.json(tx.rows);
+      LIMIT $${idx} OFFSET $${idx + 1}
+    `, [...params, limit, offset]);
+
+    res.json({
+      transactions: tx.rows,
+      total,
+      page,
+      limit,
+      total_pages: Math.ceil(total / limit)
+    });
   } catch (err) {
     console.error("[ADMIN TX ERROR]", err);
     res.status(500).json({ error: "Failed to fetch transactions" });
   }
 });
 
-// 🟢 5. GET ALL VIDEOS (For Content Library)
+// 🟢 5. GET ALL VIDEOS (With Pagination, Search & Category Filter)
 router.get("/all-videos", authenticateToken, isAdmin, async (req, res) => {
   try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(10, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+    const category = req.query.category && req.query.category !== 'all' ? req.query.category : null;
+    const search = req.query.search ? req.query.search.trim() : null;
+
+    let whereClauses = [];
+    let params = [];
+    let idx = 1;
+
+    if (category) {
+      whereClauses.push(`category = $${idx}`);
+      params.push(category);
+      idx++;
+    }
+
+    if (search) {
+      whereClauses.push(`caption ILIKE $${idx}`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const countRes = await pool.query(`SELECT COUNT(*), COALESCE(SUM(views), 0)::bigint as total_views FROM videos ${whereSql}`, params);
+    const total = parseInt(countRes.rows[0].count);
+    const filteredViews = parseInt(countRes.rows[0].total_views || 0);
+
     const videos = await pool.query(`
-      SELECT id, chat_id, message_id, caption, category, views, cloudflare_id 
+      SELECT id, chat_id, message_id, caption, category, views, cloudflare_id, created_at 
       FROM videos 
+      ${whereSql}
       ORDER BY created_at DESC 
-      LIMIT 200
-    `);
+      LIMIT $${idx} OFFSET $${idx + 1}
+    `, [...params, limit, offset]);
     
     // Auto-generate thumbnails for the grid
     const formatted = videos.rows.map(v => {
       let thumbUrl = "";
-      
-      // 🟢 THE FIX: Only route Cloudflare Stream files to videodelivery.net
       if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
         thumbUrl = `https://videodelivery.net/${v.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=600`;
       } else {
-        // R2 files and Telegram files will use your upgraded local Thumbnail API!
         const baseUrl = process.env.API_BASE_URL || 'https://naijahomemade.com';
         thumbUrl = `${baseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`;
       }
-
       return {
         ...v,
         thumbnail_url: thumbUrl
       };
     });
     
-    res.json(formatted);
+    res.json({
+      videos: formatted,
+      total,
+      total_views: filteredViews,
+      page,
+      limit,
+      total_pages: Math.ceil(total / limit)
+    });
   } catch (err) {
+    console.error("[ADMIN ALL-VIDEOS ERROR]", err);
     res.status(500).json({ error: "Failed to fetch videos" });
   }
 });

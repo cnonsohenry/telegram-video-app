@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   LayoutDashboard, Users, CreditCard, LogOut, TrendingUp, ShieldCheck, 
   Clock, RefreshCw, UploadCloud, Video, Search, Edit3, Trash2, ChevronUp, ChevronDown, X, AlertTriangle, Menu,
-  PlayCircle, Eye, PieChart, Activity, Star, Percent, Sparkles, CheckCircle, CheckCircle2, Heart, ExternalLink, DollarSign
+  PlayCircle, Eye, PieChart, Activity, Star, Percent, Sparkles, CheckCircle, Heart, ExternalLink, DollarSign,
+  Flag, ShieldAlert, BarChart3, Database, Layers, ArrowUpRight, Check
 } from "lucide-react";
 import AdminUpload from "./AdminUpload"; 
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge"; 
-
 import { APP_CONFIG } from "../config";
 import { showToast } from "../utils/toast";
 
@@ -15,33 +15,52 @@ export default function AdminDashboard({ user, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
+  // Search
   const [searchQuery, setSearchQuery] = useState("");
   const [globalSearchResults, setGlobalSearchResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
 
+  // Sorting & Pagination
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 20;
+  const ITEMS_PER_PAGE = 25;
   
+  // UI Overlays
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null); 
   const [editingCreator, setEditingCreator] = useState(null);
   const [updatingCreatorId, setUpdatingCreatorId] = useState(null);
   const [deleteWarning, setDeleteWarning] = useState(null); 
+  const [actioningReportId, setActioningReportId] = useState(null);
 
-  const [stats, setStats] = useState({ total_users: 0, premium_users: 0, total_revenue_usd: 0, pending_crypto_orders: 0 });
-  const [usersList, setUsersList] = useState([]);
+  // Analytics & Stats State
+  const [statsData, setStatsData] = useState(null);
+  const [chartTimeframe, setChartTimeframe] = useState("30"); // "7", "14", "30"
+  const [chartMetric, setChartMetric] = useState("signups"); // "signups", "uploads", "stories", "revenue"
+  const [selectedCategoryDetail, setSelectedCategoryDetail] = useState(null);
+
+  // Lists & Server-side Paginated Data
+  const [usersData, setUsersData] = useState({ users: [], total: 0, total_pages: 1 });
   const [creatorsList, setCreatorsList] = useState([]);
   const [creatorStats, setCreatorStats] = useState(null);
   const [creatorFilter, setCreatorFilter] = useState("all");
   const [creatorCategoryFilter, setCreatorCategoryFilter] = useState("all");
   const [syncingTelegram, setSyncingTelegram] = useState(false);
   const [syncingSingleCreator, setSyncingSingleCreator] = useState(false);
-  const [transactions, setTransactions] = useState([]);
-  const [videosList, setVideosList] = useState([]);
 
-  // 🟢 DEBOUNCED GLOBAL SEARCH TO BACKEND
+  const [txData, setTxData] = useState({ transactions: [], total: 0, total_pages: 1 });
+  const [txCurrencyFilter, setTxCurrencyFilter] = useState("all"); // "all", "USD", "NGN"
+  const [txStatusFilter, setTxStatusFilter] = useState("all");
+
+  const [videosData, setVideosData] = useState({ videos: [], total: 0, total_views: 0, total_pages: 1 });
+  const [videoCategoryFilter, setVideoCategoryFilter] = useState("all");
+  const [videoSearchTerm, setVideoSearchTerm] = useState("");
+
+  const [reportsList, setReportsList] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+
+  // Debounced Global Search
   useEffect(() => {
     if (!searchQuery.trim()) {
       setGlobalSearchResults(null);
@@ -62,14 +81,14 @@ export default function AdminDashboard({ user, onLogout }) {
       } finally {
         setIsSearching(false);
       }
-    }, 500); // 500ms delay prevents database spam while typing
+    }, 450);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Main Data Fetcher
   const fetchData = async () => {
-    if (searchQuery) return; // Prevent fetching background tabs if actively searching
-    
+    if (searchQuery) return;
     setLoading(true);
     setError("");
     try {
@@ -78,17 +97,9 @@ export default function AdminDashboard({ user, onLogout }) {
 
       if (activeTab === "overview") {
         const res = await fetch(`${baseUrl}/api/admin/stats`, { headers });
-        if (!res.ok) throw new Error("Not authorized");
-        setStats(await res.json());
-      } else if (activeTab === "users") {
-        const res = await fetch(`${baseUrl}/api/admin/users`, { headers });
-        setUsersList(await res.json());
-      } else if (activeTab === "transactions") {
-        const res = await fetch(`${baseUrl}/api/admin/transactions`, { headers });
-        setTransactions(await res.json());
-      } else if (activeTab === "videos") {
-        const res = await fetch(`${baseUrl}/api/admin/all-videos`, { headers });
-        setVideosList(await res.json());
+        if (!res.ok) throw new Error("Failed to load dashboard statistics");
+        const data = await res.json();
+        setStatsData(data);
       } else if (activeTab === "creators") {
         const res = await fetch(`${baseUrl}/api/admin/creators`, { headers });
         if (res.ok) {
@@ -96,6 +107,61 @@ export default function AdminDashboard({ user, onLogout }) {
           setCreatorsList(data.creators || []);
           setCreatorStats(data.stats || null);
         }
+      } else if (activeTab === "videos") {
+        const catParam = videoCategoryFilter !== "all" ? `&category=${encodeURIComponent(videoCategoryFilter)}` : "";
+        const searchParam = videoSearchTerm.trim() ? `&search=${encodeURIComponent(videoSearchTerm.trim())}` : "";
+        const res = await fetch(`${baseUrl}/api/admin/all-videos?page=${currentPage}&limit=${ITEMS_PER_PAGE}${catParam}${searchParam}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setVideosData({ videos: data, total: data.length, total_views: 0, total_pages: 1 });
+          } else {
+            setVideosData({
+              videos: data.videos || [],
+              total: data.total || 0,
+              total_views: data.total_views || 0,
+              total_pages: data.total_pages || 1
+            });
+          }
+        }
+      } else if (activeTab === "users") {
+        const res = await fetch(`${baseUrl}/api/admin/users?page=${currentPage}&limit=${ITEMS_PER_PAGE}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setUsersData({ users: data, total: data.length, total_pages: 1 });
+          } else {
+            setUsersData({
+              users: data.users || [],
+              total: data.total || 0,
+              total_pages: data.total_pages || 1
+            });
+          }
+        }
+      } else if (activeTab === "transactions") {
+        const currParam = txCurrencyFilter !== "all" ? `&currency=${txCurrencyFilter}` : "";
+        const statParam = txStatusFilter !== "all" ? `&status=${txStatusFilter}` : "";
+        const res = await fetch(`${baseUrl}/api/admin/transactions?page=${currentPage}&limit=${ITEMS_PER_PAGE}${currParam}${statParam}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setTxData({ transactions: data, total: data.length, total_pages: 1 });
+          } else {
+            setTxData({
+              transactions: data.transactions || [],
+              total: data.total || 0,
+              total_pages: data.total_pages || 1
+            });
+          }
+        }
+      } else if (activeTab === "moderation") {
+        setReportsLoading(true);
+        const res = await fetch(`${baseUrl}/api/admin/reports`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setReportsList(data.reports || []);
+        }
+        setReportsLoading(false);
       }
     } catch (err) {
       setError(err.message);
@@ -106,13 +172,17 @@ export default function AdminDashboard({ user, onLogout }) {
 
   useEffect(() => { 
     setSearchQuery(""); 
+    setCurrentPage(1);
     fetchData(); 
   }, [activeTab]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab, sortConfig]);
+    if (activeTab === "videos" || activeTab === "users" || activeTab === "transactions") {
+      fetchData();
+    }
+  }, [currentPage, videoCategoryFilter, txCurrencyFilter, txStatusFilter]);
 
+  // Sorting helper
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
@@ -120,25 +190,26 @@ export default function AdminDashboard({ user, onLogout }) {
   };
 
   const sortData = (data) => {
-    if (!sortConfig.key) return data;
+    if (!sortConfig.key || !Array.isArray(data)) return data;
     return [...data].sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+      let valA = a[sortConfig.key];
+      let valB = b[sortConfig.key];
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
   };
 
   const SortIcon = ({ columnKey }) => {
-    if (sortConfig.key !== columnKey) return <ChevronDown size={14} color="#555" style={{marginLeft: "5px"}} />;
+    if (sortConfig.key !== columnKey) return <ChevronDown size={14} color="#71717a" style={{ marginLeft: "4px" }} />;
     return sortConfig.direction === 'asc' 
-      ? <ChevronUp size={14} color="var(--primary-color)" style={{marginLeft: "5px"}} />
-      : <ChevronDown size={14} color="var(--primary-color)" style={{marginLeft: "5px"}} />;
+      ? <ChevronUp size={14} color="#f43f5e" style={{ marginLeft: "4px" }} />
+      : <ChevronDown size={14} color="#f43f5e" style={{ marginLeft: "4px" }} />;
   };
 
-  const processedUsers = useMemo(() => sortData(usersList), [usersList, sortConfig]);
-  const processedVideos = useMemo(() => sortData(videosList), [videosList, sortConfig]);
-  const processedTx = useMemo(() => sortData(transactions), [transactions, sortConfig]);
-
+  // Creators filtering
   const filteredCreators = useMemo(() => {
     return creatorsList.filter(c => {
       if (creatorFilter === "verified" && !c.is_verified) return false;
@@ -154,7 +225,7 @@ export default function AdminDashboard({ user, onLogout }) {
 
   const processedCreators = useMemo(() => sortData(filteredCreators), [filteredCreators, sortConfig]);
   const paginatedCreators = processedCreators.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-  const totalCreatorPages = Math.ceil(processedCreators.length / ITEMS_PER_PAGE);
+  const totalCreatorPages = Math.max(1, Math.ceil(processedCreators.length / ITEMS_PER_PAGE));
 
   const creatorAnalytics = useMemo(() => {
     const total = creatorStats?.total_creators || creatorsList.length;
@@ -166,6 +237,7 @@ export default function AdminDashboard({ user, onLogout }) {
     return { total, verified, managed, totalSubs, totalSubRev, totalTips };
   }, [creatorsList, creatorStats]);
 
+  // Creator Actions
   const handleToggleVerify = async (creator) => {
     const nextState = !creator.is_verified;
     setUpdatingCreatorId(creator.id);
@@ -181,9 +253,10 @@ export default function AdminDashboard({ user, onLogout }) {
       const data = await res.json();
       if (data.success) {
         setCreatorsList(prev => prev.map(c => c.id === creator.id ? { ...c, is_verified: nextState } : c));
+        showToast(`Creator verification updated`, "success");
       }
     } catch (err) {
-      console.error("Failed to toggle verify:", err);
+      showToast("Failed to update verification", "error");
     } finally {
       setUpdatingCreatorId(null);
     }
@@ -204,9 +277,10 @@ export default function AdminDashboard({ user, onLogout }) {
       const data = await res.json();
       if (data.success) {
         setCreatorsList(prev => prev.map(c => c.id === creator.id ? { ...c, is_creator: nextState } : c));
+        showToast(`Creator status updated`, "success");
       }
     } catch (err) {
-      console.error("Failed to toggle creator status:", err);
+      showToast("Failed to update creator status", "error");
     } finally {
       setUpdatingCreatorId(null);
     }
@@ -254,7 +328,7 @@ export default function AdminDashboard({ user, onLogout }) {
     if (!editingCreator || !editingCreator.id) return;
     const channelInput = (editingCreator.source_channel || "").trim();
     if (!channelInput && !editingCreator.telegram_user_id) {
-      showToast("Please enter a Telegram channel handle (e.g. @channel_name or https://t.me/channel_name) first.", "error", 4000);
+      showToast("Please enter a Telegram channel handle first.", "error");
       return;
     }
 
@@ -266,27 +340,18 @@ export default function AdminDashboard({ user, onLogout }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`
         },
-        body: JSON.stringify({
-          source_channel: channelInput
-        })
+        body: JSON.stringify({ source_channel: channelInput })
       });
       const data = await res.json();
       if (data.success && data.creator) {
-        setEditingCreator(prev => ({
-          ...prev,
-          ...data.creator
-        }));
+        setEditingCreator(prev => ({ ...prev, ...data.creator }));
         setCreatorsList(prev => prev.map(c => c.id === editingCreator.id ? { ...c, ...data.creator } : c));
-        if (data.notice) {
-          showToast(data.notice, "info", 5000);
-        } else {
-          showToast("Fetched creator profile & bio from Telegram!", "success");
-        }
+        showToast("Fetched creator profile from Telegram!", "success");
       } else {
-        showToast(data.error || "Failed to fetch from Telegram", "error", 6000);
+        showToast(data.error || "Failed to fetch from Telegram", "error");
       }
     } catch (err) {
-      showToast("Error syncing from Telegram: " + err.message, "error", 6000);
+      showToast("Error syncing from Telegram: " + err.message, "error");
     } finally {
       setSyncingSingleCreator(false);
     }
@@ -297,22 +362,12 @@ export default function AdminDashboard({ user, onLogout }) {
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators/sync-telegram`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`
-        }
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       const data = await res.json();
       if (data.success) {
         showToast(`Successfully synced ${data.count} Telegram creator(s)!`, "success");
-        // Refresh creators list
-        const refreshRes = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-        });
-        const refreshData = await refreshRes.json();
-        if (refreshData.creators) {
-          setCreatorsList(refreshData.creators);
-          setCreatorStats(refreshData.stats);
-        }
+        fetchData();
       } else {
         showToast(data.error || "Failed to sync Telegram creators", "error");
       }
@@ -323,50 +378,14 @@ export default function AdminDashboard({ user, onLogout }) {
     }
   };
 
-  const videoAnalytics = useMemo(() => {
-    const total = videosList.length;
-    const views = videosList.reduce((sum, v) => sum + (Number(v.views) || 0), 0);
-    const avgViews = total > 0 ? Math.round(views / total) : 0;
-    const catCounts = {};
-    videosList.forEach(v => { catCounts[v.category] = (catCounts[v.category] || 0) + 1; });
-    const topCat = Object.keys(catCounts).sort((a,b) => catCounts[b] - catCounts[a])[0] || 'N/A';
-    return { total, views, avgViews, topCat };
-  }, [videosList]);
-
-  const userAnalytics = useMemo(() => {
-    const total = usersList.length;
-    const premium = usersList.filter(u => u.is_premium).length;
-    const admins = usersList.filter(u => u.role === 'admin').length;
-    const ratio = total > 0 ? Math.round((premium / total) * 100) : 0;
-    return { total, premium, admins, ratio };
-  }, [usersList]);
-
-  const txAnalytics = useMemo(() => {
-    const total = transactions.length;
-    const approved = transactions.filter(t => t.status === 'APPROVED');
-    const revenue = approved.reduce((sum, t) => sum + Number(t.amount || 0), 0).toFixed(2);
-    const pending = transactions.filter(t => t.status === 'PENDING' || t.status === 'WAITING');
-    const pendingRev = pending.reduce((sum, t) => sum + Number(t.amount || 0), 0).toFixed(2);
-    const approvalRate = total > 0 ? Math.round((approved.length / total) * 100) : 0;
-    return { total, revenue, pendingRev, approvalRate };
-  }, [transactions]);
-
-  const paginatedVideos = processedVideos.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-  const totalVideoPages = Math.ceil(processedVideos.length / ITEMS_PER_PAGE);
-
-  const paginatedUsers = processedUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-  const totalUserPages = Math.ceil(processedUsers.length / ITEMS_PER_PAGE);
-
-  const paginatedTx = processedTx.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-  const totalTxPages = Math.ceil(processedTx.length / ITEMS_PER_PAGE);
-
+  // Video / User Edit & Delete Handlers
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     try {
       const endpoint = editingItem.type === 'video' ? `/api/admin/video/${editingItem.data.id}` : `/api/admin/user/${editingItem.data.id}`;
       const payload = editingItem.type === 'video' 
         ? { caption: editingItem.data.caption, category: editingItem.data.category }
-        : { role: editingItem.data.role, is_premium: editingItem.data.is_premium };
+        : { role: editingItem.data.role, is_premium: editingItem.data.is_premium, is_banned: editingItem.data.is_banned, ban_reason: editingItem.data.ban_reason };
 
       const res = await fetch(`${APP_CONFIG.apiUrl}${endpoint}`, {
         method: 'PUT',
@@ -375,19 +394,23 @@ export default function AdminDashboard({ user, onLogout }) {
       });
 
       if (res.ok) {
-        if (searchQuery) {
-          // Force search refresh to show updated data instantly
-          setSearchQuery(searchQuery + " ");
-          setTimeout(() => setSearchQuery(searchQuery.trim()), 100);
+        if (editingItem.type === 'video') {
+          setVideosData(prev => ({
+            ...prev,
+            videos: prev.videos.map(v => v.id === editingItem.data.id ? { ...v, ...editingItem.data } : v)
+          }));
         } else {
-          if (editingItem.type === 'video') setVideosList(videosList.map(v => v.id === editingItem.data.id ? editingItem.data : v));
-          else setUsersList(usersList.map(u => u.id === editingItem.data.id ? editingItem.data : u));
+          setUsersData(prev => ({
+            ...prev,
+            users: prev.users.map(u => u.id === editingItem.data.id ? { ...u, ...editingItem.data } : u)
+          }));
         }
         setEditingItem(null);
         showToast("Changes saved successfully!", "success");
-      } else showToast("Failed to save changes.", "error");
+      } else {
+        showToast("Failed to save changes.", "error");
+      }
     } catch (err) { 
-      console.error(err);
       showToast("Error saving changes.", "error"); 
     }
   };
@@ -401,21 +424,81 @@ export default function AdminDashboard({ user, onLogout }) {
       });
 
       if (res.ok) {
-        if (searchQuery) {
-           setGlobalSearchResults(prev => ({
-             ...prev,
-             [deleteWarning.type === 'video' ? 'videos' : 'users']: prev[deleteWarning.type === 'video' ? 'videos' : 'users'].filter(item => item.id !== deleteWarning.id)
-           }));
+        if (deleteWarning.type === 'video') {
+          setVideosData(prev => ({
+            ...prev,
+            videos: prev.videos.filter(v => v.id !== deleteWarning.id),
+            total: Math.max(0, prev.total - 1)
+          }));
         } else {
-          if (deleteWarning.type === 'video') setVideosList(videosList.filter(v => v.id !== deleteWarning.id));
-          else setUsersList(usersList.filter(u => u.id !== deleteWarning.id));
+          setUsersData(prev => ({
+            ...prev,
+            users: prev.users.filter(u => u.id !== deleteWarning.id),
+            total: Math.max(0, prev.total - 1)
+          }));
         }
         setDeleteWarning(null);
         showToast("Item deleted successfully!", "info");
-      } else showToast("Failed to delete item.", "error");
+      } else {
+        showToast("Failed to delete item.", "error");
+      }
     } catch (err) { 
-      console.error(err);
       showToast("Error deleting item.", "error"); 
+    }
+  };
+
+  // Moderation Actions
+  const handleDismissReport = async (reportId) => {
+    setActioningReportId(reportId);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/reports/${reportId}/dismiss`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (res.ok) {
+        setReportsList(prev => prev.filter(r => r.id !== reportId));
+        showToast("Report dismissed.", "info");
+      }
+    } catch (err) {
+      showToast("Failed to dismiss report", "error");
+    } finally {
+      setActioningReportId(null);
+    }
+  };
+
+  const handleDeleteReportedVideo = async (reportId) => {
+    setActioningReportId(reportId);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/reports/${reportId}/delete-video`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (res.ok) {
+        setReportsList(prev => prev.filter(r => r.id !== reportId));
+        showToast("Video deleted and report resolved.", "success");
+      }
+    } catch (err) {
+      showToast("Failed to delete video", "error");
+    } finally {
+      setActioningReportId(null);
+    }
+  };
+
+  const handleBanCreatorReport = async (reportId) => {
+    setActioningReportId(reportId);
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/reports/${reportId}/ban-creator`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (res.ok) {
+        setReportsList(prev => prev.filter(r => r.id !== reportId));
+        showToast("Creator banned and video removed.", "success");
+      }
+    } catch (err) {
+      showToast("Failed to ban creator", "error");
+    } finally {
+      setActioningReportId(null);
     }
   };
 
@@ -427,9 +510,9 @@ export default function AdminDashboard({ user, onLogout }) {
   if (!user || user.role !== 'admin') {
     return (
       <div style={errorScreenStyle}>
-        <ShieldCheck size={64} color="#ff3b30" style={{ marginBottom: "20px" }} />
-        <h2 style={{ margin: "0 0 10px 0", color: "#fff", fontSize: "28px" }}>Access Denied</h2>
-        <p style={{ color: "#8e8e93", marginBottom: "30px", fontSize: "16px" }}>You need administrator privileges to view this portal.</p>
+        <ShieldCheck size={56} color="#f43f5e" style={{ marginBottom: "18px" }} />
+        <h2 style={{ margin: "0 0 8px 0", color: "#f4f4f5", fontSize: "24px", fontWeight: "800" }}>Access Denied</h2>
+        <p style={{ color: "#a1a1aa", marginBottom: "26px", fontSize: "14px" }}>You need administrator privileges to view this portal.</p>
         <button onClick={onLogout} style={goBackBtnStyle}>Return to Home</button>
       </div>
     );
@@ -437,21 +520,28 @@ export default function AdminDashboard({ user, onLogout }) {
 
   if (showUploadModal) return <AdminUpload onClose={() => setShowUploadModal(false)} />;
 
+  const overview = statsData?.overview || {};
+  const financials = statsData?.financials || {};
+  const categories = statsData?.categories || [];
+  const storage = statsData?.storage || {};
+  const timeSeries = statsData?.time_series || [];
+  const topCreators = statsData?.top_creators || [];
+
   return (
     <div style={dashboardContainerStyle}>
       <style>{`
-        .hamburger-btn, .mobile-close-btn { display: none; background: transparent; border: none; color: white; cursor: pointer; padding: 0; }
+        .hamburger-btn, .mobile-close-btn { display: none; background: transparent; border: none; color: #f4f4f5; cursor: pointer; padding: 0; }
         .mobile-overlay { display: none; }
         
-        @media (max-width: 768px) {
-          .admin-sidebar { position: fixed !important; left: -100%; transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 999999; height: 100dvh; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        @media (max-width: 900px) {
+          .admin-sidebar { position: fixed !important; left: -100%; transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1); z-index: 999999; height: 100dvh; box-shadow: 10px 0 40px rgba(0,0,0,0.8); }
           .admin-sidebar.open { left: 0; }
           .hamburger-btn { display: block; }
           .mobile-close-btn { display: block; }
-          .mobile-overlay.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 999998; }
-          .top-bar-container { flex-direction: column !important; align-items: flex-start !important; gap: 15px; padding: 20px !important; }
+          .mobile-overlay.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(5px); z-index: 999998; }
+          .top-bar-container { flex-direction: column !important; align-items: flex-start !important; gap: 14px; padding: 18px 20px !important; }
           .header-title-group { width: 100%; }
-          .search-container { width: 100% !important; margin-top: 10px; }
+          .search-container { width: 100% !important; margin-top: 8px; }
           .top-bar-actions { width: 100%; display: flex; gap: 10px; }
           .top-bar-actions button { flex: 1; justify-content: center; }
           .content-area { padding: 20px !important; }
@@ -459,122 +549,223 @@ export default function AdminDashboard({ user, onLogout }) {
         }
       `}</style>
 
+      {/* Mobile Drawer Overlay */}
       <div className={`mobile-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
+      {/* Executive Sidebar */}
       <div className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`} style={sidebarStyle}>
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <h2 style={logoStyle}>
-              {APP_CONFIG.appNamePrefix}
-              <span style={{ color: "var(--primary-color)" }}>ADMIN</span>
-            </h2>
-            <button className="mobile-close-btn" onClick={() => setSidebarOpen(false)}><X size={24} /></button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "24px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div>
+              <div style={logoStyle}>
+                {APP_CONFIG.appNamePrefix || "NAIJA"}
+                <span style={{ color: "#f43f5e", marginLeft: "2px" }}>ADMIN</span>
+              </div>
+              <div style={{ fontSize: "11px", color: "#71717a", fontWeight: "600", marginTop: "2px", letterSpacing: "0.5px" }}>COMMAND CENTER</div>
+            </div>
+            <button className="mobile-close-btn" onClick={() => setSidebarOpen(false)}><X size={22} /></button>
           </div>
           
-          <div style={{ marginTop: "40px", display: "flex", flexDirection: "column", gap: "10px" }}>
-            <SidebarBtn active={activeTab === "overview" && !searchQuery} onClick={() => handleTabSwitch("overview")} icon={<LayoutDashboard size={20} />} label="Overview" />
-            <SidebarBtn active={activeTab === "creators" && !searchQuery} onClick={() => handleTabSwitch("creators")} icon={<Sparkles size={20} />} label="Creators" />
-            <SidebarBtn active={activeTab === "videos" && !searchQuery} onClick={() => handleTabSwitch("videos")} icon={<Video size={20} />} label="Videos" />
-            <SidebarBtn active={activeTab === "users" && !searchQuery} onClick={() => handleTabSwitch("users")} icon={<Users size={20} />} label="Users" />
-            <SidebarBtn active={activeTab === "transactions" && !searchQuery} onClick={() => handleTabSwitch("transactions")} icon={<CreditCard size={20} />} label="Transactions" />
+          <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "6px" }}>
+            <SidebarBtn active={activeTab === "overview" && !searchQuery} onClick={() => handleTabSwitch("overview")} icon={<LayoutDashboard size={18} />} label="Overview & Charts" />
+            <SidebarBtn active={activeTab === "creators" && !searchQuery} onClick={() => handleTabSwitch("creators")} icon={<Sparkles size={18} />} label="Creators & Funnels" />
+            <SidebarBtn active={activeTab === "videos" && !searchQuery} onClick={() => handleTabSwitch("videos")} icon={<Video size={18} />} label="Content Library" count={overview.total_videos} />
+            <SidebarBtn active={activeTab === "users" && !searchQuery} onClick={() => handleTabSwitch("users")} icon={<Users size={18} />} label="User Accounts" count={overview.total_users} />
+            <SidebarBtn active={activeTab === "transactions" && !searchQuery} onClick={() => handleTabSwitch("transactions")} icon={<CreditCard size={18} />} label="Financials & Orders" />
+            <SidebarBtn 
+              active={activeTab === "moderation" && !searchQuery} 
+              onClick={() => handleTabSwitch("moderation")} 
+              icon={<Flag size={18} />} 
+              label="Moderation Queue" 
+              badge={overview.pending_reports > 0 ? overview.pending_reports : null} 
+            />
           </div>
         </div>
-        <button onClick={onLogout} style={logoutBtnStyle}><LogOut size={20} /> Exit Admin</button>
+
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "18px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px", padding: "0 4px" }}>
+            <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#27272a", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", color: "#f43f5e", fontSize: "13px" }}>
+              {user.username ? user.username.charAt(0).toUpperCase() : "A"}
+            </div>
+            <div style={{ overflow: "hidden" }}>
+              <div style={{ fontSize: "13px", fontWeight: "700", color: "#f4f4f5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                @{user.username}
+              </div>
+              <div style={{ fontSize: "11px", color: "#71717a" }}>System Administrator</div>
+            </div>
+          </div>
+          <button onClick={onLogout} style={logoutBtnStyle}><LogOut size={16} /> Exit Admin</button>
+        </div>
       </div>
 
+      {/* Main Content Area */}
       <div style={mainContentStyle}>
+        {/* Top Action Bar */}
         <div className="top-bar-container" style={topBarStyle}>
-          
-          <div className="header-title-group" style={{ display: "flex", alignItems: "center", gap: "15px", flexWrap: "wrap", flex: 1 }}>
+          <div className="header-title-group" style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", flex: 1 }}>
             <button className="hamburger-btn" onClick={() => setSidebarOpen(true)}>
-              <Menu size={26} />
+              <Menu size={24} />
             </button>
-            <h1 style={{ margin: 0, fontSize: "24px", textTransform: "capitalize" }}>
-              {searchQuery ? "Global Search" : activeTab}
-            </h1>
+            <div>
+              <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: "#f4f4f5", letterSpacing: "-0.5px", textTransform: "capitalize" }}>
+                {searchQuery ? "Global Database Search" : activeTab === "overview" ? "Executive Dashboard" : activeTab}
+              </h1>
+            </div>
             
-            {/* 🟢 Search is now permanently visible in the top bar */}
+            {/* Global Search Bar */}
             <div className="search-container" style={searchBarStyle}>
-              <Search size={16} color="#8e8e93" />
-              <input type="text" placeholder="Search entire database..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={searchInputStyle} />
-              {searchQuery && <X size={14} color="#8e8e93" style={{cursor:"pointer"}} onClick={() => setSearchQuery("")} />}
+              <Search size={15} color="#71717a" />
+              <input 
+                type="text" 
+                placeholder="Search entire database (users, videos, creators)..." 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+                style={searchInputStyle} 
+              />
+              {searchQuery && <X size={14} color="#71717a" style={{ cursor: "pointer" }} onClick={() => setSearchQuery("")} />}
             </div>
           </div>
           
           <div className="top-bar-actions" style={{ display: "flex", gap: "10px" }}>
             <button onClick={() => setShowUploadModal(true)} style={uploadBtnStyle}>
-              <UploadCloud size={18} /> <span className="hide-on-mobile">Upload Video</span>
+              <UploadCloud size={16} /> <span className="hide-on-mobile">Direct Ingest</span>
             </button>
             <button onClick={fetchData} style={refreshBtnStyle} disabled={loading || !!searchQuery}>
-              <RefreshCw size={18} style={{ animation: loading ? "spin 1s linear infinite" : "none" }} /> <span className="hide-on-mobile">Refresh</span>
+              <RefreshCw size={15} style={{ animation: loading ? "spin 1s linear infinite" : "none" }} /> 
+              <span className="hide-on-mobile">Sync</span>
             </button>
           </div>
         </div>
 
+        {/* Content Viewport */}
         <div className="content-area" style={contentAreaStyle}>
-          {/* 🟢 GLOBAL SEARCH RESULTS OVERRIDE */}
+          {/* Global Search Results Override */}
           {searchQuery.trim() ? (
             isSearching ? (
-               <div style={centerFlex}><RefreshCw size={40} color="var(--primary-color)" style={{ animation: "spin 1s linear infinite" }} /></div>
+              <div style={centerFlex}><RefreshCw size={36} color="#f43f5e" style={{ animation: "spin 1s linear infinite" }} /></div>
             ) : globalSearchResults ? (
-               <div>
-                  <h3 style={{ color: "#8e8e93", marginBottom: "20px" }}>Found {globalSearchResults.users.length} Users</h3>
-                  {globalSearchResults.users.length > 0 && (
-                    <div style={{ ...tableContainerStyle, marginBottom: "40px" }}>
-                      <div style={{ overflowX: "auto" }}>
-                        <table style={tableStyle}>
-                          <thead>
-                            <tr>
-                              <th style={thStyle}>Username</th>
-                              <th style={thStyle}>Email</th>
-                              <th style={thStyle}>Tier</th>
-                              <th style={thStyle}>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {globalSearchResults.users.map(u => (
-                              <tr key={u.id} style={trStyle}>
-                                <td style={{...tdStyle, fontWeight: "600"}}>{u.username}</td>
-                                <td style={{...tdStyle, color: "#8e8e93"}}>{u.email}</td>
-                                <td style={tdStyle}>{u.is_premium ? <span style={premiumBadge}>Premium</span> : <span style={freeBadge}>Free</span>}</td>
-                                <td style={tdStyle}>
-                                  <div style={{ display: "flex" }}>
-                                    <button onClick={() => setEditingItem({type: 'user', data: u})} style={iconBtnStyle}><Edit3 size={16} /></button>
-                                    <button onClick={() => setDeleteWarning({type: 'user', id: u.id, name: u.username})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
+              <div>
+                <div style={{ color: "#a1a1aa", fontSize: "14px", marginBottom: "20px" }}>
+                  Search results for <strong>"{searchQuery}"</strong>
+                </div>
 
-                  <h3 style={{ color: "#8e8e93", marginBottom: "20px" }}>Found {globalSearchResults.videos.length} Videos</h3>
-                  {globalSearchResults.videos.length > 0 && (
-                    <div style={{ ...tableContainerStyle, marginBottom: "40px" }}>
+                {/* Users Found */}
+                <h3 style={{ color: "#f4f4f5", fontSize: "15px", fontWeight: "700", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Users size={16} color="#a1a1aa" /> Users ({globalSearchResults.users?.length || 0})
+                </h3>
+                {globalSearchResults.users?.length > 0 && (
+                  <div style={{ ...tableContainerStyle, marginBottom: "30px" }}>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={tableStyle}>
+                        <thead>
+                          <tr>
+                            <th style={thStyle}>Username</th>
+                            <th style={thStyle}>Email</th>
+                            <th style={thStyle}>Tier</th>
+                            <th style={thStyle}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {globalSearchResults.users.map(u => (
+                            <tr key={u.id} style={trStyle}>
+                              <td style={{ ...tdStyle, fontWeight: "600" }}>{u.username}</td>
+                              <td style={{ ...tdStyle, color: "#a1a1aa" }}>{u.email}</td>
+                              <td style={tdStyle}>{u.is_premium ? <span style={premiumBadge}>Premium</span> : <span style={freeBadge}>Free</span>}</td>
+                              <td style={tdStyle}>
+                                <div style={{ display: "flex", gap: "6px" }}>
+                                  <button onClick={() => setEditingItem({ type: 'user', data: u })} style={iconBtnStyle} title="Edit User"><Edit3 size={15} /></button>
+                                  <button onClick={() => setDeleteWarning({ type: 'user', id: u.id, name: u.username })} style={{ ...iconBtnStyle, color: "#f43f5e" }} title="Delete"><Trash2 size={15} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Videos Found */}
+                <h3 style={{ color: "#f4f4f5", fontSize: "15px", fontWeight: "700", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Video size={16} color="#a1a1aa" /> Videos ({globalSearchResults.videos?.length || 0})
+                </h3>
+                {globalSearchResults.videos?.length > 0 && (
+                  <div style={{ ...tableContainerStyle, marginBottom: "30px" }}>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={tableStyle}>
+                        <thead>
+                          <tr>
+                            <th style={thStyle}>Preview</th>
+                            <th style={thStyle}>Caption</th>
+                            <th style={thStyle}>Category</th>
+                            <th style={thStyle}>Views</th>
+                            <th style={thStyle}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {globalSearchResults.videos.map(v => (
+                            <tr key={v.id} style={trStyle}>
+                              <td style={tdStyle}>
+                                <img src={v.thumbnail_url || '/assets/default-avatar.png'} alt="" style={{ width: "42px", height: "42px", objectFit: "cover", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.08)" }} />
+                              </td>
+                              <td style={{ ...tdStyle, fontWeight: "600", maxWidth: "300px" }}>{v.caption || "Untitled"}</td>
+                              <td style={{ ...tdStyle, textTransform: "capitalize" }}>{v.category}</td>
+                              <td style={tdStyle}>{(v.views || 0).toLocaleString()}</td>
+                              <td style={tdStyle}>
+                                <div style={{ display: "flex", gap: "6px" }}>
+                                  <button onClick={() => setEditingItem({ type: 'video', data: v })} style={iconBtnStyle} title="Edit"><Edit3 size={15} /></button>
+                                  <button onClick={() => setDeleteWarning({ type: 'video', id: v.id, name: v.caption })} style={{ ...iconBtnStyle, color: "#f43f5e" }} title="Delete"><Trash2 size={15} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Creators Found */}
+                {globalSearchResults.creators?.length > 0 && (
+                  <>
+                    <h3 style={{ color: "#f4f4f5", fontSize: "15px", fontWeight: "700", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <Sparkles size={16} color="#a1a1aa" /> Creators ({globalSearchResults.creators.length})
+                    </h3>
+                    <div style={{ ...tableContainerStyle, marginBottom: "30px" }}>
                       <div style={{ overflowX: "auto" }}>
                         <table style={tableStyle}>
                           <thead>
                             <tr>
-                              <th style={thStyle}>Caption</th>
+                              <th style={thStyle}>Creator</th>
                               <th style={thStyle}>Category</th>
-                              <th style={thStyle}>Views</th>
+                              <th style={thStyle}>Monthly Rate</th>
+                              <th style={thStyle}>Verified</th>
                               <th style={thStyle}>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {globalSearchResults.videos.map(v => (
-                              <tr key={v.id} style={trStyle}>
-                                <td style={{...tdStyle, fontWeight:"600"}}>{v.caption || "Untitled"}</td>
-                                <td style={{...tdStyle, textTransform:"capitalize"}}>{v.category}</td>
-                                <td style={tdStyle}>{v.views}</td>
+                            {globalSearchResults.creators.map(c => (
+                              <tr key={c.id} style={trStyle}>
                                 <td style={tdStyle}>
-                                  <div style={{ display: "flex" }}>
-                                    <button onClick={() => setEditingItem({type: 'video', data: v})} style={iconBtnStyle}><Edit3 size={16} /></button>
-                                    <button onClick={() => setDeleteWarning({type: 'video', id: v.id, name: v.caption})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                    <img src={c.avatar_url || '/assets/default-avatar.png'} alt="" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(255,255,255,0.08)" }} />
+                                    <div>
+                                      <div style={{ fontWeight: "700", color: "#f4f4f5", fontSize: "13px" }}>{c.display_name || c.username}</div>
+                                      <div style={{ fontSize: "11px", color: "#71717a" }}>@{c.username}</div>
+                                    </div>
                                   </div>
+                                </td>
+                                <td style={tdStyle}>{c.creator_category || "Creator"}</td>
+                                <td style={{ ...tdStyle, color: "#f43f5e", fontWeight: "700" }}>
+                                  {Number(c.subscription_price) > 0 ? `$${Number(c.subscription_price).toLocaleString()}/mo` : "Free"}
+                                </td>
+                                <td style={tdStyle}>
+                                  {c.is_verified ? <TwitterVerifiedBadge size={14} /> : <span style={{ color: "#71717a", fontSize: "12px" }}>No</span>}
+                                </td>
+                                <td style={tdStyle}>
+                                  <button onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: c.username }))} style={{ ...iconBtnStyle, color: "#38bdf8" }}>
+                                    <ExternalLink size={15} />
+                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -582,114 +773,504 @@ export default function AdminDashboard({ user, onLogout }) {
                         </table>
                       </div>
                     </div>
-                  )}
-
-                  {globalSearchResults.creators && globalSearchResults.creators.length > 0 && (
-                    <>
-                      <h3 style={{ color: "#8e8e93", marginBottom: "20px" }}>Found {globalSearchResults.creators.length} Creators</h3>
-                      <div style={{ ...tableContainerStyle, marginBottom: "40px" }}>
-                        <div style={{ overflowX: "auto" }}>
-                          <table style={tableStyle}>
-                            <thead>
-                              <tr>
-                                <th style={thStyle}>Creator</th>
-                                <th style={thStyle}>Category</th>
-                                <th style={thStyle}>Monthly Rate</th>
-                                <th style={thStyle}>Verified</th>
-                                <th style={thStyle}>Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {globalSearchResults.creators.map(c => (
-                                <tr key={c.id} style={trStyle}>
-                                  <td style={tdStyle}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                      <img src={c.avatar_url || '/assets/default-avatar.png'} alt="" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} />
-                                      <div>
-                                        <div style={{ fontWeight: "700", color: "#fff", fontSize: "13px" }}>{c.display_name || c.username}</div>
-                                        <div style={{ fontSize: "11px", color: "#8e8e93" }}>@{c.username}</div>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td style={tdStyle}>{c.creator_category || "Creator"}</td>
-                                  <td style={{ ...tdStyle, color: "#f43f5e", fontWeight: "700" }}>
-                                    {Number(c.subscription_price) > 0 ? `$${Number(c.subscription_price).toLocaleString()}/mo` : "Free"}
-                                  </td>
-                                  <td style={tdStyle}>
-                                    {c.is_verified ? <TwitterVerifiedBadge size={15} /> : <span style={{ color: "#8e8e93", fontSize: "12px" }}>No</span>}
-                                  </td>
-                                  <td style={tdStyle}>
-                                    <button onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: c.username }))} style={{ ...iconBtnStyle, color: "#00aff0" }}>
-                                      <ExternalLink size={16} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </>
-                  )}
-               </div>
-            ) : <div style={centerFlex}><p>No results found.</p></div>
-          ) : loading ? (
-            <div style={centerFlex}><RefreshCw size={40} color="var(--primary-color)" style={{ animation: "spin 1s linear infinite" }} /></div>
+                  </>
+                )}
+              </div>
+            ) : <div style={centerFlex}><p style={{ color: "#71717a" }}>No results found.</p></div>
+          ) : loading && !statsData ? (
+            <div style={centerFlex}><RefreshCw size={36} color="#f43f5e" style={{ animation: "spin 1s linear infinite" }} /></div>
           ) : (
             <>
-              {/* 🟢 STANDARD TABS RENDERING */}
-              {activeTab === "overview" && (
-                <div style={gridStatsStyle}>
-                  <StatCard title="Total Revenue" value={`$${stats.total_revenue_usd}`} icon={<TrendingUp size={24} color="#f43f5e" />} bg="rgba(225, 29, 72, 0.12)" />
-                  <StatCard title="Total Users" value={stats.total_users} icon={<Users size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
-                  <StatCard title="Premium Members" value={stats.premium_users} icon={<ShieldCheck size={24} color="var(--primary-color)" />} bg="rgba(247, 147, 26, 0.1)" />
-                  <StatCard title="Pending Crypto" value={stats.pending_crypto_orders} icon={<Clock size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
+              {/* 🟢 OVERVIEW TAB: EXECUTIVE INTELLIGENCE & INTERACTIVE CHARTS */}
+              {activeTab === "overview" && statsData && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+                  
+                  {/* Row 1: Primary Executive KPIs */}
+                  <div style={gridStatsStyle}>
+                    <StatCard 
+                      title="Total Catalog Videos" 
+                      value={(overview.total_videos || 0).toLocaleString()} 
+                      subtitle={`${(overview.total_views || 0).toLocaleString()} catalog views`}
+                      icon={<Video size={20} color="#f43f5e" />} 
+                      bg="rgba(225, 29, 72, 0.12)" 
+                    />
+                    <StatCard 
+                      title="Registered User Base" 
+                      value={(overview.total_users || 0).toLocaleString()} 
+                      subtitle={`${overview.premium_users || 0} active premium VIPs`}
+                      icon={<Users size={20} color="#38bdf8" />} 
+                      bg="rgba(56, 189, 248, 0.12)" 
+                    />
+                    <StatCard 
+                      title="Approved USD Crypto" 
+                      value={`$${(financials.approved_usd || 0).toFixed(2)}`} 
+                      subtitle={`${financials.approved_usd_count || 0} orders • $${(financials.pending_crypto_usd || 0).toLocaleString()} pending`}
+                      icon={<TrendingUp size={20} color="#34d399" />} 
+                      bg="rgba(52, 211, 153, 0.12)" 
+                    />
+                    <StatCard 
+                      title="Approved NGN Bank" 
+                      value={`₦${(financials.approved_ngn || 0).toLocaleString()}`} 
+                      subtitle={`${financials.approved_ngn_count || 0} transfers • ₦${(financials.pending_bank_ngn || 0).toLocaleString()} pending`}
+                      icon={<CreditCard size={20} color="#fbbf24" />} 
+                      bg="rgba(251, 191, 36, 0.12)" 
+                    />
+                  </div>
+
+                  {/* Row 2: Interactive Platform Growth Chart */}
+                  <div style={cardContainerStyle}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <BarChart3 size={18} color="#f43f5e" />
+                          <h2 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#f4f4f5" }}>
+                            Platform Trajectory & Growth Curves
+                          </h2>
+                        </div>
+                        <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#71717a" }}>
+                          Continuous rolling time-series telemetry across key operational vectors.
+                        </p>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                        {/* Metric Selector */}
+                        <div style={{ display: "flex", background: "#27272a", borderRadius: "8px", padding: "3px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                          {[
+                            { id: "signups", label: "Signups", color: "#f43f5e" },
+                            { id: "uploads", label: "Uploads", color: "#38bdf8" },
+                            { id: "stories", label: "24h Stories", color: "#34d399" },
+                            { id: "revenue", label: "USD Revenue", color: "#fbbf24" }
+                          ].map(m => (
+                            <button
+                              key={m.id}
+                              onClick={() => setChartMetric(m.id)}
+                              style={{
+                                border: "none",
+                                background: chartMetric === m.id ? m.color : "transparent",
+                                color: chartMetric === m.id ? (m.id === "revenue" ? "#09090b" : "#fff") : "#a1a1aa",
+                                padding: "5px 12px",
+                                borderRadius: "6px",
+                                fontSize: "12px",
+                                fontWeight: "700",
+                                cursor: "pointer",
+                                transition: "all 0.15s ease"
+                              }}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Timeframe Selector */}
+                        <div style={{ display: "flex", background: "#27272a", borderRadius: "8px", padding: "3px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                          {[
+                            { id: "7", label: "7D" },
+                            { id: "14", label: "14D" },
+                            { id: "30", label: "30D" }
+                          ].map(tf => (
+                            <button
+                              key={tf.id}
+                              onClick={() => setChartTimeframe(tf.id)}
+                              style={{
+                                border: "none",
+                                background: chartTimeframe === tf.id ? "rgba(255,255,255,0.12)" : "transparent",
+                                color: chartTimeframe === tf.id ? "#f4f4f5" : "#71717a",
+                                padding: "5px 10px",
+                                borderRadius: "6px",
+                                fontSize: "11px",
+                                fontWeight: "700",
+                                cursor: "pointer"
+                              }}
+                            >
+                              {tf.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SVG Interactive Chart Component */}
+                    <InteractiveTimeSeriesChart 
+                      data={timeSeries.slice(-parseInt(chartTimeframe))} 
+                      metric={chartMetric} 
+                    />
+                  </div>
+
+                  {/* Row 3: Category Distribution & Storage Architecture */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: "20px" }}>
+                    
+                    {/* Category Breakdown */}
+                    <div style={cardContainerStyle}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <PieChart size={18} color="#38bdf8" />
+                          <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "#f4f4f5" }}>
+                            Content Category Distribution
+                          </h3>
+                        </div>
+                        <span style={{ fontSize: "12px", color: "#71717a" }}>{(overview.total_videos || 0).toLocaleString()} Videos</span>
+                      </div>
+
+                      {/* Stacked Proportional Bar */}
+                      <CategoryDistributionBar 
+                        categories={categories} 
+                        totalVideos={overview.total_videos || 1} 
+                        onSelectCategory={(cat) => setSelectedCategoryDetail(cat)}
+                        selectedCategory={selectedCategoryDetail}
+                      />
+
+                      {/* Category Grid Pills */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px", marginTop: "16px" }}>
+                        {categories.slice(0, 8).map(c => {
+                          const pct = (((c.count || 0) / (overview.total_videos || 1)) * 100).toFixed(1);
+                          return (
+                            <div 
+                              key={c.category}
+                              onClick={() => {
+                                setVideoCategoryFilter(c.category);
+                                setActiveTab("videos");
+                              }}
+                              style={{
+                                background: "#27272a",
+                                border: "1px solid rgba(255,255,255,0.06)",
+                                borderRadius: "8px",
+                                padding: "8px 10px",
+                                cursor: "pointer",
+                                transition: "border-color 0.15s"
+                              }}
+                              title="Click to view videos in this category"
+                            >
+                              <div style={{ fontSize: "12px", fontWeight: "700", color: "#f4f4f5", textTransform: "capitalize", display: "flex", justifyContent: "space-between" }}>
+                                <span>{c.category}</span>
+                                <span style={{ color: "#71717a", fontSize: "11px" }}>{pct}%</span>
+                              </div>
+                              <div style={{ fontSize: "11px", color: "#a1a1aa", marginTop: "2px" }}>
+                                {c.count.toLocaleString()} vids • {(c.views || 0).toLocaleString()} views
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Infrastructure & Engagement Health */}
+                    <div style={cardContainerStyle}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                        <Database size={18} color="#34d399" />
+                        <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "#f4f4f5" }}>
+                          Infrastructure & Community Velocity
+                        </h3>
+                      </div>
+
+                      {/* Storage Distribution */}
+                      <div style={{ marginBottom: "20px" }}>
+                        <div style={{ fontSize: "12px", color: "#71717a", fontWeight: "700", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          Storage Pipeline Architecture
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          <StorageRow 
+                            name="Cloudflare R2 Storage (Direct CDN)" 
+                            count={storage.r2 || 0} 
+                            total={overview.total_videos || 1} 
+                            color="#f43f5e" 
+                          />
+                          <StorageRow 
+                            name="Cloudflare Stream HLS Nodes" 
+                            count={storage.stream || 0} 
+                            total={overview.total_videos || 1} 
+                            color="#38bdf8" 
+                          />
+                          <StorageRow 
+                            name="Telegram Fast CDN Fallback" 
+                            count={storage.telegram || 0} 
+                            total={overview.total_videos || 1} 
+                            color="#a1a1aa" 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Engagement Ratios */}
+                      <div>
+                        <div style={{ fontSize: "12px", color: "#71717a", fontWeight: "700", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          Platform Engagement Metrics
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
+                          <EngagementCard title="Video Likes" count={overview.total_likes || 0} icon={<Heart size={14} color="#f43f5e" />} />
+                          <EngagementCard title="Comments" count={overview.total_comments || 0} icon={<Activity size={14} color="#38bdf8" />} />
+                          <EngagementCard title="Bookmark Saves" count={overview.total_saves || 0} icon={<Star size={14} color="#fbbf24" />} />
+                          <EngagementCard title="Creator Follows" count={overview.total_follows || 0} icon={<Users size={14} color="#34d399" />} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Top Creators Performance Leaderboard */}
+                  <div style={cardContainerStyle}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <Sparkles size={18} color="#fbbf24" />
+                        <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "#f4f4f5" }}>
+                          Top Content Producers & Audience Engines
+                        </h3>
+                      </div>
+                      <button 
+                        onClick={() => handleTabSwitch("creators")} 
+                        style={{ border: "none", background: "transparent", color: "#f43f5e", fontSize: "12px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+                      >
+                        Manage All {overview.total_creators || 0} Creators <ArrowUpRight size={14} />
+                      </button>
+                    </div>
+
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={tableStyle}>
+                        <thead>
+                          <tr>
+                            <th style={thStyle}>Rank & Creator</th>
+                            <th style={thStyle}>Type</th>
+                            <th style={thStyle}>Category</th>
+                            <th style={thStyle}>Total Catalog Views</th>
+                            <th style={thStyle}>Videos</th>
+                            <th style={thStyle}>Active Subscribers</th>
+                            <th style={thStyle}>Followers</th>
+                            <th style={thStyle}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {topCreators.map((c, idx) => (
+                            <tr key={c.id} style={trStyle}>
+                              <td style={tdStyle}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                  <span style={{ fontSize: "12px", fontWeight: "800", color: idx === 0 ? "#fbbf24" : idx === 1 ? "#e4e4e7" : idx === 2 ? "#cd7f32" : "#71717a", width: "16px" }}>
+                                    #{idx + 1}
+                                  </span>
+                                  <img 
+                                    src={c.avatar_url || '/assets/default-avatar.png'} 
+                                    alt="" 
+                                    style={{ width: "34px", height: "34px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(255,255,255,0.08)" }} 
+                                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                  />
+                                  <div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                      <span style={{ fontWeight: "700", color: "#f4f4f5", fontSize: "13px" }}>{c.display_name || c.username}</span>
+                                      {c.is_verified && <TwitterVerifiedBadge size={13} />}
+                                    </div>
+                                    <span style={{ fontSize: "11px", color: "#71717a" }}>@{c.username}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={tdStyle}>
+                                {c.is_managed ? (
+                                  <span style={{ background: "rgba(56, 189, 248, 0.12)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.25)", borderRadius: "6px", padding: "1px 6px", fontSize: "10px", fontWeight: "800" }}>
+                                    TELEGRAM
+                                  </span>
+                                ) : (
+                                  <span style={{ background: "rgba(244, 63, 94, 0.12)", color: "#f43f5e", border: "1px solid rgba(244, 63, 94, 0.25)", borderRadius: "6px", padding: "1px 6px", fontSize: "10px", fontWeight: "800" }}>
+                                    WEB
+                                  </span>
+                                )}
+                              </td>
+                              <td style={tdStyle}>
+                                <span style={{ color: "#a1a1aa", fontSize: "12px", textTransform: "capitalize" }}>{c.creator_category || "Creator"}</span>
+                              </td>
+                              <td style={{ ...tdStyle, fontWeight: "700", color: "#f4f4f5" }}>
+                                {Number(c.total_views || 0).toLocaleString()}
+                              </td>
+                              <td style={{ ...tdStyle, color: "#a1a1aa" }}>{c.total_posts || 0}</td>
+                              <td style={{ ...tdStyle, fontWeight: "700", color: Number(c.active_subs) > 0 ? "#34d399" : "#71717a" }}>
+                                {c.active_subs || 0} VIP
+                              </td>
+                              <td style={{ ...tdStyle, color: "#a1a1aa" }}>{c.followers_count || 0}</td>
+                              <td style={tdStyle}>
+                                <button 
+                                  onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: c.username }))}
+                                  style={{ ...iconBtnStyle, color: "#38bdf8" }} 
+                                  title="View Public Profile"
+                                >
+                                  <ExternalLink size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
                 </div>
               )}
 
-              {/* 🟢 CREATOR MANAGEMENT TAB */}
+              {/* 🟢 MODERATION & REPORTS QUEUE TAB */}
+              {activeTab === "moderation" && (
+                <div>
+                  <div style={{ ...cardContainerStyle, marginBottom: "24px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <ShieldAlert size={20} color="#f43f5e" />
+                          <h2 style={{ margin: 0, fontSize: "17px", fontWeight: "800", color: "#f4f4f5" }}>
+                            Content Moderation & Incident Queue
+                          </h2>
+                        </div>
+                        <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#71717a" }}>
+                          Review flagged community submissions, copyright claims, and inappropriate content reports.
+                        </p>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "12px", background: "rgba(244, 63, 94, 0.12)", color: "#f43f5e", border: "1px solid rgba(244, 63, 94, 0.25)", padding: "4px 10px", borderRadius: "8px", fontWeight: "700" }}>
+                          {reportsList.length} Pending Actions
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {reportsLoading ? (
+                    <div style={centerFlex}><RefreshCw size={36} color="#f43f5e" style={{ animation: "spin 1s linear infinite" }} /></div>
+                  ) : reportsList.length === 0 ? (
+                    <div style={{ ...cardContainerStyle, textAlign: "center", padding: "60px 20px" }}>
+                      <CheckCircle size={44} color="#34d399" style={{ margin: "0 auto 12px auto" }} />
+                      <h3 style={{ margin: "0 0 6px 0", color: "#f4f4f5", fontSize: "16px" }}>Clean Moderation Queue</h3>
+                      <p style={{ color: "#71717a", fontSize: "13px", margin: 0 }}>All reported items have been reviewed and resolved.</p>
+                    </div>
+                  ) : (
+                    <div style={tableContainerStyle}>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={tableStyle}>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>Reported Item</th>
+                              <th style={thStyle}>Uploader</th>
+                              <th style={thStyle}>Report Reason</th>
+                              <th style={thStyle}>Reported By</th>
+                              <th style={thStyle}>Date Flagged</th>
+                              <th style={thStyle}>Resolution Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reportsList.map(r => (
+                              <tr key={r.id} style={trStyle}>
+                                <td style={tdStyle}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                    <div style={{ width: "50px", height: "50px", borderRadius: "6px", background: "#27272a", overflow: "hidden", flexShrink: 0, position: "relative" }}>
+                                      {r.cloudflare_id && r.cloudflare_id !== "none" && !r.cloudflare_id.startsWith("r2:") ? (
+                                        <img src={`https://videodelivery.net/${r.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=200`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                      ) : (
+                                        <img src={`${APP_CONFIG.apiUrl}/api/thumbnail?chat_id=${r.chat_id}&message_id=${r.message_id}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { e.target.src = "/assets/default-avatar.png"; }} />
+                                      )}
+                                    </div>
+                                    <div style={{ maxWidth: "260px" }}>
+                                      <div style={{ fontWeight: "700", color: "#f4f4f5", fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        {r.caption || "Untitled clip"}
+                                      </div>
+                                      <div style={{ display: "flex", gap: "6px", marginTop: "3px" }}>
+                                        <span style={{ fontSize: "10px", background: "rgba(255,255,255,0.06)", color: "#a1a1aa", padding: "1px 6px", borderRadius: "4px", textTransform: "capitalize" }}>
+                                          {r.category || "video"}
+                                        </span>
+                                        <span style={{ fontSize: "10px", color: "#71717a" }}>
+                                          {r.views || 0} views
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td style={tdStyle}>
+                                  <div style={{ fontWeight: "600", color: "#f4f4f5", fontSize: "13px" }}>
+                                    {r.uploader_display_name || r.uploader_username || "Unknown"}
+                                  </div>
+                                  {r.uploader_username && <div style={{ fontSize: "11px", color: "#71717a" }}>@{r.uploader_username}</div>}
+                                </td>
+                                <td style={tdStyle}>
+                                  <span style={{ background: "rgba(244, 63, 94, 0.12)", color: "#f43f5e", border: "1px solid rgba(244, 63, 94, 0.25)", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "700" }}>
+                                    {r.reason || "Inappropriate Content"}
+                                  </span>
+                                  {r.details && <div style={{ fontSize: "11px", color: "#a1a1aa", marginTop: "4px" }}>{r.details}</div>}
+                                </td>
+                                <td style={tdStyle}>
+                                  <div style={{ fontSize: "12px", color: "#f4f4f5" }}>{r.reporter_username || "Anonymous"}</div>
+                                  <div style={{ fontSize: "10px", color: "#71717a" }}>{r.reporter_email || "N/A"}</div>
+                                </td>
+                                <td style={{ ...tdStyle, color: "#71717a", fontSize: "12px", whiteSpace: "nowrap" }}>
+                                  {new Date(r.created_at).toLocaleDateString()}
+                                </td>
+                                <td style={tdStyle}>
+                                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                                    <button
+                                      disabled={actioningReportId === r.id}
+                                      onClick={() => handleDismissReport(r.id)}
+                                      style={{ ...reportActionBtn, background: "rgba(255,255,255,0.06)", color: "#a1a1aa", borderColor: "rgba(255,255,255,0.12)" }}
+                                      title="Ignore and dismiss this report"
+                                    >
+                                      Dismiss
+                                    </button>
+                                    <button
+                                      disabled={actioningReportId === r.id}
+                                      onClick={() => handleDeleteReportedVideo(r.id)}
+                                      style={{ ...reportActionBtn, background: "rgba(245, 158, 11, 0.12)", color: "#fbbf24", borderColor: "rgba(245, 158, 11, 0.25)" }}
+                                      title="Remove video from catalog"
+                                    >
+                                      Delete Video
+                                    </button>
+                                    <button
+                                      disabled={actioningReportId === r.id}
+                                      onClick={() => handleBanCreatorReport(r.id)}
+                                      style={{ ...reportActionBtn, background: "rgba(244, 63, 94, 0.15)", color: "#f43f5e", borderColor: "rgba(244, 63, 94, 0.3)" }}
+                                      title="Ban creator account & delete video"
+                                    >
+                                      Ban Creator
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 🟢 CREATORS TAB */}
               {activeTab === "creators" && (
                 <>
-                  <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
+                  <div style={{ ...gridStatsStyle, marginBottom: "24px" }}>
                     <StatCard 
                       title="Total Creators" 
                       value={creatorAnalytics.total} 
-                      icon={<Sparkles size={24} color="#00aff0" />} 
-                      bg="rgba(0, 175, 240, 0.1)" 
-                    />
-                    <StatCard 
-                      title="Telegram Funnels" 
-                      value={creatorAnalytics.managed} 
-                      icon={<RefreshCw size={24} color="#29b6f6" />} 
-                      bg="rgba(41, 182, 246, 0.1)" 
+                      subtitle={`${creatorAnalytics.managed} Telegram + ${creatorAnalytics.total - creatorAnalytics.managed} Web`}
+                      icon={<Sparkles size={20} color="#38bdf8" />} 
+                      bg="rgba(56, 189, 248, 0.12)" 
                     />
                     <StatCard 
                       title="Verified Badges" 
                       value={creatorAnalytics.verified} 
-                      icon={<CheckCircle size={24} color="#00aff0" />} 
-                      bg="rgba(0, 175, 240, 0.1)" 
+                      subtitle={`${Math.round((creatorAnalytics.verified / (creatorAnalytics.total || 1)) * 100)}% verification rate`}
+                      icon={<CheckCircle size={20} color="#34d399" />} 
+                      bg="rgba(52, 211, 153, 0.12)" 
                     />
                     <StatCard 
                       title="Active VIP Subscribers" 
                       value={creatorAnalytics.totalSubs} 
-                      icon={<Users size={24} color="#F3BA2F" />} 
-                      bg="rgba(243, 186, 47, 0.1)" 
+                      subtitle={`Recurring fan memberships`}
+                      icon={<Users size={20} color="#fbbf24" />} 
+                      bg="rgba(251, 191, 36, 0.12)" 
                     />
                     <StatCard 
                       title="Total Tips Volume" 
                       value={`$${Number(creatorAnalytics.totalTips).toLocaleString()}`} 
-                      icon={<Heart size={24} color="#f91880" />} 
-                      bg="rgba(249, 24, 128, 0.1)" 
+                      subtitle="Direct creator tips received"
+                      icon={<Heart size={20} color="#f43f5e" />} 
+                      bg="rgba(225, 29, 72, 0.12)" 
                     />
                   </div>
 
-                  {/* Filter bar */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {/* Filter Toolbar */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                       {[
                         { id: "all", label: "All Creators" },
-                        { id: "telegram", label: "🤖 Telegram Funnels" },
-                        { id: "web", label: "🌐 Web Creators" },
+                        { id: "telegram", label: "Telegram Funnels" },
+                        { id: "web", label: "Web Creators" },
                         { id: "verified", label: "Verified Only" },
                         { id: "unverified", label: "Unverified" },
                         { id: "paid", label: "Paid Subscriptions" },
@@ -700,15 +1281,15 @@ export default function AdminDashboard({ user, onLogout }) {
                           type="button"
                           onClick={() => { setCreatorFilter(f.id); setCurrentPage(1); }}
                           style={{
-                            padding: "6px 14px",
-                            borderRadius: "20px",
+                            padding: "6px 12px",
+                            borderRadius: "8px",
                             fontSize: "12px",
                             fontWeight: "700",
                             cursor: "pointer",
                             border: "1px solid",
-                            borderColor: creatorFilter === f.id ? "var(--primary-color)" : "rgba(255,255,255,0.12)",
-                            background: creatorFilter === f.id ? "rgba(247, 147, 26, 0.15)" : "transparent",
-                            color: creatorFilter === f.id ? "#fff" : "#8e8e93"
+                            borderColor: creatorFilter === f.id ? "rgba(244, 63, 94, 0.4)" : "rgba(255,255,255,0.08)",
+                            background: creatorFilter === f.id ? "rgba(244, 63, 94, 0.12)" : "#18181b",
+                            color: creatorFilter === f.id ? "#f43f5e" : "#a1a1aa"
                           }}
                         >
                           {f.label}
@@ -726,30 +1307,29 @@ export default function AdminDashboard({ user, onLogout }) {
                           alignItems: "center",
                           gap: "6px",
                           padding: "6px 14px",
-                          borderRadius: "10px",
+                          borderRadius: "8px",
                           fontSize: "12px",
                           fontWeight: "700",
-                          background: "rgba(0, 136, 204, 0.15)",
-                          color: "#29b6f6",
-                          border: "1px solid rgba(41, 182, 246, 0.35)",
+                          background: "#27272a",
+                          color: "#38bdf8",
+                          border: "1px solid rgba(56, 189, 248, 0.3)",
                           cursor: syncingTelegram ? "not-allowed" : "pointer"
                         }}
                         title="Scan Telegram uploaders and sync into managed creators"
                       >
                         <RefreshCw size={13} style={{ animation: syncingTelegram ? "spin 1s linear infinite" : "none" }} />
-                        {syncingTelegram ? "Syncing..." : "Sync Telegram"}
+                        {syncingTelegram ? "Syncing..." : "Sync Telegram Channels"}
                       </button>
 
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "12px", color: "#8e8e93" }}>Category:</span>
                         <select
                           value={creatorCategoryFilter}
                           onChange={(e) => { setCreatorCategoryFilter(e.target.value); setCurrentPage(1); }}
                           style={{
-                            background: "#18181b",
-                            border: "1px solid rgba(255,255,255,0.15)",
-                            borderRadius: "10px",
-                            color: "#fff",
+                            background: "#27272a",
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            borderRadius: "8px",
+                            color: "#f4f4f5",
                             padding: "6px 12px",
                             fontSize: "12px",
                             outline: "none"
@@ -768,6 +1348,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     </div>
                   </div>
 
+                  {/* Creators Table */}
                   <div style={tableContainerStyle}>
                     <div style={{ overflowX: "auto" }}>
                       <table style={tableStyle}>
@@ -799,7 +1380,7 @@ export default function AdminDashboard({ user, onLogout }) {
                         <tbody>
                           {paginatedCreators.length === 0 ? (
                             <tr>
-                              <td colSpan={9} style={{ ...tdStyle, textAlign: "center", padding: "40px 16px", color: "#8e8e93" }}>
+                              <td colSpan={9} style={{ ...tdStyle, textAlign: "center", padding: "40px 16px", color: "#71717a" }}>
                                 No creators matching this filter.
                               </td>
                             </tr>
@@ -811,41 +1392,23 @@ export default function AdminDashboard({ user, onLogout }) {
                                     <img 
                                       src={c.avatar_url || '/assets/default-avatar.png'} 
                                       alt="" 
-                                      style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", border: c.is_verified ? "1.5px solid #00aff0" : "1px solid #333" }}
+                                      style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "1px solid rgba(255,255,255,0.08)" }}
                                       onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                                     />
                                     <div>
-                                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                        <span style={{ fontWeight: "700", color: "#fff", fontSize: "13px" }}>{c.display_name || c.username}</span>
-                                        {c.is_verified && <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />}
+                                      <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                        <span style={{ fontWeight: "700", color: "#f4f4f5", fontSize: "13px" }}>{c.display_name || c.username}</span>
+                                        {c.is_verified && <TwitterVerifiedBadge size={13} />}
                                       </div>
                                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
-                                        <span style={{ fontSize: "11px", color: "#8e8e93" }}>@{c.username}</span>
+                                        <span style={{ fontSize: "11px", color: "#71717a" }}>@{c.username}</span>
                                         {c.is_managed ? (
-                                          <span style={{
-                                            background: "rgba(0, 136, 204, 0.18)",
-                                            color: "#29b6f6",
-                                            border: "1px solid rgba(41, 182, 246, 0.35)",
-                                            borderRadius: "6px",
-                                            padding: "1px 5px",
-                                            fontSize: "9px",
-                                            fontWeight: "800",
-                                            letterSpacing: "0.5px"
-                                          }}>
-                                            🤖 TELEGRAM
+                                          <span style={{ background: "rgba(56, 189, 248, 0.12)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.25)", borderRadius: "4px", padding: "1px 5px", fontSize: "9px", fontWeight: "800" }}>
+                                            TELEGRAM
                                           </span>
                                         ) : (
-                                          <span style={{
-                                            background: "rgba(225, 29, 72, 0.12)",
-                                            color: "#f43f5e",
-                                            border: "1px solid rgba(225, 29, 72, 0.25)",
-                                            borderRadius: "6px",
-                                            padding: "1px 5px",
-                                            fontSize: "9px",
-                                            fontWeight: "800",
-                                            letterSpacing: "0.5px"
-                                          }}>
-                                            🌐 WEB
+                                          <span style={{ background: "rgba(244, 63, 94, 0.12)", color: "#f43f5e", border: "1px solid rgba(244, 63, 94, 0.25)", borderRadius: "4px", padding: "1px 5px", fontSize: "9px", fontWeight: "800" }}>
+                                            WEB
                                           </span>
                                         )}
                                       </div>
@@ -853,14 +1416,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                   </div>
                                 </td>
                                 <td style={tdStyle}>
-                                  <span style={{
-                                    background: "rgba(0, 175, 240, 0.12)",
-                                    color: "#00aff0",
-                                    borderRadius: "8px",
-                                    padding: "3px 8px",
-                                    fontSize: "11px",
-                                    fontWeight: "700"
-                                  }}>
+                                  <span style={{ background: "#27272a", color: "#a1a1aa", borderRadius: "6px", padding: "3px 8px", fontSize: "11px", fontWeight: "700" }}>
                                     {c.creator_category || "Creator"}
                                   </span>
                                 </td>
@@ -868,19 +1424,19 @@ export default function AdminDashboard({ user, onLogout }) {
                                   {Number(c.subscription_price) > 0 ? (
                                     <span style={{ color: "#f43f5e" }}>${Number(c.subscription_price).toLocaleString()}/mo</span>
                                   ) : (
-                                    <span style={{ color: "#8e8e93" }}>Free</span>
+                                    <span style={{ color: "#71717a" }}>Free</span>
                                   )}
                                 </td>
-                                <td style={{ ...tdStyle, fontWeight: "700", color: "#fff" }}>
-                                  {c.subscribers_count}
+                                <td style={{ ...tdStyle, fontWeight: "700", color: "#f4f4f5" }}>
+                                  {c.subscribers_count || 0}
                                 </td>
                                 <td style={tdStyle}>
-                                  <span style={{ fontWeight: "700", color: "#f91880" }}>${(c.tips_total || 0).toLocaleString()}</span>
-                                  <span style={{ display: "block", fontSize: "10px", color: "#8e8e93" }}>{c.tips_count || 0} tips</span>
+                                  <span style={{ fontWeight: "700", color: "#f4f4f5" }}>${(c.tips_total || 0).toLocaleString()}</span>
+                                  <span style={{ display: "block", fontSize: "10px", color: "#71717a" }}>{c.tips_count || 0} tips</span>
                                 </td>
                                 <td style={tdStyle}>
-                                  <span style={{ fontWeight: "700", color: "#fff" }}>{c.posts_count} posts</span>
-                                  <span style={{ display: "block", fontSize: "10px", color: "#8e8e93" }}>{(c.total_views || 0).toLocaleString()} views</span>
+                                  <span style={{ fontWeight: "700", color: "#f4f4f5" }}>{c.posts_count || 0} posts</span>
+                                  <span style={{ display: "block", fontSize: "10px", color: "#71717a" }}>{(c.total_views || 0).toLocaleString()} views</span>
                                 </td>
                                 <td style={tdStyle}>
                                   <button
@@ -888,11 +1444,11 @@ export default function AdminDashboard({ user, onLogout }) {
                                     onClick={() => handleToggleVerify(c)}
                                     disabled={updatingCreatorId === c.id}
                                     style={{
-                                      background: c.is_verified ? "rgba(0, 175, 240, 0.15)" : "rgba(255,255,255,0.06)",
-                                      border: `1px solid ${c.is_verified ? "#00aff0" : "rgba(255,255,255,0.15)"}`,
-                                      borderRadius: "14px",
-                                      padding: "4px 10px",
-                                      color: c.is_verified ? "#00aff0" : "#8e8e93",
+                                      background: c.is_verified ? "rgba(56, 189, 248, 0.12)" : "#27272a",
+                                      border: `1px solid ${c.is_verified ? "rgba(56, 189, 248, 0.3)" : "rgba(255,255,255,0.08)"}`,
+                                      borderRadius: "8px",
+                                      padding: "4px 8px",
+                                      color: c.is_verified ? "#38bdf8" : "#71717a",
                                       fontSize: "11px",
                                       fontWeight: "700",
                                       cursor: "pointer",
@@ -901,7 +1457,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                       gap: "4px"
                                     }}
                                   >
-                                    {c.is_verified ? <TwitterVerifiedBadge size={13} /> : <CheckCircle size={12} color="#666" />}
+                                    {c.is_verified ? <TwitterVerifiedBadge size={12} /> : <CheckCircle size={12} color="#71717a" />}
                                     <span>{c.is_verified ? "Verified" : "Unverified"}</span>
                                   </button>
                                 </td>
@@ -911,11 +1467,11 @@ export default function AdminDashboard({ user, onLogout }) {
                                     onClick={() => handleToggleCreatorStatus(c)}
                                     disabled={updatingCreatorId === c.id}
                                     style={{
-                                      background: c.is_creator ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 59, 48, 0.12)",
-                                      border: `1px solid ${c.is_creator ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 59, 48, 0.3)"}`,
-                                      borderRadius: "14px",
-                                      padding: "4px 10px",
-                                      color: c.is_creator ? "#f4f4f5" : "#ff3b30",
+                                      background: c.is_creator ? "rgba(52, 211, 153, 0.12)" : "rgba(244, 63, 94, 0.12)",
+                                      border: `1px solid ${c.is_creator ? "rgba(52, 211, 153, 0.3)" : "rgba(244, 63, 94, 0.3)"}`,
+                                      borderRadius: "8px",
+                                      padding: "4px 8px",
+                                      color: c.is_creator ? "#34d399" : "#f43f5e",
                                       fontSize: "11px",
                                       fontWeight: "700",
                                       cursor: "pointer"
@@ -932,15 +1488,15 @@ export default function AdminDashboard({ user, onLogout }) {
                                       style={iconBtnStyle} 
                                       title="Edit Creator"
                                     >
-                                      <Edit3 size={16} />
+                                      <Edit3 size={15} />
                                     </button>
                                     <button 
                                       type="button"
                                       onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: c.username }))} 
-                                      style={{ ...iconBtnStyle, color: "#00aff0" }} 
+                                      style={{ ...iconBtnStyle, color: "#38bdf8" }} 
                                       title="Preview Public Profile"
                                     >
-                                      <ExternalLink size={16} />
+                                      <ExternalLink size={15} />
                                     </button>
                                   </div>
                                 </td>
@@ -961,13 +1517,55 @@ export default function AdminDashboard({ user, onLogout }) {
                 </>
               )}
 
+              {/* 🟢 VIDEOS TAB */}
               {activeTab === "videos" && (
                 <>
-                  <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
-                    <StatCard title="Total Videos" value={videoAnalytics.total} icon={<PlayCircle size={24} color="#ff3b30" />} bg="rgba(255, 59, 48, 0.1)" />
-                    <StatCard title="Total Views" value={videoAnalytics.views.toLocaleString()} icon={<Eye size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
-                    <StatCard title="Avg Views/Video" value={videoAnalytics.avgViews.toLocaleString()} icon={<Activity size={24} color="#f43f5e" />} bg="rgba(225, 29, 72, 0.12)" />
-                    <StatCard title="Top Category" value={<span style={{textTransform:'capitalize'}}>{videoAnalytics.topCat}</span>} icon={<PieChart size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
+                  <div style={{ ...gridStatsStyle, marginBottom: "24px" }}>
+                    <StatCard title="Total Video Library" value={(videosData.total || 0).toLocaleString()} subtitle="Indexed video records" icon={<PlayCircle size={20} color="#f43f5e" />} bg="rgba(225, 29, 72, 0.12)" />
+                    <StatCard title="Total Catalog Views" value={(videosData.total_views || overview.total_views || 0).toLocaleString()} subtitle="Aggregate platform plays" icon={<Eye size={20} color="#38bdf8" />} bg="rgba(56, 189, 248, 0.12)" />
+                    <StatCard title="Active 24h Stories" value={overview.active_stories || 0} subtitle={`${overview.active_story_creators || 0} creators publishing`} icon={<Activity size={20} color="#34d399" />} bg="rgba(52, 211, 153, 0.12)" />
+                    <StatCard title="Cloudflare R2 Ratio" value={`${Math.round(((storage.r2 || 0) / (overview.total_videos || 1)) * 100)}%`} subtitle={`${(storage.r2 || 0).toLocaleString()} clips in R2`} icon={<Database size={20} color="#fbbf24" />} bg="rgba(251, 191, 36, 0.12)" />
+                  </div>
+
+                  {/* Filter & Search Bar */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                      <select
+                        value={videoCategoryFilter}
+                        onChange={(e) => { setVideoCategoryFilter(e.target.value); setCurrentPage(1); }}
+                        style={{
+                          background: "#27272a",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          borderRadius: "8px",
+                          color: "#f4f4f5",
+                          padding: "6px 12px",
+                          fontSize: "12px",
+                          outline: "none"
+                        }}
+                      >
+                        <option value="all">All Categories ({videosData.total.toLocaleString()})</option>
+                        {categories.map(c => (
+                          <option key={c.category} value={c.category}>{c.category.charAt(0).toUpperCase() + c.category.slice(1)} ({c.count})</option>
+                        ))}
+                      </select>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#27272a", padding: "5px 10px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <Search size={14} color="#71717a" />
+                        <input
+                          type="text"
+                          placeholder="Search captions..."
+                          value={videoSearchTerm}
+                          onChange={(e) => setVideoSearchTerm(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { setCurrentPage(1); fetchData(); } }}
+                          style={{ background: "transparent", border: "none", color: "#f4f4f5", fontSize: "12px", outline: "none", width: "160px" }}
+                        />
+                        {videoSearchTerm && <X size={12} color="#71717a" style={{ cursor: "pointer" }} onClick={() => { setVideoSearchTerm(""); setCurrentPage(1); }} />}
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: "12px", color: "#71717a" }}>
+                      Showing {(videosData.videos || []).length} of {videosData.total.toLocaleString()} clips
+                    </div>
                   </div>
 
                   <div style={tableContainerStyle}>
@@ -975,26 +1573,32 @@ export default function AdminDashboard({ user, onLogout }) {
                       <table style={tableStyle}>
                         <thead>
                           <tr>
-                            <th style={thStyle}>Thumb</th>
-                            <th onClick={() => handleSort('caption')} style={{...thStyle, cursor:"pointer"}}>Caption <SortIcon columnKey="caption" /></th>
-                            <th onClick={() => handleSort('category')} style={{...thStyle, cursor:"pointer"}}>Category <SortIcon columnKey="category" /></th>
-                            <th onClick={() => handleSort('views')} style={{...thStyle, cursor:"pointer"}}>Views <SortIcon columnKey="views" /></th>
-                            <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Uploaded <SortIcon columnKey="created_at" /></th>
+                            <th style={thStyle}>Preview</th>
+                            <th onClick={() => handleSort('caption')} style={{ ...thStyle, cursor: "pointer" }}>Caption <SortIcon columnKey="caption" /></th>
+                            <th onClick={() => handleSort('category')} style={{ ...thStyle, cursor: "pointer" }}>Category <SortIcon columnKey="category" /></th>
+                            <th onClick={() => handleSort('views')} style={{ ...thStyle, cursor: "pointer" }}>Views <SortIcon columnKey="views" /></th>
+                            <th onClick={() => handleSort('created_at')} style={{ ...thStyle, cursor: "pointer" }}>Uploaded <SortIcon columnKey="created_at" /></th>
                             <th style={thStyle}>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {paginatedVideos.map(v => (
+                          {(videosData.videos || []).map(v => (
                             <tr key={v.id} style={trStyle}>
-                              <td style={tdStyle}><img src={v.thumbnail_url || '/assets/default-avatar.png'} alt="" style={{width:"50px", height:"50px", objectFit:"cover", borderRadius:"6px"}}/></td>
-                              <td style={{...tdStyle, fontWeight:"600", minWidth: "200px"}}>{v.caption || "Untitled"}</td>
-                              <td style={{...tdStyle, textTransform:"capitalize"}}>{v.category}</td>
-                              <td style={tdStyle}>{v.views}</td>
-                              <td style={{...tdStyle, color:"#8e8e93", minWidth: "120px"}}>{new Date(v.created_at).toLocaleDateString()}</td>
                               <td style={tdStyle}>
-                                <div style={{ display: "flex" }}>
-                                  <button onClick={() => setEditingItem({type: 'video', data: v})} style={iconBtnStyle}><Edit3 size={16} /></button>
-                                  <button onClick={() => setDeleteWarning({type: 'video', id: v.id, name: v.caption})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
+                                <img src={v.thumbnail_url || '/assets/default-avatar.png'} alt="" style={{ width: "44px", height: "44px", objectFit: "cover", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.08)" }} onError={(e) => { e.target.src = "/assets/default-avatar.png"; }} />
+                              </td>
+                              <td style={{ ...tdStyle, fontWeight: "600", minWidth: "220px", maxWidth: "340px" }}>{v.caption || "Untitled"}</td>
+                              <td style={{ ...tdStyle, textTransform: "capitalize" }}>
+                                <span style={{ background: "#27272a", color: "#a1a1aa", borderRadius: "6px", padding: "2px 8px", fontSize: "11px", fontWeight: "700" }}>
+                                  {v.category}
+                                </span>
+                              </td>
+                              <td style={{ ...tdStyle, fontWeight: "700" }}>{(v.views || 0).toLocaleString()}</td>
+                              <td style={{ ...tdStyle, color: "#71717a", minWidth: "110px", fontSize: "12px" }}>{new Date(v.created_at).toLocaleDateString()}</td>
+                              <td style={tdStyle}>
+                                <div style={{ display: "flex", gap: "6px" }}>
+                                  <button onClick={() => setEditingItem({ type: 'video', data: v })} style={iconBtnStyle} title="Edit Caption/Category"><Edit3 size={15} /></button>
+                                  <button onClick={() => setDeleteWarning({ type: 'video', id: v.id, name: v.caption })} style={{ ...iconBtnStyle, color: "#f43f5e" }} title="Delete Clip"><Trash2 size={15} /></button>
                                 </div>
                               </td>
                             </tr>
@@ -1002,24 +1606,25 @@ export default function AdminDashboard({ user, onLogout }) {
                         </tbody>
                       </table>
                     </div>
-                    {totalVideoPages > 1 && (
+                    {videosData.total_pages > 1 && (
                       <div style={paginationStyle}>
                         <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                        <span style={pageTextStyle}>Page {currentPage} of {totalVideoPages}</span>
-                        <button disabled={currentPage === totalVideoPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalVideoPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                        <span style={pageTextStyle}>Page {currentPage} of {videosData.total_pages}</span>
+                        <button disabled={currentPage === videosData.total_pages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === videosData.total_pages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
                       </div>
                     )}
                   </div>
                 </>
               )}
 
+              {/* 🟢 USERS TAB */}
               {activeTab === "users" && (
                 <>
-                  <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
-                    <StatCard title="Total Registered" value={userAnalytics.total} icon={<Users size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
-                    <StatCard title="Premium Users" value={userAnalytics.premium} icon={<Star size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
-                    <StatCard title="Premium Ratio" value={`${userAnalytics.ratio}%`} icon={<Percent size={24} color="#f43f5e" />} bg="rgba(225, 29, 72, 0.12)" />
-                    <StatCard title="Admin Staff" value={userAnalytics.admins} icon={<ShieldCheck size={24} color="#ff3b30" />} bg="rgba(255, 59, 48, 0.1)" />
+                  <div style={{ ...gridStatsStyle, marginBottom: "24px" }}>
+                    <StatCard title="Total Registered" value={(usersData.total || 0).toLocaleString()} subtitle="Registered platform accounts" icon={<Users size={20} color="#38bdf8" />} bg="rgba(56, 189, 248, 0.12)" />
+                    <StatCard title="Premium VIP Tier" value={overview.premium_users || 0} subtitle={`${Math.round(((overview.premium_users || 0) / (usersData.total || 1)) * 100)}% conversion rate`} icon={<Star size={20} color="#fbbf24" />} bg="rgba(251, 191, 36, 0.12)" />
+                    <StatCard title="Active Subscriptions" value={financials.active_subscriptions || 0} subtitle="Direct creator fan passes" icon={<Sparkles size={20} color="#34d399" />} bg="rgba(52, 211, 153, 0.12)" />
+                    <StatCard title="Admin Accounts" value="1" subtitle="Privileged access" icon={<ShieldCheck size={20} color="#f43f5e" />} bg="rgba(225, 29, 72, 0.12)" />
                   </div>
 
                   <div style={tableContainerStyle}>
@@ -1027,26 +1632,26 @@ export default function AdminDashboard({ user, onLogout }) {
                       <table style={tableStyle}>
                         <thead>
                           <tr>
-                            <th onClick={() => handleSort('username')} style={{...thStyle, cursor:"pointer"}}>Username <SortIcon columnKey="username" /></th>
-                            <th onClick={() => handleSort('email')} style={{...thStyle, cursor:"pointer"}}>Email <SortIcon columnKey="email" /></th>
-                            <th onClick={() => handleSort('is_premium')} style={{...thStyle, cursor:"pointer"}}>Tier <SortIcon columnKey="is_premium" /></th>
-                            <th onClick={() => handleSort('role')} style={{...thStyle, cursor:"pointer"}}>Role <SortIcon columnKey="role" /></th>
-                            <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Joined <SortIcon columnKey="created_at" /></th>
+                            <th onClick={() => handleSort('username')} style={{ ...thStyle, cursor: "pointer" }}>Username <SortIcon columnKey="username" /></th>
+                            <th onClick={() => handleSort('email')} style={{ ...thStyle, cursor: "pointer" }}>Email <SortIcon columnKey="email" /></th>
+                            <th onClick={() => handleSort('is_premium')} style={{ ...thStyle, cursor: "pointer" }}>Tier <SortIcon columnKey="is_premium" /></th>
+                            <th onClick={() => handleSort('role')} style={{ ...thStyle, cursor: "pointer" }}>Role <SortIcon columnKey="role" /></th>
+                            <th onClick={() => handleSort('created_at')} style={{ ...thStyle, cursor: "pointer" }}>Joined <SortIcon columnKey="created_at" /></th>
                             <th style={thStyle}>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {paginatedUsers.map(u => (
+                          {(usersData.users || []).map(u => (
                             <tr key={u.id} style={trStyle}>
-                              <td style={{...tdStyle, fontWeight: "600"}}>{u.username}</td>
-                              <td style={{...tdStyle, color: "#8e8e93"}}>{u.email}</td>
+                              <td style={{ ...tdStyle, fontWeight: "600" }}>{u.username}</td>
+                              <td style={{ ...tdStyle, color: "#a1a1aa" }}>{u.email}</td>
                               <td style={tdStyle}>{u.is_premium ? <span style={premiumBadge}>Premium</span> : <span style={freeBadge}>Free</span>}</td>
-                              <td style={{...tdStyle, textTransform: "capitalize", color: u.role==='admin' ? '#ff3b30' : '#8e8e93'}}>{u.role}</td>
-                              <td style={{...tdStyle, color: "#8e8e93", minWidth: "120px"}}>{new Date(u.created_at).toLocaleDateString()}</td>
+                              <td style={{ ...tdStyle, textTransform: "capitalize", color: u.role === 'admin' ? '#f43f5e' : '#a1a1aa' }}>{u.role}</td>
+                              <td style={{ ...tdStyle, color: "#71717a", minWidth: "110px", fontSize: "12px" }}>{new Date(u.created_at).toLocaleDateString()}</td>
                               <td style={tdStyle}>
-                                <div style={{ display: "flex" }}>
-                                  <button onClick={() => setEditingItem({type: 'user', data: u})} style={iconBtnStyle}><Edit3 size={16} /></button>
-                                  <button onClick={() => setDeleteWarning({type: 'user', id: u.id, name: u.username})} style={{...iconBtnStyle, color: "#ff3b30"}}><Trash2 size={16} /></button>
+                                <div style={{ display: "flex", gap: "6px" }}>
+                                  <button onClick={() => setEditingItem({ type: 'user', data: u })} style={iconBtnStyle} title="Edit User Tier/Role"><Edit3 size={15} /></button>
+                                  <button onClick={() => setDeleteWarning({ type: 'user', id: u.id, name: u.username })} style={{ ...iconBtnStyle, color: "#f43f5e" }} title="Delete Account"><Trash2 size={15} /></button>
                                 </div>
                               </td>
                             </tr>
@@ -1054,24 +1659,104 @@ export default function AdminDashboard({ user, onLogout }) {
                         </tbody>
                       </table>
                     </div>
-                    {totalUserPages > 1 && (
+                    {usersData.total_pages > 1 && (
                       <div style={paginationStyle}>
                         <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                        <span style={pageTextStyle}>Page {currentPage} of {totalUserPages}</span>
-                        <button disabled={currentPage === totalUserPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalUserPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                        <span style={pageTextStyle}>Page {currentPage} of {usersData.total_pages}</span>
+                        <button disabled={currentPage === usersData.total_pages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === usersData.total_pages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
                       </div>
                     )}
                   </div>
                 </>
               )}
 
+              {/* 🟢 TRANSACTIONS TAB: TRUE SPLIT USD CRYPTO & NGN BANK */}
               {activeTab === "transactions" && (
                 <>
-                  <div style={{ ...gridStatsStyle, marginBottom: "30px" }}>
-                    <StatCard title="Gross Revenue" value={`$${txAnalytics.revenue}`} icon={<TrendingUp size={24} color="#f43f5e" />} bg="rgba(225, 29, 72, 0.12)" />
-                    <StatCard title="Pending Review" value={`$${txAnalytics.pendingRev}`} icon={<Clock size={24} color="#F3BA2F" />} bg="rgba(243, 186, 47, 0.1)" />
-                    <StatCard title="Total Volume" value={txAnalytics.total} icon={<CreditCard size={24} color="#0098EA" />} bg="rgba(0, 152, 234, 0.1)" />
-                    <StatCard title="Approval Rate" value={`${txAnalytics.approvalRate}%`} icon={<ShieldCheck size={24} color="#ff3b30" />} bg="rgba(255, 59, 48, 0.1)" />
+                  <div style={{ ...gridStatsStyle, marginBottom: "24px" }}>
+                    <StatCard 
+                      title="Approved USD Crypto" 
+                      value={`$${(financials.approved_usd || 0).toFixed(2)}`} 
+                      subtitle={`${financials.approved_usd_count || 0} completed orders`} 
+                      icon={<TrendingUp size={20} color="#34d399" />} 
+                      bg="rgba(52, 211, 153, 0.12)" 
+                    />
+                    <StatCard 
+                      title="Pending USD Crypto" 
+                      value={`$${(financials.pending_crypto_usd || 0).toLocaleString()}`} 
+                      subtitle={`${financials.pending_crypto_count || 0} orders awaiting block confirmation`} 
+                      icon={<Clock size={20} color="#fbbf24" />} 
+                      bg="rgba(251, 191, 36, 0.12)" 
+                    />
+                    <StatCard 
+                      title="Approved NGN Bank" 
+                      value={`₦${(financials.approved_ngn || 0).toLocaleString()}`} 
+                      subtitle={`${financials.approved_ngn_count || 0} approved bank transfers`} 
+                      icon={<CreditCard size={20} color="#38bdf8" />} 
+                      bg="rgba(56, 189, 248, 0.12)" 
+                    />
+                    <StatCard 
+                      title="Pending NGN Bank" 
+                      value={`₦${(financials.pending_bank_ngn || 0).toLocaleString()}`} 
+                      subtitle={`${financials.pending_bank_count || 0} transfers awaiting bank proof`} 
+                      icon={<Clock size={20} color="#f43f5e" />} 
+                      bg="rgba(225, 29, 72, 0.12)" 
+                    />
+                  </div>
+
+                  {/* Currency & Status Filter */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {[
+                        { id: "all", label: "All Currencies" },
+                        { id: "USD", label: "USD Crypto (< ₦1k)" },
+                        { id: "NGN", label: "NGN Bank (≥ ₦1k)" }
+                      ].map(c => (
+                        <button
+                          key={c.id}
+                          onClick={() => { setTxCurrencyFilter(c.id); setCurrentPage(1); }}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                            border: "1px solid",
+                            borderColor: txCurrencyFilter === c.id ? "rgba(244, 63, 94, 0.4)" : "rgba(255,255,255,0.08)",
+                            background: txCurrencyFilter === c.id ? "rgba(244, 63, 94, 0.12)" : "#18181b",
+                            color: txCurrencyFilter === c.id ? "#f43f5e" : "#a1a1aa"
+                          }}
+                        >
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {[
+                        { id: "all", label: "All Statuses" },
+                        { id: "APPROVED", label: "Approved Only" },
+                        { id: "PENDING", label: "Pending Review" }
+                      ].map(s => (
+                        <button
+                          key={s.id}
+                          onClick={() => { setTxStatusFilter(s.id); setCurrentPage(1); }}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                            border: "1px solid",
+                            borderColor: txStatusFilter === s.id ? "rgba(52, 211, 153, 0.4)" : "rgba(255,255,255,0.08)",
+                            background: txStatusFilter === s.id ? "rgba(52, 211, 153, 0.12)" : "#18181b",
+                            color: txStatusFilter === s.id ? "#34d399" : "#a1a1aa"
+                          }}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div style={tableContainerStyle}>
@@ -1079,35 +1764,51 @@ export default function AdminDashboard({ user, onLogout }) {
                       <table style={tableStyle}>
                         <thead>
                           <tr>
-                            <th onClick={() => handleSort('username')} style={{...thStyle, cursor:"pointer"}}>User <SortIcon columnKey="username" /></th>
-                            <th onClick={() => handleSort('amount')} style={{...thStyle, cursor:"pointer"}}>Amount <SortIcon columnKey="amount" /></th>
-                            <th onClick={() => handleSort('payment_method')} style={{...thStyle, cursor:"pointer"}}>Method <SortIcon columnKey="payment_method" /></th>
-                            <th onClick={() => handleSort('status')} style={{...thStyle, cursor:"pointer"}}>Status <SortIcon columnKey="status" /></th>
-                            <th onClick={() => handleSort('created_at')} style={{...thStyle, cursor:"pointer"}}>Date <SortIcon columnKey="created_at" /></th>
+                            <th onClick={() => handleSort('username')} style={{ ...thStyle, cursor: "pointer" }}>User <SortIcon columnKey="username" /></th>
+                            <th onClick={() => handleSort('amount')} style={{ ...thStyle, cursor: "pointer" }}>Amount <SortIcon columnKey="amount" /></th>
+                            <th onClick={() => handleSort('payment_method')} style={{ ...thStyle, cursor: "pointer" }}>Method / Rail <SortIcon columnKey="payment_method" /></th>
+                            <th onClick={() => handleSort('status')} style={{ ...thStyle, cursor: "pointer" }}>Status <SortIcon columnKey="status" /></th>
+                            <th onClick={() => handleSort('created_at')} style={{ ...thStyle, cursor: "pointer" }}>Timestamp <SortIcon columnKey="created_at" /></th>
                           </tr>
                         </thead>
                         <tbody>
-                          {paginatedTx.map(tx => (
-                            <tr key={tx.id} style={trStyle}>
-                              <td style={{...tdStyle, fontWeight: "600"}}>{tx.username || tx.email || "Unknown"}</td>
-                              <td style={{...tdStyle, fontWeight: "700", minWidth: "140px"}}>${tx.amount} <br/><span style={{fontSize:"12px", color:"#8e8e93"}}>({tx.crypto_amount || 0} {tx.crypto_currency?.toUpperCase()})</span></td>
-                              <td style={tdStyle}>{tx.payment_method?.toUpperCase() || 'TRANSFER'}</td>
-                              <td style={tdStyle}>
-                                {tx.status === 'APPROVED' && <span style={premiumBadge}>Approved</span>}
-                                {tx.status === 'WAITING' && <span style={{...premiumBadge, color:"#F3BA2F", background:"rgba(243,186,47,0.1)"}}>Waiting</span>}
-                                {(tx.status === 'FAILED' || tx.status === 'PENDING') && <span style={{...freeBadge}}>Pending</span>}
-                              </td>
-                              <td style={{...tdStyle, color: "#8e8e93", minWidth: "180px"}}>{new Date(tx.created_at).toLocaleString()}</td>
-                            </tr>
-                          ))}
+                          {(txData.transactions || []).map(tx => {
+                            const isNgn = Number(tx.amount) >= 1000;
+                            return (
+                              <tr key={tx.id} style={trStyle}>
+                                <td style={{ ...tdStyle, fontWeight: "600" }}>{tx.username || tx.email || "Unknown User"}</td>
+                                <td style={{ ...tdStyle, fontWeight: "700", minWidth: "140px" }}>
+                                  {isNgn ? `₦${Number(tx.amount).toLocaleString()}` : `$${Number(tx.amount).toFixed(2)}`}
+                                  {tx.crypto_currency && (
+                                    <div style={{ fontSize: "11px", color: "#71717a", fontWeight: "400" }}>
+                                      {tx.crypto_amount} {tx.crypto_currency?.toUpperCase()}
+                                    </div>
+                                  )}
+                                </td>
+                                <td style={tdStyle}>
+                                  <span style={{ background: "#27272a", color: "#a1a1aa", borderRadius: "6px", padding: "2px 8px", fontSize: "11px", fontWeight: "700" }}>
+                                    {isNgn ? "BANK TRANSFER" : `${(tx.crypto_currency || 'CRYPTO').toUpperCase()}`}
+                                  </span>
+                                </td>
+                                <td style={tdStyle}>
+                                  {tx.status === 'APPROVED' && <span style={approvedBadge}>Approved</span>}
+                                  {tx.status === 'WAITING' && <span style={waitingBadge}>Awaiting</span>}
+                                  {(tx.status === 'FAILED' || tx.status === 'PENDING') && <span style={pendingBadgeStyle}>Pending</span>}
+                                </td>
+                                <td style={{ ...tdStyle, color: "#71717a", minWidth: "150px", fontSize: "12px" }}>
+                                  {new Date(tx.created_at).toLocaleString()}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
-                    {totalTxPages > 1 && (
+                    {txData.total_pages > 1 && (
                       <div style={paginationStyle}>
                         <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} style={currentPage === 1 ? pageBtnDisabledStyle : pageBtnStyle}>Prev</button>
-                        <span style={pageTextStyle}>Page {currentPage} of {totalTxPages}</span>
-                        <button disabled={currentPage === totalTxPages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === totalTxPages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
+                        <span style={pageTextStyle}>Page {currentPage} of {txData.total_pages}</span>
+                        <button disabled={currentPage === txData.total_pages} onClick={() => setCurrentPage(p => p + 1)} style={currentPage === txData.total_pages ? pageBtnDisabledStyle : pageBtnStyle}>Next</button>
                       </div>
                     )}
                   </div>
@@ -1118,24 +1819,27 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       </div>
 
+      {/* Item Edit Modal */}
       {editingItem && (
         <div style={modalOverlayStyle}>
           <form onSubmit={handleSaveEdit} style={modalBoxStyle}>
             <div style={modalHeaderStyle}>
-              <h2 style={{margin:0}}>Edit {editingItem.type === 'video' ? 'Video' : 'User'}</h2>
-              <X size={20} cursor="pointer" onClick={() => setEditingItem(null)} color="#8e8e93"/>
+              <h2 style={{ margin: 0, fontSize: "17px", fontWeight: "800", color: "#f4f4f5" }}>
+                Edit {editingItem.type === 'video' ? 'Video Metadata' : 'User Privileges'}
+              </h2>
+              <X size={20} cursor="pointer" onClick={() => setEditingItem(null)} color="#71717a"/>
             </div>
 
             {editingItem.type === 'video' ? (
               <>
                 <div style={inputGroupStyle}>
-                  <label>Caption</label>
-                  <input type="text" value={editingItem.data.caption} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, caption: e.target.value}})} style={formInputStyle} />
+                  <label style={labelStyle}>Caption</label>
+                  <input type="text" value={editingItem.data.caption || ""} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, caption: e.target.value}})} style={formInputStyle} />
                 </div>
                 <div style={inputGroupStyle}>
-                  <label>Category</label>
-                  <select value={editingItem.data.category} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, category: e.target.value}})} style={formInputStyle}>
-                    {APP_CONFIG.categories.map((cat) => (
+                  <label style={labelStyle}>Category</label>
+                  <select value={editingItem.data.category || ""} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, category: e.target.value}})} style={formInputStyle}>
+                    {APP_CONFIG.categories?.map((cat) => (
                       <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
                     ))}
                     <option value="premium">Premium</option>
@@ -1145,17 +1849,24 @@ export default function AdminDashboard({ user, onLogout }) {
             ) : (
               <>
                 <div style={inputGroupStyle}>
-                  <label>Role</label>
-                  <select value={editingItem.data.role} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, role: e.target.value}})} style={formInputStyle}>
+                  <label style={labelStyle}>User Role</label>
+                  <select value={editingItem.data.role || "user"} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, role: e.target.value}})} style={formInputStyle}>
                     <option value="user">Standard User</option>
                     <option value="admin">Administrator</option>
                   </select>
                 </div>
                 <div style={inputGroupStyle}>
-                  <label>Premium Access</label>
+                  <label style={labelStyle}>Premium Membership Tier</label>
                   <select value={editingItem.data.is_premium ? "true" : "false"} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, is_premium: e.target.value === "true"}})} style={formInputStyle}>
                     <option value="false">Free Tier</option>
-                    <option value="true">Premium Tier</option>
+                    <option value="true">Premium VIP Tier</option>
+                  </select>
+                </div>
+                <div style={inputGroupStyle}>
+                  <label style={labelStyle}>Account Moderation Status</label>
+                  <select value={editingItem.data.is_banned ? "true" : "false"} onChange={e => setEditingItem({...editingItem, data: {...editingItem.data, is_banned: e.target.value === "true"}})} style={formInputStyle}>
+                    <option value="false">Active / Normal</option>
+                    <option value="true">Banned / Suspended</option>
                   </select>
                 </div>
               </>
@@ -1165,21 +1876,22 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       )}
 
+      {/* Creator Edit Modal */}
       {editingCreator && (
         <div style={modalOverlayStyle}>
           <form onSubmit={handleSaveCreatorEdit} style={{ ...modalBoxStyle, maxHeight: "90vh", overflowY: "auto" }}>
             <div style={modalHeaderStyle}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <Sparkles size={18} color="#FFD700" />
-                <h2 style={{ margin: 0, fontSize: "17px", color: "#fff" }}>
+                <Sparkles size={18} color="#f43f5e" />
+                <h2 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#f4f4f5" }}>
                   Edit Creator @{editingCreator.username}
                 </h2>
               </div>
-              <X size={20} cursor="pointer" onClick={() => setEditingCreator(null)} color="#8e8e93"/>
+              <X size={20} cursor="pointer" onClick={() => setEditingCreator(null)} color="#71717a"/>
             </div>
 
             <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Display Name</label>
+              <label style={labelStyle}>Display Name</label>
               <input 
                 type="text" 
                 value={editingCreator.display_name || ""} 
@@ -1189,7 +1901,7 @@ export default function AdminDashboard({ user, onLogout }) {
             </div>
 
             <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Username (@handle)</label>
+              <label style={labelStyle}>Username (@handle)</label>
               <input 
                 type="text" 
                 value={editingCreator.username || ""} 
@@ -1199,30 +1911,30 @@ export default function AdminDashboard({ user, onLogout }) {
             </div>
 
             <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Creator Type / Origin</label>
+              <label style={labelStyle}>Creator Origin</label>
               <select 
                 value={editingCreator.is_managed ? "true" : "false"} 
                 onChange={e => setEditingCreator({ ...editingCreator, is_managed: e.target.value === "true" })} 
                 style={formInputStyle}
               >
-                <option value="true">🤖 Telegram Funnel / Managed Creator</option>
-                <option value="false">🌐 Registered Web Creator</option>
+                <option value="true">Telegram Funnel / Managed Creator</option>
+                <option value="false">Registered Web Creator</option>
               </select>
             </div>
 
             <div style={inputGroupStyle}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Telegram Channel / Handle</label>
+                <label style={labelStyle}>Telegram Channel / Handle</label>
                 <button
                   type="button"
                   disabled={syncingSingleCreator}
                   onClick={handleFetchTelegramProfile}
                   style={{
-                    background: "rgba(0, 136, 204, 0.2)",
-                    border: "1px solid #0088cc",
+                    background: "#27272a",
+                    border: "1px solid rgba(56, 189, 248, 0.3)",
                     color: "#38bdf8",
                     borderRadius: "6px",
-                    padding: "4px 8px",
+                    padding: "3px 8px",
                     fontSize: "11px",
                     fontWeight: "600",
                     cursor: syncingSingleCreator ? "not-allowed" : "pointer",
@@ -1231,8 +1943,8 @@ export default function AdminDashboard({ user, onLogout }) {
                     gap: "4px"
                   }}
                 >
-                  <RefreshCw size={12} className={syncingSingleCreator ? "animate-spin" : ""} />
-                  {syncingSingleCreator ? "Fetching..." : "Fetch from Telegram"}
+                  <RefreshCw size={11} className={syncingSingleCreator ? "animate-spin" : ""} />
+                  {syncingSingleCreator ? "Fetching..." : "Fetch Telegram Profile"}
                 </button>
               </div>
               <input 
@@ -1242,13 +1954,10 @@ export default function AdminDashboard({ user, onLogout }) {
                 placeholder="@channel_name or https://t.me/channel_name"
                 style={formInputStyle} 
               />
-              <span style={{ fontSize: "11px", color: "#888", marginTop: "3px", lineHeight: "1.4" }}>
-                Enter the public channel handle (e.g. @channel_name or https://t.me/channel_name). If private, add bot @Mini_video_app_bot as channel admin.
-              </span>
             </div>
 
             <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Category</label>
+              <label style={labelStyle}>Category</label>
               <select 
                 value={editingCreator.creator_category || "Creator"} 
                 onChange={e => setEditingCreator({ ...editingCreator, creator_category: e.target.value })} 
@@ -1265,7 +1974,7 @@ export default function AdminDashboard({ user, onLogout }) {
             </div>
 
             <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Monthly Subscription Price ($ USD)</label>
+              <label style={labelStyle}>Monthly Subscription Price ($ USD)</label>
               <input 
                 type="number" 
                 min={0}
@@ -1277,63 +1986,19 @@ export default function AdminDashboard({ user, onLogout }) {
             </div>
 
             <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Verified Badge</label>
+              <label style={labelStyle}>Official Verified Badge</label>
               <select 
                 value={editingCreator.is_verified ? "true" : "false"} 
                 onChange={e => setEditingCreator({ ...editingCreator, is_verified: e.target.value === "true" })} 
                 style={formInputStyle}
               >
-                <option value="true">Verified ✓ (Official Blue Checkmark)</option>
+                <option value="true">Verified Checkmark</option>
                 <option value="false">Unverified</option>
               </select>
             </div>
 
             <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Creator Channel Status</label>
-              <select 
-                value={editingCreator.is_creator ? "true" : "false"} 
-                onChange={e => setEditingCreator({ ...editingCreator, is_creator: e.target.value === "true" })} 
-                style={formInputStyle}
-              >
-                <option value="true">Active Creator</option>
-                <option value="false">Disabled / Revoked</option>
-              </select>
-            </div>
-
-            <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Avatar Image</label>
-              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                {editingCreator.avatar_url && (
-                  <img 
-                    src={editingCreator.avatar_url.startsWith("http") ? editingCreator.avatar_url : `${APP_CONFIG.apiUrl}${editingCreator.avatar_url}`} 
-                    alt="Avatar Preview" 
-                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
-                    style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover", border: "1px solid #444", flexShrink: 0 }}
-                  />
-                )}
-                <input 
-                  type="text" 
-                  value={editingCreator.avatar_url || ""} 
-                  onChange={e => setEditingCreator({ ...editingCreator, avatar_url: e.target.value })} 
-                  placeholder="https://... or /api/avatar?user_id=..."
-                  style={{ ...formInputStyle, flex: 1 }} 
-                />
-              </div>
-            </div>
-
-            <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Banner Image URL</label>
-              <input 
-                type="text" 
-                value={editingCreator.banner_url || ""} 
-                onChange={e => setEditingCreator({ ...editingCreator, banner_url: e.target.value })} 
-                placeholder="https://images.unsplash.com/..."
-                style={formInputStyle} 
-              />
-            </div>
-
-            <div style={inputGroupStyle}>
-              <label style={{ fontSize: "12px", color: "#aaa", fontWeight: "700" }}>Bio / Summary</label>
+              <label style={labelStyle}>Bio / Description</label>
               <textarea 
                 rows={3} 
                 value={editingCreator.creator_bio || ""} 
@@ -1347,15 +2012,22 @@ export default function AdminDashboard({ user, onLogout }) {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
       {deleteWarning && (
         <div style={modalOverlayStyle}>
-          <div style={{...modalBoxStyle, textAlign: "center", maxWidth: "350px", margin: "0 20px"}}>
-            <AlertTriangle size={48} color="#ff3b30" style={{ margin: "0 auto 15px auto" }} />
-            <h2 style={{ margin: "0 0 10px 0" }}>Confirm Deletion</h2>
-            <p style={{ color: "#8e8e93", fontSize: "14px", marginBottom: "20px" }}>Permanently delete <strong>{deleteWarning.name}</strong>? This cannot be undone.</p>
+          <div style={{ ...modalBoxStyle, textAlign: "center", maxWidth: "340px" }}>
+            <AlertTriangle size={40} color="#f43f5e" style={{ margin: "0 auto 12px auto" }} />
+            <h2 style={{ margin: "0 0 8px 0", color: "#f4f4f5", fontSize: "16px", fontWeight: "800" }}>Confirm Deletion</h2>
+            <p style={{ color: "#a1a1aa", fontSize: "13px", marginBottom: "20px" }}>
+              Permanently delete <strong>"{deleteWarning.name}"</strong>? This action cannot be reversed.
+            </p>
             <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={() => setDeleteWarning(null)} style={{ flex: 1, padding: "12px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer" }}>Cancel</button>
-              <button onClick={handleDelete} style={{ flex: 1, padding: "12px", background: "#ff3b30", border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>Delete</button>
+              <button onClick={() => setDeleteWarning(null)} style={{ flex: 1, padding: "10px", background: "#27272a", border: "none", color: "#f4f4f5", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
+                Cancel
+              </button>
+              <button onClick={handleDelete} style={{ flex: 1, padding: "10px", background: "#f43f5e", border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "13px" }}>
+                Delete
+              </button>
             </div>
           </div>
         </div>
@@ -1364,54 +2036,355 @@ export default function AdminDashboard({ user, onLogout }) {
   );
 }
 
-const SidebarBtn = ({ active, onClick, icon, label }) => (
-  <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: "12px", width: "100%", padding: "12px 16px", borderRadius: "10px", border: "none", cursor: "pointer", fontSize: "15px", fontWeight: "600", transition: "all 0.2s", background: active ? "rgba(247, 147, 26, 0.1)" : "transparent", color: active ? "var(--primary-color)" : "#8e8e93" }}>
-    {icon} {label}
+// -------------------------------------------------------------
+// Interactive SVG Time-Series Chart Component
+// -------------------------------------------------------------
+function InteractiveTimeSeriesChart({ data = [], metric = "signups" }) {
+  const [hoveredPoint, setHoveredPoint] = useState(null);
+  const containerRef = useRef(null);
+
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ height: "200px", display: "flex", alignItems: "center", justifyContent: "center", color: "#71717a", fontSize: "13px" }}>
+        No historical telemetry available for this timeframe.
+      </div>
+    );
+  }
+
+  // Metric configuration
+  const config = {
+    signups: { label: "User Registrations", color: "#f43f5e", fillGradient: "signupsGrad" },
+    uploads: { label: "Catalog Video Uploads", color: "#38bdf8", fillGradient: "uploadsGrad" },
+    stories: { label: "24h Stories Published", color: "#34d399", fillGradient: "storiesGrad" },
+    revenue: { label: "USD Crypto Revenue", color: "#fbbf24", fillGradient: "revenueGrad" }
+  }[metric] || { label: "Metric", color: "#f43f5e", fillGradient: "signupsGrad" };
+
+  const values = data.map(d => {
+    if (metric === "revenue") return Number(d.usd_rev || 0);
+    return Number(d[metric] || 0);
+  });
+
+  const total = values.reduce((sum, v) => sum + v, 0);
+  const avg = Math.round(total / values.length);
+  const maxVal = Math.max(...values, 5);
+  const peakDayIdx = values.indexOf(Math.max(...values));
+  const peakDate = data[peakDayIdx]?.label || "N/A";
+  const peakVal = values[peakDayIdx] || 0;
+
+  // Chart coordinates
+  const width = 800;
+  const height = 220;
+  const paddingX = 40;
+  const paddingTop = 20;
+  const paddingBottom = 30;
+  const chartW = width - paddingX * 2;
+  const chartH = height - paddingTop - paddingBottom;
+
+  const points = data.map((d, i) => {
+    const x = paddingX + (i / Math.max(1, data.length - 1)) * chartW;
+    const y = paddingTop + chartH - (values[i] / maxVal) * chartH;
+    return { x, y, value: values[i], date: d.label || d.date, rawDate: d.date };
+  });
+
+  // Construct smooth SVG path
+  let pathD = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const cpX1 = p0.x + (p1.x - p0.x) / 2;
+    const cpY1 = p0.y;
+    const cpX2 = p0.x + (p1.x - p0.x) / 2;
+    const cpY2 = p1.y;
+    pathD += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
+  }
+
+  const areaD = `${pathD} L ${points[points.length - 1].x} ${paddingTop + chartH} L ${points[0].x} ${paddingTop + chartH} Z`;
+
+  // Mouse move handler for crosshair
+  const handleMouseMove = (e) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const svgX = (mouseX / rect.width) * width;
+
+    let closest = points[0];
+    let minDist = Math.abs(points[0].x - svgX);
+    for (let p of points) {
+      const dist = Math.abs(p.x - svgX);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = p;
+      }
+    }
+    setHoveredPoint(closest);
+  };
+
+  return (
+    <div>
+      {/* Mini KPI summary bar */}
+      <div style={{ display: "flex", gap: "24px", marginBottom: "16px", flexWrap: "wrap" }}>
+        <div>
+          <span style={{ fontSize: "11px", color: "#71717a", textTransform: "uppercase", letterSpacing: "0.5px" }}>Range Aggregate:</span>
+          <div style={{ fontSize: "16px", fontWeight: "800", color: "#f4f4f5" }}>
+            {metric === "revenue" ? `$${total.toFixed(2)}` : total.toLocaleString()}
+          </div>
+        </div>
+        <div>
+          <span style={{ fontSize: "11px", color: "#71717a", textTransform: "uppercase", letterSpacing: "0.5px" }}>Daily Velocity:</span>
+          <div style={{ fontSize: "16px", fontWeight: "800", color: "#f4f4f5" }}>
+            {metric === "revenue" ? `$${avg}/day` : `${avg}/day`}
+          </div>
+        </div>
+        <div>
+          <span style={{ fontSize: "11px", color: "#71717a", textTransform: "uppercase", letterSpacing: "0.5px" }}>Peak Day:</span>
+          <div style={{ fontSize: "16px", fontWeight: "800", color: config.color }}>
+            {metric === "revenue" ? `$${peakVal.toFixed(2)}` : peakVal.toLocaleString()} <span style={{ fontSize: "12px", color: "#71717a", fontWeight: "500" }}>({peakDate})</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Responsive SVG Container */}
+      <div 
+        ref={containerRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setHoveredPoint(null)}
+        style={{ position: "relative", width: "100%", height: "220px", cursor: "crosshair" }}
+      >
+        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+          <defs>
+            <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={config.color} stopOpacity="0.25" />
+              <stop offset="100%" stopColor={config.color} stopOpacity="0.01" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
+          {[0, 0.5, 1].map((ratio, i) => {
+            const y = paddingTop + chartH * (1 - ratio);
+            return (
+              <g key={i}>
+                <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+                <text x={paddingX - 8} y={y + 3} fill="#71717a" fontSize="10" textAnchor="end" fontFamily="sans-serif">
+                  {metric === "revenue" ? `$${Math.round(maxVal * ratio)}` : Math.round(maxVal * ratio)}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Area Fill */}
+          <path d={areaD} fill="url(#chartGradient)" />
+
+          {/* Line Stroke */}
+          <path d={pathD} fill="none" stroke={config.color} strokeWidth="2.5" strokeLinecap="round" />
+
+          {/* X-axis date labels */}
+          {points.filter((_, i) => i % Math.ceil(points.length / 6) === 0 || i === points.length - 1).map((p, i) => (
+            <text key={i} x={p.x} y={height - 8} fill="#71717a" fontSize="10" textAnchor="middle" fontFamily="sans-serif">
+              {p.date}
+            </text>
+          ))}
+
+          {/* Hover Crosshair & Dot */}
+          {hoveredPoint && (
+            <g>
+              <line x1={hoveredPoint.x} y1={paddingTop} x2={hoveredPoint.x} y2={paddingTop + chartH} stroke="rgba(255,255,255,0.25)" strokeDasharray="2 2" />
+              <circle cx={hoveredPoint.x} cy={hoveredPoint.y} r="5" fill={config.color} stroke="#09090b" strokeWidth="2" />
+              <circle cx={hoveredPoint.x} cy={hoveredPoint.y} r="9" fill={config.color} opacity="0.3" />
+            </g>
+          )}
+        </svg>
+
+        {/* Floating Tooltip */}
+        {hoveredPoint && (
+          <div 
+            style={{
+              position: "absolute",
+              left: `${(hoveredPoint.x / width) * 100}%`,
+              top: `${Math.max(10, ((hoveredPoint.y - 45) / height) * 100)}%`,
+              transform: "translate(-50%, -50%)",
+              background: "#18181b",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: "8px",
+              padding: "6px 10px",
+              pointerEvents: "none",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+              whiteSpace: "nowrap",
+              zIndex: 10
+            }}
+          >
+            <div style={{ fontSize: "10px", color: "#71717a", fontWeight: "600" }}>{hoveredPoint.date}</div>
+            <div style={{ fontSize: "13px", fontWeight: "800", color: config.color, marginTop: "1px" }}>
+              {metric === "revenue" ? `$${hoveredPoint.value.toFixed(2)}` : hoveredPoint.value.toLocaleString()} {config.label.split(" ")[0]}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// Proportional Category Distribution Bar
+// -------------------------------------------------------------
+function CategoryDistributionBar({ categories = [], totalVideos = 1, onSelectCategory, selectedCategory }) {
+  const palette = ["#f43f5e", "#38bdf8", "#fbbf24", "#34d399", "#818cf8", "#a78bfa", "#f472b6", "#94a3b8"];
+
+  return (
+    <div>
+      <div style={{ display: "flex", height: "12px", borderRadius: "6px", overflow: "hidden", background: "#27272a", gap: "1px" }}>
+        {categories.map((c, i) => {
+          const pct = Math.max(0.5, ((c.count || 0) / totalVideos) * 100);
+          const color = palette[i % palette.length];
+          const isSelected = selectedCategory?.category === c.category;
+          return (
+            <div
+              key={c.category}
+              onClick={() => onSelectCategory(c)}
+              style={{
+                width: `${pct}%`,
+                background: color,
+                opacity: selectedCategory ? (isSelected ? 1 : 0.35) : 0.85,
+                cursor: "pointer",
+                transition: "opacity 0.2s"
+              }}
+              title={`${c.category}: ${c.count.toLocaleString()} videos (${pct.toFixed(1)}%)`}
+            />
+          );
+        })}
+      </div>
+
+      {selectedCategory && (
+        <div style={{ marginTop: "10px", background: "#27272a", borderRadius: "8px", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <span style={{ fontSize: "12px", fontWeight: "700", color: "#f4f4f5", textTransform: "capitalize" }}>
+              {selectedCategory.category}
+            </span>
+            <span style={{ fontSize: "11px", color: "#a1a1aa", marginLeft: "8px" }}>
+              {selectedCategory.count.toLocaleString()} videos ({(((selectedCategory.count || 0) / totalVideos) * 100).toFixed(1)}%) • {(selectedCategory.views || 0).toLocaleString()} views
+            </span>
+          </div>
+          <button onClick={() => onSelectCategory(null)} style={{ border: "none", background: "transparent", color: "#71717a", cursor: "pointer", padding: "2px" }}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// Sub-Components & Rows
+// -------------------------------------------------------------
+const SidebarBtn = ({ active, onClick, icon, label, count, badge }) => (
+  <button 
+    onClick={onClick} 
+    style={{ 
+      display: "flex", 
+      alignItems: "center", 
+      justifyContent: "space-between",
+      width: "100%", 
+      padding: "10px 14px", 
+      borderRadius: "8px", 
+      border: "none", 
+      cursor: "pointer", 
+      fontSize: "14px", 
+      fontWeight: "600", 
+      transition: "all 0.15s ease", 
+      background: active ? "rgba(244, 63, 94, 0.12)" : "transparent", 
+      color: active ? "#f43f5e" : "#a1a1aa" 
+    }}
+  >
+    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      {icon} <span>{label}</span>
+    </div>
+    {badge ? (
+      <span style={{ background: "#f43f5e", color: "#fff", fontSize: "10px", fontWeight: "800", padding: "1px 6px", borderRadius: "10px" }}>
+        {badge}
+      </span>
+    ) : count !== undefined ? (
+      <span style={{ color: "#71717a", fontSize: "11px" }}>
+        {Number(count).toLocaleString()}
+      </span>
+    ) : null}
   </button>
 );
 
-const StatCard = ({ title, value, icon, bg }) => (
-  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", padding: "24px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+const StatCard = ({ title, value, subtitle, icon, bg }) => (
+  <div style={{ background: "#18181b", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
     <div>
-      <div style={{ color: "#8e8e93", fontSize: "14px", fontWeight: "600", marginBottom: "8px" }}>{title}</div>
-      <div style={{ color: "#fff", fontSize: "32px", fontWeight: "900" }}>{value}</div>
+      <div style={{ color: "#71717a", fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{title}</div>
+      <div style={{ color: "#f4f4f5", fontSize: "26px", fontWeight: "800", letterSpacing: "-0.5px" }}>{value}</div>
+      {subtitle && <div style={{ color: "#a1a1aa", fontSize: "12px", marginTop: "4px" }}>{subtitle}</div>}
     </div>
-    <div style={{ background: bg, padding: "12px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
+    <div style={{ background: bg, padding: "10px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
   </div>
 );
 
-// 🖌 UI STYLES
-const dashboardContainerStyle = { display: "flex", height: "100dvh", width: "100vw", background: "#09090b", color: "#fff", position: "absolute", zIndex: 999999, top: 0, left: 0 };
-const sidebarStyle = { width: "260px", background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.08)", padding: "30px 20px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
-const logoStyle = { margin: 0, fontSize: "20px", fontWeight: "900", letterSpacing: "-1px", color: "#fff" };
+const StorageRow = ({ name, count, total, color }) => {
+  const pct = Math.max(1, ((count / total) * 100).toFixed(1));
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "3px" }}>
+        <span style={{ color: "#f4f4f5", fontWeight: "600" }}>{name}</span>
+        <span style={{ color: "#71717a" }}>{count.toLocaleString()} ({pct}%)</span>
+      </div>
+      <div style={{ height: "6px", background: "#27272a", borderRadius: "3px", overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: "3px" }} />
+      </div>
+    </div>
+  );
+};
+
+const EngagementCard = ({ title, count, icon }) => (
+  <div style={{ background: "#27272a", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div>
+      <div style={{ fontSize: "11px", color: "#71717a" }}>{title}</div>
+      <div style={{ fontSize: "14px", fontWeight: "700", color: "#f4f4f5", marginTop: "2px" }}>{count.toLocaleString()}</div>
+    </div>
+    {icon}
+  </div>
+);
+
+// -------------------------------------------------------------
+// Executive Calm Dark Styles
+// -------------------------------------------------------------
+const dashboardContainerStyle = { display: "flex", height: "100dvh", width: "100vw", background: "#09090b", color: "#f4f4f5", position: "absolute", zIndex: 999999, top: 0, left: 0, fontFamily: "system-ui, -apple-system, sans-serif" };
+const sidebarStyle = { width: "260px", background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.06)", padding: "24px 18px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
+const logoStyle = { margin: 0, fontSize: "18px", fontWeight: "900", letterSpacing: "-0.5px", color: "#f4f4f5" };
 const mainContentStyle = { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" };
-const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "30px 40px", borderBottom: "1px solid rgba(255,255,255,0.05)" };
-const contentAreaStyle = { flex: 1, overflowY: "auto", padding: "40px" };
-const gridStatsStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px" };
-const tableContainerStyle = { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", overflow: "hidden" };
+const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 30px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#09090b" };
+const contentAreaStyle = { flex: 1, overflowY: "auto", padding: "30px", background: "#09090b" };
+const gridStatsStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" };
+const cardContainerStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "22px" };
+const tableContainerStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", overflow: "hidden" };
 const tableStyle = { width: "100%", borderCollapse: "collapse" };
-const thStyle = { textAlign: "left", padding: "18px 20px", color: "#8e8e93", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", borderBottom: "1px solid rgba(255,255,255,0.1)", userSelect: "none", whiteSpace: "nowrap" };
-const trStyle = { borderBottom: "1px solid rgba(255,255,255,0.05)" };
-const tdStyle = { padding: "15px 20px", fontSize: "14px" };
-const badgeStyle = { padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "700" };
-const premiumBadge = { ...badgeStyle, background: "rgba(225, 29, 72, 0.15)", color: "#f43f5e" };
-const freeBadge = { ...badgeStyle, background: "rgba(255,255,255,0.05)", color: "#8e8e93" };
-const iconBtnStyle = { background: "rgba(255,255,255,0.05)", border: "none", color: "#fff", padding: "8px", borderRadius: "8px", cursor: "pointer", marginLeft: "5px" };
-const searchBarStyle = { display: "flex", alignItems: "center", gap: "10px", background: "rgba(255,255,255,0.05)", padding: "10px 16px", borderRadius: "8px", width: "250px" };
-const searchInputStyle = { background: "transparent", border: "none", color: "#fff", outline: "none", width: "100%", fontSize: "14px" };
-const logoutBtnStyle = { display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", background: "rgba(255,255,255,0.05)", color: "#fff", border: "none", padding: "14px", borderRadius: "10px", fontWeight: "600", cursor: "pointer" };
-const refreshBtnStyle = { display: "flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", padding: "10px 16px", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "600" };
-const uploadBtnStyle = { display: "flex", alignItems: "center", gap: "8px", background: "var(--primary-color)", color: "#fff", border: "none", padding: "10px 16px", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "700" };
-const centerFlex = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%" };
-const errorScreenStyle = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100dvh", width: "100vw", background: "#050505", color: "#ff3b30", position: "absolute", zIndex: 999999, top: 0, left: 0 };
-const goBackBtnStyle = { background: "#fff", color: "#000", padding: "12px 30px", borderRadius: "30px", border: "none", fontWeight: "700", cursor: "pointer", fontSize: "15px", transition: "transform 0.2s" };
-const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999999 };
-const modalBoxStyle = { background: "#111", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "16px", padding: "25px", width: "100%", maxWidth: "400px", margin: "0 15px" };
-const modalHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" };
-const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "6px", marginBottom: "15px" };
-const formInputStyle = { background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", padding: "12px", borderRadius: "8px", color: "#fff", fontSize: "14px", outline: "none" };
-const saveBtnStyle = { width: "100%", background: "var(--primary-color)", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "700", fontSize: "15px", cursor: "pointer", marginTop: "10px" };
-const paginationStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 20px", background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.05)" };
-const pageBtnStyle = { background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 16px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600", transition: "0.2s" };
+const thStyle = { textAlign: "left", padding: "14px 18px", color: "#71717a", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", borderBottom: "1px solid rgba(255,255,255,0.06)", userSelect: "none", whiteSpace: "nowrap" };
+const trStyle = { borderBottom: "1px solid rgba(255,255,255,0.04)" };
+const tdStyle = { padding: "12px 18px", fontSize: "13px", color: "#f4f4f5" };
+const badgeStyle = { padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "700" };
+const premiumBadge = { ...badgeStyle, background: "rgba(244, 63, 94, 0.12)", color: "#f43f5e" };
+const freeBadge = { ...badgeStyle, background: "#27272a", color: "#a1a1aa" };
+const approvedBadge = { ...badgeStyle, background: "rgba(52, 211, 153, 0.12)", color: "#34d399" };
+const waitingBadge = { ...badgeStyle, background: "rgba(251, 191, 36, 0.12)", color: "#fbbf24" };
+const pendingBadgeStyle = { ...badgeStyle, background: "#27272a", color: "#a1a1aa" };
+const iconBtnStyle = { background: "#27272a", border: "none", color: "#f4f4f5", padding: "6px", borderRadius: "6px", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" };
+const reportActionBtn = { border: "1px solid", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", fontWeight: "700", cursor: "pointer" };
+const searchBarStyle = { display: "flex", alignItems: "center", gap: "8px", background: "#18181b", border: "1px solid rgba(255,255,255,0.08)", padding: "7px 12px", borderRadius: "8px", width: "300px" };
+const searchInputStyle = { background: "transparent", border: "none", color: "#f4f4f5", outline: "none", width: "100%", fontSize: "13px" };
+const logoutBtnStyle = { display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", background: "#18181b", color: "#a1a1aa", border: "1px solid rgba(255,255,255,0.06)", padding: "10px", borderRadius: "8px", fontWeight: "600", fontSize: "13px", cursor: "pointer", width: "100%" };
+const refreshBtnStyle = { display: "flex", alignItems: "center", gap: "6px", background: "#18181b", border: "1px solid rgba(255,255,255,0.08)", color: "#f4f4f5", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "600" };
+const uploadBtnStyle = { display: "flex", alignItems: "center", gap: "6px", background: "#f43f5e", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "700" };
+const centerFlex = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "300px" };
+const errorScreenStyle = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100dvh", width: "100vw", background: "#09090b", color: "#f43f5e", position: "absolute", zIndex: 999999, top: 0, left: 0 };
+const goBackBtnStyle = { background: "#f4f4f5", color: "#09090b", padding: "10px 24px", borderRadius: "8px", border: "none", fontWeight: "700", cursor: "pointer", fontSize: "14px" };
+const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999999 };
+const modalBoxStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "14px", padding: "22px", width: "100%", maxWidth: "420px", margin: "0 15px", boxShadow: "0 10px 40px rgba(0,0,0,0.9)" };
+const modalHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" };
+const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "5px", marginBottom: "14px" };
+const labelStyle = { fontSize: "11px", color: "#a1a1aa", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" };
+const formInputStyle = { background: "#27272a", border: "1px solid rgba(255,255,255,0.08)", padding: "10px", borderRadius: "8px", color: "#f4f4f5", fontSize: "13px", outline: "none" };
+const saveBtnStyle = { width: "100%", background: "#f43f5e", color: "#fff", border: "none", padding: "11px", borderRadius: "8px", fontWeight: "700", fontSize: "14px", cursor: "pointer", marginTop: "8px" };
+const paginationStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 18px", background: "#18181b", borderTop: "1px solid rgba(255,255,255,0.06)" };
+const pageBtnStyle = { background: "#27272a", border: "none", color: "#f4f4f5", padding: "5px 14px", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" };
 const pageBtnDisabledStyle = { ...pageBtnStyle, opacity: 0.3, cursor: "not-allowed" };
-const pageTextStyle = { fontSize: "13px", color: "#8e8e93", fontWeight: "600" };
+const pageTextStyle = { fontSize: "12px", color: "#71717a", fontWeight: "600" };
