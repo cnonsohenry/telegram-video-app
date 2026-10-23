@@ -696,6 +696,7 @@ const DesktopRightSidebar = ({
   onSelectTopic,
   highlights,
   highlightsLoading,
+  onRefreshHighlights,
   featuredCreators,
   onCreatorClick,
   onVideoClick,
@@ -801,6 +802,29 @@ const DesktopRightSidebar = ({
       <div style={desktopCardStyle}>
         <div style={desktopCardHeaderStyle}>
           <h3 style={desktopCardTitleStyle}>Highlights</h3>
+          {onRefreshHighlights && (
+            <button
+              type="button"
+              onClick={onRefreshHighlights}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#71767b",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "4px",
+                borderRadius: "50%",
+                transition: "color 0.2s ease"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = "#ffffff"}
+              onMouseLeave={(e) => e.currentTarget.style.color = "#71767b"}
+              title="Refresh highlights"
+            >
+              <RefreshCw size={14} className={highlightsLoading ? "animate-spin" : ""} />
+            </button>
+          )}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column" }}>
@@ -909,9 +933,9 @@ const DesktopRightSidebar = ({
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: "10px",
-                    padding: "14px 16px",
-                    borderBottom: cIdx < 2 ? "1px solid rgba(255, 255, 255, 0.06)" : "none",
+                    gap: "14px",
+                    padding: "20px 22px",
+                    borderBottom: cIdx < 2 ? "1px solid rgba(255, 255, 255, 0.08)" : "none",
                     cursor: "pointer",
                     transition: "background 0.15s ease"
                   }}
@@ -920,53 +944,55 @@ const DesktopRightSidebar = ({
                   onClick={() => onCreatorClick(uname)}
                 >
                   {/* Top Row: Avatar + Info */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%", minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", width: "100%", minWidth: 0 }}>
                     <div style={{ flexShrink: 0 }}>
                       <StoryAvatar
                         username={uname}
                         avatarUrl={creator.avatar_url}
                         displayName={creator.display_name || uname}
-                        size={46}
-                        borderWidth={2}
+                        size={52}
+                        borderWidth={2.2}
                         onClick={() => onCreatorClick && onCreatorClick(uname)}
                       />
                     </div>
 
-                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" }}>
                       {/* Name + Verified */}
                       <div style={{ display: "inline-flex", alignItems: "center", gap: "3px", minWidth: 0 }}>
                         <span style={{
-                          fontSize: "14.5px",
+                          fontSize: "15px",
                           fontWeight: "800",
                           color: "#ffffff",
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          lineHeight: "1.2"
+                          lineHeight: "1.25"
                         }}>
                           {creator.display_name || uname}
                         </span>
                         {creator.is_verified && (
-                          <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
+                          <TwitterVerifiedBadge size={14.5} style={{ flexShrink: 0 }} />
                         )}
                       </div>
 
                       {/* Bio line (1 line truncated with ellipsis) */}
                       {creator.creator_bio && (
                         <span style={{
-                          fontSize: "11.5px",
+                          fontSize: "12px",
                           color: "#8e8e93",
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          lineHeight: "1.2"
+                          lineHeight: "1.35",
+                          marginTop: "2px",
+                          marginBottom: "2px"
                         }} title={creator.creator_bio}>
                           {creator.creator_bio}
                         </span>
                       )}
 
                       {/* Handle & Followers */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11.5px", color: "#71767b", lineHeight: "1.2" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "12px", color: "#71767b", lineHeight: "1.2" }}>
                         <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           @{uname}
                         </span>
@@ -979,16 +1005,17 @@ const DesktopRightSidebar = ({
                     </div>
                   </div>
 
-                  {/* Middle Row: 4 Thumbnails (Discover Page Style) */}
+                  {/* Middle Row: 4 Thumbnails (Discover Page Style with generous breathing room) */}
                   {sampleVideos.length > 0 && (
                     <div style={{
                       display: "grid",
                       gridTemplateColumns: "repeat(4, 1fr)",
-                      gap: "3px",
+                      gap: "5px",
                       width: "100%",
                       borderRadius: "8px",
                       overflow: "hidden",
-                      marginTop: "2px"
+                      marginTop: "6px",
+                      marginBottom: "4px"
                     }}>
                       {sampleVideos.slice(0, 4).map((video, vIdx) => {
                         const totalThumbs = Math.min(sampleVideos.length, 4);
@@ -1030,29 +1057,29 @@ const DesktopRightSidebar = ({
                             }} />
                             <div style={{
                               position: "absolute",
-                              bottom: "4px",
-                              left: "4px",
+                              bottom: "5px",
+                              left: "5px",
                               display: "flex",
                               alignItems: "center",
                               color: "#ffffff",
-                              fontSize: "9px",
+                              fontSize: "9.5px",
                               fontWeight: "600",
                               pointerEvents: "none"
                             }}>
-                              <Play size={8} fill="#ffffff" strokeWidth={0} style={{ marginRight: "2px" }} />
+                              <Play size={9} fill="#ffffff" strokeWidth={0} style={{ marginRight: "2px" }} />
                               {Number(video.views || 0).toLocaleString()}
                             </div>
                             {(video.is_premium || video.category === "premium") && (
                               <span style={{
                                 position: "absolute",
-                                top: "3px",
-                                right: "3px",
+                                top: "4px",
+                                right: "4px",
                                 backgroundColor: "rgba(255, 180, 0, 0.9)",
                                 color: "#000000",
-                                fontSize: "7.5px",
+                                fontSize: "8px",
                                 fontWeight: "800",
-                                padding: "1px 3px",
-                                borderRadius: "2px",
+                                padding: "1px 4px",
+                                borderRadius: "3px",
                                 pointerEvents: "none"
                               }}>
                                 VIP
@@ -1065,14 +1092,14 @@ const DesktopRightSidebar = ({
                   )}
 
                   {/* Action Row: Follow & VIP Subscribe Buttons */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", marginTop: "2px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%", marginTop: "6px" }}>
                     <button
                       type="button"
                       style={{
                         flex: 1,
-                        height: "32px",
-                        borderRadius: "16px",
-                        fontSize: "12.5px",
+                        height: "36px",
+                        borderRadius: "18px",
+                        fontSize: "13px",
                         fontWeight: "700",
                         cursor: "pointer",
                         display: "flex",
@@ -1087,7 +1114,7 @@ const DesktopRightSidebar = ({
                       disabled={isLoading}
                     >
                       {isLoading ? (
-                        <Loader2 size={12} className="animate-spin" />
+                        <Loader2 size={13} className="animate-spin" />
                       ) : isFollowing ? (
                         "Following"
                       ) : (
@@ -1100,9 +1127,9 @@ const DesktopRightSidebar = ({
                         type="button"
                         style={{
                           flex: 1,
-                          height: "32px",
-                          borderRadius: "16px",
-                          fontSize: "12.5px",
+                          height: "36px",
+                          borderRadius: "18px",
+                          fontSize: "13px",
                           fontWeight: "700",
                           cursor: "pointer",
                           display: "flex",
@@ -1265,10 +1292,21 @@ export default function Explore({
   const fetchHighlights = useCallback(async () => {
     try {
       setHighlightLoading(true);
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=trends&limit=4`);
+      const randomSeed = Math.floor(Math.random() * 9999999);
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?category=all&sort=random&limit=16&seed=${randomSeed}`);
       if (res.ok) {
         const data = await res.json();
-        if (data?.videos) setHighlightVideos(data.videos);
+        if (data?.videos && data.videos.length > 0) {
+          const seen = new Set();
+          const cleanVideos = data.videos.filter(v => {
+            if (!v || !v.thumbnail_url) return false;
+            const id = v.message_id || v.id;
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
+          setHighlightVideos(cleanVideos.slice(0, 4));
+        }
       }
     } catch (e) {
     } finally {
@@ -2535,6 +2573,7 @@ export default function Explore({
                       } else {
                         await loadForYouFeed(false, selectedCategory, 1);
                       }
+                      fetchHighlights();
                     }}
                     style={desktopRefreshBtnStyle}
                     title="Refresh Feed"
@@ -2669,6 +2708,7 @@ export default function Explore({
               onSelectTopic={(catId) => handleSelectCategory(catId)}
               highlights={highlightVideos}
               highlightsLoading={highlightLoading}
+              onRefreshHighlights={fetchHighlights}
               featuredCreators={featuredCreators}
               onCreatorClick={onCreatorClick}
               onVideoClick={onVideoClick}
@@ -2900,7 +2940,7 @@ const desktopContainerStyle = {
 const desktopInnerWrapperStyle = {
   display: "flex",
   width: "100%",
-  maxWidth: "1340px",
+  maxWidth: "1420px",
   height: "100vh",
   position: "relative"
 };
@@ -3210,17 +3250,17 @@ const desktopSearchClearBtn = {
 };
 
 const desktopRightRailStyle = {
-  flex: 1,
-  minWidth: "350px",
-  maxWidth: "420px",
+  flex: "1 1 390px",
+  minWidth: "370px",
+  maxWidth: "460px",
   height: "100vh",
   overflowY: "auto",
   position: "sticky",
   top: 0,
-  padding: "16px 20px 24px 20px",
+  padding: "20px 22px 60px 22px",
   display: "flex",
   flexDirection: "column",
-  gap: "16px",
+  gap: "22px",
   boxSizing: "border-box"
 };
 
@@ -3228,7 +3268,7 @@ const desktopSearchBoxWrapper = {
   display: "flex",
   alignItems: "center",
   gap: "10px",
-  padding: "10px 16px",
+  padding: "12px 18px",
   borderRadius: "9999px",
   background: "var(--bg-color, #09090b)",
   border: "1px solid rgba(255, 255, 255, 0.10)",
@@ -3274,59 +3314,60 @@ const desktopCardHeaderStyle = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "14px 16px 12px 16px",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
+  padding: "16px 20px 14px 20px",
+  borderBottom: "1px solid rgba(255, 255, 255, 0.08)"
 };
 
 const desktopCardTitleStyle = {
-  fontSize: "17px",
+  fontSize: "18px",
   fontWeight: "800",
   color: "#ffffff",
   margin: 0,
-  letterSpacing: "-0.2px"
+  letterSpacing: "-0.3px"
 };
 
 const desktopTrendItemStyle = {
   display: "flex",
   flexDirection: "column",
-  padding: "12px 16px",
+  padding: "15px 20px",
   cursor: "pointer",
   transition: "background 0.15s ease",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.03)"
+  borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
 };
 
 const desktopTrendSublabel = {
-  fontSize: "11px",
+  fontSize: "12px",
   color: "#71767b",
-  marginBottom: "2px"
+  marginBottom: "4px"
 };
 
 const desktopTrendTitle = {
-  fontSize: "15px",
-  fontWeight: "700",
+  fontSize: "15.5px",
+  fontWeight: "800",
   color: "#ffffff",
-  marginBottom: "3px"
+  marginBottom: "4px",
+  letterSpacing: "-0.2px"
 };
 
 const desktopTrendPosts = {
-  fontSize: "12px",
+  fontSize: "12.5px",
   color: "#71767b"
 };
 
 const desktopHighlightCardStyle = {
   display: "flex",
-  gap: "12px",
-  padding: "10px 16px",
+  gap: "14px",
+  padding: "16px 20px",
   cursor: "pointer",
   transition: "background 0.15s ease",
   alignItems: "center",
-  borderBottom: "1px solid rgba(255, 255, 255, 0.03)"
+  borderBottom: "1px solid rgba(255, 255, 255, 0.06)"
 };
 
 const desktopHighlightThumbBox = {
-  width: "68px",
-  height: "82px",
-  borderRadius: "8px",
+  width: "82px",
+  height: "102px",
+  borderRadius: "10px",
   overflow: "hidden",
   background: "#111",
   flexShrink: 0,
@@ -3376,10 +3417,10 @@ const desktopHighlightInfo = {
 
 const desktopHighlightCaption = {
   color: "#ffffff",
-  fontSize: "13px",
+  fontSize: "13.5px",
   fontWeight: "600",
-  margin: 0,
-  lineHeight: "1.35",
+  margin: "0 0 6px 0",
+  lineHeight: "1.4",
   display: "-webkit-box",
   WebkitLineClamp: 2,
   WebkitBoxOrient: "vertical",
@@ -3388,7 +3429,7 @@ const desktopHighlightCaption = {
 
 const desktopHighlightMeta = {
   color: "#71767b",
-  fontSize: "11px",
+  fontSize: "12px",
   display: "flex",
   alignItems: "center",
   gap: "6px"
@@ -3396,8 +3437,8 @@ const desktopHighlightMeta = {
 
 const desktopHighlightSkeleton = {
   display: "flex",
-  gap: "12px",
-  padding: "10px 16px",
+  gap: "14px",
+  padding: "16px 20px",
   alignItems: "center"
 };
 
@@ -3482,13 +3523,13 @@ const desktopCardShowMoreBtn = {
   display: "flex",
   alignItems: "center",
   gap: "6px",
-  padding: "14px 16px",
+  padding: "16px 20px",
   background: "none",
   border: "none",
-  borderTop: "1px solid rgba(255, 255, 255, 0.06)",
-  color: "#ffffff",
+  borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+  color: "var(--primary-color, #f43f5e)",
   fontSize: "14px",
-  fontWeight: "600",
+  fontWeight: "700",
   cursor: "pointer",
   transition: "background 0.15s ease",
   textAlign: "left"
