@@ -23,9 +23,9 @@ export const avatarColumnStyle = { marginRight: "12px", flexShrink: 0 };
 export const contentColumnStyle = { flex: 1, display: "flex", flexDirection: "column", minWidth: 0 };
 const postHeaderStyle = { display: "flex", alignItems: "center", gap: "4px", marginBottom: "2px", lineHeight: "20px" };
 const avatarStyle = { width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover", backgroundColor: "#18181b" };
-const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#f4f4f5", lineHeight: "20px" };
+const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#d4d4d8", lineHeight: "20px" };
 const timeStyle = { fontSize: "15px", color: "#71767b", lineHeight: "20px", textTransform: "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
-const captionStyle = { fontSize: "15px", lineHeight: "20px", letterSpacing: "-0.01em", color: "#f4f4f5", margin: "0 0 8px 0", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-line" };
+const captionStyle = { fontSize: "15px", lineHeight: "20px", letterSpacing: "-0.01em", color: "#c4c4c8", margin: "0 0 8px 0", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-line" };
 
 const videoContainerStyle = { 
   position: "relative", 
@@ -731,7 +731,7 @@ export default function FeedPost({
             aria-label="More options"
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
-              e.currentTarget.style.color = "#f4f4f5";
+              e.currentTarget.style.color = "#d4d4d8";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = "transparent";
@@ -760,7 +760,7 @@ export default function FeedPost({
                 style={{ ...carouselNavBtnStyle, left: "6px" }}
                 aria-label="Previous video"
               >
-                <ChevronLeft size={18} color="#f4f4f5" />
+                <ChevronLeft size={18} color="#d4d4d8" />
               </button>
             )}
 
@@ -774,7 +774,7 @@ export default function FeedPost({
                 style={{ ...carouselNavBtnStyle, right: "6px" }}
                 aria-label="Next video"
               >
-                <ChevronRight size={18} color="#f4f4f5" />
+                <ChevronRight size={18} color="#d4d4d8" />
               </button>
             )}
 
@@ -852,7 +852,7 @@ export default function FeedPost({
                   {/* Unlocked Play Icon Overlay */}
                   {isUnlocked && (!isPlaying || idx !== 0 || isAnyModalOpen) && (
                     <div style={playOverlayStyle}>
-                      <Play size={24} fill="#f4f4f5" strokeWidth={0} />
+                      <Play size={24} fill="#d4d4d8" strokeWidth={0} />
                     </div>
                   )}
 
@@ -862,7 +862,7 @@ export default function FeedPost({
                       <div style={albumLockCircleStyle}>
                         <Lock size={20} color="#FFD700" />
                       </div>
-                      <span style={{ color: "#f4f4f5", fontSize: "11px", fontWeight: "800", marginTop: "6px", letterSpacing: "0.5px" }}>
+                      <span style={{ color: "#d4d4d8", fontSize: "11px", fontWeight: "800", marginTop: "6px", letterSpacing: "0.5px" }}>
                         Locked
                       </span>
                     </div>
@@ -1008,7 +1008,7 @@ export default function FeedPost({
                   <div style={vipLockCircleStyle}>
                     <Lock size={24} color="#FFD700" />
                   </div>
-                  <div style={{ color: "#f4f4f5", fontSize: "13px", fontWeight: "800", textAlign: "center" }}>
+                  <div style={{ color: "#d4d4d8", fontSize: "13px", fontWeight: "800", textAlign: "center" }}>
                     Locked Premium Release
                   </div>
                   <button
@@ -1038,7 +1038,7 @@ export default function FeedPost({
               <>
                 {(!isPlaying || isAnyModalOpen) && (
                   <div style={playOverlayStyle}>
-                    <Play size={24} fill="#f4f4f5" strokeWidth={0} />
+                    <Play size={24} fill="#d4d4d8" strokeWidth={0} />
                   </div>
                 )}
                 {isPremium && (
@@ -1070,8 +1070,8 @@ export default function FeedPost({
               <span>{likesCount > 0 ? likesCount : ''}</span>
             </div>
 
-            <div style={{ ...actionItemStyle, color: isSaved ? "#f4f4f5" : "#71767b" }} onClick={handleSave}>
-              <Bookmark size={18} fill={isSaved ? "#f4f4f5" : "none"} />
+            <div style={{ ...actionItemStyle, color: isSaved ? "#d4d4d8" : "#71767b" }} onClick={handleSave}>
+              <Bookmark size={18} fill={isSaved ? "#d4d4d8" : "none"} />
               <span>{savesCount > 0 ? savesCount : ''}</span>
             </div>
 

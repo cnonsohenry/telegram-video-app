@@ -1051,7 +1051,7 @@ export default function App() {
 
           <button 
             onClick={() => handleTabSwitch("explore")} 
-            style={{...btnStyle, color: activeTab === 'explore' ? '#f4f4f5' : '#71717a'}}
+            style={{...btnStyle, color: activeTab === 'explore' ? '#d4d4d8' : '#71717a'}}
           >
             <Compass size={24} strokeWidth={activeTab === 'explore' ? 2.5 : 2} fill={activeTab === 'explore' ? 'currentColor' : 'none'} />
             <span style={labelStyle}>Explore</span>
@@ -1059,7 +1059,7 @@ export default function App() {
 
           <button 
             onClick={() => handleTabSwitch("profile")} 
-            style={{...btnStyle, color: activeTab === 'profile' ? '#f4f4f5' : '#71717a'}}
+            style={{...btnStyle, color: activeTab === 'profile' ? '#d4d4d8' : '#71717a'}}
           >
             <User size={24} strokeWidth={activeTab === 'profile' ? 2.5 : 2} fill={activeTab === 'profile' ? 'currentColor' : 'none'} />
             <span style={labelStyle}>Profile</span>
@@ -1068,7 +1068,7 @@ export default function App() {
           {user?.role === 'admin' && (
             <button 
               onClick={() => handleTabSwitch("admin")} 
-              style={{...btnStyle, color: activeTab === 'admin' ? '#f4f4f5' : '#71717a'}}
+              style={{...btnStyle, color: activeTab === 'admin' ? '#d4d4d8' : '#71717a'}}
             >
               <ShieldCheck size={24} strokeWidth={activeTab === 'admin' ? 2.5 : 2} fill={activeTab === 'admin' ? 'currentColor' : 'none'} />
               <span style={labelStyle}>Admin</span>

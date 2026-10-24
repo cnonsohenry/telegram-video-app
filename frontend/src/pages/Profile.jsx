@@ -787,7 +787,7 @@ export default function Profile({
                       onClick={() => handleOpenFollowList("followers")}
                       style={{ cursor: "pointer" }}
                     >
-                      <strong style={{ color: "#f4f4f5", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
+                      <strong style={{ color: "#d4d4d8", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
                       <span>followers</span>
                     </span>
                     <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
@@ -795,12 +795,12 @@ export default function Profile({
                       onClick={() => handleOpenFollowList("following")}
                       style={{ cursor: "pointer" }}
                     >
-                      <strong style={{ color: "#f4f4f5", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
+                      <strong style={{ color: "#d4d4d8", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
                       <span>following</span>
                     </span>
                     <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
                     <span>
-                      <strong style={{ color: "#f4f4f5", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                      <strong style={{ color: "#d4d4d8", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
                       <span>likes</span>
                     </span>
                   </div>
@@ -965,7 +965,7 @@ export default function Profile({
                     onClick={() => handleOpenFollowList("followers")}
                     style={{ cursor: "pointer" }}
                   >
-                    <strong style={{ color: "#f4f4f5", fontSize: "16px", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
+                    <strong style={{ color: "#d4d4d8", fontSize: "16px", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
                     <span>followers</span>
                   </span>
                   <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
@@ -973,12 +973,12 @@ export default function Profile({
                     onClick={() => handleOpenFollowList("following")}
                     style={{ cursor: "pointer" }}
                   >
-                    <strong style={{ color: "#f4f4f5", fontSize: "16px", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
+                    <strong style={{ color: "#d4d4d8", fontSize: "16px", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
                     <span>following</span>
                   </span>
                   <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
                   <span>
-                    <strong style={{ color: "#f4f4f5", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                    <strong style={{ color: "#d4d4d8", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
                     <span>likes</span>
                   </span>
                 </div>
@@ -1628,12 +1628,12 @@ const containerStyle = {
 const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%" };
 const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", position: "sticky", top: 0, background: "#09090b", zIndex: 100, backdropFilter: "blur(20px)" };
 const centerTitleContainer = { display: "flex", alignItems: "center", cursor: "pointer" };
-const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0, color: "#f4f4f5" };
+const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0, color: "#d4d4d8" };
 const tabsContainerStyle = { display: "flex", position: "sticky", background: "#09090b", zIndex: 90 };
 const loaderStyle = { padding: "40px", textAlign: "center", color: "#737373", fontSize: "14px" };
 
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", background: "#121214", borderBottom: "1px solid #262626" };
-const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#f4f4f5", fontSize: "14px", fontWeight: "600", cursor: "pointer", padding: "0" };
+const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#d4d4d8", fontSize: "14px", fontWeight: "600", cursor: "pointer", padding: "0" };
 const groupTitleStyle = { 
   fontSize: "13px", 
   color: "#8e8e8e", 

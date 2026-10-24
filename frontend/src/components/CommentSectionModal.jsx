@@ -539,7 +539,7 @@ export default function CommentSectionModal({ video, onClose }) {
             {replyingTo && (
               <div style={replyingBannerStyle}>
                 <span style={replyingBannerTextStyle}>
-                  Replying to <span style={{ color: "#f4f4f5", fontWeight: 700 }}>{replyingTo.displayName || replyingTo.username}</span>
+                  Replying to <span style={{ color: "#d4d4d8", fontWeight: 700 }}>{replyingTo.displayName || replyingTo.username}</span>
                 </span>
                 <button 
                   type="button" 
@@ -639,7 +639,7 @@ const commentHeaderWrapperStyle = {
   flexShrink: 0
 };
 
-const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, color: "#f4f4f5" };
+const commentHeaderTitleStyle = { margin: 0, fontSize: "16px", fontWeight: 800, color: "#d4d4d8" };
 
 const closeBottomSheetBtnStyle = {
   background: "none",
@@ -674,13 +674,13 @@ const commentContentWrapper = { display: "flex", flexDirection: "column", flex: 
 const commentDisplayNameStyle = { 
   fontSize: "13.5px", 
   fontWeight: "700", 
-  color: "#f4f4f5", 
+  color: "#d4d4d8", 
   letterSpacing: "-0.2px" 
 };
 const commentUsernameStyle = commentDisplayNameStyle;
 
 const commentText = {
-  fontSize: "14px", color: "#e7e9ea",
+  fontSize: "14px", color: "#c4c4c8",
   margin: "4px 0 0 0", lineHeight: "1.4", wordBreak: "break-word"
 };
 
@@ -743,7 +743,7 @@ const composerInputStyle = {
   border: "1px solid rgba(255, 255, 255, 0.08)",
   borderRadius: "20px", 
   padding: "12px 18px",
-  color: "#f4f4f5", 
+  color: "#d4d4d8", 
   fontSize: "15px", 
   outline: "none"
 };
@@ -752,7 +752,7 @@ const commentSendBtnStyle = {
   background: "var(--primary-color)", border: "none",
   width: "40px", height: "40px", borderRadius: "50%",
   display: "flex", alignItems: "center", justifyContent: "center",
-  color: "#f4f4f5", cursor: "pointer",
+  color: "#d4d4d8", cursor: "pointer",
   transition: "opacity 0.2s ease", flexShrink: 0
 };
 

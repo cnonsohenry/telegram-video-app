@@ -168,7 +168,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       return {
         opacity: 1,
         transform: "scale(1)",
-        color: "#f4f4f5",
+        color: "#d4d4d8",
         fontWeight: "700",
         textShadow: "none",
         letterSpacing: "0.15px",
@@ -1058,7 +1058,7 @@ const showMoreButtonStyle = {
   gap: "10px", // Slightly tighter gap between text and thumbnails
   margin: "30px 0", // Tighter margins around the button
   background: "transparent", 
-  color: "#f4f4f5", 
+  color: "#d4d4d8", 
   padding: "10px 20px 18px 20px", // 🟢 Drastically reduced height
   borderRadius: "35px", // 🟢 Adjusted curve to look natural on a thinner button
   border: "1px solid rgba(255, 255, 255, 0.15)", // 🟢 Softer border color for a premium feel
@@ -1070,7 +1070,7 @@ const showMoreButtonStyle = {
 };
 const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "pointer" };
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 15px 0", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)" };
-const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#f4f4f5", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
+const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#d4d4d8", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
 const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
 const seoFooterStyle = { padding: "20px 25px", fontSize: "12px", color: "#666", textAlign: "center", lineHeight: "1.6", maxWidth: "800px", margin: "20px auto 0", borderTop: "1px solid rgba(255,255,255,0.05)" };
 
