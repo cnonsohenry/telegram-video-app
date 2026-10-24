@@ -335,7 +335,7 @@ const igArrowBtn = {
   borderRadius: "50%",
   background: "rgba(255, 255, 255, 0.08)",
   border: "none",
-  color: "#ffffff",
+  color: "#f4f4f5",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
@@ -440,7 +440,7 @@ const igVerifiedBadge = {
 const igDisplayName = {
   fontSize: "13px",
   fontWeight: "700",
-  color: "#ffffff",
+  color: "#f4f4f5",
   textAlign: "center",
   width: "100%",
   whiteSpace: "nowrap",

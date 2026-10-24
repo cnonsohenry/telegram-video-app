@@ -448,7 +448,7 @@ const DesktopLeftSidebar = ({
           title="NaijaHomemade"
         >
           <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-            <span style={{ fontSize: "20px", fontWeight: "900", color: "#ffffff", letterSpacing: "-0.4px" }}>
+            <span style={{ fontSize: "20px", fontWeight: "900", color: "#f4f4f5", letterSpacing: "-0.4px" }}>
               Naija
             </span>
             <span style={{ fontSize: "20px", fontWeight: "900", color: "var(--primary-color, #f43f5e)", letterSpacing: "-0.4px" }}>
@@ -468,7 +468,7 @@ const DesktopLeftSidebar = ({
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
           >
             <div style={desktopNavIconBox}>
-              <Home size={20} color="#ffffff" strokeWidth={1.8} />
+              <Home size={20} color="#e4e4e7" strokeWidth={1.8} />
             </div>
             <span style={desktopNavLabelStyle}>Home</span>
           </button>
@@ -492,7 +492,7 @@ const DesktopLeftSidebar = ({
             }}
           >
             <div style={desktopNavIconBox}>
-              <Compass size={20} color="#ffffff" strokeWidth={1.8} />
+              <Compass size={20} color="#e4e4e7" strokeWidth={1.8} />
             </div>
             <span style={{
               ...desktopNavLabelStyle,
@@ -519,7 +519,7 @@ const DesktopLeftSidebar = ({
             }}
           >
             <div style={desktopNavIconBox}>
-              <Users size={20} color="#ffffff" strokeWidth={1.8} />
+              <Users size={20} color="#e4e4e7" strokeWidth={1.8} />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
               <span style={{
@@ -546,7 +546,7 @@ const DesktopLeftSidebar = ({
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
           >
             <div style={desktopNavIconBox}>
-              <Sparkles size={20} color="#ffffff" strokeWidth={1.8} />
+              <Sparkles size={20} color="#e4e4e7" strokeWidth={1.8} />
             </div>
             <span style={desktopNavLabelStyle}>Creators</span>
           </button>
@@ -560,7 +560,7 @@ const DesktopLeftSidebar = ({
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
           >
             <div style={desktopNavIconBox}>
-              <User size={20} color="#ffffff" strokeWidth={1.8} />
+              <User size={20} color="#e4e4e7" strokeWidth={1.8} />
             </div>
             <span style={desktopNavLabelStyle}>
               {user ? (user.is_creator || user.role === "creator" ? "Creator Studio" : "Profile") : "Sign In"}
@@ -598,8 +598,8 @@ const DesktopLeftSidebar = ({
                   style={{
                     ...desktopCategoryBtnStyle,
                     background: isSelected ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                    color: isSelected ? "#ffffff" : "#8e8e93",
-                    borderLeft: isSelected ? "3px solid #ffffff" : "3px solid transparent"
+                    color: isSelected ? "#f4f4f5" : "#8e8e93",
+                    borderLeft: isSelected ? "3px solid #f4f4f5" : "3px solid transparent"
                   }}
                   onMouseEnter={(e) => {
                     if (!isSelected) e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
@@ -857,7 +857,7 @@ const DesktopRightSidebar = ({
                         <span style={{
                           fontSize: "15px",
                           fontWeight: "800",
-                          color: "#ffffff",
+                          color: "#f4f4f5",
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -2936,8 +2936,8 @@ const communityEmptyActionBtn = {
   gap: "8px",
   padding: "12px 24px",
   borderRadius: "24px",
-  background: "#ffffff",
-  color: "#000000",
+  background: "#e4e4e7",
+  color: "#09090b",
   fontSize: "14px",
   fontWeight: "700",
   border: "none",
@@ -2955,8 +2955,8 @@ const communityFabStyle = {
   justifyContent: "center",
   padding: "10px 18px",
   borderRadius: "24px",
-  background: "#ffffff",
-  color: "#000000",
+  background: "#e4e4e7",
+  color: "#09090b",
   border: "none",
   boxShadow: "0 6px 20px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(255, 255, 255, 0.2)",
   cursor: "pointer",
@@ -3101,8 +3101,8 @@ const desktopPostBtnStyle = {
   width: "100%",
   height: "48px",
   borderRadius: "9999px",
-  background: "#ffffff",
-  color: "#000000",
+  background: "#e4e4e7",
+  color: "#09090b",
   border: "none",
   fontSize: "16px",
   fontWeight: "800",
@@ -3207,7 +3207,7 @@ const desktopHeaderTopStyle = {
 const desktopHeaderTitleStyle = {
   fontSize: "20px",
   fontWeight: "800",
-  color: "#ffffff",
+  color: "#f4f4f5",
   letterSpacing: "-0.3px"
 };
 
@@ -3265,7 +3265,7 @@ const desktopTabActivePillStyle = {
   height: "4px",
   width: "56px",
   borderRadius: "4px 4px 0 0",
-  backgroundColor: "#ffffff"
+  backgroundColor: "#f4f4f5"
 };
 
 const desktopSearchActiveBanner = {
@@ -3360,7 +3360,7 @@ const desktopCardHeaderStyle = {
 const desktopCardTitleStyle = {
   fontSize: "18px",
   fontWeight: "800",
-  color: "#ffffff",
+  color: "#f4f4f5",
   margin: 0,
   letterSpacing: "-0.3px"
 };
@@ -3382,7 +3382,7 @@ const desktopTrendSublabel = {
 const desktopTrendTitle = {
   fontSize: "15.5px",
   fontWeight: "800",
-  color: "#ffffff",
+  color: "#e4e4e7",
   marginBottom: "4px",
   letterSpacing: "-0.2px"
 };
@@ -3453,7 +3453,7 @@ const desktopHighlightInfo = {
 };
 
 const desktopHighlightCaption = {
-  color: "#ffffff",
+  color: "#e4e4e7",
   fontSize: "13.5px",
   fontWeight: "600",
   margin: "0 0 5px 0",
@@ -3605,7 +3605,7 @@ const avatarColumnStyle = { marginRight: "12px", flexShrink: 0 };
 const contentColumnStyle = { flex: 1, display: "flex", flexDirection: "column", minWidth: 0 };
 const postHeaderStyle = { display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" };
 const avatarStyle = { width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover", backgroundColor: "#222" };
-const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#fff" };
+const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#f4f4f5" };
 const timeStyle = { fontSize: "13px", color: "#71767b", textTransform: "capitalize", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 const captionStyle = { fontSize: "15px", lineHeight: "1.5", color: "#e7e9ea", margin: "0 0 12px 0", wordWrap: "break-word" };
 

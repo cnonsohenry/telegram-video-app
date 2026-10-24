@@ -619,7 +619,7 @@ export default function AppHeader({
       {!isDesktop && (
         <div style={mobileHeaderStyle}>
           {/* 🟢 THE FIX: Dynamic App Logo */}
-          <h1 style={{ color: "#fff", fontSize: "18px", fontWeight: "900", margin: 0 }}>
+          <h1 style={{ color: "#f4f4f5", fontSize: "18px", fontWeight: "900", margin: 0 }}>
             {APP_CONFIG.appNamePrefix}
             <span style={{ color: "var(--primary-color)" }}>{APP_CONFIG.appNameSuffix}</span>
           </h1>
@@ -641,9 +641,9 @@ export default function AppHeader({
 
 // 🎨 Styles (Remain exactly the same!)
 const desktopHeaderStyle = { position: "sticky", top: 0, zIndex: 100, height: "70px", background: "rgba(9, 9, 11, 0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between" };
-const logoStyle = { color: "#fff", fontSize: "24px", fontWeight: "900", letterSpacing: "-1px", margin: 0 };
+const logoStyle = { color: "#f4f4f5", fontSize: "24px", fontWeight: "900", letterSpacing: "-1px", margin: 0 };
 const searchBarStyle = { display: "flex", alignItems: "center", background: "#1c1c1e", borderRadius: "20px", padding: "0 15px", width: "400px", border: "1px solid #333", cursor: "text" };
-const inputStyle = { background: "none", border: "none", color: "#fff", padding: "10px", width: "100%", outline: "none", fontSize: "14px" };
+const inputStyle = { background: "none", border: "none", color: "#f4f4f5", padding: "10px", width: "100%", outline: "none", fontSize: "14px" };
 const profileBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: 0 };
 const avatarStyle = (isDesktop) => ({ width: isDesktop ? "36px" : "30px", height: isDesktop ? "36px" : "30px", borderRadius: "50%", border: "2px solid var(--primary-color)", objectFit: "cover" });
 const loginBadgeStyle = { background: "var(--primary-color)", color: "#fff", padding: "6px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "800" };
@@ -656,11 +656,11 @@ const activeSearchBarStyle = { display: "flex", alignItems: "center", background
 const searchActionBtnStyle = { background: "none", border: "none", color: "var(--primary-color)", fontWeight: "700", fontSize: "14px", cursor: "pointer" };
 const overlayContentStyle = { flex: 1, overflowY: "auto", padding: "20px" };
 const sectionStyle = { marginBottom: "20px" };
-const sectionTitleStyle = { display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "16px", fontWeight: "800", margin: "0 0 15px 0" };
+const sectionTitleStyle = { display: "flex", alignItems: "center", gap: "8px", color: "#f4f4f5", fontSize: "16px", fontWeight: "800", margin: "0 0 15px 0" };
 const keywordGridStyle = { display: "flex", flexWrap: "wrap", gap: "10px" };
 const keywordPillStyle = { display: "flex", alignItems: "center", gap: "6px", background: "#1c1c1e", color: "#ddd", border: "none", padding: "10px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: "600", cursor: "pointer", transition: "0.2s" };
 const recentSearchItemStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", cursor: "pointer", borderBottom: "1px solid #1c1c1e" };
-const showMoreButtonStyle = { display: "block", margin: "30px auto", background: "#1c1c1e", color: "#fff", padding: "12px 30px", borderRadius: "35px", border: "1px solid #333", fontWeight: "800", cursor: "pointer" };
+const showMoreButtonStyle = { display: "block", margin: "30px auto", background: "#1c1c1e", color: "#f4f4f5", padding: "12px 30px", borderRadius: "35px", border: "1px solid #333", fontWeight: "800", cursor: "pointer" };
 
 // Live Suggestion Styles (List view)
 const suggestedContentGrid = (isDesktop) => ({ display: isDesktop ? "grid" : "flex", flexDirection: isDesktop ? "row" : "column", gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(150px, 1fr))" : "none", gap: isDesktop ? "15px" : "0" });
@@ -668,8 +668,8 @@ const suggestedVideoItem = (isDesktop) => ({ display: "flex", flexDirection: isD
 const suggestedThumbWrapper = (isDesktop) => ({ width: isDesktop ? "100%" : "56px", height: isDesktop ? "auto" : "80px", aspectRatio: isDesktop ? "9/16" : "auto", background: "#111", borderRadius: isDesktop ? "8px" : "6px", position: "relative", overflow: "hidden", flexShrink: 0 });
 const suggestedVideoInfo = (isDesktop) => ({ display: "flex", flexDirection: "column", justifyContent: "center", flex: 1, minWidth: 0 });
 const suggestedThumb = { width: "100%", height: "100%", objectFit: "cover" };
-const viewsOverlay = { position: "absolute", bottom: "6px", left: "6px", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", padding: "4px 8px", borderRadius: "4px", color: "#fff", fontSize: "10px", fontWeight: "800", display: "flex", alignItems: "center", gap: "4px" };
-const suggestedCaption = { color: "#fff", fontSize: "14px", fontWeight: "600", margin: "0 0 6px 0", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.4" };
+const viewsOverlay = { position: "absolute", bottom: "6px", left: "6px", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", padding: "4px 8px", borderRadius: "4px", color: "#f4f4f5", fontSize: "10px", fontWeight: "800", display: "flex", alignItems: "center", gap: "4px" };
+const suggestedCaption = { color: "#e4e4e7", fontSize: "14px", fontWeight: "600", margin: "0 0 6px 0", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: "1.4" };
 const suggestedUploader = { color: "#8e8e8e", fontSize: "12px", fontWeight: "500" };
 
 // Submitted Grid Styles

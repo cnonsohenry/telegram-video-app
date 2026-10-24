@@ -1,20 +1,20 @@
 import React from "react";
 
 /**
- * Parses caption text and renders @creator mentions as clickable links
- * that navigate directly to the creator's profile.
+ * Parses caption text and renders @creator mentions and #hashtags as clickable links
+ * styled authentically like X / Twitter with smooth, precise typography.
  * 
- * Example: "Check out @alphaxdash2's new drop!" 
- * -> "@alphaxdash2" is rendered as a clickable link that opens the creator profile.
+ * - @creator -> navigates directly to the creator's profile.
+ * - #hashtag -> opens search for that specific hashtag topic.
  */
 export const renderClickableCaption = (text, onCreatorClick, customMentionStyle = {}) => {
   if (!text) return null;
   const str = String(text);
 
-  // Matches @username where username starts with alphanumeric/underscore,
-  // supports inner dots/hyphens, and is preceded by start-of-string or non-word character.
-  // Trailing punctuation like '.', ',', '!', '?', or possessive "'s" is excluded.
-  const regex = /(^|[^a-zA-Z0-9_])@([a-zA-Z0-9_]+(?:[.-][a-zA-Z0-9_]+)*)/g;
+  // Matches either:
+  // 1. @mention: (^|[^a-zA-Z0-9_])@([a-zA-Z0-9_]+(?:[.-][a-zA-Z0-9_]+)*)
+  // 2. #hashtag: (^|[^a-zA-Z0-9_])#([a-zA-Z0-9_\u00c0-\u024f]+)
+  const regex = /(^|[^a-zA-Z0-9_])(@[a-zA-Z0-9_]+(?:[.-][a-zA-Z0-9_]+)*|#[a-zA-Z0-9_\u00c0-\u024f]+)/g;
 
   const elements = [];
   let lastIndex = 0;
@@ -22,7 +22,7 @@ export const renderClickableCaption = (text, onCreatorClick, customMentionStyle 
 
   while ((match = regex.exec(str)) !== null) {
     const prefix = match[1];
-    const rawHandle = match[2];
+    const token = match[2];
     const matchIndex = match.index + prefix.length;
 
     // Push preceding text including the prefix
@@ -30,51 +30,89 @@ export const renderClickableCaption = (text, onCreatorClick, customMentionStyle 
       elements.push(str.slice(lastIndex, matchIndex));
     }
 
-    const cleanHandle = rawHandle.replace(/^@/, "").trim();
-
-    // Push clickable @handle
-    elements.push(
-      <span
-        key={`mention-${matchIndex}-${cleanHandle}`}
-        onClick={(e) => {
-          if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-          }
-          if (onCreatorClick && typeof onCreatorClick === "function") {
-            onCreatorClick(cleanHandle);
-          } else {
+    if (token.startsWith("@")) {
+      const cleanHandle = token.slice(1).trim();
+      elements.push(
+        <span
+          key={`mention-${matchIndex}-${cleanHandle}`}
+          onClick={(e) => {
+            if (e) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+            if (onCreatorClick && typeof onCreatorClick === "function") {
+              onCreatorClick(cleanHandle);
+            } else {
+              window.dispatchEvent(
+                new CustomEvent("openCreatorProfile", { detail: cleanHandle })
+              );
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          style={{
+            color: "#1d9bf0", // X signature sky blue
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "inline",
+            textDecoration: "none",
+            transition: "opacity 0.15s ease",
+            ...customMentionStyle
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = "0.85";
+            e.currentTarget.style.textDecoration = "underline";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = "1";
+            e.currentTarget.style.textDecoration = "none";
+          }}
+          title={`View @${cleanHandle}'s profile`}
+        >
+          @{cleanHandle}
+        </span>
+      );
+    } else if (token.startsWith("#")) {
+      const hashtag = token.slice(1).trim();
+      elements.push(
+        <span
+          key={`tag-${matchIndex}-${hashtag}`}
+          onClick={(e) => {
+            if (e) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
             window.dispatchEvent(
-              new CustomEvent("openCreatorProfile", { detail: cleanHandle })
+              new CustomEvent("openSearchModal", { detail: { query: `#${hashtag}` } })
             );
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        style={{
-          color: "#00aff0",
-          fontWeight: "700",
-          cursor: "pointer",
-          display: "inline",
-          textDecoration: "none",
-          transition: "opacity 0.15s ease, text-decoration 0.15s ease",
-          ...customMentionStyle
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.opacity = "0.8";
-          e.currentTarget.style.textDecoration = "underline";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = "1";
-          e.currentTarget.style.textDecoration = "none";
-        }}
-        title={`View @${cleanHandle}'s profile`}
-      >
-        @{cleanHandle}
-      </span>
-    );
+          }}
+          role="button"
+          tabIndex={0}
+          style={{
+            color: "#1d9bf0", // X signature sky blue
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "inline",
+            textDecoration: "none",
+            transition: "opacity 0.15s ease",
+            ...customMentionStyle
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = "0.85";
+            e.currentTarget.style.textDecoration = "underline";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = "1";
+            e.currentTarget.style.textDecoration = "none";
+          }}
+          title={`Search #${hashtag}`}
+        >
+          #{hashtag}
+        </span>
+      );
+    }
 
-    lastIndex = matchIndex + 1 + rawHandle.length;
+    lastIndex = matchIndex + token.length;
   }
 
   if (lastIndex < str.length) {

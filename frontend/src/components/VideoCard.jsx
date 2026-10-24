@@ -229,8 +229,8 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
             backdropFilter: "blur(6px)",
             border: "1px solid rgba(255,255,255,0.12)"
           }}>
-            <Play size={10} fill="#fff" strokeWidth={0} />
-            <span style={{ color: "#fff", fontSize: "11px", fontWeight: "700" }}>
+            <Play size={10} fill="#f4f4f5" strokeWidth={0} />
+            <span style={{ color: "#f4f4f5", fontSize: "11px", fontWeight: "700" }}>
               {Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}
             </span>
           </div>
@@ -297,7 +297,7 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
   );
 }
 
-const captionTextStyle = { margin: "0 0 6px 0", fontSize: "12px", color: "#e0e0e0", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "500" };
+const captionTextStyle = { margin: "0 0 6px 0", fontSize: "12px", color: "#e4e4e7", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "500" };
 const userInfoRowStyle = { display: "flex", alignItems: "center", gap: "8px" };
 const avatarWrapperStyle = { width: "14px", height: "14px", borderRadius: "50%", background: "#1a1a1a", overflow: "hidden", flexShrink: 0, border: "1px solid rgba(255,255,255,0.08)" };
 const uploaderNameStyle = { fontSize: "10px", color: "#8e8e93", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "140px" };

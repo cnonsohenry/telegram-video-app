@@ -569,7 +569,7 @@ export default function CreatorProfileModal({
                         style={{ cursor: "pointer" }}
                         title="View followers"
                       >
-                        <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
+                        <strong style={{ color: "#f4f4f5", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
                         <span>followers</span>
                       </span>
                       <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
@@ -578,12 +578,12 @@ export default function CreatorProfileModal({
                         style={{ cursor: "pointer" }}
                         title="View following"
                       >
-                        <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
+                        <strong style={{ color: "#f4f4f5", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
                         <span>following</span>
                       </span>
                       <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
                       <span>
-                        <strong style={{ color: "#ffffff", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                        <strong style={{ color: "#f4f4f5", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
                         <span>likes</span>
                       </span>
                     </div>
@@ -712,7 +712,7 @@ export default function CreatorProfileModal({
                       style={{ cursor: "pointer" }}
                       title="View followers"
                     >
-                      <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
+                      <strong style={{ color: "#f4f4f5", fontSize: "16px", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
                       <span>followers</span>
                     </span>
                     <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
@@ -721,12 +721,12 @@ export default function CreatorProfileModal({
                       style={{ cursor: "pointer" }}
                       title="View following"
                     >
-                      <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
+                      <strong style={{ color: "#f4f4f5", fontSize: "16px", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
                       <span>following</span>
                     </span>
                     <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
                     <span>
-                      <strong style={{ color: "#ffffff", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
+                      <strong style={{ color: "#f4f4f5", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
                       <span>likes</span>
                     </span>
                   </div>
@@ -1135,7 +1135,7 @@ const topNavStyle = {
 };
 
 const navBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center" };
-const topNavNameStyle = { fontWeight: "700", fontSize: "16px", color: "#fff" };
+const topNavNameStyle = { fontWeight: "700", fontSize: "16px", color: "#f4f4f5" };
 const scrollContentStyle = { flex: 1, overflowY: "auto", paddingBottom: "60px" };
 
 const profileInnerContainer = {

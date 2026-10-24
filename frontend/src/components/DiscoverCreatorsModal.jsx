@@ -368,7 +368,7 @@ export default function DiscoverCreatorsModal({
             ) : filteredCreators.length === 0 ? (
               <div style={emptyStateStyle}>
                 <Users size={44} color="#555555" style={{ marginBottom: "12px" }} />
-                <div style={{ fontSize: "16px", fontWeight: "600", color: "#ffffff", marginBottom: "6px" }}>
+                <div style={{ fontSize: "16px", fontWeight: "600", color: "#f4f4f5", marginBottom: "6px" }}>
                   No creators found
                 </div>
                 <div style={{ fontSize: "13px", color: "#8e8e93", maxWidth: "260px", textAlign: "center" }}>
@@ -612,7 +612,7 @@ const headerStyle = {
 const titleStyle = {
   fontSize: "16.5px",
   fontWeight: "700",
-  color: "#ffffff",
+  color: "#f4f4f5",
   margin: 0,
   letterSpacing: "0.2px"
 };
@@ -620,7 +620,7 @@ const titleStyle = {
 const iconBtnStyle = {
   background: "transparent",
   border: "none",
-  color: "#ffffff",
+  color: "#f4f4f5",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
@@ -658,7 +658,7 @@ const searchInputStyle = {
   background: "transparent",
   border: "none",
   outline: "none",
-  color: "#ffffff",
+  color: "#f4f4f5",
   fontSize: "14px",
   lineHeight: "1.4"
 };
@@ -793,7 +793,7 @@ const displayNameStyle = {
   fontSize: "16px",
   fontWeight: "800",
   letterSpacing: "-0.2px",
-  color: "#ffffff",
+  color: "#f4f4f5",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -891,7 +891,7 @@ const viewBadgeStyle = {
   left: "5px",
   display: "flex",
   alignItems: "center",
-  color: "#ffffff",
+  color: "#f4f4f5",
   fontSize: "10px",
   fontWeight: "600",
   textShadow: "0 1px 3px rgba(0, 0, 0, 0.85)",
