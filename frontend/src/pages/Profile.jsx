@@ -712,7 +712,7 @@ export default function Profile({
             <div style={{ width: "36px" }}>
               {activeGroup && (
                 <button onClick={handleCloseGroup} style={headerIconButton}>
-                  <ArrowLeft size={22} color="#fff" />
+                  <ArrowLeft size={22} color="#d4d4d8" />
                 </button>
               )}
             </div>
@@ -725,7 +725,7 @@ export default function Profile({
             </div>
             <div style={{ display: "flex", gap: "14px", justifyContent: "flex-end", flex: 1, alignItems: "center" }}>
               <button onClick={handleOpenSettings} style={headerIconButton} title="Settings">
-                <Settings size={21} color="#fff" />
+                <Settings size={21} color="#d4d4d8" />
               </button>
             </div>
           </div>
@@ -820,7 +820,7 @@ export default function Profile({
                     style={mobileAvatarEditBadge}
                     title="Change Profile Photo"
                   >
-                    <Camera size={13} color="#fff" />
+                    <Camera size={13} color="#d4d4d8" />
                   </button>
                 </div>
 
@@ -1036,7 +1036,7 @@ export default function Profile({
                     </button>
                   )}
                   <button onClick={handleOpenSettings} style={desktopIconBtnStyle} title="Settings">
-                    <Settings size={18} color="#fff" />
+                    <Settings size={18} color="#d4d4d8" />
                   </button>
                 </div>
 
@@ -1079,7 +1079,7 @@ export default function Profile({
                   style={desktopAvatarEditBadge}
                   title="Change Profile Photo"
                 >
-                  <Camera size={15} color="#fff" />
+                  <Camera size={15} color="#d4d4d8" />
                 </button>
               </div>
 
@@ -1212,7 +1212,7 @@ export default function Profile({
                   <div style={{ width: "60px", height: "60px", borderRadius: "50%", border: "2px solid #333", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px auto" }}>
                     <Sparkles size={28} color="#FFD700" />
                   </div>
-                  <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#fff", margin: "0 0 6px 0" }}>
+                  <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#d4d4d8", margin: "0 0 6px 0" }}>
                     No Active VIP Passes
                   </h3>
                   <p style={{ fontSize: "13px", color: "#8e8e93", maxWidth: "320px", margin: "0 auto 20px auto", lineHeight: "1.4" }}>
@@ -1251,7 +1251,7 @@ export default function Profile({
                         </div>
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span style={{ fontSize: "14px", fontWeight: "700", color: "#fff" }}>
+                            <span style={{ fontSize: "14px", fontWeight: "700", color: "#d4d4d8" }}>
                               {sub.creator_display_name || sub.creator_username || "Creator"}
                             </span>
                             <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
@@ -1359,7 +1359,7 @@ export default function Profile({
                       <Grid3X3 size={28} color="#555" />
                     )}
                   </div>
-                  <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#fff", margin: "0 0 6px 0" }}>
+                  <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#d4d4d8", margin: "0 0 6px 0" }}>
                     {activeTab === "likes" 
                       ? "No Liked Videos Yet" 
                       : activeTab === "saved"
@@ -1713,7 +1713,7 @@ const statColStyle = {
 const statNumberStyle = {
   fontSize: "17px",
   fontWeight: "700",
-  color: "#ffffff"
+  color: "#d4d4d8"
 };
 
 const statLabelStyle = {
@@ -1805,7 +1805,7 @@ const mobileActionButton = {
   flex: 1,
   height: "36px",
   backgroundColor: "#262626",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "1px solid #363636",
   borderRadius: "20px",
   fontSize: "13px",
@@ -1822,7 +1822,7 @@ const desktopActionButton = {
   height: "36px",
   padding: "0 20px",
   backgroundColor: "#262626",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "1px solid #363636",
   borderRadius: "20px",
   fontSize: "13px",

@@ -237,7 +237,7 @@ export default function PaywallModal({ onClose, user }) {
           style={navBackBtnStyle}
           aria-label="Back"
         >
-          <ArrowLeft size={24} color="#fff" />
+          <ArrowLeft size={24} color="#d4d4d8" />
         </button>
 
         <span style={topNavTitleStyle}>
@@ -292,7 +292,7 @@ export default function PaywallModal({ onClose, user }) {
                     onClick={() => setSelectedPackage(pkg)}
                     style={packageCardStyle}
                   >
-                    <span style={{ fontWeight: "700", color: "#fff" }}>{pkg.label}</span>
+                    <span style={{ fontWeight: "700", color: "#d4d4d8" }}>{pkg.label}</span>
                     <span style={{ fontWeight: "900", color: "var(--primary-color)" }}>
                       {selectedMethod === 'crypto' ? pkg.textUsd : pkg.priceText}
                     </span>
@@ -304,7 +304,7 @@ export default function PaywallModal({ onClose, user }) {
 
           {selectedMethod === 'transfer' && selectedPackage && !verifying && !verifyStatus && (
             <div style={transferDetailsBox}>
-              <p style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#8e8e93" }}>Please transfer exactly <strong style={{color:"#fff"}}>{selectedPackage.priceText}</strong> to:</p>
+              <p style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#8e8e93" }}>Please transfer exactly <strong style={{color:"#d4d4d8"}}>{selectedPackage.priceText}</strong> to:</p>
               <div style={infoBoxStyle}>
                 {/* 🟢 THE FIX: Dynamic Bank Details from Config */}
                 <div><strong>Bank:</strong> {APP_CONFIG.bankDetails.bankName}</div>
@@ -332,7 +332,7 @@ export default function PaywallModal({ onClose, user }) {
           {/* STATE 3B: CRYPTO FLOW WITH GRID */}
           {selectedMethod === 'crypto' && selectedPackage && !cryptoPaymentDetails && !generatingCrypto && (
             <div style={transferDetailsBox}>
-               <h3 style={{color: "#fff", textAlign: "center", marginBottom: "15px", marginTop: "0", fontSize: "18px"}}>Select Cryptocurrency</h3>
+               <h3 style={{color: "#d4d4d8", textAlign: "center", marginBottom: "15px", marginTop: "0", fontSize: "18px"}}>Select Cryptocurrency</h3>
                
                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                  {/* 🟢 Sleek dark buttons blending with modal aesthetics */}
@@ -356,7 +356,7 @@ export default function PaywallModal({ onClose, user }) {
           {generatingCrypto && (
              <div style={{ textAlign: "center", padding: "40px 10px", margin: "auto" }}>
                 <Loader2 size={40} color="#f7931a" style={{ animation: "spin 1s linear infinite", margin: "0 auto 15px auto" }} />
-                <h3 style={{color: "#fff"}}>Generating Secure Wallet...</h3>
+                <h3 style={{color: "#d4d4d8"}}>Generating Secure Wallet...</h3>
                 <p style={{color: "#8e8e93", fontSize: "14px"}}>Calculating real-time exchange rate.</p>
              </div>
           )}
@@ -370,7 +370,7 @@ export default function PaywallModal({ onClose, user }) {
                   <div style={{ fontSize: "11px", fontWeight: "700", color: "#a1a1aa", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                     Selected Plan
                   </div>
-                  <div style={{ fontSize: "16px", fontWeight: "900", color: "#fff" }}>
+                  <div style={{ fontSize: "16px", fontWeight: "900", color: "#d4d4d8" }}>
                     {selectedPackage?.label || "VIP Access Pass"}
                   </div>
                 </div>
@@ -462,7 +462,7 @@ export default function PaywallModal({ onClose, user }) {
                   rel="noopener noreferrer" 
                   style={openWalletBtnStyle}
                 >
-                  <ExternalLink size={16} color="#fff" />
+                  <ExternalLink size={16} color="#d4d4d8" />
                   <span>Open in Crypto Wallet App</span>
                 </a>
               )}
@@ -514,7 +514,7 @@ export default function PaywallModal({ onClose, user }) {
               <Loader2 size={48} color="var(--primary-color)" style={{ animation: "spin 1s linear infinite", margin: "0 auto 20px auto" }} />
               <h2 style={titleStyle}>Verifying Payment...</h2>
               <p style={subStyle}>Our AI is scanning the bank network. This usually takes 1 to 3 minutes.</p>
-              <div style={{ fontSize: "24px", fontWeight: "900", color: "#fff", marginTop: "20px", fontFamily: "monospace" }}>
+              <div style={{ fontSize: "24px", fontWeight: "900", color: "#d4d4d8", marginTop: "20px", fontFamily: "monospace" }}>
                 {formatTime(timer)}
               </div>
               <p style={{ fontSize: "12px", color: "#ff3b30", marginTop: "15px" }}>Please do not close this window.</p>
@@ -533,7 +533,7 @@ export default function PaywallModal({ onClose, user }) {
             <div style={{ textAlign: "center", padding: "20px 10px", margin: "auto" }}>
               <h2 style={titleStyle}>Network Delay</h2>
               <p style={subStyle}>The bank network is a bit slow right now. If you have been debited, your transaction is safely logged.</p>
-              <p style={{ fontSize: "13px", color: "#fff", marginTop: "15px", marginBottom: "20px", background: "rgba(255,255,255,0.05)", padding: "10px", borderRadius: "8px" }}>
+              <p style={{ fontSize: "13px", color: "#d4d4d8", marginTop: "15px", marginBottom: "20px", background: "rgba(255,255,255,0.05)", padding: "10px", borderRadius: "8px" }}>
                 Send your receipt to our Admin on Telegram to instantly unlock your account.
               </p>
               {/* 🟢 THE FIX: Dynamic Support Link */}
@@ -609,7 +609,7 @@ const topNavStyle = {
 const navBackBtnStyle = {
   background: "none",
   border: "none",
-  color: "#fff",
+  color: "#d4d4d8",
   cursor: "pointer",
   padding: "6px",
   display: "flex",
@@ -619,7 +619,7 @@ const navBackBtnStyle = {
 const topNavTitleStyle = {
   fontSize: "16px",
   fontWeight: "700",
-  color: "#fff",
+  color: "#d4d4d8",
   letterSpacing: "0.2px"
 };
 
@@ -647,16 +647,16 @@ const footerStyle = { display: "flex", justifyContent: "space-between", alignIte
 
 const headerStyle = { textAlign: "center", marginBottom: "25px" };
 const iconWrapperStyle = { width: "64px", height: "64px", borderRadius: "50%", background: "rgba(255, 59, 48, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 15px auto" };
-const titleStyle = { fontSize: "24px", fontWeight: "900", color: "#fff", margin: "0 0 10px 0" };
+const titleStyle = { fontSize: "24px", fontWeight: "900", color: "#d4d4d8", margin: "0 0 10px 0" };
 const subStyle = { fontSize: "14px", color: "#8e8e93", lineHeight: "1.5", margin: 0 };
 const benefitsListStyle = { marginBottom: "25px", padding: "0 10px" };
 const actionColumnStyle = { display: "flex", flexDirection: "column", gap: "12px", marginTop: "auto" };
-const payButtonStyle = { display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", width: "100%", padding: "16px", borderRadius: "14px", color: "#fff", border: "none", fontSize: "16px", fontWeight: "800", cursor: "pointer", transition: "transform 0.2s" };
+const payButtonStyle = { display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", width: "100%", padding: "16px", borderRadius: "14px", color: "#d4d4d8", border: "none", fontSize: "16px", fontWeight: "800", cursor: "pointer", transition: "transform 0.2s" };
 
 const packageCardStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)", cursor: "pointer", transition: "all 0.2s" };
 const transferDetailsBox = { background: "#18181b", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "16px", boxSizing: "border-box", animation: "fadeInUp 0.3s ease-out" };
 const infoBoxStyle = { background: "rgba(0,0,0,0.3)", padding: "15px", borderRadius: "10px", fontSize: "14px", color: "#ccc", display: "flex", flexDirection: "column", gap: "8px", fontFamily: "monospace" };
-const inputStyle = { width: "100%", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.5)", color: "#fff", fontSize: "16px", outline: "none", boxSizing: "border-box" };
+const inputStyle = { width: "100%", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.5)", color: "#d4d4d8", fontSize: "16px", outline: "none", boxSizing: "border-box" };
 
 const copyBtnStyle = {
   background: "rgba(255, 255, 255, 0.08)",
@@ -782,13 +782,13 @@ const transferLabelStyle = {
 const transferAmountStyle = {
   fontSize: "20px",
   fontWeight: "900",
-  color: "#fff",
+  color: "#d4d4d8",
   marginTop: "2px"
 };
 
 const walletAddressStyle = {
   fontSize: "12px",
-  color: "#fff",
+  color: "#d4d4d8",
   fontFamily: "monospace",
   wordBreak: "break-all",
   marginTop: "4px",

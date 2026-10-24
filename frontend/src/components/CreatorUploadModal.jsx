@@ -435,7 +435,7 @@ export default function CreatorUploadModal({
             style={closeIconButtonStyle}
             aria-label="Close"
           >
-            <X size={20} color="#ffffff" />
+            <X size={20} color="#d4d4d8" />
           </button>
 
           <div style={headerCenterTitleStyle}>
@@ -453,7 +453,7 @@ export default function CreatorUploadModal({
             disabled={!canPost}
             style={{
               ...postPillButtonStyle,
-              backgroundColor: canPost ? "#ffffff" : "rgba(255, 255, 255, 0.2)",
+              backgroundColor: canPost ? "#c4c4c8" : "rgba(255, 255, 255, 0.2)",
               color: canPost ? "#000000" : "rgba(255, 255, 255, 0.4)",
               cursor: canPost ? "pointer" : "not-allowed"
             }}
@@ -476,7 +476,7 @@ export default function CreatorUploadModal({
               style={{
                 ...progressBarFillStyle,
                 width: `${uploadProgress}%`,
-                backgroundColor: isVip ? "#FFD700" : "#ffffff"
+                backgroundColor: isVip ? "#FFD700" : "#d4d4d8"
               }} 
             />
           </div>
@@ -501,9 +501,9 @@ export default function CreatorUploadModal({
         {uploadStatus === "success" ? (
           <div style={successWrapperStyle}>
             <div style={successIconCircleStyle}>
-              <CheckCircle2 size={44} color="#ffffff" />
+              <CheckCircle2 size={44} color="#d4d4d8" />
             </div>
-            <h3 style={{ color: "#ffffff", fontSize: "19px", fontWeight: "800", margin: "16px 0 6px 0" }}>
+            <h3 style={{ color: "#d4d4d8", fontSize: "19px", fontWeight: "800", margin: "16px 0 6px 0" }}>
               Your post was sent!
             </h3>
             <p style={{ color: "#71767b", fontSize: "13.5px", margin: 0, textAlign: "center" }}>
@@ -539,7 +539,7 @@ export default function CreatorUploadModal({
                     style={{
                       ...audiencePillStyle,
                       borderColor: isVip ? "rgba(255, 215, 0, 0.4)" : "#333336",
-                      color: isVip ? "#FFD700" : "#ffffff"
+                      color: isVip ? "#FFD700" : "#d4d4d8"
                     }}
                   >
                     {isVip ? (
@@ -549,7 +549,7 @@ export default function CreatorUploadModal({
                       </>
                     ) : (
                       <>
-                        <Globe size={12} color="#ffffff" />
+                        <Globe size={12} color="#d4d4d8" />
                         <span>Everyone</span>
                       </>
                     )}
@@ -573,17 +573,17 @@ export default function CreatorUploadModal({
                         }}
                       >
                         <div style={dropdownOptionIconStyle}>
-                          <Globe size={18} color="#ffffff" />
+                          <Globe size={18} color="#d4d4d8" />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff" }}>
+                          <div style={{ fontSize: "14px", fontWeight: "700", color: "#d4d4d8" }}>
                             Everyone
                           </div>
                           <div style={{ fontSize: "12px", color: "#71767b", marginTop: "2px" }}>
                             Community feed • Free for all viewers
                           </div>
                         </div>
-                        {!isVip && <Check size={16} color="#ffffff" />}
+                        {!isVip && <Check size={16} color="#d4d4d8" />}
                       </div>
 
                       {/* VIP Subscribers Option */}
@@ -610,7 +610,7 @@ export default function CreatorUploadModal({
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff" }}>
+                            <span style={{ fontSize: "14px", fontWeight: "700", color: "#d4d4d8" }}>
                               VIP Subscribers
                             </span>
                             <span style={monetizedBadgeStyle}>VIP</span>
@@ -691,7 +691,7 @@ export default function CreatorUploadModal({
                   <div 
                     style={{
                       ...videoDropzoneStyle,
-                      borderColor: isDragOver ? "#ffffff" : "#222224",
+                      borderColor: isDragOver ? "#d4d4d8" : "#222224",
                       backgroundColor: isDragOver ? "rgba(255, 255, 255, 0.04)" : "#0c0c0e"
                     }}
                     onDrop={handleDrop}
@@ -713,10 +713,10 @@ export default function CreatorUploadModal({
                       }}
                     />
                     <div style={mediaUploadIconCircleStyle}>
-                      <Video size={24} color="#ffffff" />
+                      <Video size={24} color="#d4d4d8" />
                     </div>
                     <div style={{ textAlign: "center", marginTop: "10px" }}>
-                      <span style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff" }}>
+                      <span style={{ fontSize: "14px", fontWeight: "700", color: "#d4d4d8" }}>
                         Add video
                       </span>
                       <p style={{ fontSize: "12px", color: "#71767b", margin: "4px 0 0 0" }}>
@@ -744,7 +744,7 @@ export default function CreatorUploadModal({
                           title="Remove video"
                           aria-label="Remove video"
                         >
-                          <X size={16} color="#ffffff" />
+                          <X size={16} color="#d4d4d8" />
                         </button>
                       )}
                     </div>
@@ -776,7 +776,7 @@ export default function CreatorUploadModal({
                         title="Add Video"
                         aria-label="Add Video"
                       >
-                        <Video size={19} color="#ffffff" />
+                        <Video size={19} color="#d4d4d8" />
                       </button>
                     )}
                   </div>
@@ -846,7 +846,7 @@ const headerBarStyle = {
 const closeIconButtonStyle = {
   background: "none",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   cursor: "pointer",
   padding: "8px",
   borderRadius: "50%",
@@ -1029,7 +1029,7 @@ const seamlessTextareaStyle = {
   backgroundColor: "transparent",
   border: "none",
   outline: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "18px",
   lineHeight: "1.4",
   resize: "none",
@@ -1062,7 +1062,7 @@ const priceInputStyle = {
   width: "60px",
   background: "none",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "14px",
   fontWeight: "700",
   outline: "none"
@@ -1137,7 +1137,7 @@ const floatingRemoveBtnStyle = {
   backgroundColor: "rgba(0, 0, 0, 0.75)",
   backdropFilter: "blur(8px)",
   border: "1px solid rgba(255, 255, 255, 0.2)",
-  color: "#ffffff",
+  color: "#d4d4d8",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -1176,7 +1176,7 @@ const bottomToolbarStyle = {
 const toolbarIconBtnStyle = {
   background: "none",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   cursor: "pointer",
   padding: "6px",
   borderRadius: "50%",

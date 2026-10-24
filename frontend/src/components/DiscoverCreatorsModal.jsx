@@ -293,7 +293,7 @@ export default function DiscoverCreatorsModal({
               title="Back"
               aria-label="Back"
             >
-              <ArrowLeft size={22} color="#ffffff" />
+              <ArrowLeft size={22} color="#d4d4d8" />
             </button>
             <div style={{ display: "flex", alignItems: "center" }}>
               <h2 style={titleStyle}>Discover Creators</h2>
@@ -489,7 +489,7 @@ export default function DiscoverCreatorsModal({
 
                                 {/* View count at bottom-left */}
                                 <div style={viewBadgeStyle}>
-                                  <Play size={9} fill="#ffffff" color="#ffffff" style={{ marginRight: "3px" }} />
+                                  <Play size={9} fill="#d4d4d8" color="#d4d4d8" style={{ marginRight: "3px" }} />
                                   <span>{formatViews(video.views)}</span>
                                 </div>
 

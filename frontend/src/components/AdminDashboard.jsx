@@ -548,7 +548,7 @@ export default function AdminDashboard({ user, onLogout }) {
                 style={{
                   ...pageBtnStyle,
                   background: currentPage === p ? "#f43f5e" : "#27272a",
-                  color: currentPage === p ? "#fff" : "#a1a1aa",
+                  color: currentPage === p ? "#d4d4d8" : "#a1a1aa",
                   fontWeight: currentPage === p ? "700" : "500",
                   padding: "4px 10px",
                   minWidth: "28px"
@@ -1248,7 +1248,7 @@ export default function AdminDashboard({ user, onLogout }) {
                               style={{
                                 border: "none",
                                 background: chartMetric === m.id ? m.color : "transparent",
-                                color: chartMetric === m.id ? (m.id === "revenue" ? "#09090b" : "#fff") : "#a1a1aa",
+                                color: chartMetric === m.id ? (m.id === "revenue" ? "#09090b" : "#d4d4d8") : "#a1a1aa",
                                 padding: "5px 12px",
                                 borderRadius: "6px",
                                 fontSize: "12px",
@@ -1880,7 +1880,7 @@ export default function AdminDashboard({ user, onLogout }) {
                                           onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                                         />
                                         <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                          <Play size={16} color="#fff" fill="#fff" />
+                                          <Play size={16} color="#d4d4d8" fill="#d4d4d8" />
                                         </div>
                                       </div>
                                     </td>
@@ -3247,7 +3247,7 @@ export default function AdminDashboard({ user, onLogout }) {
               <button onClick={() => setDeleteWarning(null)} style={{ flex: 1, padding: "10px", background: "#27272a", border: "none", color: "#f4f4f5", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
                 Cancel
               </button>
-              <button onClick={handleDelete} style={{ flex: 1, padding: "10px", background: "#f43f5e", border: "none", color: "#fff", borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "13px" }}>
+              <button onClick={handleDelete} style={{ flex: 1, padding: "10px", background: "#f43f5e", border: "none", color: "#d4d4d8", borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "13px" }}>
                 Delete
               </button>
             </div>
@@ -3545,7 +3545,7 @@ const SidebarBtn = ({ active, onClick, icon, label, count, badge }) => (
       {icon} <span>{label}</span>
     </div>
     {badge ? (
-      <span style={{ background: "#f43f5e", color: "#fff", fontSize: "10px", fontWeight: "800", padding: "1px 6px", borderRadius: "10px" }}>
+      <span style={{ background: "#f43f5e", color: "#d4d4d8", fontSize: "10px", fontWeight: "800", padding: "1px 6px", borderRadius: "10px" }}>
         {badge}
       </span>
     ) : count !== undefined ? (
@@ -3621,7 +3621,7 @@ const searchBarStyle = { display: "flex", alignItems: "center", gap: "8px", back
 const searchInputStyle = { background: "transparent", border: "none", color: "#f4f4f5", outline: "none", width: "100%", fontSize: "13px" };
 const logoutBtnStyle = { display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", background: "#18181b", color: "#a1a1aa", border: "1px solid rgba(255,255,255,0.06)", padding: "10px", borderRadius: "8px", fontWeight: "600", fontSize: "13px", cursor: "pointer", width: "100%" };
 const refreshBtnStyle = { display: "flex", alignItems: "center", gap: "6px", background: "#18181b", border: "1px solid rgba(255,255,255,0.08)", color: "#f4f4f5", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "600" };
-const uploadBtnStyle = { display: "flex", alignItems: "center", gap: "6px", background: "#f43f5e", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "700" };
+const uploadBtnStyle = { display: "flex", alignItems: "center", gap: "6px", background: "#f43f5e", color: "#d4d4d8", border: "none", padding: "8px 14px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "700" };
 const centerFlex = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "300px" };
 const errorScreenStyle = { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100dvh", width: "100vw", background: "#09090b", color: "#f43f5e", position: "absolute", zIndex: 999999, top: 0, left: 0 };
 const goBackBtnStyle = { background: "#f4f4f5", color: "#09090b", padding: "10px 24px", borderRadius: "8px", border: "none", fontWeight: "700", cursor: "pointer", fontSize: "14px" };
@@ -3631,7 +3631,7 @@ const modalHeaderStyle = { display: "flex", justifyContent: "space-between", ali
 const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "5px", marginBottom: "14px" };
 const labelStyle = { fontSize: "11px", color: "#a1a1aa", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" };
 const formInputStyle = { background: "#27272a", border: "1px solid rgba(255,255,255,0.08)", padding: "10px", borderRadius: "8px", color: "#f4f4f5", fontSize: "13px", outline: "none" };
-const saveBtnStyle = { width: "100%", background: "#f43f5e", color: "#fff", border: "none", padding: "11px", borderRadius: "8px", fontWeight: "700", fontSize: "14px", cursor: "pointer", marginTop: "8px" };
+const saveBtnStyle = { width: "100%", background: "#f43f5e", color: "#d4d4d8", border: "none", padding: "11px", borderRadius: "8px", fontWeight: "700", fontSize: "14px", cursor: "pointer", marginTop: "8px" };
 const paginationStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 18px", background: "#18181b", borderTop: "1px solid rgba(255,255,255,0.06)" };
 const pageBtnStyle = { background: "#27272a", border: "none", color: "#f4f4f5", padding: "5px 14px", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" };
 const pageBtnDisabledStyle = { ...pageBtnStyle, opacity: 0.3, cursor: "not-allowed" };

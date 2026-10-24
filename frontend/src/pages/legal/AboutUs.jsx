@@ -3,8 +3,8 @@ import React from "react";
 import { APP_CONFIG } from "../../config";
 
 export default function AboutUs() {
-  const headerStyle = { color: "#fff", marginTop: "40px", marginBottom: "15px", fontSize: "24px", borderBottom: "1px solid #333", paddingBottom: "10px" };
-  const subHeaderStyle = { color: "#fff", marginTop: "25px", marginBottom: "10px", fontSize: "19px", fontWeight: "600" };
+  const headerStyle = { color: "#d4d4d8", marginTop: "40px", marginBottom: "15px", fontSize: "24px", borderBottom: "1px solid #333", paddingBottom: "10px" };
+  const subHeaderStyle = { color: "#d4d4d8", marginTop: "25px", marginBottom: "10px", fontSize: "19px", fontWeight: "600" };
   const textBlockStyle = { marginBottom: "15px" };
   const highlightBox = { background: "#1a1a1a", padding: "20px", borderRadius: "8px", border: "1px solid #333", margin: "20px 0" };
 
@@ -63,11 +63,11 @@ export default function AboutUs() {
       <section>
         <h2 style={headerStyle}>Our Values</h2>
         <ul style={{ paddingLeft: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
-          <li><strong style={{ color: "#fff" }}>Passion:</strong> You should be able to make a living doing what you love.</li>
-          <li><strong style={{ color: "#fff" }}>Sustainability:</strong> We build platforms for lasting careers, rewarding hard work and dedication.</li>
-          <li><strong style={{ color: "#fff" }}>Transparency:</strong> Trust is essential. We are open and honest with our creators and fans.</li>
-          <li><strong style={{ color: "#fff" }}>Innovation:</strong> We are constantly pushing boundaries to create new ways to connect and earn.</li>
-          <li><strong style={{ color: "#fff" }}>Creativity:</strong> We celebrate the power of imagination and reward creative expression.</li>
+          <li><strong style={{ color: "#d4d4d8" }}>Passion:</strong> You should be able to make a living doing what you love.</li>
+          <li><strong style={{ color: "#d4d4d8" }}>Sustainability:</strong> We build platforms for lasting careers, rewarding hard work and dedication.</li>
+          <li><strong style={{ color: "#d4d4d8" }}>Transparency:</strong> Trust is essential. We are open and honest with our creators and fans.</li>
+          <li><strong style={{ color: "#d4d4d8" }}>Innovation:</strong> We are constantly pushing boundaries to create new ways to connect and earn.</li>
+          <li><strong style={{ color: "#d4d4d8" }}>Creativity:</strong> We celebrate the power of imagination and reward creative expression.</li>
         </ul>
       </section>
 
@@ -78,19 +78,19 @@ export default function AboutUs() {
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
           <div>
-            <strong style={{ color: "#fff" }}>Tailored Monetization:</strong> 
+            <strong style={{ color: "#d4d4d8" }}>Tailored Monetization:</strong> 
             <span style={{ marginLeft: "5px" }}>Revenue options including subscriptions, tips, merchandise, and brand partnerships.</span>
           </div>
           <div>
-            <strong style={{ color: "#fff" }}>Global Reach:</strong> 
+            <strong style={{ color: "#d4d4d8" }}>Global Reach:</strong> 
             <span style={{ marginLeft: "5px" }}>Access to a diverse international audience with dedicated promotion of African talent.</span>
           </div>
           <div>
-            <strong style={{ color: "#fff" }}>Supportive Community:</strong> 
+            <strong style={{ color: "#d4d4d8" }}>Supportive Community:</strong> 
             <span style={{ marginLeft: "5px" }}>A network providing resources and mentorship specifically tailored to African needs.</span>
           </div>
           <div>
-            <strong style={{ color: "#fff" }}>Safety & Sensitivity:</strong> 
+            <strong style={{ color: "#d4d4d8" }}>Safety & Sensitivity:</strong> 
             <span style={{ marginLeft: "5px" }}>A safe, inclusive environment sensitive to diverse cultural contexts.</span>
           </div>
         </div>

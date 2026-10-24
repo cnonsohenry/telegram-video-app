@@ -480,7 +480,7 @@ export default function CreatorProfileModal({
       {/* Top Navbar */}
       <div style={topNavStyle}>
         <button onClick={onClose} style={navBtnStyle} title="Back">
-          <ArrowLeft size={22} color="#fff" />
+          <ArrowLeft size={22} color="#d4d4d8" />
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span style={topNavNameStyle}>{creatorData?.username || creatorUsername}</span>
@@ -497,7 +497,7 @@ export default function CreatorProfileModal({
             </button>
           )}
           <button onClick={handleShare} style={navBtnStyle} title="Share Profile">
-            <Share2 size={20} color="#fff" />
+            <Share2 size={20} color="#d4d4d8" />
           </button>
         </div>
       </div>
@@ -509,7 +509,7 @@ export default function CreatorProfileModal({
         </div>
       ) : error ? (
         <div style={errorCenterStyle}>
-          <span style={{ fontSize: "16px", color: "#fff", fontWeight: "700" }}>Profile Not Found</span>
+          <span style={{ fontSize: "16px", color: "#d4d4d8", fontWeight: "700" }}>Profile Not Found</span>
           <p style={{ color: "#8e8e93", fontSize: "13px", marginTop: "4px" }}>The requested account could not be found.</p>
           <button onClick={onClose} style={errorBackBtnStyle}>Back to Feed</button>
         </div>
@@ -824,7 +824,7 @@ export default function CreatorProfileModal({
                   borderTop: (isDesktop && activeTab === "posts") ? "1px solid #ffffff" : "none",
                   borderBottom: (!isDesktop && activeTab === "posts") ? "2px solid #ffffff" : "none",
                   opacity: activeTab === "posts" ? 1 : 0.4, 
-                  color: activeTab === "posts" ? "#ffffff" : "#a8a8a8" 
+                  color: activeTab === "posts" ? "#d4d4d8" : "#a8a8a8" 
                 }}
               >
                 <Grid3X3 size={isDesktop ? 16 : 22} />
@@ -837,7 +837,7 @@ export default function CreatorProfileModal({
                   borderTop: (isDesktop && activeTab === "reels") ? "1px solid #ffffff" : "none",
                   borderBottom: (!isDesktop && activeTab === "reels") ? "2px solid #ffffff" : "none",
                   opacity: activeTab === "reels" ? 1 : 0.4, 
-                  color: activeTab === "reels" ? "#ffffff" : "#a8a8a8" 
+                  color: activeTab === "reels" ? "#d4d4d8" : "#a8a8a8" 
                 }}
               >
                 <Film size={isDesktop ? 16 : 22} />
@@ -851,7 +851,7 @@ export default function CreatorProfileModal({
                     borderTop: (isDesktop && activeTab === "premium") ? "1px solid #ffffff" : "none",
                     borderBottom: (!isDesktop && activeTab === "premium") ? "2px solid #ffffff" : "none",
                     opacity: activeTab === "premium" ? 1 : 0.4, 
-                    color: activeTab === "premium" ? "#ffffff" : "#a8a8a8" 
+                    color: activeTab === "premium" ? "#d4d4d8" : "#a8a8a8" 
                   }}
                 >
                   <Lock size={isDesktop ? 16 : 22} />
@@ -867,7 +867,7 @@ export default function CreatorProfileModal({
                   <div style={{ width: "56px", height: "56px", borderRadius: "50%", backgroundColor: "rgba(255, 215, 0, 0.12)", border: "1px solid rgba(255, 215, 0, 0.3)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px" }}>
                     <Lock size={26} color="#FFD700" />
                   </div>
-                  <h3 style={{ margin: "0 0 6px 0", fontSize: "18px", fontWeight: "800", color: "#fff" }}>
+                  <h3 style={{ margin: "0 0 6px 0", fontSize: "18px", fontWeight: "800", color: "#d4d4d8" }}>
                     VIP Exclusive Drops
                   </h3>
                   <p style={{ margin: "0 0 20px 0", color: "#8e8e93", fontSize: "13px", maxWidth: "340px", lineHeight: "1.5" }}>
@@ -894,7 +894,7 @@ export default function CreatorProfileModal({
                   <div style={{ width: "56px", height: "56px", borderRadius: "50%", border: "2px solid #333", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "12px" }}>
                     {activeTab === "premium" ? <Lock size={26} color="#FFD700" /> : <Grid3X3 size={26} color="#555" />}
                   </div>
-                  <span style={{ color: "#fff", fontWeight: "700", fontSize: "15px" }}>
+                  <span style={{ color: "#d4d4d8", fontWeight: "700", fontSize: "15px" }}>
                     {activeTab === "premium" ? "No VIP Exclusive Drops Yet" : "No Posts Yet"}
                   </span>
                   <span style={{ marginTop: "4px", color: "#8e8e93", fontSize: "13px" }}>
@@ -974,7 +974,7 @@ export default function CreatorProfileModal({
                           border: "1px solid #363636",
                           borderRadius: "8px",
                           padding: "8px 20px",
-                          color: "#fff",
+                          color: "#d4d4d8",
                           fontSize: "13px",
                           fontWeight: "600",
                           cursor: "pointer",
@@ -1230,7 +1230,7 @@ const statColStyle = {
 const statNumberStyle = {
   fontSize: "17px",
   fontWeight: "700",
-  color: "#ffffff"
+  color: "#d4d4d8"
 };
 
 const statLabelStyle = {
@@ -1299,7 +1299,7 @@ const mobileSecondaryBtn = {
   height: "36px",
   padding: "0 16px",
   backgroundColor: "#262626",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "1px solid #363636",
   borderRadius: "20px",
   fontSize: "13px",
@@ -1351,7 +1351,7 @@ const desktopSecondaryBtn = {
   height: "36px",
   padding: "0 18px",
   backgroundColor: "#262626",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "1px solid #363636",
   borderRadius: "20px",
   fontSize: "13px",
@@ -1427,7 +1427,7 @@ const lockedBannerStyle = {
 
 const unlockNowBtnStyle = {
   background: "#e11d48",
-  color: "#fff",
+  color: "#d4d4d8",
   border: "none",
   borderRadius: "8px",
   padding: "10px 24px",
@@ -1459,7 +1459,7 @@ const errorCenterStyle = {
 const errorBackBtnStyle = {
   marginTop: "16px",
   backgroundColor: "#262626",
-  color: "#fff",
+  color: "#d4d4d8",
   border: "1px solid #363636",
   borderRadius: "8px",
   padding: "8px 18px",

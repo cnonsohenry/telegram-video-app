@@ -153,7 +153,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
           style={navBackBtnStyle}
           aria-label="Back"
         >
-          <ArrowLeft size={24} color="#fff" />
+          <ArrowLeft size={24} color="#d4d4d8" />
         </button>
 
         <div style={{ textAlign: "center", flex: 1 }}>
@@ -188,7 +188,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                   onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                 />
                 <div>
-                  <div style={{ fontWeight: "800", color: "#fff", fontSize: "14px" }}>
+                  <div style={{ fontWeight: "800", color: "#d4d4d8", fontSize: "14px" }}>
                     {creator?.display_name || creator?.username}
                   </div>
                   <div style={{ fontSize: "12px", color: "#f43f5e", fontWeight: "700" }}>
@@ -220,7 +220,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                     <div style={{ fontSize: "11px", color: "#8e8e93", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                       Subscribing to
                     </div>
-                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#fff" }}>
+                    <div style={{ fontSize: "14px", fontWeight: "800", color: "#d4d4d8" }}>
                       @{creator?.username}
                     </div>
                   </div>
@@ -410,7 +410,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
                 {generating ? (
                   <div style={loaderBoxStyle}>
                     <Loader2 size={32} color="#f7931a" className="animate-spin" />
-                    <span style={{ fontSize: "13px", color: "#fff", fontWeight: "700", marginTop: "10px" }}>
+                    <span style={{ fontSize: "13px", color: "#d4d4d8", fontWeight: "700", marginTop: "10px" }}>
                       Generating Secure Deposit Wallet...
                     </span>
                     <span style={{ fontSize: "11px", color: "#8e8e93", marginTop: "4px" }}>
@@ -480,7 +480,7 @@ const topNavStyle = {
 const navBackBtnStyle = {
   background: "none",
   border: "none",
-  color: "#fff",
+  color: "#d4d4d8",
   cursor: "pointer",
   padding: "6px",
   display: "flex",
@@ -490,7 +490,7 @@ const navBackBtnStyle = {
 const topNavTitleStyle = {
   fontSize: "16px",
   fontWeight: "700",
-  color: "#fff",
+  color: "#d4d4d8",
   letterSpacing: "0.2px"
 };
 
@@ -531,7 +531,7 @@ const creatorProfileAvatarStyle = {
   backgroundColor: "#27272a"
 };
 
-const creatorNameStyle = { fontWeight: "800", fontSize: "15px", color: "#fff" };
+const creatorNameStyle = { fontWeight: "800", fontSize: "15px", color: "#d4d4d8" };
 const creatorMetaStyle = { fontSize: "12px", color: "#8e8e93", display: "block", marginTop: "2px" };
 const priceTagStyle = { fontSize: "15px", fontWeight: "900", color: "#f43f5e", marginTop: "4px" };
 
@@ -557,7 +557,7 @@ const perkItemStyle = {
 const selectCoinLabelStyle = {
   fontSize: "13px",
   fontWeight: "800",
-  color: "#fff",
+  color: "#d4d4d8",
   marginBottom: "4px"
 };
 
@@ -667,13 +667,13 @@ const transferLabelStyle = {
 const transferAmountStyle = {
   fontSize: "20px",
   fontWeight: "900",
-  color: "#fff",
+  color: "#d4d4d8",
   marginTop: "2px"
 };
 
 const walletAddressStyle = {
   fontSize: "12px",
-  color: "#fff",
+  color: "#d4d4d8",
   fontFamily: "monospace",
   wordBreak: "break-all",
   marginTop: "4px",
@@ -831,7 +831,7 @@ const successIconStyle = {
   marginBottom: "16px"
 };
 
-const successTitleStyle = { margin: "0 0 8px 0", fontSize: "20px", fontWeight: "900", color: "#fff" };
+const successTitleStyle = { margin: "0 0 8px 0", fontSize: "20px", fontWeight: "900", color: "#d4d4d8" };
 const successSubStyle = { margin: "0 0 20px 0", fontSize: "13px", color: "#8e8e93", lineHeight: "1.5", maxWidth: "360px" };
 
 const successCreatorCardStyle = {
@@ -848,7 +848,7 @@ const successCreatorCardStyle = {
 const doneBtnStyle = {
   width: "100%",
   background: "#e11d48",
-  color: "#fff",
+  color: "#d4d4d8",
   border: "none",
   borderRadius: "14px",
   padding: "14px",

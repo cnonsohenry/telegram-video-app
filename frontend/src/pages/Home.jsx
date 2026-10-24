@@ -1016,7 +1016,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
           onClick={scrollToTop} 
           style={{ ...scrollTopButtonStyle, opacity: showScrollTop ? 1 : 0, transform: showScrollTop ? "translateY(0)" : "translateY(20px)", pointerEvents: showScrollTop ? "auto" : "none" }}
         >
-          <ArrowUp size={24} color="#fff" />
+          <ArrowUp size={24} color="#d4d4d8" />
         </button>
       )}
 

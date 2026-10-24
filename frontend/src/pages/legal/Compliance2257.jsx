@@ -4,7 +4,7 @@ import React from "react";
 import { APP_CONFIG } from "../../config";
 
 export default function Compliance2257() {
-  const sectionHeaderStyle = { color: "#fff", marginTop: "25px", marginBottom: "10px", fontSize: "18px" };
+  const sectionHeaderStyle = { color: "#d4d4d8", marginTop: "25px", marginBottom: "10px", fontSize: "18px" };
   const textBlockStyle = { marginBottom: "15px" };
 
   // 🟢 Auto-format the brand name for prose
@@ -23,11 +23,11 @@ export default function Compliance2257() {
       margin: "0 auto",
       padding: "20px"
     }}>
-      <h2 style={{ color: "#fff", borderBottom: "1px solid #333", paddingBottom: "10px", marginBottom: "20px" }}>
+      <h2 style={{ color: "#d4d4d8", borderBottom: "1px solid #333", paddingBottom: "10px", marginBottom: "20px" }}>
         RECORD-KEEPING REQUIREMENTS COMPLIANCE STATEMENT
       </h2>
 
-      <p style={{ ...textBlockStyle, color: "#fff", fontWeight: "500" }}>
+      <p style={{ ...textBlockStyle, color: "#d4d4d8", fontWeight: "500" }}>
         All models, actors, and other persons appearing in visual depictions of actual or simulated sexually explicit conduct on this website were 18 years of age or older at the time of the creation of such depictions.
       </p>
 
@@ -45,7 +45,7 @@ export default function Compliance2257() {
       <p style={textBlockStyle}>
         For further assistance in communicating with Verified Uploaders or questions regarding this notice, please contact our compliance department at: 
         {/* 🟢 THE FIX: Dynamic Support Email */}
-        <a href={`mailto:${APP_CONFIG.supportEmail}`} style={{ color: "#fff", marginLeft: "5px" }}>{APP_CONFIG.supportEmail}</a>.
+        <a href={`mailto:${APP_CONFIG.supportEmail}`} style={{ color: "#d4d4d8", marginLeft: "5px" }}>{APP_CONFIG.supportEmail}</a>.
       </p>
 
       <h3 style={sectionHeaderStyle}>Strict Compliance Procedures</h3>
@@ -53,16 +53,16 @@ export default function Compliance2257() {
       
       <ul style={{ paddingLeft: "20px", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "12px" }}>
         <li>
-          <strong style={{ color: "#fff" }}>Identification:</strong> All Verified Uploaders must be over 18 (or the age of majority in their jurisdiction) and are personally identified and verified at account activation.
+          <strong style={{ color: "#d4d4d8" }}>Identification:</strong> All Verified Uploaders must be over 18 (or the age of majority in their jurisdiction) and are personally identified and verified at account activation.
         </li>
         <li>
-          <strong style={{ color: "#fff" }}>Consent & Age:</strong> Uploaders must certify that all individuals in the content are over 18 and freely consented to the production and upload.
+          <strong style={{ color: "#d4d4d8" }}>Consent & Age:</strong> Uploaders must certify that all individuals in the content are over 18 and freely consented to the production and upload.
         </li>
         <li>
-          <strong style={{ color: "#fff" }}>§ 2257 Certification:</strong> As producers, Verified Uploaders certify compliance with record-keeping requirements under U.S.C. § 2257 and agree to deliver documentation promptly upon request.
+          <strong style={{ color: "#d4d4d8" }}>§ 2257 Certification:</strong> As producers, Verified Uploaders certify compliance with record-keeping requirements under U.S.C. § 2257 and agree to deliver documentation promptly upon request.
         </li>
         <li>
-          <strong style={{ color: "#fff" }}>Policy Adherence:</strong> Content must not violate our Child Sexual Abuse Material (CSAM) Policy or Non-Consensual Content Policy.
+          <strong style={{ color: "#d4d4d8" }}>Policy Adherence:</strong> Content must not violate our Child Sexual Abuse Material (CSAM) Policy or Non-Consensual Content Policy.
         </li>
       </ul>
 
@@ -73,10 +73,10 @@ export default function Compliance2257() {
         border: "1px solid #333", 
         marginTop: "10px" 
       }}>
-        <h3 style={{ margin: "0 0 15px 0", color: "#fff", fontSize: "16px", textTransform: "uppercase" }}>
+        <h3 style={{ margin: "0 0 15px 0", color: "#d4d4d8", fontSize: "16px", textTransform: "uppercase" }}>
           Custodian of Records
         </h3>
-        <p style={{ margin: 0, fontStyle: "normal", color: "#fff" }}>
+        <p style={{ margin: 0, fontStyle: "normal", color: "#d4d4d8" }}>
           Compliance Department<br/>
           {/* 🟢 THE FIX: Dynamic Company Name and Address */}
           {APP_CONFIG.companyName}<br/>

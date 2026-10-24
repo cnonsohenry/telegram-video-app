@@ -340,7 +340,7 @@ export default function CommentSectionModal({ video, onClose }) {
               {comments.length > 0 ? comments.length : (video.comments_count || 0)} Comments
             </h3>
             <button onClick={onClose} style={closeBottomSheetBtnStyle} aria-label="Close comments">
-              <X size={20} color="#fff" />
+              <X size={20} color="#d4d4d8" />
             </button>
           </div>
 

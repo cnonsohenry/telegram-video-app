@@ -160,7 +160,7 @@ export default function StoryArchiveModal({
           flexDirection: "column",
           overflow: "hidden",
           boxShadow: "0 20px 60px rgba(0, 0, 0, 0.9)",
-          color: "#ffffff"
+          color: "#d4d4d8"
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -181,7 +181,7 @@ export default function StoryArchiveModal({
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "#ffffff",
+                  color: "#d4d4d8",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -196,7 +196,7 @@ export default function StoryArchiveModal({
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "#ffffff",
+                  color: "#d4d4d8",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -224,7 +224,7 @@ export default function StoryArchiveModal({
               disabled={selectedIds.length === 0}
               style={{
                 backgroundColor: selectedIds.length > 0 ? "#0095f6" : "rgba(255, 255, 255, 0.1)",
-                color: selectedIds.length > 0 ? "#ffffff" : "rgba(255, 255, 255, 0.3)",
+                color: selectedIds.length > 0 ? "#d4d4d8" : "rgba(255, 255, 255, 0.3)",
                 border: "none",
                 borderRadius: "8px",
                 padding: "8px 16px",
@@ -242,7 +242,7 @@ export default function StoryArchiveModal({
               disabled={saving || !title.trim()}
               style={{
                 backgroundColor: saving || !title.trim() ? "rgba(255, 255, 255, 0.1)" : "#0095f6",
-                color: saving || !title.trim() ? "rgba(255, 255, 255, 0.3)" : "#ffffff",
+                color: saving || !title.trim() ? "rgba(255, 255, 255, 0.3)" : "#d4d4d8",
                 border: "none",
                 borderRadius: "8px",
                 padding: "8px 16px",
@@ -367,7 +367,7 @@ export default function StoryArchiveModal({
                           fontSize: "11px",
                           fontWeight: "600",
                           backgroundColor: "rgba(0, 0, 0, 0.65)",
-                          color: "#ffffff",
+                          color: "#d4d4d8",
                           padding: "2px 6px",
                           borderRadius: "4px",
                           backdropFilter: "blur(4px)"
@@ -390,7 +390,7 @@ export default function StoryArchiveModal({
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          color: "#ffffff",
+                          color: "#d4d4d8",
                           fontSize: "11px",
                           fontWeight: "700",
                           boxSizing: "border-box"
@@ -471,7 +471,7 @@ export default function StoryArchiveModal({
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "10px",
                   padding: "12px 14px",
-                  color: "#ffffff",
+                  color: "#d4d4d8",
                   fontSize: "15px",
                   outline: "none",
                   boxSizing: "border-box"
@@ -542,7 +542,7 @@ export default function StoryArchiveModal({
                               justifyContent: "center"
                             }}
                           >
-                            <Check size={18} color="#ffffff" strokeWidth={3} />
+                            <Check size={18} color="#d4d4d8" strokeWidth={3} />
                           </div>
                         )}
                       </div>

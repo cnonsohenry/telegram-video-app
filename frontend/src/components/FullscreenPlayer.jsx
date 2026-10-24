@@ -1068,7 +1068,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                   border: "1px solid rgba(255,255,255,0.18)",
                   borderRadius: "20px",
                   padding: "6px 14px",
-                  color: "#fff",
+                  color: "#d4d4d8",
                   fontSize: "12px",
                   fontWeight: "700",
                   letterSpacing: "0.5px",
@@ -1104,7 +1104,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                       display: "flex",
                       alignItems: "center",
                       gap: "8px",
-                      backgroundColor: "#ffffff",
+                      backgroundColor: "#d4d4d8",
                       color: "#000000",
                       border: "none",
                       borderRadius: "24px",
@@ -1165,7 +1165,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                       alignItems: "center",
                       gap: "8px",
                       backgroundColor: "var(--primary-color, #e11d48)",
-                      color: "#fff",
+                      color: "#d4d4d8",
                       border: "none",
                       borderRadius: "24px",
                       padding: "10px 20px",
@@ -1198,7 +1198,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                     backgroundColor: "rgba(0,0,0,0.7)",
                     backdropFilter: "blur(8px)",
                     border: "1px solid rgba(255,255,255,0.2)",
-                    color: "#fff",
+                    color: "#d4d4d8",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1393,9 +1393,9 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                      onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                    >
                      {isPlaying ? (
-                       <Pause size={22} fill="#ffffff" color="#ffffff" />
+                       <Pause size={22} fill="#d4d4d8" color="#d4d4d8" />
                      ) : (
-                       <Play size={22} fill="#ffffff" color="#ffffff" style={{ marginLeft: "2px" }} />
+                       <Play size={22} fill="#d4d4d8" color="#d4d4d8" style={{ marginLeft: "2px" }} />
                      )}
                    </button>
 
@@ -1440,7 +1440,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 {/* 🟢 RESTORED: Action Bar (Views, Like, Comment, Save, Share) */}
                 <div style={engagementBarStyle}>
                    <div style={{ ...engagementBtnStyle, cursor: "default" }}>
-                      <Eye size={20} color="#fff" />
+                      <Eye size={20} color="#d4d4d8" />
                       <span>{Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}</span>
                    </div>
                    <button 
@@ -1449,7 +1449,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                      onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
                      onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                    >
-                      <Heart size={21} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#fff"} />
+                      <Heart size={21} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#d4d4d8"} />
                       <span>{likesCount > 0 ? likesCount : 'Like'}</span>
                    </button>
                    <button 
@@ -1458,7 +1458,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                      onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
                      onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                    >
-                      <MessageCircle size={21} color="#fff" />
+                      <MessageCircle size={21} color="#d4d4d8" />
                       <span>{commentsCount > 0 ? commentsCount : 'Reply'}</span>
                    </button>
                    <button 
@@ -1467,7 +1467,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                      onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
                      onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                    >
-                      <Bookmark size={21} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#fff"} />
+                      <Bookmark size={21} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#d4d4d8"} />
                       <span>{savesCount > 0 ? savesCount : 'Save'}</span>
                    </button>
                     {!isPremium && (
@@ -1477,7 +1477,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                         onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
                         onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                       >
-                         {copied ? <Check size={21} color="#f4f4f5" /> : <Share2 size={21} color="#fff" />}
+                         {copied ? <Check size={21} color="#f4f4f5" /> : <Share2 size={21} color="#d4d4d8" />}
                          <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
                       </button>
                     )}
@@ -1499,7 +1499,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
               style={editNavBackBtnStyle}
               aria-label="Back"
             >
-              <ArrowLeft size={24} color="#fff" />
+              <ArrowLeft size={24} color="#d4d4d8" />
             </button>
             <span style={editTopNavTitleStyle}>Edit Info</span>
             <button 
@@ -1599,23 +1599,23 @@ const centerHeartBurstStyle = {
 const topGradientStyle = { position: "absolute", top: 0, left: 0, right: 0, height: "130px", background: "linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0) 100%)", zIndex: 10005, transition: "opacity 0.3s ease" };
 const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "320px", background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.3s ease", pointerEvents: "none" };
 
-const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "transparent", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.7))", cursor: "pointer", transition: "all 0.2s ease" };
-const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "transparent", color: "#fff", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.7))", transition: "all 0.2s ease" };
+const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "transparent", color: "#d4d4d8", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.7))", cursor: "pointer", transition: "all 0.2s ease" };
+const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "transparent", color: "#d4d4d8", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.7))", transition: "all 0.2s ease" };
 
-const menuButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", background: "transparent", color: "#fff", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.7))", transition: "all 0.2s ease", cursor: "pointer" };
+const menuButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", background: "transparent", color: "#d4d4d8", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.7))", transition: "all 0.2s ease", cursor: "pointer" };
 const dropdownMenuStyle = { position: "absolute", top: "max(75px, calc(env(safe-area-inset-top) + 75px))", background: "rgba(25, 25, 25, 0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", padding: "6px", display: "flex", flexDirection: "column", gap: "2px", minWidth: "170px", backdropFilter: "blur(15px)", boxShadow: "0 10px 40px rgba(0,0,0,0.8)" };
-const dropdownItemStyle = { background: "transparent", border: "none", color: "#fff", padding: "12px 14px", display: "flex", alignItems: "center", gap: "12px", fontSize: "14px", fontWeight: "500", cursor: "pointer", borderRadius: "8px", width: "100%", textAlign: "left", transition: "background 0.2s" };
+const dropdownItemStyle = { background: "transparent", border: "none", color: "#d4d4d8", padding: "12px 14px", display: "flex", alignItems: "center", gap: "12px", fontSize: "14px", fontWeight: "500", cursor: "pointer", borderRadius: "8px", width: "100%", textAlign: "left", transition: "background 0.2s" };
 const dropdownDividerStyle = { height: "1px", background: "rgba(255,255,255,0.08)", margin: "4px 0" };
 
 const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area-inset-bottom))", left: 0, right: 0, padding: "0 15px", zIndex: 10002, display: "flex", flexDirection: "column", transition: "opacity 0.2s ease" };
 const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "8px" };
-const floatingBtnStyle = { background: "transparent", border: "none", color: "#fff", width: "40px", height: "40px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.7))", cursor: "pointer", transition: "all 0.2s ease" };
+const floatingBtnStyle = { background: "transparent", border: "none", color: "#d4d4d8", width: "40px", height: "40px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.7))", cursor: "pointer", transition: "all 0.2s ease" };
 
 const postInfoStyle = { display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "12px", width: "100%" };
 const avatarStyle = { width: "42px", height: "42px", borderRadius: "50%", objectFit: "cover", border: "1.5px solid rgba(255,255,255,0.3)", flexShrink: 0 };
 const textDetailsStyle = { display: "flex", flexDirection: "column", gap: "4px", overflow: "hidden", flex: 1, minWidth: 0 };
 const usernameRowStyle = { display: "flex", alignItems: "center", justifyContent: "flex-start", width: "auto", gap: "10px" };
-const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#fff", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#d4d4d8", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 const followBtnStyle = {
   background: "transparent",
   color: "#f4f4f5",
@@ -1674,7 +1674,7 @@ const visualTrackStyle = {
 };
 const progressFillStyle = {
   height: "100%",
-  backgroundColor: "#ffffff",
+  backgroundColor: "#d4d4d8",
   borderRadius: "9999px",
   pointerEvents: "none"
 };
@@ -1684,13 +1684,13 @@ const scrubberThumbStyle = {
   width: "14px",
   height: "14px",
   borderRadius: "50%",
-  backgroundColor: "#ffffff",
+  backgroundColor: "#d4d4d8",
   boxShadow: "0 1px 6px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.2)",
   pointerEvents: "none",
   transition: "transform 0.15s ease",
   cursor: "grab"
 };
-const timeDisplayStyle = { display: "flex", alignItems: "center", fontSize: "12px", fontWeight: "600", fontVariantNumeric: "tabular-nums", color: "#ffffff", whiteSpace: "nowrap", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", flexShrink: 0 };
+const timeDisplayStyle = { display: "flex", alignItems: "center", fontSize: "12px", fontWeight: "600", fontVariantNumeric: "tabular-nums", color: "#d4d4d8", whiteSpace: "nowrap", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", flexShrink: 0 };
 
 // 🟢 RESTORED: Engagement Bar Styles
 const engagementBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 10px 4px 10px", borderTop: "1px solid rgba(255,255,255,0.12)" };
@@ -1720,7 +1720,7 @@ const editTopNavStyle = {
 const editNavBackBtnStyle = {
   background: "none",
   border: "none",
-  color: "#fff",
+  color: "#d4d4d8",
   cursor: "pointer",
   padding: "6px",
   display: "flex",
@@ -1730,7 +1730,7 @@ const editNavBackBtnStyle = {
 const editTopNavTitleStyle = {
   fontSize: "16px",
   fontWeight: "700",
-  color: "#fff",
+  color: "#d4d4d8",
   letterSpacing: "0.2px"
 };
 
@@ -1760,8 +1760,8 @@ const editFormInnerStyle = {
 };
 const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "6px", marginBottom: "15px" };
 const formLabelStyle = { fontSize: "13px", color: "#8e8e93", fontWeight: "600" };
-const formInputStyle = { background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", padding: "12px", borderRadius: "8px", color: "#fff", fontSize: "14px", outline: "none" };
-const saveBtnStyle = { width: "100%", background: "var(--primary-color)", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "700", fontSize: "15px", cursor: "pointer", marginTop: "10px" };
+const formInputStyle = { background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", padding: "12px", borderRadius: "8px", color: "#d4d4d8", fontSize: "14px", outline: "none" };
+const saveBtnStyle = { width: "100%", background: "var(--primary-color)", color: "#d4d4d8", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "700", fontSize: "15px", cursor: "pointer", marginTop: "10px" };
 
 const playerMenuOverlay = {
   position: "fixed",
@@ -1823,7 +1823,7 @@ const playerMenuItem = {
   gap: "14px",
   padding: "13px 12px",
   borderRadius: "12px",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "15px",
   fontWeight: "600",
   textAlign: "left",
@@ -1836,7 +1836,7 @@ const playerCancelBtn = {
   borderRadius: "9999px",
   backgroundColor: "#27272a",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "15px",
   fontWeight: "700",
   cursor: "pointer",

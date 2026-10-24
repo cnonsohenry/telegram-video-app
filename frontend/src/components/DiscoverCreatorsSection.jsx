@@ -271,9 +271,9 @@ export default function DiscoverCreatorsSection({
               <button 
                 style={{
                   ...igFollowBtn,
-                  backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.15)" : "#ffffff",
+                  backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.08)" : "#c4c4c8",
                   border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none",
-                  color: isFollowing ? "#ffffff" : "#000000",
+                  color: isFollowing ? "#a1a1aa" : "#09090b",
                   fontWeight: "700"
                 }}
                 onClick={(e) => handleFollowToggle(e, creator)}
@@ -312,7 +312,7 @@ const igSuggestedTitle = {
   fontSize: "14px",
   fontWeight: "700",
   letterSpacing: "0.2px",
-  color: "#ffffff"
+  color: "#d4d4d8"
 };
 
 const igSeeAllBtn = {

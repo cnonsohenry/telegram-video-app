@@ -247,7 +247,7 @@ const iconContainerStyle = {
 const titleStyle = {
   fontSize: "19px",
   fontWeight: "800",
-  color: "#ffffff",
+  color: "#d4d4d8",
   letterSpacing: "-0.3px",
   marginBottom: "8px"
 };
@@ -310,7 +310,7 @@ const secondaryBtnStyle = {
   borderRadius: "9999px",
   border: "none",
   background: "#27272a",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "14px",
   fontWeight: "600",
   cursor: "pointer",

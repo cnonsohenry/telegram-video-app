@@ -359,7 +359,7 @@ export default function FollowListModal({
                         <span style={styles.verifiedBadge} title="Verified">
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
                             <circle cx="12" cy="12" r="10" fill="#3897f0" />
-                            <path d="M8 12.5L10.8 15.3L16 9.5" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M8 12.5L10.8 15.3L16 9.5" stroke="#d4d4d8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         </span>
                       )}

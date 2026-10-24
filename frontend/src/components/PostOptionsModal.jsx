@@ -311,7 +311,7 @@ const textWrapperStyle = {
 const itemTitleStyle = {
   fontSize: "15px",
   fontWeight: "600",
-  color: "#ffffff",
+  color: "#d4d4d8",
   letterSpacing: "-0.2px"
 };
 
@@ -325,7 +325,7 @@ const cancelBtnStyle = {
   borderRadius: "9999px",
   backgroundColor: "#27272a",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "15px",
   fontWeight: "700",
   cursor: "pointer",

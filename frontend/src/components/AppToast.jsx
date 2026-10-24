@@ -135,7 +135,7 @@ const iconBoxStyle = {
 const textStyle = {
   fontSize: "13.5px",
   fontWeight: "600",
-  color: "#ffffff",
+  color: "#d4d4d8",
   flex: 1,
   lineHeight: "1.4",
   wordBreak: "break-word",

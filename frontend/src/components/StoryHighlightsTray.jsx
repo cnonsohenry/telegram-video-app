@@ -128,7 +128,7 @@ export default function StoryHighlightsTray({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#ffffff",
+              color: "#d4d4d8",
               transition: "transform 0.15s ease, border-color 0.15s ease",
               boxSizing: "border-box"
             }}

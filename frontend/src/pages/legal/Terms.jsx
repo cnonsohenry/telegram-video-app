@@ -4,8 +4,8 @@ import React from "react";
 import { APP_CONFIG } from "../../config";
 
 export default function Terms() {
-  const headerStyle = { color: "#fff", marginTop: "30px", marginBottom: "10px", fontSize: "20px" };
-  const subHeaderStyle = { color: "#fff", marginTop: "20px", marginBottom: "8px", fontSize: "17px" };
+  const headerStyle = { color: "#d4d4d8", marginTop: "30px", marginBottom: "10px", fontSize: "20px" };
+  const subHeaderStyle = { color: "#d4d4d8", marginTop: "20px", marginBottom: "8px", fontSize: "17px" };
   const textBlockStyle = { marginBottom: "15px" };
 
   // 🟢 THE FIX: Auto-format the brand name, domain, and DSA email

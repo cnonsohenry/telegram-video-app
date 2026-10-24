@@ -53,7 +53,7 @@ const playOverlayStyle = {
   height: "48px", 
   borderRadius: "50%", 
   background: "rgba(0, 0, 0, 0.6)", 
-  color: "#ffffff", 
+  color: "#d4d4d8", 
   display: "flex", 
   alignItems: "center", 
   justifyContent: "center", 
@@ -68,7 +68,7 @@ const groupBadgeStyle = {
   top: "12px", 
   right: "12px", 
   background: "rgba(0,0,0,0.6)", 
-  color: "#fff", 
+  color: "#d4d4d8", 
   fontSize: "11px", 
   fontWeight: "700", 
   padding: "3px 8px", 
@@ -99,7 +99,7 @@ const vipBadgePillStyle = {
   top: "12px",
   left: "12px",
   background: "rgba(0, 0, 0, 0.55)",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "1px solid rgba(255, 255, 255, 0.18)",
   padding: "3px 8px",
   borderRadius: "6px",
@@ -134,7 +134,7 @@ const vipLockCircleStyle = {
 
 const vipSubscribeButtonStyle = {
   background: "#e11d48",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "none",
   borderRadius: "100px",
   padding: "10px 18px",
@@ -154,7 +154,7 @@ const vipUnlockedBadgeStyle = {
   top: "12px",
   left: "12px",
   background: "rgba(0, 0, 0, 0.55)",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "1px solid rgba(255, 255, 255, 0.18)",
   padding: "3px 8px",
   borderRadius: "6px",
@@ -211,7 +211,7 @@ const albumCardCounterStyle = {
   top: "10px",
   right: "10px",
   background: "rgba(0, 0, 0, 0.65)",
-  color: "#fff",
+  color: "#d4d4d8",
   fontSize: "10.5px",
   fontWeight: "700",
   padding: "3px 8px",
@@ -257,7 +257,7 @@ const albumSubscribeBarBtnStyle = {
   borderRadius: "24px",
   background: "#e11d48",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
@@ -282,7 +282,7 @@ const carouselNavBtnStyle = {
   borderRadius: "50%",
   background: "rgba(0, 0, 0, 0.75)",
   border: "1px solid rgba(255, 255, 255, 0.25)",
-  color: "#fff",
+  color: "#d4d4d8",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -884,7 +884,7 @@ export default function FeedPost({
                     width: dotIdx === activeSlide ? "16px" : "6px",
                     height: "6px",
                     borderRadius: "3px",
-                    background: dotIdx === activeSlide ? "#ffffff" : "rgba(255, 255, 255, 0.3)",
+                    background: dotIdx === activeSlide ? "#d4d4d8" : "rgba(255, 255, 255, 0.3)",
                     cursor: "pointer",
                     transition: "all 0.2s ease"
                   }}
@@ -913,7 +913,7 @@ export default function FeedPost({
                   }
                 }}
               >
-                <Lock size={14} color="#ffffff" />
+                <Lock size={14} color="#d4d4d8" />
                 <span>Subscribe</span>
               </button>
             )}

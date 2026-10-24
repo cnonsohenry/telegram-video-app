@@ -36,7 +36,7 @@ export default function SuggestedSidebar({ onVideoClick }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
-      <h3 style={{ color: "#fff", fontSize: "16px", fontWeight: "800", margin: "0 0 10px 0" }}>Suggested for you</h3>
+      <h3 style={{ color: "#d4d4d8", fontSize: "16px", fontWeight: "800", margin: "0 0 10px 0" }}>Suggested for you</h3>
       
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         
@@ -64,7 +64,7 @@ export default function SuggestedSidebar({ onVideoClick }) {
                 <img src={v.thumbnail_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" />
                 
                 {v.is_group && (
-                  <div style={{ position: "absolute", bottom: 4, right: 4, background: "rgba(0,0,0,0.8)", padding: "4px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold", color: "#fff" }}>
+                  <div style={{ position: "absolute", bottom: 4, right: 4, background: "rgba(0,0,0,0.8)", padding: "4px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold", color: "#d4d4d8" }}>
                     1/{v.group_count}
                   </div>
                 )}
@@ -78,7 +78,7 @@ export default function SuggestedSidebar({ onVideoClick }) {
               
               <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
                 <p style={{ 
-                  color: "#fff", fontSize: "13px", fontWeight: "600", margin: "0 0 4px 0", 
+                  color: "#d4d4d8", fontSize: "13px", fontWeight: "600", margin: "0 0 4px 0", 
                   lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", 
                   WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis" 
                 }}>

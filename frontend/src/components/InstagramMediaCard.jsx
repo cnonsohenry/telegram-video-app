@@ -203,7 +203,7 @@ export default function InstagramMediaCard({
       >
         {video.is_group ? (
           <div style={badgeStyle}>
-            <Copy size={13} color="#fff" />
+            <Copy size={13} color="#d4d4d8" />
           </div>
         ) : isLocked ? (
           <div style={{ ...badgeStyle, backgroundColor: "rgba(0,0,0,0.65)", border: "1px solid rgba(255,215,0,0.4)" }}>
@@ -211,7 +211,7 @@ export default function InstagramMediaCard({
           </div>
         ) : (
           <div style={badgeStyle}>
-            <Film size={12} color="#fff" />
+            <Film size={12} color="#d4d4d8" />
           </div>
         )}
       </div>
@@ -227,13 +227,13 @@ export default function InstagramMediaCard({
             display: "flex",
             alignItems: "center",
             gap: "4px",
-            color: "#fff",
+            color: "#d4d4d8",
             textShadow: "0 1px 4px rgba(0,0,0,0.8)",
             fontSize: "11px",
             fontWeight: "700"
           }}
         >
-          <Play size={10} fill="#fff" strokeWidth={0} />
+          <Play size={10} fill="#d4d4d8" strokeWidth={0} />
           <span>{formattedViews}</span>
         </div>
       )}
@@ -250,18 +250,18 @@ export default function InstagramMediaCard({
             alignItems: "center",
             justifyContent: "center",
             gap: "24px",
-            color: "#fff",
+            color: "#d4d4d8",
             opacity: isHovered ? 1 : 0,
             transition: "opacity 0.2s ease",
             pointerEvents: "none"
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "700", fontSize: "14px" }}>
-            <Heart size={18} fill="#fff" color="#fff" />
+            <Heart size={18} fill="#d4d4d8" color="#d4d4d8" />
             <span>{formattedLikes}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "700", fontSize: "14px" }}>
-            <MessageCircle size={18} fill="#fff" color="#fff" />
+            <MessageCircle size={18} fill="#d4d4d8" color="#d4d4d8" />
             <span>{formattedViews}</span>
           </div>
         </div>

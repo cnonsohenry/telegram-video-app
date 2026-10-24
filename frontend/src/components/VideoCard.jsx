@@ -194,7 +194,7 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
             justifyContent: "center",
             zIndex: 11 
           }}>
-            <Copy size={16} color="#fff" />
+            <Copy size={16} color="#d4d4d8" />
           </div>
         )}
 
@@ -204,7 +204,7 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
             top: "10px",
             left: "10px",
             background: "rgba(0, 0, 0, 0.55)",
-            color: "#ffffff",
+            color: "#d4d4d8",
             border: "1px solid rgba(255, 255, 255, 0.18)",
             padding: "3px 8px",
             borderRadius: "6px",

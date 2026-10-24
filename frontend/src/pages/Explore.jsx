@@ -309,7 +309,7 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
               <span style={{
                 fontSize: "10px",
                 fontWeight: "600",
-                color: "#ffffff",
+                color: "#d4d4d8",
                 background: "rgba(255, 255, 255, 0.1)",
                 padding: "1px 6px",
                 borderRadius: "6px",
@@ -497,7 +497,7 @@ const DesktopLeftSidebar = ({
             <span style={{
               ...desktopNavLabelStyle,
               fontWeight: (!selectedCategory && activeTab === "for_you") ? "800" : "600",
-              color: "#ffffff"
+              color: "#d4d4d8"
             }}>
               Explore
             </span>
@@ -525,7 +525,7 @@ const DesktopLeftSidebar = ({
               <span style={{
                 ...desktopNavLabelStyle,
                 fontWeight: activeTab === "community" ? "800" : "600",
-                color: "#ffffff"
+                color: "#d4d4d8"
               }}>
                 Community
               </span>
@@ -957,12 +957,12 @@ const DesktopRightSidebar = ({
                               left: "5px",
                               display: "flex",
                               alignItems: "center",
-                              color: "#ffffff",
+                              color: "#d4d4d8",
                               fontSize: "9.5px",
                               fontWeight: "600",
                               pointerEvents: "none"
                             }}>
-                              <Play size={9} fill="#ffffff" strokeWidth={0} style={{ marginRight: "2px" }} />
+                              <Play size={9} fill="#d4d4d8" strokeWidth={0} style={{ marginRight: "2px" }} />
                               {Number(video.views || 0).toLocaleString()}
                             </div>
                             {(video.is_premium || video.category === "premium") && (
@@ -1034,7 +1034,7 @@ const DesktopRightSidebar = ({
                           transition: "all 0.15s ease",
                           border: isSubscribed ? "1px solid rgba(225, 29, 72, 0.3)" : "none",
                           backgroundColor: isSubscribed ? "rgba(225, 29, 72, 0.14)" : "var(--primary-color, #e11d48)",
-                          color: isSubscribed ? "#f43f5e" : "#ffffff"
+                          color: isSubscribed ? "#f43f5e" : "#d4d4d8"
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1083,7 +1083,7 @@ const DesktopRightSidebar = ({
                 borderRadius: "50%",
                 transition: "color 0.2s ease"
               }}
-              onMouseEnter={(e) => e.currentTarget.style.color = "#ffffff"}
+              onMouseEnter={(e) => e.currentTarget.style.color = "#d4d4d8"}
               onMouseLeave={(e) => e.currentTarget.style.color = "#71767b"}
               title="Refresh highlights"
             >
@@ -1123,7 +1123,7 @@ const DesktopRightSidebar = ({
                 <div style={desktopHighlightThumbBox}>
                   <img src={v.thumbnail_url} alt="" style={desktopHighlightThumbImg} />
                   <div style={desktopHighlightPlayOverlay}>
-                    <Play size={12} fill="#fff" strokeWidth={0} />
+                    <Play size={12} fill="#d4d4d8" strokeWidth={0} />
                   </div>
                   {v.category === "premium" && (
                     <div style={desktopHighlightVipTag}>VIP</div>
@@ -2051,7 +2051,7 @@ export default function Explore({
                 background: "transparent"
               }}>
                 <div style={{ display: "flex", alignItems: "center" }}>
-                  <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#ffffff" }}>
+                  <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#d4d4d8" }}>
                     Creators
                   </h3>
                 </div>
@@ -2064,7 +2064,7 @@ export default function Explore({
                     style={{
                       background: "none",
                       border: "none",
-                      color: "#ffffff",
+                      color: "#d4d4d8",
                       fontSize: "13px",
                       fontWeight: "600",
                       cursor: "pointer",
@@ -2144,7 +2144,7 @@ export default function Explore({
         return (
           <div style={communityEmptyWrapper}>
             <div style={communityEmptyIconBox}>
-              <Users size={32} color="#ffffff" />
+              <Users size={32} color="#d4d4d8" />
             </div>
             <h3 style={communityEmptyTitle}>Creator Community</h3>
             <p style={communityEmptySubtitle}>
@@ -2312,7 +2312,7 @@ export default function Explore({
                   style={{
                     background: "none",
                     border: "none",
-                    color: "#ffffff",
+                    color: "#d4d4d8",
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
@@ -2344,7 +2344,7 @@ export default function Explore({
                 >
                   <Search size={16} color="#8e8e8e" style={{ flexShrink: 0 }} />
                   <span style={{
-                    color: "#ffffff",
+                    color: "#d4d4d8",
                     fontSize: "14px",
                     fontWeight: "600",
                     flex: 1,
@@ -2390,7 +2390,7 @@ export default function Explore({
                       style={{ width: "30px", height: "30px", borderRadius: "50%", border: "2px solid rgba(255, 255, 255, 0.2)", objectFit: "cover" }} 
                     />
                   ) : (
-                    <div style={{ background: "#ffffff", color: "#000000", padding: "5px 10px", borderRadius: "18px", fontSize: "11px", fontWeight: "800" }}>
+                    <div style={{ background: "#c4c4c8", color: "#09090b", padding: "5px 10px", borderRadius: "18px", fontSize: "11px", fontWeight: "800" }}>
                       LOGIN
                     </div>
                   )}
@@ -2451,7 +2451,7 @@ export default function Explore({
                     <span style={{
                       fontSize: "14.5px",
                       fontWeight: activeTab === "for_you" ? "700" : "500",
-                      color: activeTab === "for_you" ? "#ffffff" : "#71767b",
+                      color: activeTab === "for_you" ? "#d4d4d8" : "#71767b",
                       letterSpacing: "0.2px",
                       transition: "color 0.2s ease, font-weight 0.15s ease"
                     }}>
@@ -2469,7 +2469,7 @@ export default function Explore({
                       <span style={{
                         fontSize: "14.5px",
                         fontWeight: activeTab === "community" ? "700" : "500",
-                        color: activeTab === "community" ? "#ffffff" : "#71767b",
+                        color: activeTab === "community" ? "#d4d4d8" : "#71767b",
                         letterSpacing: "0.2px",
                         transition: "color 0.2s ease, font-weight 0.15s ease"
                       }}>
@@ -2521,7 +2521,7 @@ export default function Explore({
                 {renderTimelineContent()}
 
                 {(isSearching ? searchLoadingMore : (activeTab === "community" ? communityLoadingMore : forYouLoadingMore)) && (
-                  <div style={{ padding: "20px", display: "flex", justifyContent: "center", color: "#ffffff" }}>
+                  <div style={{ padding: "20px", display: "flex", justifyContent: "center", color: "#d4d4d8" }}>
                     <Loader2 className="animate-spin" size={24} />
                   </div>
                 )}
@@ -2538,8 +2538,8 @@ export default function Explore({
               title="Post video to Community"
               aria-label="Post video to Community"
             >
-              <Plus size={22} color="#ffffff" strokeWidth={2.5} />
-              <span style={{ fontSize: "13px", fontWeight: "700", color: "#fff", marginLeft: "4px" }}>
+              <Plus size={22} color="#d4d4d8" strokeWidth={2.5} />
+              <span style={{ fontSize: "13px", fontWeight: "700", color: "#d4d4d8", marginLeft: "4px" }}>
                 Post
               </span>
             </button>
@@ -2633,7 +2633,7 @@ export default function Explore({
                       <span style={{
                         fontSize: "15px",
                         fontWeight: activeTab === "for_you" ? "700" : "500",
-                        color: activeTab === "for_you" ? "#ffffff" : "#71767b",
+                        color: activeTab === "for_you" ? "#d4d4d8" : "#71767b",
                         transition: "color 0.2s ease"
                       }}>
                         For You
@@ -2653,7 +2653,7 @@ export default function Explore({
                         <span style={{
                           fontSize: "15px",
                           fontWeight: activeTab === "community" ? "700" : "500",
-                          color: activeTab === "community" ? "#ffffff" : "#71767b",
+                          color: activeTab === "community" ? "#d4d4d8" : "#71767b",
                           transition: "color 0.2s ease"
                         }}>
                           Community
@@ -2729,7 +2729,7 @@ export default function Explore({
 
                 {/* Load More Spinners */}
                 {(isSearching ? searchLoadingMore : (activeTab === "community" ? communityLoadingMore : forYouLoadingMore)) && (
-                  <div style={{ padding: "24px", display: "flex", justifyContent: "center", color: "#ffffff" }}>
+                  <div style={{ padding: "24px", display: "flex", justifyContent: "center", color: "#d4d4d8" }}>
                     <Loader2 className="animate-spin" size={26} />
                   </div>
                 )}
@@ -2872,7 +2872,7 @@ const exploreTabActivePillStyle = {
 
 const communityCountPillStyle = {
   background: "rgba(255, 255, 255, 0.12)",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "11px",
   fontWeight: "700",
   padding: "1px 6px",
@@ -2905,7 +2905,7 @@ const communityEmptyIconBox = {
 const communityEmptyTitle = {
   fontSize: "19px",
   fontWeight: "800",
-  color: "#fff",
+  color: "#d4d4d8",
   marginBottom: "8px"
 };
 
@@ -3138,7 +3138,7 @@ const desktopUserPillAvatar = {
 const desktopUserPillName = {
   fontSize: "14px",
   fontWeight: "700",
-  color: "#ffffff",
+  color: "#d4d4d8",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis"
@@ -3163,7 +3163,7 @@ const desktopLoginPillBtn = {
   borderRadius: "9999px",
   background: "rgba(255, 255, 255, 0.08)",
   border: "1px solid rgba(255, 255, 255, 0.2)",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "14px",
   fontWeight: "700",
   cursor: "pointer",
@@ -3218,7 +3218,7 @@ const categoryFilterTagStyle = {
   padding: "3px 10px",
   borderRadius: "12px",
   background: "rgba(255, 255, 255, 0.12)",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "1px solid rgba(255, 255, 255, 0.2)",
   fontSize: "12px",
   fontWeight: "700",
@@ -3280,7 +3280,7 @@ const desktopSearchActiveBanner = {
 const desktopSearchClearBtn = {
   background: "none",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer"
@@ -3319,7 +3319,7 @@ const desktopSearchInput = {
   flex: 1,
   background: "transparent",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "14px",
   outline: "none"
 };
@@ -3515,7 +3515,7 @@ const desktopSideCreatorInfo = {
 const desktopSideCreatorName = {
   fontSize: "14px",
   fontWeight: "700",
-  color: "#ffffff",
+  color: "#d4d4d8",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -3614,8 +3614,8 @@ const videoContainerStyle = { position: "relative", borderRadius: "16px", overfl
 
 // 🟢 FIX: Let media scale naturally up to 600px tall
 const thumbnailImgStyle = { width: "100%", height: "100%", maxHeight: "560px", objectFit: "cover", display: "block" };
-const playOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "48px", height: "48px", borderRadius: "50%", background: "rgba(0, 0, 0, 0.6)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,0.5)", border: "1.5px solid rgba(255,255,255,0.25)", backdropFilter: "blur(4px)" };
-const groupBadgeStyle = { position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.15)", zIndex: 11 };
+const playOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "48px", height: "48px", borderRadius: "50%", background: "rgba(0, 0, 0, 0.6)", color: "#d4d4d8", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,0.5)", border: "1.5px solid rgba(255,255,255,0.25)", backdropFilter: "blur(4px)" };
+const groupBadgeStyle = { position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.6)", color: "#d4d4d8", fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.15)", zIndex: 11 };
 const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "12px", maxWidth: "425px" };
 const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", color: "#71767b", fontSize: "13px", cursor: "pointer", transition: "color 0.2s ease" };
 const skeletonAvatar = { width: "40px", height: "40px", borderRadius: "50%", animation: "skeleton-loading 1.5s infinite" };
@@ -3645,7 +3645,7 @@ const igSuggestedTitle = {
   fontSize: "14px",
   fontWeight: "700",
   letterSpacing: "0.2px",
-  color: "#ffffff"
+  color: "#d4d4d8"
 };
 
 const igSeeAllBtn = {
@@ -3674,7 +3674,7 @@ const igArrowBtn = {
   borderRadius: "50%",
   background: "rgba(255, 255, 255, 0.08)",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
@@ -3779,7 +3779,7 @@ const igVerifiedBadge = {
 const igDisplayName = {
   fontSize: "14px",
   fontWeight: "700",
-  color: "#ffffff",
+  color: "#d4d4d8",
   textAlign: "center",
   maxWidth: "calc(100% - 18px)",
   whiteSpace: "nowrap",
@@ -3852,7 +3852,7 @@ const vipBadgePillStyle = {
   top: "12px",
   left: "12px",
   background: "rgba(0, 0, 0, 0.55)",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "1px solid rgba(255, 255, 255, 0.18)",
   padding: "3px 8px",
   borderRadius: "6px",
@@ -3887,7 +3887,7 @@ const vipLockCircleStyle = {
 
 const vipSubscribeButtonStyle = {
   background: "#e11d48",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "none",
   borderRadius: "100px",
   padding: "10px 18px",
@@ -3907,7 +3907,7 @@ const vipUnlockedBadgeStyle = {
   top: "12px",
   left: "12px",
   background: "rgba(0, 0, 0, 0.55)",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "1px solid rgba(255, 255, 255, 0.18)",
   padding: "3px 8px",
   borderRadius: "6px",
@@ -3964,7 +3964,7 @@ const albumCardCounterStyle = {
   top: "10px",
   right: "10px",
   background: "rgba(0, 0, 0, 0.65)",
-  color: "#fff",
+  color: "#d4d4d8",
   fontSize: "10.5px",
   fontWeight: "700",
   padding: "3px 8px",
@@ -4010,7 +4010,7 @@ const albumSubscribeBarBtnStyle = {
   borderRadius: "24px",
   background: "#e11d48",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "13px",
   fontWeight: "700",
   cursor: "pointer",
@@ -4035,7 +4035,7 @@ const carouselNavBtnStyle = {
   borderRadius: "50%",
   background: "rgba(0, 0, 0, 0.75)",
   border: "1px solid rgba(255, 255, 255, 0.25)",
-  color: "#fff",
+  color: "#d4d4d8",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",

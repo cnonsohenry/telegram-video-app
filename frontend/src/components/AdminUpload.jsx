@@ -62,7 +62,7 @@ function CreatorDropdown({ creators, selectedKey, onSelect }) {
           alignItems: "center",
           justifyContent: "space-between",
           cursor: "pointer",
-          color: "#fff",
+          color: "#d4d4d8",
           transition: "all 0.2s ease",
           textAlign: "left",
           outline: "none"
@@ -86,7 +86,7 @@ function CreatorDropdown({ creators, selectedKey, onSelect }) {
             {selectedKey === "custom" ? "⚙️" : (selectedCreator?.displayName?.charAt(0) || "👤")}
           </div>
           <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-            <span style={{ fontSize: "14px", fontWeight: "700", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <span style={{ fontSize: "14px", fontWeight: "700", color: "#d4d4d8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {selectedKey === "custom" ? "Custom Creator / Channel" : (selectedCreator?.displayName || "Select Creator")}
             </span>
             <span style={{ fontSize: "11px", color: selectedKey === "custom" ? "#ffa500" : "#888", whiteSpace: "nowrap" }}>
@@ -139,7 +139,7 @@ function CreatorDropdown({ creators, selectedKey, onSelect }) {
                     borderRadius: "8px",
                     padding: "6px 10px 6px 30px",
                     fontSize: "12px",
-                    color: "#fff",
+                    color: "#d4d4d8",
                     outline: "none"
                   }}
                 />
@@ -166,7 +166,7 @@ function CreatorDropdown({ creators, selectedKey, onSelect }) {
                     borderRadius: "8px",
                     cursor: "pointer",
                     background: isSelected ? "rgba(225, 29, 72, 0.15)" : "transparent",
-                    color: isSelected ? "#fff" : "#ccc",
+                    color: isSelected ? "#d4d4d8" : "#a1a1aa",
                     transition: "background 0.15s"
                   }}
                   onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#242428"; }}
@@ -178,7 +178,7 @@ function CreatorDropdown({ creators, selectedKey, onSelect }) {
                       height: "28px",
                       borderRadius: "50%",
                       background: isSelected ? "var(--primary-color, #e11d48)" : "#2a2a2e",
-                      color: "#fff",
+                      color: "#d4d4d8",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -189,7 +189,7 @@ function CreatorDropdown({ creators, selectedKey, onSelect }) {
                       {c.displayName?.charAt(0) || "👤"}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                      <span style={{ fontSize: "13px", fontWeight: isSelected ? "700" : "500", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <span style={{ fontSize: "13px", fontWeight: isSelected ? "700" : "500", color: "#d4d4d8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {c.displayName}
                       </span>
                       <span style={{ fontSize: "11px", color: isSelected ? "rgba(255,255,255,0.8)" : "#777" }}>
@@ -294,7 +294,7 @@ function TelegramDestDropdown({ destinations, selectedDestId, onSelect }) {
           alignItems: "center",
           justifyContent: "space-between",
           cursor: "pointer",
-          color: "#fff",
+          color: "#d4d4d8",
           transition: "border-color 0.2s",
           outline: "none"
         }}
@@ -313,7 +313,7 @@ function TelegramDestDropdown({ destinations, selectedDestId, onSelect }) {
           }}>
             <Send size={14} />
           </div>
-          <span style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>
+          <span style={{ fontSize: "13px", fontWeight: "700", color: "#d4d4d8" }}>
             {selectedDest?.label || "Select Destination Channel"}
           </span>
         </div>
@@ -361,7 +361,7 @@ function TelegramDestDropdown({ destinations, selectedDestId, onSelect }) {
                   borderRadius: "8px",
                   cursor: "pointer",
                   background: isSelected ? "rgba(0, 136, 204, 0.2)" : "transparent",
-                  color: isSelected ? "#fff" : "#ccc",
+                  color: isSelected ? "#d4d4d8" : "#a1a1aa",
                   transition: "background 0.15s"
                 }}
                 onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "#242428"; }}
@@ -409,7 +409,7 @@ function RoutingPipelineControl({ pipelineRoute, setPipelineRoute, telegramDest,
               borderRadius: "8px",
               border: "none",
               background: pipelineRoute === "direct" ? "var(--primary-color, #e11d48)" : "transparent",
-              color: pipelineRoute === "direct" ? "#fff" : "#888",
+              color: pipelineRoute === "direct" ? "#d4d4d8" : "#888",
               fontSize: "12px",
               fontWeight: "700",
               cursor: "pointer",
@@ -431,7 +431,7 @@ function RoutingPipelineControl({ pipelineRoute, setPipelineRoute, telegramDest,
               borderRadius: "8px",
               border: "none",
               background: pipelineRoute === "telethon" ? "#0088cc" : "transparent",
-              color: pipelineRoute === "telethon" ? "#fff" : "#888",
+              color: pipelineRoute === "telethon" ? "#d4d4d8" : "#888",
               fontSize: "12px",
               fontWeight: "700",
               cursor: "pointer",
@@ -1140,7 +1140,7 @@ export default function AdminUpload({ onClose }) {
       {/* Instagram-style Top Navigation Bar */}
       <div style={topNavStyle}>
         <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
-          <ArrowLeft size={24} color="#fff" />
+          <ArrowLeft size={24} color="#d4d4d8" />
         </button>
 
         <span style={topNavTitleStyle}>
@@ -1156,7 +1156,7 @@ export default function AdminUpload({ onClose }) {
           <div style={tabsContainerStyle}>
             <button 
               onClick={() => setUploadMode("local")} 
-              style={{ ...tabStyle, padding: "8px 2px", background: uploadMode === "local" ? "#333" : "transparent", color: uploadMode === "local" ? "#fff" : "#888" }}
+              style={{ ...tabStyle, padding: "8px 2px", background: uploadMode === "local" ? "#333" : "transparent", color: uploadMode === "local" ? "#d4d4d8" : "#888" }}
             >
               Local
             </button>
@@ -1281,7 +1281,7 @@ export default function AdminUpload({ onClose }) {
                       background: isSelected
                         ? (isVip ? "rgba(255, 215, 0, 0.16)" : "rgba(225, 29, 72, 0.18)")
                         : "#1c1c1f",
-                      color: isSelected ? (isVip ? "#ffd700" : "#fff") : "#999",
+                      color: isSelected ? (isVip ? "#ffd700" : "#d4d4d8") : "#999",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -1325,7 +1325,7 @@ export default function AdminUpload({ onClose }) {
                   borderRadius: "8px",
                   border: "none",
                   background: uploadTarget === "r2" ? "var(--primary-color, #e11d48)" : "transparent",
-                  color: uploadTarget === "r2" ? "#fff" : "#888",
+                  color: uploadTarget === "r2" ? "#d4d4d8" : "#888",
                   fontSize: "12px",
                   fontWeight: "700",
                   cursor: "pointer",
@@ -1347,7 +1347,7 @@ export default function AdminUpload({ onClose }) {
                   borderRadius: "8px",
                   border: "none",
                   background: uploadTarget === "stream" ? "var(--primary-color, #e11d48)" : "transparent",
-                  color: uploadTarget === "stream" ? "#fff" : "#888",
+                  color: uploadTarget === "stream" ? "#d4d4d8" : "#888",
                   fontSize: "12px",
                   fontWeight: "700",
                   cursor: "pointer",
@@ -1388,7 +1388,7 @@ export default function AdminUpload({ onClose }) {
                   borderRadius: "8px",
                   border: "none",
                   background: applyWatermark ? "var(--primary-color, #e11d48)" : "transparent",
-                  color: applyWatermark ? "#fff" : "#888",
+                  color: applyWatermark ? "#d4d4d8" : "#888",
                   fontSize: "12px",
                   fontWeight: "700",
                   cursor: "pointer",
@@ -1410,7 +1410,7 @@ export default function AdminUpload({ onClose }) {
                   borderRadius: "8px",
                   border: "none",
                   background: !applyWatermark ? "#333338" : "transparent",
-                  color: !applyWatermark ? "#fff" : "#888",
+                  color: !applyWatermark ? "#d4d4d8" : "#888",
                   fontSize: "12px",
                   fontWeight: "700",
                   cursor: "pointer",
@@ -1441,7 +1441,7 @@ export default function AdminUpload({ onClose }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <Scissors size={18} color="var(--primary-color, #e11d48)" />
-                <span style={{ fontSize: "12px", fontWeight: "700", color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                <span style={{ fontSize: "12px", fontWeight: "700", color: "#d4d4d8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                   Video Section & Length
                 </span>
               </div>
@@ -1472,7 +1472,7 @@ export default function AdminUpload({ onClose }) {
                     borderRadius: "8px",
                     border: trimMode === m.id ? "1px solid var(--primary-color, #e11d48)" : "1px solid #333",
                     background: trimMode === m.id ? "rgba(225, 29, 72, 0.2)" : "#262628",
-                    color: trimMode === m.id ? "#fff" : "#999",
+                    color: trimMode === m.id ? "#d4d4d8" : "#999",
                     fontSize: "12px",
                     fontWeight: "700",
                     cursor: "pointer",
@@ -1514,7 +1514,7 @@ export default function AdminUpload({ onClose }) {
                         borderRadius: "8px",
                         border: (trimDuration === sec && !customDuration) ? "1px solid var(--primary-color, #e11d48)" : "1px solid #333",
                         background: (trimDuration === sec && !customDuration) ? "var(--primary-color, #e11d48)" : "#262628",
-                        color: (trimDuration === sec && !customDuration) ? "#fff" : "#bbb",
+                        color: (trimDuration === sec && !customDuration) ? "#d4d4d8" : "#bbb",
                         fontSize: "12px",
                         fontWeight: "700",
                         cursor: "pointer"
@@ -1537,7 +1537,7 @@ export default function AdminUpload({ onClose }) {
                       borderRadius: "8px",
                       border: trimDuration === "custom" ? "1px solid var(--primary-color, #e11d48)" : "1px solid #333",
                       background: trimDuration === "custom" ? "var(--primary-color, #e11d48)" : "#262628",
-                      color: trimDuration === "custom" ? "#fff" : "#bbb",
+                      color: trimDuration === "custom" ? "#d4d4d8" : "#bbb",
                       fontSize: "12px",
                       fontWeight: "700",
                       cursor: "pointer"
@@ -1563,7 +1563,7 @@ export default function AdminUpload({ onClose }) {
                         flex: 1,
                         background: "#2c2c2e",
                         border: "1px solid #3a3a3c",
-                        color: "#fff",
+                        color: "#d4d4d8",
                         padding: "8px 12px",
                         borderRadius: "8px",
                         fontSize: "13px",
@@ -1609,7 +1609,7 @@ export default function AdminUpload({ onClose }) {
                       {(() => {
                         const { start, end, duration } = getTrimRange();
                         return (
-                          <span style={{ color: "#fff", fontWeight: "700" }}>
+                          <span style={{ color: "#d4d4d8", fontWeight: "700" }}>
                             ✂️ {formatTime(start)} ➔ {formatTime(end)} ({duration}s from {trimMode})
                           </span>
                         );
@@ -1657,7 +1657,7 @@ export default function AdminUpload({ onClose }) {
                           borderRadius: "6px",
                           border: "none",
                           background: isPlayingPreview ? "#444" : "var(--primary-color, #e11d48)",
-                          color: "#fff",
+                          color: "#d4d4d8",
                           fontSize: "12px",
                           fontWeight: "700",
                           cursor: "pointer"
@@ -1903,7 +1903,7 @@ const topNavStyle = {
 const navBackBtnStyle = {
   background: "none",
   border: "none",
-  color: "#fff",
+  color: "#d4d4d8",
   cursor: "pointer",
   padding: "6px",
   display: "flex",
@@ -1913,7 +1913,7 @@ const navBackBtnStyle = {
 const topNavTitleStyle = {
   fontSize: "16px",
   fontWeight: "700",
-  color: "#fff",
+  color: "#d4d4d8",
   letterSpacing: "0.2px"
 };
 
@@ -1939,6 +1939,6 @@ const tabStyle = { flex: 1, padding: "8px 4px", border: "none", borderRadius: "8
 const formStyle = { display: "flex", flexDirection: "column", gap: "20px" };
 const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "8px" };
 const labelStyle = { fontSize: "12px", fontWeight: "700", color: "#888", textTransform: "uppercase" };
-const inputStyle = { width: "100%", boxSizing: "border-box", background: "#2c2c2e", border: "1px solid #3a3a3c", color: "#fff", padding: "12px", borderRadius: "8px", fontSize: "14px", outline: "none" };
+const inputStyle = { width: "100%", boxSizing: "border-box", background: "#2c2c2e", border: "1px solid #3a3a3c", color: "#d4d4d8", padding: "12px", borderRadius: "8px", fontSize: "14px", outline: "none" };
 const fileDropStyle = { position: "relative", height: "120px", border: "2px dashed #444", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", background: "#121212", transition: "0.2s" };
-const buttonStyle = { padding: "14px", borderRadius: "12px", border: "none", color: "#fff", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px", transition: "0.2s" };
+const buttonStyle = { padding: "14px", borderRadius: "12px", border: "none", color: "#d4d4d8", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px", transition: "0.2s" };

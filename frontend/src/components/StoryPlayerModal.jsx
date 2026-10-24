@@ -338,7 +338,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "#fff",
+            color: "#d4d4d8",
             cursor: "pointer",
             zIndex: 100,
             transition: "all 0.2s"
@@ -375,7 +375,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "#fff",
+            color: "#d4d4d8",
             cursor: "pointer",
             zIndex: 100,
             transition: "all 0.2s"
@@ -493,7 +493,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#fff",
+              color: "#d4d4d8",
               cursor: "pointer",
               zIndex: 25,
               opacity: 0.7,
@@ -533,7 +533,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#fff",
+              color: "#d4d4d8",
               cursor: "pointer",
               zIndex: 25,
               opacity: 0.7,
@@ -594,7 +594,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                     style={{
                       height: "100%",
                       width: `${fill}%`,
-                      backgroundColor: "#ffffff",
+                      backgroundColor: "#d4d4d8",
                       transition: idx === currentIndex && !isPaused ? "width 0.1s linear" : "none"
                     }}
                   />
@@ -637,7 +637,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <span
                     style={{
-                      color: "#fff",
+                      color: "#d4d4d8",
                       fontWeight: "700",
                       fontSize: "15px",
                       whiteSpace: "nowrap",
@@ -713,7 +713,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                   alignItems: "center",
                   justifyContent: "center",
                   cursor: "pointer",
-                  color: "#fff",
+                  color: "#d4d4d8",
                   padding: 0,
                   filter: "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))"
                 }}
@@ -746,7 +746,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
               pointerEvents: "none"
             }}
           >
-            <svg width="28" height="28" fill="#ffffff" viewBox="0 0 24 24">
+            <svg width="28" height="28" fill="#d4d4d8" viewBox="0 0 24 24">
               <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
             </svg>
           </div>
@@ -773,7 +773,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
-            color: "#ffffff",
+            color: "#d4d4d8",
             padding: 0,
             filter: "drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7))"
           }}

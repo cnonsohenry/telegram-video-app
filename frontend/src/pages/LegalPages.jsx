@@ -208,7 +208,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
               <div style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.08em", color: "var(--primary-color)", textTransform: "uppercase" }}>
                 Legal Center
               </div>
-              <h2 style={{ fontSize: "15px", margin: 0, fontWeight: "700", color: "#fff", lineHeight: "1.2" }}>
+              <h2 style={{ fontSize: "15px", margin: 0, fontWeight: "700", color: "#d4d4d8", lineHeight: "1.2" }}>
                 {activeTabDetails.shortLabel}
               </h2>
             </div>
@@ -245,7 +245,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
                     background: isActive 
                       ? "linear-gradient(135deg, var(--primary-color) 0%, #e02424 100%)" 
                       : "rgba(255, 255, 255, 0.05)",
-                    color: isActive ? "#ffffff" : "#a1a1aa",
+                    color: isActive ? "#d4d4d8" : "#a1a1aa",
                     borderColor: isActive ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.08)",
                     boxShadow: isActive ? "0 4px 16px var(--primary-glow)" : "none",
                     fontWeight: isActive ? "700" : "500",
@@ -292,7 +292,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
                   Policies & Legal
                 </span>
               </div>
-              <h2 style={{ fontSize: "22px", margin: 0, fontWeight: "900", color: "#ffffff", letterSpacing: "-0.02em" }}>
+              <h2 style={{ fontSize: "22px", margin: 0, fontWeight: "900", color: "#d4d4d8", letterSpacing: "-0.02em" }}>
                 Legal Center
               </h2>
             </div>
@@ -333,7 +333,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
                     <div style={{
                       ...tabIconBoxStyle,
                       background: isActive ? "var(--primary-color)" : "rgba(255, 255, 255, 0.06)",
-                      color: isActive ? "#ffffff" : "#a1a1aa",
+                      color: isActive ? "#d4d4d8" : "#a1a1aa",
                       boxShadow: isActive ? "0 2px 10px var(--primary-glow)" : "none"
                     }}>
                       <TabIcon size={16} strokeWidth={isActive ? 2.5 : 2} />
@@ -344,7 +344,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
                       <div style={{ 
                         fontSize: "14px", 
                         fontWeight: isActive ? "700" : "500", 
-                        color: isActive ? "#ffffff" : "#d4d4d8",
+                        color: isActive ? "#d4d4d8" : "#a1a1aa",
                         lineHeight: "1.3"
                       }}>
                         {tab.label}
@@ -374,7 +374,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
             <div style={sidebarFooterBadgeStyle}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
                 <ShieldCheck size={18} color="#f43f5e" />
-                <span style={{ fontSize: "12px", fontWeight: "700", color: "#ffffff" }}>
+                <span style={{ fontSize: "12px", fontWeight: "700", color: "#d4d4d8" }}>
                   Verified & Compliant
                 </span>
               </div>
@@ -481,7 +481,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
                   <ChevronLeft size={16} />
                   <span>Previous</span>
                 </div>
-                <div style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff", marginTop: "4px" }}>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: "#d4d4d8", marginTop: "4px" }}>
                   {prevTab.label}
                 </div>
               </button>
@@ -504,7 +504,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
                   <span>Next</span>
                   <ChevronRight size={16} />
                 </div>
-                <div style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff", marginTop: "4px" }}>
+                <div style={{ fontSize: "14px", fontWeight: "700", color: "#d4d4d8", marginTop: "4px" }}>
                   {nextTab.label}
                 </div>
               </button>
@@ -551,7 +551,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
         }
 
         .legal-article-content h2 {
-          color: #ffffff !important;
+          color: #d4d4d8 !important;
           font-size: 19px !important;
           font-weight: 700 !important;
           letter-spacing: -0.01em !important;
@@ -565,7 +565,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
         }
 
         .legal-article-content h3 {
-          color: #f4f4f5 !important;
+          color: #d4d4d8 !important;
           font-size: 16px !important;
           font-weight: 600 !important;
           margin-top: 24px !important;
@@ -573,19 +573,19 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
         }
 
         .legal-article-content p {
-          color: #d4d4d8 !important;
+          color: #c4c4c8 !important;
           line-height: 1.75 !important;
           font-size: 14.5px !important;
           margin-bottom: 16px !important;
         }
 
         .legal-article-content strong {
-          color: #ffffff !important;
+          color: #d4d4d8 !important;
           font-weight: 600 !important;
         }
 
         .legal-article-content ul, .legal-article-content ol {
-          color: #d4d4d8 !important;
+          color: #c4c4c8 !important;
           padding-left: 20px !important;
           margin-bottom: 20px !important;
           line-height: 1.7 !important;
@@ -627,7 +627,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
 
         .legal-article-content th {
           background: rgba(255, 255, 255, 0.05) !important;
-          color: #ffffff !important;
+          color: #d4d4d8 !important;
           font-weight: 700 !important;
           padding: 14px 16px !important;
           border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -636,7 +636,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
         .legal-article-content td {
           padding: 12px 16px !important;
           border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
-          color: #d4d4d8 !important;
+          color: #c4c4c8 !important;
         }
 
         .legal-article-content tr:last-child td {
@@ -660,7 +660,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
 const containerStyle = { 
   minHeight: "100vh", 
   background: "var(--bg-color, #0a0a0c)", 
-  color: "#ffffff", 
+  color: "#d4d4d8", 
   position: "fixed", 
   inset: 0, 
   zIndex: 100000, 
@@ -686,7 +686,7 @@ const mobileBackBtnStyle = {
   background: "rgba(255, 255, 255, 0.06)", 
   border: "1px solid rgba(255, 255, 255, 0.1)", 
   borderRadius: "50%", 
-  color: "#ffffff", 
+  color: "#d4d4d8", 
   cursor: "pointer", 
   display: "flex", 
   alignItems: "center", 
@@ -788,7 +788,7 @@ const desktopTabItemStyle = {
   padding: "11px 14px", 
   borderRadius: "12px", 
   border: "1px solid", 
-  color: "#ffffff", 
+  color: "#d4d4d8", 
   cursor: "pointer", 
   textAlign: "left", 
   transition: "all 0.22s cubic-bezier(0.16, 1, 0.3, 1)" 
@@ -828,7 +828,7 @@ const docTagStyle = {
   fontSize: "11px",
   fontWeight: "800",
   letterSpacing: "0.08em",
-  color: "#ffffff"
+  color: "#d4d4d8"
 };
 
 const copyLinkPillStyle = {
@@ -852,7 +852,7 @@ const docTitleStyle = {
   margin: "0 0 10px 0", 
   letterSpacing: "-0.03em",
   lineHeight: "1.15",
-  background: "linear-gradient(135deg, #ffffff 40%, #a1a1aa 100%)",
+  background: "linear-gradient(135deg, #d4d4d8 40%, #a1a1aa 100%)",
   WebkitBackgroundClip: "text",
   WebkitTextFillColor: "transparent"
 };

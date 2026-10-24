@@ -3,12 +3,12 @@ import React from "react";
 import { APP_CONFIG } from "../../config";
 
 export default function Cookies() {
-  const headerStyle = { color: "#fff", marginTop: "40px", marginBottom: "15px", fontSize: "24px", borderBottom: "1px solid #333", paddingBottom: "10px" };
-  const subHeaderStyle = { color: "#fff", marginTop: "25px", marginBottom: "10px", fontSize: "18px", fontWeight: "600" };
+  const headerStyle = { color: "#d4d4d8", marginTop: "40px", marginBottom: "15px", fontSize: "24px", borderBottom: "1px solid #333", paddingBottom: "10px" };
+  const subHeaderStyle = { color: "#d4d4d8", marginTop: "25px", marginBottom: "10px", fontSize: "18px", fontWeight: "600" };
   const textBlockStyle = { marginBottom: "15px" };
   const tableWrapperStyle = { overflowX: "auto", marginBottom: "30px", borderRadius: "8px", border: "1px solid #333" };
   const tableStyle = { width: "100%", borderCollapse: "collapse", fontSize: "13px", textAlign: "left" };
-  const thStyle = { background: "#1a1a1a", color: "#fff", padding: "12px", borderBottom: "1px solid #333" };
+  const thStyle = { background: "#1a1a1a", color: "#d4d4d8", padding: "12px", borderBottom: "1px solid #333" };
   const tdStyle = { padding: "12px", borderBottom: "1px solid #222" };
 
   // 🟢 THE FIX: Auto-format the brand name and domain

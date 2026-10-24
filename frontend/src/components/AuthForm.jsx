@@ -44,7 +44,7 @@ const FloatingSelect = ({ label, value, onChange, options, ...props }) => {
           border: `1.5px solid ${isFocused ? "#777" : "#333"}`,
           borderRadius: "30px",
           padding: "22px 40px 8px 20px",
-          color: "#fff",
+          color: "#d4d4d8",
           fontSize: "15px",
           outline: "none",
           appearance: "none",
@@ -59,7 +59,7 @@ const FloatingSelect = ({ label, value, onChange, options, ...props }) => {
         {options.map(opt => {
           const val = typeof opt === "object" ? opt.value : opt;
           const lab = typeof opt === "object" ? opt.label : opt;
-          return <option key={val} value={val} style={{ background: "#16181c", color: "#fff" }}>{lab}</option>;
+          return <option key={val} value={val} style={{ background: "#16181c", color: "#d4d4d8" }}>{lab}</option>;
         })}
       </select>
       <div style={{ position: "absolute", right: "20px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "#8e8e93", fontSize: "11px" }}>▼</div>
@@ -103,7 +103,7 @@ const FloatingInput = ({ label, type = "text", value, onChange, rightIcon, statu
           border: `1.5px solid ${borderColor}`,
           borderRadius: "30px",
           padding: "22px 45px 8px 20px", 
-          color: "#fff",
+          color: "#d4d4d8",
           fontSize: "15px",
           outline: "none",
           boxSizing: "border-box",
@@ -317,7 +317,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
       {/* Top Bar with Close Button */}
       <div style={topBarStyle}>
         <button onClick={onClose} style={closeButtonStyle}>
-          <X size={24} color="#fff" />
+          <X size={24} color="#d4d4d8" />
         </button>
       </div>
 
@@ -336,7 +336,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
               style={{
                 ...tabSwitcherButton,
                 backgroundColor: authTab === "member" ? "#222" : "transparent",
-                color: authTab === "member" ? "#fff" : "#8e8e93",
+                color: authTab === "member" ? "#d4d4d8" : "#8e8e93",
                 fontWeight: authTab === "member" ? "700" : "500"
               }}
             >
@@ -352,7 +352,7 @@ export default function AuthForm({ onLoginSuccess, onClose }) {
               style={{
                 ...tabSwitcherButton,
                 backgroundColor: authTab === "creator" ? "#222" : "transparent",
-                color: authTab === "creator" ? "#fff" : "#8e8e93",
+                color: authTab === "creator" ? "#d4d4d8" : "#8e8e93",
                 fontWeight: authTab === "creator" ? "700" : "500",
                 display: "flex",
                 alignItems: "center",
@@ -567,7 +567,7 @@ const errorBannerStyle = { background: "rgba(255, 59, 48, 0.1)", color: "#ff3b30
 const contentWrapper = { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", width: "100%", overflowY: "auto", paddingTop: "50px" };
 const innerContainer = { width: "100%", maxWidth: "360px", display: "flex", flexDirection: "column", alignItems: "center", padding: "16px 20px", marginTop: "auto" };
 const footerWrapperStyle = { width: "100%", marginTop: "auto" };
-const logoStyle = { fontSize: "20px", marginBottom: "16px", color: "#fff", fontWeight: "900", letterSpacing: "-1px" };
+const logoStyle = { fontSize: "20px", marginBottom: "16px", color: "#d4d4d8", fontWeight: "900", letterSpacing: "-1px" };
 
 const tabSwitcherContainer = {
   display: "flex",
@@ -590,7 +590,7 @@ const tabSwitcherButton = {
 };
 
 const formStyle = { width: "100%", display: "flex", flexDirection: "column", gap: "10px" }; 
-const loginButtonStyle = { color: "#fff", border: "none", borderRadius: "30px", padding: "16px", fontSize: "15px", fontWeight: "800", marginTop: "8px", cursor: "pointer", transition: "opacity 0.2s" };
+const loginButtonStyle = { color: "#d4d4d8", border: "none", borderRadius: "30px", padding: "16px", fontSize: "15px", fontWeight: "800", marginTop: "8px", cursor: "pointer", transition: "opacity 0.2s" };
 const eyeButtonStyle = { background: "none", border: "none", color: "#666", display: "flex", cursor: "pointer", padding: "5px" };
 const dividerContainer = { width: "100%", display: "flex", alignItems: "center", margin: "16px 0 14px 0", gap: "15px" };
 const line = { flex: 1, height: "1px", background: "#262626" };

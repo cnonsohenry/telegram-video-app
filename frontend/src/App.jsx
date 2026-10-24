@@ -945,7 +945,7 @@ export default function App() {
       height: appHeight, // 🟢 NO MORE 100dvh! Frozen rigid height.
       width: '100vw', 
       backgroundColor: 'var(--bg-color)', 
-      color: '#fff', 
+      color: '#d4d4d8', 
       overflow: 'hidden',
       position: 'fixed',
       top: 0, 

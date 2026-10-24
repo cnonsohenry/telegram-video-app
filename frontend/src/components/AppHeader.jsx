@@ -259,7 +259,7 @@ export default function AppHeader({
         <div style={searchOverlayStyle}>
           <div style={overlayHeaderStyle}>
             <button onClick={handleCloseSearch} style={iconBtnStyle}>
-              <ArrowLeft size={24} color="#fff" />
+              <ArrowLeft size={24} color="#d4d4d8" />
             </button>
             <div style={activeSearchBarStyle}>
               <Search size={16} color="#8e8e8e" />
@@ -335,7 +335,7 @@ export default function AppHeader({
                                 top: "6px",
                                 left: "6px",
                                 background: "rgba(0, 0, 0, 0.55)",
-                                color: "#ffffff",
+                                color: "#d4d4d8",
                                 border: "1px solid rgba(255, 255, 255, 0.18)",
                                 padding: "2px 6px",
                                 borderRadius: "4px",
@@ -349,7 +349,7 @@ export default function AppHeader({
                             ) : (
                               isDesktop && (
                                 <div style={viewsOverlay}>
-                                  <Play size={10} fill="#fff" strokeWidth={0} />
+                                  <Play size={10} fill="#d4d4d8" strokeWidth={0} />
                                   {Number(v.views).toLocaleString()}
                                 </div>
                               )
@@ -436,7 +436,7 @@ export default function AppHeader({
                               </div>
 
                               <div style={{ display: "flex", alignItems: "center", gap: "4px", maxWidth: "100%", justifyContent: "center" }}>
-                                <span style={{ fontWeight: "700", fontSize: "13.5px", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                <span style={{ fontWeight: "700", fontSize: "13.5px", color: "#d4d4d8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                                   {creator.display_name || creator.username}
                                 </span>
                                 {creator.is_verified && (
@@ -496,7 +496,7 @@ export default function AppHeader({
                                   top: "6px",
                                   left: "6px",
                                   background: "rgba(0, 0, 0, 0.55)",
-                                  color: "#ffffff",
+                                  color: "#d4d4d8",
                                   border: "1px solid rgba(255, 255, 255, 0.18)",
                                   padding: "2px 6px",
                                   borderRadius: "4px",
@@ -510,7 +510,7 @@ export default function AppHeader({
                               ) : (
                                 isDesktop && (
                                   <div style={viewsOverlay}>
-                                    <Play size={10} fill="#fff" strokeWidth={0} />
+                                    <Play size={10} fill="#d4d4d8" strokeWidth={0} />
                                     {Number(v.views).toLocaleString()}
                                   </div>
                                 )
@@ -539,7 +539,7 @@ export default function AppHeader({
                                   top: "6px",
                                   left: "6px",
                                   background: "rgba(0, 0, 0, 0.55)",
-                                  color: "#ffffff",
+                                  color: "#d4d4d8",
                                   border: "1px solid rgba(255, 255, 255, 0.18)",
                                   padding: "2px 6px",
                                   borderRadius: "4px",
@@ -552,7 +552,7 @@ export default function AppHeader({
                                 </div>
                               ) : (
                                 <div style={viewsOverlay}>
-                                  <Play size={10} fill="#fff" strokeWidth={0} />
+                                  <Play size={10} fill="#d4d4d8" strokeWidth={0} />
                                   {Number(v.views).toLocaleString()}
                                 </div>
                               )}
@@ -599,7 +599,7 @@ export default function AppHeader({
           <div style={{ display: "flex", alignItems: "center", gap: "25px" }}>
             <div style={searchBarStyle} onClick={handleOpenSearch}>
               <Search size={18} color="#8e8e8e" />
-              <div style={{ ...inputStyle, color: searchTerm ? "#fff" : "#8e8e8e", cursor: "text" }}>
+              <div style={{ ...inputStyle, color: searchTerm ? "#d4d4d8" : "#8e8e8e", cursor: "text" }}>
                 {searchTerm || APP_CONFIG.searchPlaceholder}
               </div>
             </div>
@@ -624,7 +624,7 @@ export default function AppHeader({
             <span style={{ color: "var(--primary-color)" }}>{APP_CONFIG.appNameSuffix}</span>
           </h1>
           <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-            <Search size={22} color="#fff" onClick={handleOpenSearch} />
+            <Search size={22} color="#d4d4d8" onClick={handleOpenSearch} />
             <button onClick={onProfileClick} style={profileBtnStyle}>
               {isLoggedIn ? (
                 <img src={user.avatar_url || "/assets/default-avatar.png"} alt="P" style={avatarStyle(false)} />
@@ -646,7 +646,7 @@ const searchBarStyle = { display: "flex", alignItems: "center", background: "#1c
 const inputStyle = { background: "none", border: "none", color: "#d4d4d8", padding: "10px", width: "100%", outline: "none", fontSize: "14px" };
 const profileBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: 0 };
 const avatarStyle = (isDesktop) => ({ width: isDesktop ? "36px" : "30px", height: isDesktop ? "36px" : "30px", borderRadius: "50%", border: "2px solid var(--primary-color)", objectFit: "cover" });
-const loginBadgeStyle = { background: "var(--primary-color)", color: "#fff", padding: "6px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "800" };
+const loginBadgeStyle = { background: "var(--primary-color)", color: "#d4d4d8", padding: "6px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "800" };
 const mobileHeaderStyle = { zIndex: 100, padding: "12px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#09090b", borderBottom: "1px solid rgba(255, 255, 255, 0.08)" };
 
 const searchOverlayStyle = { position: "fixed", inset: 0, zIndex: 1000100, background: "var(--bg-color)", display: "flex", flexDirection: "column", animation: "fadeIn 0.2s ease-out" };

@@ -4,8 +4,8 @@ import React from "react";
 import { APP_CONFIG } from "../../config";
 
 export default function Privacy() {
-  const headerStyle = { color: "#fff", marginTop: "40px", marginBottom: "15px", fontSize: "24px", borderBottom: "1px solid #333", paddingBottom: "10px" };
-  const subHeaderStyle = { color: "#fff", marginTop: "25px", marginBottom: "10px", fontSize: "19px", fontWeight: "600" };
+  const headerStyle = { color: "#d4d4d8", marginTop: "40px", marginBottom: "15px", fontSize: "24px", borderBottom: "1px solid #333", paddingBottom: "10px" };
+  const subHeaderStyle = { color: "#d4d4d8", marginTop: "25px", marginBottom: "10px", fontSize: "19px", fontWeight: "600" };
   const textBlockStyle = { marginBottom: "15px" };
   const highlightBox = { background: "#1a1a1a", padding: "20px", borderRadius: "8px", border: "1px solid #333", margin: "20px 0" };
 
@@ -64,7 +64,7 @@ export default function Privacy() {
       <section>
         <h2 style={headerStyle}>2. Our Policy Towards Minors</h2>
         <div style={{ ...highlightBox, borderColor: "#ff4d4d" }}>
-          <p style={{ margin: 0, color: "#fff" }}>
+          <p style={{ margin: 0, color: "#d4d4d8" }}>
             <strong>STRICT PROHIBITION:</strong> {brandName} prohibits minors from using the platform. Access is 
             forbidden for persons under the age of 18. If you believe a minor has provided us with personal 
             information, contact <strong>{APP_CONFIG.supportEmail}</strong> immediately for deletion.
@@ -124,7 +124,7 @@ export default function Privacy() {
       <section>
         <h2 style={headerStyle}>5. Google API Services & OAuth 2.0 User Data Policy</h2>
         <div style={{ ...highlightBox, borderColor: "rgba(225, 29, 72, 0.3)" }}>
-          <p style={{ margin: "0 0 12px 0", color: "#fff", fontWeight: "700", fontSize: "16px" }}>
+          <p style={{ margin: "0 0 12px 0", color: "#d4d4d8", fontWeight: "700", fontSize: "16px" }}>
             Google User Data Protection & Limited Use Disclosure
           </p>
           <p style={{ margin: "0 0 10px 0", lineHeight: "1.7" }}>
@@ -167,7 +167,7 @@ export default function Privacy() {
           We retain your personal data and Google OAuth information only for as long as your account remains active or as necessary to provide you with services.
         </p>
         <div style={highlightBox}>
-          <p style={{ margin: "0 0 10px 0", color: "#fff", fontWeight: "700" }}>How to Request Immediate Data Deletion:</p>
+          <p style={{ margin: "0 0 10px 0", color: "#d4d4d8", fontWeight: "700" }}>How to Request Immediate Data Deletion:</p>
           <p style={{ margin: "0 0 8px 0" }}>
             You have the absolute right to delete your account, personal data, and revoke Google authentication credentials at any time:
           </p>
@@ -201,8 +201,8 @@ export default function Privacy() {
         <h2 style={headerStyle}>10. Contact Information</h2>
         <div style={highlightBox}>
           {/* 🟢 THE FIX: Dynamic Emails and Legal Address */}
-          <p style={{ margin: "0 0 10px 0", color: "#fff" }}><strong>General Support:</strong> {APP_CONFIG.supportEmail}</p>
-          <p style={{ margin: "0 0 10px 0", color: "#fff" }}><strong>Data Protection Officer:</strong> {dpoEmail}</p>
+          <p style={{ margin: "0 0 10px 0", color: "#d4d4d8" }}><strong>General Support:</strong> {APP_CONFIG.supportEmail}</p>
+          <p style={{ margin: "0 0 10px 0", color: "#d4d4d8" }}><strong>Data Protection Officer:</strong> {dpoEmail}</p>
           <p style={{ margin: 0 }}>
             <strong>Address:</strong><br/>
             {APP_CONFIG.companyName}<br/>

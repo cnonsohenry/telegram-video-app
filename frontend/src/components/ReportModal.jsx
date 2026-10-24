@@ -89,7 +89,7 @@ export default function ReportModal({ isOpen, onClose, video }) {
         {submitted ? (
           <div style={successContainer}>
             <CheckCircle2 size={42} color="#f43f5e" />
-            <h4 style={{ color: "#fff", fontSize: "17px", fontWeight: "700", marginTop: "12px", marginBottom: "6px" }}>
+            <h4 style={{ color: "#d4d4d8", fontSize: "17px", fontWeight: "700", marginTop: "12px", marginBottom: "6px" }}>
               Report Received
             </h4>
             <p style={{ color: "#71767b", fontSize: "13.5px", margin: 0, textAlign: "center", lineHeight: "1.4" }}>
@@ -121,10 +121,10 @@ export default function ReportModal({ isOpen, onClose, video }) {
                       value={item.id}
                       checked={isSelected}
                       onChange={() => setReason(item.id)}
-                      style={{ accentColor: "#ffffff", marginTop: "2px" }}
+                      style={{ accentColor: "#d4d4d8", marginTop: "2px" }}
                     />
                     <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                      <span style={{ fontSize: "13.5px", fontWeight: isSelected ? "700" : "500", color: "#fff" }}>
+                      <span style={{ fontSize: "13.5px", fontWeight: isSelected ? "700" : "500", color: "#d4d4d8" }}>
                         {item.label}
                       </span>
                       <span style={{ fontSize: "11.5px", color: "#71767b", lineHeight: "1.3" }}>
@@ -249,7 +249,7 @@ const modalHeader = {
 const modalTitle = {
   fontSize: "17px",
   fontWeight: "800",
-  color: "#fff",
+  color: "#d4d4d8",
   margin: 0
 };
 
@@ -288,7 +288,7 @@ const detailsTextarea = {
   border: "1px solid rgba(255, 255, 255, 0.08)",
   borderRadius: "8px",
   padding: "10px 12px",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontSize: "13px",
   resize: "none",
   outline: "none",
@@ -306,7 +306,7 @@ const actionRow = {
 const cancelBtn = {
   background: "#27272a",
   border: "none",
-  color: "#ffffff",
+  color: "#d4d4d8",
   padding: "11px 20px",
   borderRadius: "9999px",
   fontSize: "14px",
@@ -318,9 +318,9 @@ const submitBtn = {
   display: "flex",
   alignItems: "center",
   gap: "6px",
-  background: "#ffffff",
+  background: "#c4c4c8",
   border: "none",
-  color: "#000000",
+  color: "#09090b",
   padding: "11px 24px",
   borderRadius: "9999px",
   fontSize: "14px",

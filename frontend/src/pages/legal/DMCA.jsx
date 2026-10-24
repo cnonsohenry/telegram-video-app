@@ -4,8 +4,8 @@ import React from "react";
 import { APP_CONFIG } from "../../config";
 
 export default function DMCA() {
-  const headerStyle = { color: "#fff", marginTop: "30px", marginBottom: "15px", fontSize: "22px", borderBottom: "1px solid #333", paddingBottom: "10px" };
-  const subHeaderStyle = { color: "#fff", marginTop: "20px", marginBottom: "10px", fontSize: "17px", fontWeight: "600" };
+  const headerStyle = { color: "#d4d4d8", marginTop: "30px", marginBottom: "15px", fontSize: "22px", borderBottom: "1px solid #333", paddingBottom: "10px" };
+  const subHeaderStyle = { color: "#d4d4d8", marginTop: "20px", marginBottom: "10px", fontSize: "17px", fontWeight: "600" };
   const textBlockStyle = { marginBottom: "15px" };
   const highlightBox = { background: "#1a1a1a", padding: "20px", borderRadius: "8px", border: "1px solid #333", margin: "20px 0" };
 
@@ -43,7 +43,7 @@ export default function DMCA() {
       </p>
 
       <div style={highlightBox}>
-        <p style={{ ...textBlockStyle, color: "#fff" }}><strong>Your DMCA Notice must include the following:</strong></p>
+        <p style={{ ...textBlockStyle, color: "#d4d4d8" }}><strong>Your DMCA Notice must include the following:</strong></p>
         <ul style={{ paddingLeft: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
           <li>Identification of the copyrighted work you believe to have been infringed.</li>
           <li>Identification of the material you believe to be infringing, including the <strong>exact URL(s)</strong>.</li>
@@ -56,7 +56,7 @@ export default function DMCA() {
 
       <h3 style={subHeaderStyle}>Designated Copyright Agent</h3>
       <div style={{ ...highlightBox, borderColor: "#444" }}>
-        <p style={{ margin: 0, color: "#fff" }}>
+        <p style={{ margin: 0, color: "#d4d4d8" }}>
           <strong>Compliance Officer</strong><br/>
           {/* 🟢 THE FIX: Dynamic Company Name and Address */}
           {APP_CONFIG.companyName}<br/>
@@ -65,7 +65,7 @@ export default function DMCA() {
               {line}<br/>
             </React.Fragment>
           ))}
-          <strong>Email:</strong> <a href={`mailto:${APP_CONFIG.supportEmail}`} style={{ color: "#fff" }}>{APP_CONFIG.supportEmail}</a>
+          <strong>Email:</strong> <a href={`mailto:${APP_CONFIG.supportEmail}`} style={{ color: "#d4d4d8" }}>{APP_CONFIG.supportEmail}</a>
         </p>
       </div>
 
@@ -75,7 +75,7 @@ export default function DMCA() {
       </p>
 
       <div style={highlightBox}>
-        <p style={{ ...textBlockStyle, color: "#fff" }}><strong>The Counter-Notice must include:</strong></p>
+        <p style={{ ...textBlockStyle, color: "#d4d4d8" }}><strong>The Counter-Notice must include:</strong></p>
         <ul style={{ paddingLeft: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
           <li>Your name, address, and phone number.</li>
           <li>Identification of the content and its location before removal.</li>

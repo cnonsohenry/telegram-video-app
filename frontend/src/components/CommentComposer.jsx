@@ -90,11 +90,11 @@ const composerWrapperStyle = {
 
 const composerInputStyle = { 
   flex: 1, background: "#2c2c2e", border: "none", borderRadius: "20px", 
-  padding: "12px 20px", color: "#fff", fontSize: "15px", outline: "none" 
+  padding: "12px 20px", color: "#c4c4c8", fontSize: "15px", outline: "none" 
 };
 
 const commentSendBtnStyle = { 
   background: "var(--primary-color)", border: "none", width: "42px", height: "42px", 
   borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", 
-  color: "#fff", cursor: "pointer", transition: "opacity 0.2s ease", flexShrink: 0
+  color: "#d4d4d8", cursor: "pointer", transition: "opacity 0.2s ease", flexShrink: 0
 };

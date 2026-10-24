@@ -156,7 +156,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
       <div style={topNavStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <button onClick={handleSafeClose} style={navBackBtnStyle} aria-label="Back">
-            <ArrowLeft size={24} color="#fff" />
+            <ArrowLeft size={24} color="#d4d4d8" />
           </button>
           <div style={studioLogoBadgeStyle}>
             <Sparkles size={18} color="#FFD700" />
@@ -180,7 +180,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
               ...previewBtnStyle,
               background: "linear-gradient(135deg, #00aff0, #0088cc)",
               borderColor: "transparent",
-              color: "#fff",
+              color: "#d4d4d8",
               fontWeight: "700"
             }}
             title="Upload video"
@@ -206,35 +206,35 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
         <div style={tabsBarStyle}>
           <button 
             onClick={() => setActiveTab("overview")} 
-            style={{ ...tabBtnStyle, borderBottomColor: activeTab === "overview" ? "var(--primary-color)" : "transparent", color: activeTab === "overview" ? "#fff" : "#8e8e93" }}
+            style={{ ...tabBtnStyle, borderBottomColor: activeTab === "overview" ? "var(--primary-color)" : "transparent", color: activeTab === "overview" ? "#d4d4d8" : "#8e8e93" }}
           >
             <TrendingUp size={16} />
             <span>Overview</span>
           </button>
           <button 
             onClick={() => setActiveTab("subscribers")} 
-            style={{ ...tabBtnStyle, borderBottomColor: activeTab === "subscribers" ? "var(--primary-color)" : "transparent", color: activeTab === "subscribers" ? "#fff" : "#8e8e93" }}
+            style={{ ...tabBtnStyle, borderBottomColor: activeTab === "subscribers" ? "var(--primary-color)" : "transparent", color: activeTab === "subscribers" ? "#d4d4d8" : "#8e8e93" }}
           >
             <Users size={16} />
             <span>VIP Fans ({stats.active_subscribers || 0})</span>
           </button>
           <button 
             onClick={() => setActiveTab("tips")} 
-            style={{ ...tabBtnStyle, borderBottomColor: activeTab === "tips" ? "var(--primary-color)" : "transparent", color: activeTab === "tips" ? "#fff" : "#8e8e93" }}
+            style={{ ...tabBtnStyle, borderBottomColor: activeTab === "tips" ? "var(--primary-color)" : "transparent", color: activeTab === "tips" ? "#d4d4d8" : "#8e8e93" }}
           >
             <Heart size={16} />
             <span>Tips ({stats.tips_count || 0})</span>
           </button>
           <button 
             onClick={() => setActiveTab("videos")} 
-            style={{ ...tabBtnStyle, borderBottomColor: activeTab === "videos" ? "var(--primary-color)" : "transparent", color: activeTab === "videos" ? "#fff" : "#8e8e93" }}
+            style={{ ...tabBtnStyle, borderBottomColor: activeTab === "videos" ? "var(--primary-color)" : "transparent", color: activeTab === "videos" ? "#d4d4d8" : "#8e8e93" }}
           >
             <Eye size={16} />
             <span>Content ({stats.posts_count || 0})</span>
           </button>
           <button 
             onClick={() => setActiveTab("settings")} 
-            style={{ ...tabBtnStyle, borderBottomColor: activeTab === "settings" ? "var(--primary-color)" : "transparent", color: activeTab === "settings" ? "#fff" : "#8e8e93" }}
+            style={{ ...tabBtnStyle, borderBottomColor: activeTab === "settings" ? "var(--primary-color)" : "transparent", color: activeTab === "settings" ? "#d4d4d8" : "#8e8e93" }}
           >
             <Settings size={16} />
             <span>Pricing & Rates</span>
@@ -251,7 +251,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
           ) : error ? (
             <div style={errorCenterStyle}>
               <AlertCircle size={36} color="#ff3b30" />
-              <p style={{ color: "#fff", marginTop: "10px", fontSize: "14px" }}>{error}</p>
+              <p style={{ color: "#d4d4d8", marginTop: "10px", fontSize: "14px" }}>{error}</p>
             </div>
           ) : (
             <>
@@ -335,7 +335,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                       <div style={subBoxHeaderStyle}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <Heart size={16} color="#f91880" />
-                          <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "#fff" }}>Recent Fan Tips</h4>
+                          <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "#d4d4d8" }}>Recent Fan Tips</h4>
                         </div>
                         <button onClick={() => setActiveTab("tips")} style={seeAllBtnStyle}>See All</button>
                       </div>
@@ -357,7 +357,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                                   onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                                 />
                                 <div>
-                                  <div style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>
+                                  <div style={{ fontSize: "13px", fontWeight: "700", color: "#d4d4d8" }}>
                                     @{t.sender_username || "Anonymous Fan"}
                                   </div>
                                   {t.message && (
@@ -386,7 +386,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                       <div style={subBoxHeaderStyle}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <Users size={16} color="#00aff0" />
-                          <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "#fff" }}>Active VIP Subscribers</h4>
+                          <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "#d4d4d8" }}>Active VIP Subscribers</h4>
                         </div>
                         <button onClick={() => setActiveTab("subscribers")} style={seeAllBtnStyle}>See All</button>
                       </div>
@@ -408,7 +408,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                                   onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                                 />
                                 <div>
-                                  <div style={{ fontSize: "13px", fontWeight: "700", color: "#fff" }}>
+                                  <div style={{ fontSize: "13px", fontWeight: "700", color: "#d4d4d8" }}>
                                     @{s.subscriber_username}
                                   </div>
                                   <div style={{ fontSize: "11px", color: "#8e8e93" }}>
@@ -431,7 +431,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#fff" }}>
+                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#d4d4d8" }}>
                         All VIP Subscribers ({data?.subscribers?.length || 0})
                       </h3>
                       <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#8e8e93" }}>
@@ -443,7 +443,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                   {(data?.subscribers || []).length === 0 ? (
                     <div style={emptyBoxStyle}>
                       <Users size={36} color="#555" />
-                      <h4 style={{ margin: "10px 0 4px 0", color: "#fff" }}>No Subscribers Yet</h4>
+                      <h4 style={{ margin: "10px 0 4px 0", color: "#d4d4d8" }}>No Subscribers Yet</h4>
                       <p style={{ margin: 0, fontSize: "12px", color: "#8e8e93" }}>
                         When users pay the subscription fee with crypto, they will be listed here automatically.
                       </p>
@@ -471,7 +471,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                                     onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                                   />
                                   <div>
-                                    <div style={{ fontWeight: "700", color: "#fff", fontSize: "13px" }}>
+                                    <div style={{ fontWeight: "700", color: "#d4d4d8", fontSize: "13px" }}>
                                       {sub.subscriber_display_name || sub.subscriber_username}
                                     </div>
                                     <div style={{ fontSize: "11px", color: "#8e8e93" }}>
@@ -502,7 +502,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
               {activeTab === "tips" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#fff" }}>
+                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#d4d4d8" }}>
                       Tip History & Support Messages
                     </h3>
                     <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#8e8e93" }}>
@@ -513,7 +513,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                   {(data?.tips || []).length === 0 ? (
                     <div style={emptyBoxStyle}>
                       <Heart size={36} color="#555" />
-                      <h4 style={{ margin: "10px 0 4px 0", color: "#fff" }}>No Tips Received Yet</h4>
+                      <h4 style={{ margin: "10px 0 4px 0", color: "#d4d4d8" }}>No Tips Received Yet</h4>
                       <p style={{ margin: 0, fontSize: "12px", color: "#8e8e93" }}>
                         Encourage fans to send you tips by dropping exclusive preview clips.
                       </p>
@@ -531,7 +531,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                                 onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
                               />
                               <div>
-                                <span style={{ fontWeight: "700", color: "#fff", fontSize: "14px" }}>
+                                <span style={{ fontWeight: "700", color: "#d4d4d8", fontSize: "14px" }}>
                                   @{t.sender_username || "Anonymous Fan"}
                                 </span>
                                 <span style={{ display: "block", fontSize: "11px", color: "#8e8e93" }}>
@@ -560,7 +560,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#fff" }}>
+                      <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#d4d4d8" }}>
                         Video Performance Analytics
                       </h3>
                       <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#8e8e93" }}>
@@ -577,7 +577,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                         alignItems: "center",
                         gap: "6px",
                         background: "linear-gradient(135deg, #00aff0, #0088cc)",
-                        color: "#fff",
+                        color: "#d4d4d8",
                         border: "none",
                         padding: "8px 14px",
                         borderRadius: "10px",
@@ -594,7 +594,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                   {(data?.top_videos || []).length === 0 ? (
                     <div style={emptyBoxStyle}>
                       <Eye size={36} color="#555" />
-                      <h4 style={{ margin: "10px 0 4px 0", color: "#fff" }}>No Uploaded Content Yet</h4>
+                      <h4 style={{ margin: "10px 0 4px 0", color: "#d4d4d8" }}>No Uploaded Content Yet</h4>
                       <p style={{ margin: "0 0 14px 0", fontSize: "12px", color: "#8e8e93", maxWidth: "340px", textAlign: "center" }}>
                         Upload videos directly from your browser to your public feed or VIP exclusive channel.
                       </p>
@@ -608,7 +608,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                           alignItems: "center",
                           gap: "6px",
                           background: "linear-gradient(135deg, #00aff0, #0088cc)",
-                          color: "#fff",
+                          color: "#d4d4d8",
                           border: "none",
                           padding: "10px 20px",
                           borderRadius: "10px",
@@ -638,7 +638,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                           {data.top_videos.map((vid) => (
                             <tr key={vid.id} style={trStyle}>
                               <td style={tdStyle}>
-                                <div style={{ fontSize: "13px", fontWeight: "600", color: "#fff", maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                <div style={{ fontSize: "13px", fontWeight: "600", color: "#d4d4d8", maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {vid.caption || "Untitled Post"}
                                 </div>
                               </td>
@@ -696,7 +696,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
               {activeTab === "settings" && (
                 <form onSubmit={handleSaveSettings} style={settingsFormStyle}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#fff" }}>
+                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: "#d4d4d8" }}>
                       Monetization & Creator Profile Settings
                     </h3>
                     <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#8e8e93" }}>
@@ -830,7 +830,7 @@ const fullscreenContainerStyle = {
 const navBackBtnStyle = {
   background: "none",
   border: "none",
-  color: "#fff",
+  color: "#d4d4d8",
   cursor: "pointer",
   padding: "6px",
   display: "flex",
@@ -858,7 +858,7 @@ const studioLogoBadgeStyle = {
   justifyContent: "center"
 };
 
-const studioTitleStyle = { margin: 0, fontSize: "16px", fontWeight: "800", color: "#fff" };
+const studioTitleStyle = { margin: 0, fontSize: "16px", fontWeight: "800", color: "#d4d4d8" };
 const studioSubtitleStyle = { fontSize: "11px", color: "#8e8e93", display: "block" };
 
 const previewBtnStyle = {
@@ -869,7 +869,7 @@ const previewBtnStyle = {
   border: "1px solid rgba(255, 255, 255, 0.15)",
   borderRadius: "14px",
   padding: "6px 12px",
-  color: "#fff",
+  color: "#d4d4d8",
   fontSize: "12px",
   fontWeight: "600",
   cursor: "pointer"
@@ -956,7 +956,7 @@ const kpiIconBox = (bg, color) => ({
 });
 
 const kpiLabelStyle = { fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "#8e8e93", fontWeight: "700" };
-const kpiValueStyle = { fontSize: "22px", fontWeight: "900", color: "#fff", marginTop: "4px" };
+const kpiValueStyle = { fontSize: "22px", fontWeight: "900", color: "#d4d4d8", marginTop: "4px" };
 const kpiSubtextStyle = { fontSize: "11px", color: "#71717a", marginTop: "4px" };
 
 const runRateCardStyle = {
@@ -976,7 +976,7 @@ const adjustRatesBtnStyle = {
   alignItems: "center",
   gap: "8px",
   background: "#e11d48",
-  color: "#ffffff",
+  color: "#d4d4d8",
   border: "none",
   borderRadius: "14px",
   padding: "10px 18px",
@@ -1118,7 +1118,7 @@ const formRowStyle = {
 const fieldLabelStyle = {
   fontSize: "13px",
   fontWeight: "800",
-  color: "#fff"
+  color: "#d4d4d8"
 };
 
 const fieldHintStyle = {
@@ -1141,7 +1141,7 @@ const inputStyle = {
   border: "1px solid #333",
   borderRadius: "12px",
   padding: "12px 14px",
-  color: "#fff",
+  color: "#d4d4d8",
   fontSize: "14px",
   outline: "none",
   boxSizing: "border-box"
@@ -1153,7 +1153,7 @@ const textareaStyle = {
   border: "1px solid #333",
   borderRadius: "12px",
   padding: "12px 14px",
-  color: "#fff",
+  color: "#d4d4d8",
   fontSize: "13px",
   outline: "none",
   boxSizing: "border-box",
@@ -1162,7 +1162,7 @@ const textareaStyle = {
 
 const saveBtnStyle = {
   background: "linear-gradient(135deg, #00aff0, #0088cc)",
-  color: "#fff",
+  color: "#d4d4d8",
   border: "none",
   borderRadius: "14px",
   padding: "14px",

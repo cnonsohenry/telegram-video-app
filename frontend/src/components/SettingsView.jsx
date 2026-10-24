@@ -174,7 +174,7 @@ export default function SettingsView({
       {/* Top Navigation */}
       <div style={navBarStyle}>
         <button onClick={onBack} style={navBackBtnStyle} aria-label="Back">
-          <ArrowLeft size={22} color="#fff" />
+          <ArrowLeft size={22} color="#d4d4d8" />
         </button>
         <h2 style={headerTitleStyle}>Settings</h2>
         <div style={{ width: "36px" }} />
@@ -195,7 +195,7 @@ export default function SettingsView({
             </div>
             <div style={{ flex: 1, minWidth: 0, marginLeft: "14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "15px", fontWeight: "700", color: "#fff" }}>
+                <span style={{ fontSize: "15px", fontWeight: "700", color: "#d4d4d8" }}>
                   {user?.display_name || user?.username || "Member"}
                 </span>
                 {(user?.is_creator || user?.is_verified) && (
@@ -466,7 +466,7 @@ export default function SettingsView({
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div style={modalToggleRow}>
               <div>
-                <div style={{ fontSize: "14px", fontWeight: "600", color: "#fff" }}>Private Profile</div>
+                <div style={{ fontSize: "14px", fontWeight: "600", color: "#d4d4d8" }}>Private Profile</div>
                 <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>Hide followers/following lists & saved clips from visitors</div>
               </div>
               <ToggleSwitch active={privateProfile} onClick={togglePrivateProfile} />
@@ -474,7 +474,7 @@ export default function SettingsView({
 
             <div style={modalToggleRow}>
               <div>
-                <div style={{ fontSize: "14px", fontWeight: "600", color: "#fff" }}>Hide Followers & Following List</div>
+                <div style={{ fontSize: "14px", fontWeight: "600", color: "#d4d4d8" }}>Hide Followers & Following List</div>
                 <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>Only you can tap to view who follows you and who you follow</div>
               </div>
               <ToggleSwitch active={hideFollowList || privateProfile} onClick={toggleHideFollowList} />
@@ -482,7 +482,7 @@ export default function SettingsView({
 
             <div style={modalToggleRow}>
               <div>
-                <div style={{ fontSize: "14px", fontWeight: "600", color: "#fff" }}>Show Liked Videos</div>
+                <div style={{ fontSize: "14px", fontWeight: "600", color: "#d4d4d8" }}>Show Liked Videos</div>
                 <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>Make liked videos tab visible to visitors</div>
               </div>
               <ToggleSwitch active={showLikes} onClick={toggleShowLikes} />
@@ -490,7 +490,7 @@ export default function SettingsView({
 
             <div style={modalToggleRow}>
               <div>
-                <div style={{ fontSize: "14px", fontWeight: "600", color: "#fff" }}>Allow Fan Tips</div>
+                <div style={{ fontSize: "14px", fontWeight: "600", color: "#d4d4d8" }}>Allow Fan Tips</div>
                 <div style={{ fontSize: "12px", color: "#8e8e93", marginTop: "2px" }}>Enable tipping button on profile</div>
               </div>
               <ToggleSwitch active={allowTips} onClick={toggleAllowTips} />
@@ -504,7 +504,7 @@ export default function SettingsView({
         <ModalSheet title="VIP Subscriptions" onClose={handleCloseActiveModal}>
           {subscriptionsList.length === 0 ? (
             <div style={{ textAlign: "center", padding: "36px 16px", color: "#8e8e93" }}>
-              <div style={{ fontSize: "14px", fontWeight: "600", color: "#fff" }}>No Active Subscriptions</div>
+              <div style={{ fontSize: "14px", fontWeight: "600", color: "#d4d4d8" }}>No Active Subscriptions</div>
               <p style={{ fontSize: "13px", marginTop: "4px" }}>You are not currently subscribed to any VIP creators.</p>
             </div>
           ) : (
@@ -523,7 +523,7 @@ export default function SettingsView({
                       />
                     </div>
                     <div>
-                      <div style={{ fontSize: "14px", fontWeight: "600", color: "#fff" }}>
+                      <div style={{ fontSize: "14px", fontWeight: "600", color: "#d4d4d8" }}>
                         {sub.creator_display_name || sub.creator_username || "Creator"}
                       </div>
                       <div style={{ fontSize: "12px", color: "#8e8e93" }}>@{sub.creator_username || "creator"}</div>
@@ -629,7 +629,7 @@ const ToggleSwitch = ({ active, onClick }) => (
     style={{
       width: "44px",
       height: "24px",
-      backgroundColor: active ? "#ffffff" : "#262628",
+      backgroundColor: active ? "#d4d4d8" : "#262628",
       borderRadius: "12px",
       position: "relative",
       cursor: "pointer",
@@ -655,7 +655,7 @@ const DetailRow = ({ label, value, onCopy }) => (
   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", backgroundColor: "#141416", borderRadius: "8px", border: "1px solid #222" }}>
     <div>
       <div style={{ fontSize: "11px", color: "#8e8e93", textTransform: "uppercase" }}>{label}</div>
-      <div style={{ fontSize: "13.5px", fontWeight: "600", color: "#fff", marginTop: "2px" }}>{value}</div>
+      <div style={{ fontSize: "13.5px", fontWeight: "600", color: "#d4d4d8", marginTop: "2px" }}>{value}</div>
     </div>
     {onCopy && (
       <button onClick={onCopy} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px" }} title="Copy">
@@ -672,7 +672,7 @@ const ModalSheet = ({ title, onClose, children }) => (
         <div style={dragHandlePill} />
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "10px" }}>
-        <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#fff", margin: 0 }}>{title}</h3>
+        <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#d4d4d8", margin: 0 }}>{title}</h3>
         <button onClick={onClose} style={{ background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer", padding: "6px", color: "#8e8e93", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <X size={18} />
         </button>
@@ -689,7 +689,7 @@ const containerStyle = {
   width: "100%",
   height: "100%",
   backgroundColor: "#09090b",
-  color: "#fff",
+  color: "#d4d4d8",
   zIndex: 99999,
   display: "flex",
   flexDirection: "column",
@@ -714,7 +714,7 @@ const navBarStyle = {
 const navBackBtnStyle = {
   background: "none",
   border: "none",
-  color: "#fff",
+  color: "#d4d4d8",
   cursor: "pointer",
   padding: "6px",
   display: "flex",
@@ -724,7 +724,7 @@ const navBackBtnStyle = {
 const headerTitleStyle = {
   fontSize: "15px",
   fontWeight: "700",
-  color: "#fff",
+  color: "#d4d4d8",
   margin: 0
 };
 
@@ -766,7 +766,7 @@ const editProfileBtnStyle = {
   borderRadius: "16px",
   backgroundColor: "#1c1c1e",
   border: "1px solid #333",
-  color: "#fff",
+  color: "#d4d4d8",
   fontSize: "12.5px",
   fontWeight: "600",
   cursor: "pointer"
@@ -795,7 +795,7 @@ const rowLabelStyle = {
   marginLeft: "14px",
   fontSize: "14px",
   fontWeight: "500",
-  color: "#ffffff"
+  color: "#d4d4d8"
 };
 
 const rowValueStyle = {
@@ -879,7 +879,7 @@ const viewChannelBtn = {
   borderRadius: "14px",
   backgroundColor: "#323236",
   border: "none",
-  color: "#fff",
+  color: "#d4d4d8",
   fontSize: "12px",
   fontWeight: "600",
   cursor: "pointer"
@@ -912,7 +912,7 @@ const logoutSheetTitle = {
   fontSize: "19px",
   fontWeight: "800",
   marginBottom: "8px",
-  color: "#ffffff",
+  color: "#d4d4d8",
   letterSpacing: "-0.3px"
 };
 
@@ -936,7 +936,7 @@ const logoutSheetConfirmBtn = {
   borderRadius: "9999px",
   border: "none",
   backgroundColor: "#f4212e",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontWeight: "800",
   fontSize: "15px",
   cursor: "pointer",
@@ -949,7 +949,7 @@ const logoutSheetCancelBtn = {
   borderRadius: "9999px",
   border: "none",
   backgroundColor: "#27272a",
-  color: "#ffffff",
+  color: "#d4d4d8",
   fontWeight: "700",
   fontSize: "15px",
   cursor: "pointer",
