@@ -524,21 +524,18 @@ export default function CreatorProfileModal({
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "14px" }}>
                   <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
                     {/* Line 1: Display Name */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
                       <h1 style={{
                         margin: 0,
                         fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                         fontSize: "20px",
                         fontWeight: "800",
                         letterSpacing: "-0.3px",
-                        color: "#fff",
+                        color: "#d4d4d8",
                         lineHeight: "1.25"
                       }}>
                         {creatorData?.display_name || creatorUsername}
                       </h1>
-                      {creatorData?.is_verified && (
-                        <TwitterVerifiedBadge size={17} style={{ flexShrink: 0 }} />
-                      )}
                     </div>
 
                     {/* Line 2: Bio directly next after display name */}
@@ -597,8 +594,6 @@ export default function CreatorProfileModal({
                       displayName={creatorData?.display_name || creatorUsername}
                       size={84}
                       borderWidth={2.5}
-                      showVerifiedBadge={Boolean(creatorData?.is_verified)}
-                      badgeSize={16}
                     />
                   </div>
                 </div>
@@ -666,21 +661,18 @@ export default function CreatorProfileModal({
                 {/* Desktop Details on Left */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {/* Line 1: Display Name */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                  <div style={{ display: "flex", alignItems: "center", marginBottom: "6px" }}>
                     <h1 style={{
                       fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                       fontSize: "28px",
                       fontWeight: "800",
                       letterSpacing: "-0.5px",
-                      color: "#fff",
+                      color: "#d4d4d8",
                       margin: 0,
                       lineHeight: "1.15"
                     }}>
                       {creatorData?.display_name || creatorUsername}
                     </h1>
-                    {creatorData?.is_verified && (
-                      <TwitterVerifiedBadge size={22} style={{ flexShrink: 0 }} />
-                    )}
                   </div>
 
                   {/* Line 2: Bio directly after display name */}
@@ -796,8 +788,6 @@ export default function CreatorProfileModal({
                     displayName={creatorData?.display_name || creatorUsername}
                     size={132}
                     borderWidth={3.5}
-                    showVerifiedBadge={Boolean(creatorData?.is_verified)}
-                    badgeSize={20}
                   />
                 </div>
 

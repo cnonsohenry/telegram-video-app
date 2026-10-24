@@ -743,21 +743,18 @@ export default function Profile({
                 {/* Display Name, Bio, Inline Stats */}
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
                   {/* Line 1: Display Name */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
                     <h1 style={{
                       margin: 0,
                       fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                       fontSize: "20px",
                       fontWeight: "800",
                       letterSpacing: "-0.3px",
-                      color: "#fff",
+                      color: "#d4d4d8",
                       lineHeight: "1.25"
                     }}>
                       {user?.display_name || user?.username || "Member"}
                     </h1>
-                    {(user?.is_creator || user?.is_verified) && (
-                      <TwitterVerifiedBadge size={16} />
-                    )}
                   </div>
 
                   {/* Line 2: Bio directly next under display name */}
@@ -920,21 +917,18 @@ export default function Profile({
               <div style={{ flex: 1, minWidth: 0 }}>
                 
                 {/* Line 1: Display Name */}
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                <div style={{ display: "flex", alignItems: "center", marginBottom: "6px" }}>
                   <h1 style={{
                     fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                     fontSize: "28px",
                     fontWeight: "800",
                     letterSpacing: "-0.5px",
-                    color: "#fff",
+                    color: "#d4d4d8",
                     margin: 0,
                     lineHeight: "1.15"
                   }}>
                     {user?.display_name || user?.username || "Member"}
                   </h1>
-                  {(user?.is_creator || user?.is_verified) && (
-                    <TwitterVerifiedBadge size={20} />
-                  )}
                 </div>
 
                 {/* Line 2: Bio directly under display name */}

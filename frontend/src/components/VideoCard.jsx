@@ -223,14 +223,11 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
         {!(video.category === "premium" || video.is_premium) && (
           <div style={{
             position: "absolute", bottom: 8, left: 8, zIndex: 10, 
-            display: "flex", alignItems: "center", gap: 5, 
-            background: "rgba(0,0,0,0.55)", 
-            padding: "4px 8px", borderRadius: "100px",
-            backdropFilter: "blur(6px)",
-            border: "1px solid rgba(255,255,255,0.12)"
+            display: "flex", alignItems: "center", gap: 4,
+            pointerEvents: "none"
           }}>
-            <Play size={10} fill="#d4d4d8" strokeWidth={0} />
-            <span style={{ color: "#d4d4d8", fontSize: "11px", fontWeight: "700" }}>
+            <Play size={10} fill="#d4d4d8" strokeWidth={0} style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.85))" }} />
+            <span style={{ color: "#d4d4d8", fontSize: "11px", fontWeight: "700", textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>
               {Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}
             </span>
           </div>
