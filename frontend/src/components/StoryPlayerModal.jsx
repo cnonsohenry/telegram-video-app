@@ -26,12 +26,19 @@ function formatStoryTimeAgo(story) {
 
 export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
   const handleSafeClose = useModalHistory(isOpen, onClose, "storyPlayer");
-  const videoRef = useRef(null);
+
+  // 🟢 DUAL-PLAYER PING-PONG SLOTS (0ms Instant Transitions, No DOM Re-mounts)
+  const videoRef0 = useRef(null);
+  const videoRef1 = useRef(null);
   const containerRef = useRef(null);
+
+  const [activeSlot, setActiveSlot] = useState(0); // 0 or 1
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
+
   const pauseTimeoutRef = useRef(null);
   const pointerStartRef = useRef({ time: 0, x: 0, y: 0, isHolding: false });
   const lastNavTimeRef = useRef(0);
@@ -43,7 +50,12 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     return [];
   }, [stories, story]);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const currentStory = storyList[currentIndex] || story;
+
+  // Helper to retrieve the currently active video DOM element
+  const getActiveVideo = useCallback(() => {
+    return activeSlot === 0 ? videoRef0.current : videoRef1.current;
+  }, [activeSlot]);
 
   // Enforce authentication: Only logged-in users can view stories
   useEffect(() => {
@@ -57,25 +69,28 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     }
   }, [isOpen, handleSafeClose]);
 
-  // 🟢 Pause background media when story status is opened, resume when closed
+  // 🟢 Pause background feed videos when story modal is open, resume when closed
   useEffect(() => {
     if (isOpen) {
       document.querySelectorAll("video").forEach((el) => {
-        if (el !== videoRef.current) {
+        if (el !== videoRef0.current && el !== videoRef1.current) {
           try { el.pause(); } catch (_) {}
         }
       });
       window.dispatchEvent(new CustomEvent("pauseMainVideo"));
     }
     return () => {
-      if (videoRef.current) {
-        try { videoRef.current.pause(); } catch (_) {}
+      if (videoRef0.current) {
+        try { videoRef0.current.pause(); videoRef0.current.currentTime = 0; } catch (_) {}
+      }
+      if (videoRef1.current) {
+        try { videoRef1.current.pause(); videoRef1.current.currentTime = 0; } catch (_) {}
       }
       window.dispatchEvent(new CustomEvent("resumeMainVideo"));
     };
   }, [isOpen]);
 
-  // Initialize currentIndex to targeted story or first unviewed story upon opening
+  // Initialize Dual-Player on open: Slot 0 plays current, Slot 1 pre-buffers next
   useEffect(() => {
     if (isOpen && storyList.length > 0) {
       let initIdx = 0;
@@ -86,14 +101,36 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
         const unviewedIdx = storyList.findIndex((s) => !s.has_viewed);
         if (unviewedIdx !== -1) initIdx = unviewedIdx;
       }
+
       setCurrentIndex(initIdx);
+      setActiveSlot(0);
       setProgress(0);
       setIsPaused(false);
       setIsVideoReady(false);
+
+      const currentStoryObj = storyList[initIdx];
+      const currentUrl = currentStoryObj?.video_url || currentStoryObj?.raw_video_url;
+
+      const nextStoryObj = storyList[initIdx + 1];
+      const nextUrl = nextStoryObj?.video_url || nextStoryObj?.raw_video_url;
+
+      if (videoRef0.current && currentUrl) {
+        videoRef0.current.src = currentUrl;
+        videoRef0.current.currentTime = 0;
+        videoRef0.current.play().catch(() => {});
+      }
+
+      if (videoRef1.current) {
+        if (nextUrl) {
+          videoRef1.current.src = nextUrl;
+          videoRef1.current.preload = "auto";
+          videoRef1.current.load();
+        } else {
+          videoRef1.current.removeAttribute("src");
+        }
+      }
     }
   }, [isOpen, story?.id, storyList]);
-
-  const currentStory = storyList[currentIndex] || story;
 
   // Record story view when player is open and currentStory is loaded
   useEffect(() => {
@@ -147,59 +184,182 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     recordStoryView();
   }, [isOpen, currentStory?.id, creator?.username, currentStory?.username]);
 
-  // Video time tracking
-  const handleTimeUpdate = () => {
-    if (!videoRef.current) return;
-    const duration =
-      videoRef.current.duration ||
-      (currentStory?.duration ? parseFloat(currentStory.duration) : 30);
-    const current = videoRef.current.currentTime;
+  // Video time tracking (filtered strictly to the active slot)
+  const handleTimeUpdate = (e, slotId) => {
+    if (slotId !== activeSlot) return;
+    const v = e.currentTarget;
+    const duration = v.duration || (currentStory?.duration ? parseFloat(currentStory.duration) : 15);
+    const current = v.currentTime;
     const pct = Math.min(100, (current / duration) * 100);
     setProgress(pct);
   };
 
-  // Debounced, rock-solid navigation handlers
+  // Jump directly to an arbitrary story segment
+  const jumpToStory = useCallback(
+    (targetIdx) => {
+      if (targetIdx === currentIndex) {
+        const activeVid = getActiveVideo();
+        if (activeVid) {
+          activeVid.currentTime = 0;
+          activeVid.play().catch(() => {});
+        }
+        setProgress(0);
+        return;
+      }
+
+      const targetStory = storyList[targetIdx];
+      if (!targetStory) return;
+      const targetUrl = targetStory.video_url || targetStory.raw_video_url;
+      const newSlot = activeSlot === 0 ? 1 : 0;
+
+      const currentVid = activeSlot === 0 ? videoRef0.current : videoRef1.current;
+      const targetVid = newSlot === 0 ? videoRef0.current : videoRef1.current;
+
+      if (currentVid) {
+        try {
+          currentVid.pause();
+          currentVid.currentTime = 0;
+        } catch (_) {}
+      }
+
+      if (targetVid) {
+        targetVid.src = targetUrl;
+        targetVid.currentTime = 0;
+        targetVid.play().catch(() => {});
+      }
+
+      // Preload next upcoming story into the standby slot
+      const nextStory = storyList[targetIdx + 1];
+      if (nextStory && currentVid) {
+        const nextUrl = nextStory.video_url || nextStory.raw_video_url;
+        if (nextUrl) {
+          currentVid.src = nextUrl;
+          currentVid.preload = "auto";
+          currentVid.load();
+        } else {
+          currentVid.removeAttribute("src");
+        }
+      }
+
+      setActiveSlot(newSlot);
+      setCurrentIndex(targetIdx);
+      setProgress(0);
+      setIsVideoReady(true);
+    },
+    [currentIndex, storyList, activeSlot, getActiveVideo]
+  );
+
+  // Debounced, 0ms latency navigation handlers
   const navigateWithDebounce = useCallback(
     (direction) => {
       const now = Date.now();
-      if (now - lastNavTimeRef.current < 300) return;
+      if (now - lastNavTimeRef.current < 250) return;
       lastNavTimeRef.current = now;
 
       if (direction === "next") {
-        setCurrentIndex((prev) => {
-          if (prev < storyList.length - 1) {
-            setProgress(0);
-            setIsVideoReady(false);
-            return prev + 1;
-          } else {
-            handleSafeClose();
-            return prev;
+        if (currentIndex < storyList.length - 1) {
+          const nextIdx = currentIndex + 1;
+          const nextStoryObj = storyList[nextIdx];
+          const nextUrl = nextStoryObj?.video_url || nextStoryObj?.raw_video_url;
+          const newSlot = activeSlot === 0 ? 1 : 0;
+
+          const currentVideo = activeSlot === 0 ? videoRef0.current : videoRef1.current;
+          const upcomingVideo = newSlot === 0 ? videoRef0.current : videoRef1.current;
+
+          // 1. Pause previous video
+          if (currentVideo) {
+            try {
+              currentVideo.pause();
+              currentVideo.currentTime = 0;
+            } catch (_) {}
           }
-        });
-      } else if (direction === "prev") {
-        if (videoRef.current && videoRef.current.currentTime > 2) {
-          videoRef.current.currentTime = 0;
+
+          // 2. Play upcoming video (already pre-loaded into hardware buffer!)
+          if (upcomingVideo) {
+            if (nextUrl && upcomingVideo.src !== nextUrl && !upcomingVideo.src.endsWith(nextUrl)) {
+              upcomingVideo.src = nextUrl;
+            }
+            upcomingVideo.currentTime = 0;
+            upcomingVideo.play().catch(() => {});
+          }
+
+          // 3. Pre-load the next-next story into the standby slot
+          const futureIdx = nextIdx + 1;
+          if (futureIdx < storyList.length && currentVideo) {
+            const futureStory = storyList[futureIdx];
+            const futureUrl = futureStory?.video_url || futureStory?.raw_video_url;
+            if (futureUrl) {
+              currentVideo.src = futureUrl;
+              currentVideo.preload = "auto";
+              currentVideo.load();
+            } else {
+              currentVideo.removeAttribute("src");
+            }
+          }
+
+          setActiveSlot(newSlot);
+          setCurrentIndex(nextIdx);
           setProgress(0);
-          videoRef.current.play().catch(() => {});
+          setIsVideoReady(true);
+        } else {
+          handleSafeClose();
+        }
+      } else if (direction === "prev") {
+        const currentVideo = getActiveVideo();
+        if (currentVideo && currentVideo.currentTime > 2) {
+          currentVideo.currentTime = 0;
+          setProgress(0);
+          currentVideo.play().catch(() => {});
           return;
         }
-        setCurrentIndex((prev) => {
-          if (prev > 0) {
-            setProgress(0);
-            setIsVideoReady(false);
-            return prev - 1;
-          } else {
-            if (videoRef.current) {
-              videoRef.current.currentTime = 0;
-              videoRef.current.play().catch(() => {});
-            }
-            setProgress(0);
-            return 0;
+
+        if (currentIndex > 0) {
+          const prevIdx = currentIndex - 1;
+          const prevStoryObj = storyList[prevIdx];
+          const prevUrl = prevStoryObj?.video_url || prevStoryObj?.raw_video_url;
+          const newSlot = activeSlot === 0 ? 1 : 0;
+
+          const activeVid = activeSlot === 0 ? videoRef0.current : videoRef1.current;
+          const targetVid = newSlot === 0 ? videoRef0.current : videoRef1.current;
+
+          if (activeVid) {
+            try {
+              activeVid.pause();
+              activeVid.currentTime = 0;
+            } catch (_) {}
           }
-        });
+
+          if (targetVid) {
+            if (prevUrl && targetVid.src !== prevUrl && !targetVid.src.endsWith(prevUrl)) {
+              targetVid.src = prevUrl;
+            }
+            targetVid.currentTime = 0;
+            targetVid.play().catch(() => {});
+          }
+
+          // Preload next story into the standby slot
+          const futureStory = storyList[prevIdx + 1];
+          const futureUrl = futureStory?.video_url || futureStory?.raw_video_url;
+          if (futureUrl && activeVid) {
+            activeVid.src = futureUrl;
+            activeVid.preload = "auto";
+            activeVid.load();
+          }
+
+          setActiveSlot(newSlot);
+          setCurrentIndex(prevIdx);
+          setProgress(0);
+          setIsVideoReady(true);
+        } else {
+          if (currentVideo) {
+            currentVideo.currentTime = 0;
+            currentVideo.play().catch(() => {});
+          }
+          setProgress(0);
+        }
       }
     },
-    [storyList.length, handleSafeClose]
+    [currentIndex, storyList, activeSlot, getActiveVideo, handleSafeClose]
   );
 
   const goToNext = useCallback(() => navigateWithDebounce("next"), [navigateWithDebounce]);
@@ -209,7 +369,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     goToNext();
   };
 
-  // Pointer Down / Up tap & hold handling (unified across touch and mouse, preventing double-fires)
+  // Pointer Down / Up tap & hold handling (unified across touch and mouse)
   const handlePointerDown = (e) => {
     if (e.button && e.button !== 0) return;
     pointerStartRef.current = {
@@ -222,8 +382,9 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     if (pauseTimeoutRef.current) clearTimeout(pauseTimeoutRef.current);
     pauseTimeoutRef.current = setTimeout(() => {
       pointerStartRef.current.isHolding = true;
-      if (videoRef.current && !videoRef.current.paused) {
-        videoRef.current.pause();
+      const activeVid = getActiveVideo();
+      if (activeVid && !activeVid.paused) {
+        activeVid.pause();
         setIsPaused(true);
       }
     }, 200);
@@ -235,10 +396,12 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       pauseTimeoutRef.current = null;
     }
 
+    const activeVid = getActiveVideo();
+
     if (pointerStartRef.current.isHolding) {
       pointerStartRef.current.isHolding = false;
-      if (videoRef.current && isPaused) {
-        videoRef.current.play().catch(() => {});
+      if (activeVid && isPaused) {
+        activeVid.play().catch(() => {});
         setIsPaused(false);
       }
       return;
@@ -271,12 +434,13 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
         goToNext();
       } else if (e.key === " ") {
         e.preventDefault();
-        if (videoRef.current) {
-          if (videoRef.current.paused) {
-            videoRef.current.play().catch(() => {});
+        const activeVid = getActiveVideo();
+        if (activeVid) {
+          if (activeVid.paused) {
+            activeVid.play().catch(() => {});
             setIsPaused(false);
           } else {
-            videoRef.current.pause();
+            activeVid.pause();
             setIsPaused(true);
           }
         }
@@ -284,7 +448,18 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, handleSafeClose, goToPrev, goToNext]);
+  }, [isOpen, handleSafeClose, goToPrev, goToNext, getActiveVideo]);
+
+  // Volume / Mute Toggle (applies to both players simultaneously)
+  const toggleMute = (e) => {
+    e.stopPropagation();
+    setIsMuted((prev) => {
+      const next = !prev;
+      if (videoRef0.current) videoRef0.current.muted = next;
+      if (videoRef1.current) videoRef1.current.muted = next;
+      return next;
+    });
+  };
 
   if (!isOpen || !currentStory) return null;
 
@@ -296,7 +471,6 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
   const avatarUrl =
     creator?.avatar_url || currentStory.avatar_url || "/assets/default-avatar.png";
   const soundTitle = currentStory.sound_title || "Trending Afrobeat Track";
-  const videoSrc = currentStory.video_url || currentStory.raw_video_url;
   const storyTimeAgo = formatStoryTimeAgo(currentStory);
 
   const modalContent = (
@@ -315,7 +489,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       }}
     >
       {/* Desktop Prev Button (Outside Frame) */}
-      {storyList.length > 1 && currentIndex > 0 && (
+      {storyList.length > 1 && (
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
@@ -408,38 +582,51 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
           userSelect: "none"
         }}
       >
-        {/* Background Video Element */}
+        {/* 🟢 Dual-Player Ping-Pong Slot 0 */}
         <video
-          key={currentStory.id || currentIndex}
-          ref={videoRef}
-          src={videoSrc}
-          poster={currentStory?.thumbnail_url || undefined}
+          ref={videoRef0}
           preload="auto"
           playsInline
-          autoPlay
           muted={isMuted}
-          onTimeUpdate={handleTimeUpdate}
-          onEnded={handleVideoEnded}
-          onCanPlay={() => setIsVideoReady(true)}
+          onTimeUpdate={(e) => handleTimeUpdate(e, 0)}
+          onEnded={() => { if (activeSlot === 0) handleVideoEnded(); }}
+          onCanPlay={() => { if (activeSlot === 0) setIsVideoReady(true); }}
           style={{
             position: "absolute",
             inset: 0,
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            backgroundColor: "#09090b"
+            backgroundColor: "#09090b",
+            opacity: activeSlot === 0 ? 1 : 0,
+            zIndex: activeSlot === 0 ? 2 : 1,
+            pointerEvents: activeSlot === 0 ? "auto" : "none",
+            transition: "opacity 0.12s ease-out"
           }}
         />
 
-        {/* Preload next story in background for instantaneous transitions */}
-        {storyList[currentIndex + 1]?.video_url && (
-          <video
-            src={storyList[currentIndex + 1].video_url}
-            preload="auto"
-            style={{ display: "none" }}
-            aria-hidden="true"
-          />
-        )}
+        {/* 🟢 Dual-Player Ping-Pong Slot 1 */}
+        <video
+          ref={videoRef1}
+          preload="auto"
+          playsInline
+          muted={isMuted}
+          onTimeUpdate={(e) => handleTimeUpdate(e, 1)}
+          onEnded={() => { if (activeSlot === 1) handleVideoEnded(); }}
+          onCanPlay={() => { if (activeSlot === 1) setIsVideoReady(true); }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            backgroundColor: "#09090b",
+            opacity: activeSlot === 1 ? 1 : 0,
+            zIndex: activeSlot === 1 ? 2 : 1,
+            pointerEvents: activeSlot === 1 ? "auto" : "none",
+            transition: "opacity 0.12s ease-out"
+          }}
+        />
 
         {/* Top Gradient Shadow */}
         <div
@@ -469,91 +656,68 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
           }}
         />
 
-        {/* In-Frame Previous Tap Chevron (Left) */}
-        {storyList.length > 1 && currentIndex > 0 && (
-          <button
-            type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              goToPrev();
-            }}
-            style={{
-              position: "absolute",
-              left: "12px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              background: "rgba(0, 0, 0, 0.35)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              borderRadius: "50%",
-              width: "38px",
-              height: "38px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#d4d4d8",
-              cursor: "pointer",
-              zIndex: 25,
-              opacity: 0.7,
-              transition: "opacity 0.2s"
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
-            title="Previous Story"
-          >
-            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-        )}
-
-        {/* In-Frame Next Tap Chevron (Right) */}
+        {/* Subtle in-frame Chevrons for visual affordance */}
         {storyList.length > 1 && (
-          <button
-            type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              goToNext();
-            }}
-            style={{
-              position: "absolute",
-              right: "12px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              background: "rgba(0, 0, 0, 0.35)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              borderRadius: "50%",
-              width: "38px",
-              height: "38px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#d4d4d8",
-              cursor: "pointer",
-              zIndex: 25,
-              opacity: 0.7,
-              transition: "opacity 0.2s"
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
-            title={currentIndex < storyList.length - 1 ? "Next Story" : "Close Story"}
-          >
-            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+          <>
+            {currentIndex > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  zIndex: 12,
+                  pointerEvents: "none",
+                  opacity: 0.75,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(0, 0, 0, 0.4)",
+                  backdropFilter: "blur(4px)"
+                }}
+              >
+                <svg width="18" height="18" fill="none" stroke="#d4d4d8" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </div>
+            )}
+            <div
+              style={{
+                position: "absolute",
+                right: "12px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 12,
+                pointerEvents: "none",
+                opacity: 0.75,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "28px",
+                height: "28px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(0, 0, 0, 0.4)",
+                backdropFilter: "blur(4px)"
+              }}
+            >
+              <svg width="18" height="18" fill="none" stroke="#d4d4d8" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </>
         )}
 
-        {/* Top Header & Segmented Progress Bar */}
+        {/* Top Controls Overlay */}
         <div
           style={{
-            position: "relative",
-            zIndex: 30,
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 20,
             padding: "16px 16px 8px 16px",
             display: "flex",
             flexDirection: "column",
@@ -576,9 +740,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                   key={item.id || idx}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setCurrentIndex(idx);
-                    setProgress(0);
-                    setIsVideoReady(false);
+                    jumpToStory(idx);
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
                   style={{
@@ -631,23 +793,23 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                   }}
                 />
               </div>
-
-              <div style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
-                {/* Creator Display Name & Verified Badge */}
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                {/* Creator Display Name & Checkmark */}
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: 0 }}>
                   <span
                     style={{
                       color: "#d4d4d8",
+                      fontSize: "14px",
                       fontWeight: "700",
-                      fontSize: "15px",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
-                      textOverflow: "ellipsis"
+                      textOverflow: "ellipsis",
+                      textShadow: "0 1px 3px rgba(0, 0, 0, 0.8)"
                     }}
                   >
                     {displayName}
                   </span>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="#00d2ff" style={{ flexShrink: 0 }}>
+                  <svg width="14" height="14" fill="#1d9bf0" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                   </svg>
                 </div>
@@ -695,7 +857,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
               </div>
             </div>
 
-            {/* Top Right Close Button (Background removed) */}
+            {/* Top Right Close Button */}
             <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
               <button
                 type="button"
@@ -752,14 +914,11 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
           </div>
         )}
 
-        {/* Lower Left Corner Volume / Mute Button (Background removed) */}
+        {/* Lower Left Corner Volume / Mute Button */}
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsMuted(!isMuted);
-          }}
+          onClick={toggleMute}
           style={{
             position: "absolute",
             bottom: "18px",
@@ -789,16 +948,11 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             </svg>
           )}
         </button>
-
-        {/* Spacer for full-bleed video */}
-        <div style={{ flex: 1 }} />
       </div>
     </div>
   );
 
-  return typeof document !== "undefined"
-    ? createPortal(modalContent, document.body)
-    : modalContent;
+  return createPortal(modalContent, document.body);
 }
 
 export default StoryPlayerModal;
