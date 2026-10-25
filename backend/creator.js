@@ -2065,36 +2065,87 @@ router.get("/:username/highlights", optionalAuth, async (req, res) => {
   }
 });
 
+const API_SECRETS = [
+  process.env.SIGNING_SECRET,
+  process.env.JWT_SECRET,
+  process.env.ADMIN_PASSWORD
+].filter(Boolean);
+
+async function authenticateOwnerOrApiKey(req, res, next) {
+  const apiKey = req.headers['x-api-key'] || req.headers['x-api-secret'] || req.body?.api_key || req.query?.api_key;
+  if (apiKey && API_SECRETS.includes(apiKey)) {
+    const targetUsername = req.params.username;
+    if (targetUsername) {
+      try {
+        const uRes = await pool.query(
+          `SELECT id, username, role FROM app_users WHERE LOWER(username) = LOWER($1)`,
+          [targetUsername]
+        );
+        if (uRes.rows.length > 0) {
+          req.user = { id: uRes.rows[0].id, role: uRes.rows[0].role, username: uRes.rows[0].username };
+        }
+      } catch (e) {
+        // non-fatal
+      }
+    }
+    req.isApiKey = true;
+    return next();
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = { id: decoded.id, role: decoded.role, username: decoded.username };
+    return next();
+  } catch (err) {
+    return res.status(401).json({ error: "Session expired" });
+  }
+}
+
 /* =======================================================
    3.8. GET CREATOR STORY ARCHIVE
    GET /api/creator/:username/stories/archive
    (Allows creator to browse all expired & archived stories)
 ======================================================= */
-router.get("/:username/stories/archive", authenticateToken, async (req, res) => {
+router.get("/:username/stories/archive", authenticateOwnerOrApiKey, async (req, res) => {
   const { username } = req.params;
-  const userId = req.user.id;
+  const includeActive = req.query.include_active === "true" || req.query.include_active === "1" || req.isApiKey;
   if (!username) return res.status(400).json({ error: "Username required" });
 
   try {
-    const userRes = await pool.query(
-      `SELECT id, username, telegram_user_id, role FROM app_users WHERE id = $1`,
-      [userId]
-    );
-    if (userRes.rows.length === 0) return res.status(401).json({ error: "User not found" });
+    let isOwner = false;
+    if (req.isApiKey) {
+      isOwner = true;
+    } else {
+      const userRes = await pool.query(
+        `SELECT id, username, telegram_user_id, role FROM app_users WHERE id = $1`,
+        [req.user.id]
+      );
+      if (userRes.rows.length === 0) return res.status(401).json({ error: "User not found" });
 
-    const currentUser = userRes.rows[0];
-    const isOwner = 
-      currentUser.role === "admin" ||
-      currentUser.username.toLowerCase() === username.toLowerCase();
+      const currentUser = userRes.rows[0];
+      isOwner = 
+        currentUser.role === "admin" ||
+        currentUser.username.toLowerCase() === username.toLowerCase();
+    }
 
     if (!isOwner) {
       return res.status(403).json({ error: "Only the profile owner can view their story archive" });
     }
 
+    const whereClause = includeActive
+      ? `WHERE LOWER(username) = LOWER($1)`
+      : `WHERE LOWER(username) = LOWER($1) AND (is_archived = TRUE OR expires_at <= NOW())`;
+
     const archRes = await pool.query(
       `SELECT id, creator_id, username, video_url, thumbnail_url, duration, sound_title, created_at, expires_at, is_active, is_archived
        FROM creator_stories
-       WHERE LOWER(username) = LOWER($1) AND (is_archived = TRUE OR expires_at <= NOW())
+       ${whereClause}
        ORDER BY created_at DESC`,
       [username]
     );
@@ -2124,9 +2175,8 @@ router.get("/:username/stories/archive", authenticateToken, async (req, res) => 
    POST /api/creator/:username/highlights
    (Allows creator to curate multiple stories into a highlight reel)
 ======================================================= */
-router.post("/:username/highlights", authenticateToken, async (req, res) => {
+router.post("/:username/highlights", authenticateOwnerOrApiKey, async (req, res) => {
   const { username } = req.params;
-  const userId = req.user.id;
   const { title, cover_url, story_ids } = req.body;
 
   if (!story_ids || !Array.isArray(story_ids) || story_ids.length === 0) {
@@ -2134,16 +2184,26 @@ router.post("/:username/highlights", authenticateToken, async (req, res) => {
   }
 
   try {
-    const userRes = await pool.query(
-      `SELECT id, username, role FROM app_users WHERE id = $1`,
-      [userId]
-    );
-    if (userRes.rows.length === 0) return res.status(401).json({ error: "User not found" });
+    let isOwner = false;
+    let userId = null;
 
-    const currentUser = userRes.rows[0];
-    const isOwner = 
-      currentUser.role === "admin" ||
-      currentUser.username.toLowerCase() === username.toLowerCase();
+    if (req.isApiKey) {
+      isOwner = true;
+      const uRes = await pool.query(`SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)`, [username]);
+      if (uRes.rows.length > 0) userId = uRes.rows[0].id;
+    } else {
+      const userRes = await pool.query(
+        `SELECT id, username, role FROM app_users WHERE id = $1`,
+        [req.user.id]
+      );
+      if (userRes.rows.length === 0) return res.status(401).json({ error: "User not found" });
+
+      const currentUser = userRes.rows[0];
+      isOwner = 
+        currentUser.role === "admin" ||
+        currentUser.username.toLowerCase() === username.toLowerCase();
+      userId = currentUser.id;
+    }
 
     if (!isOwner) {
       return res.status(403).json({ error: "Only the profile owner can create highlights" });
@@ -2193,19 +2253,130 @@ router.post("/:username/highlights", authenticateToken, async (req, res) => {
 });
 
 /* =======================================================
-   3.10. DELETE STORY HIGHLIGHT
-   DELETE /api/creator/:username/highlights/:id
+   3.10. UPDATE STORY HIGHLIGHT (Append stories, touch updated_at to push to front)
+   PATCH /api/creator/:username/highlights/:id
 ======================================================= */
-router.delete("/:username/highlights/:id", authenticateToken, async (req, res) => {
+router.patch("/:username/highlights/:id", authenticateOwnerOrApiKey, async (req, res) => {
   const { username, id } = req.params;
-  const userId = req.user.id;
+  const { story_id, story_ids, title, cover_url } = req.body;
 
   try {
-    const userRes = await pool.query(`SELECT id, username, role FROM app_users WHERE id = $1`, [userId]);
-    if (userRes.rows.length === 0) return res.status(401).json({ error: "User not found" });
+    let isOwner = false;
+    let creatorId = null;
 
-    const currentUser = userRes.rows[0];
-    const isOwner = currentUser.role === "admin" || currentUser.username.toLowerCase() === username.toLowerCase();
+    if (req.isApiKey) {
+      isOwner = true;
+      const uRes = await pool.query(`SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)`, [username]);
+      if (uRes.rows.length > 0) creatorId = uRes.rows[0].id;
+    } else {
+      const userRes = await pool.query(`SELECT id, username, role FROM app_users WHERE id = $1`, [req.user.id]);
+      if (userRes.rows.length === 0) return res.status(401).json({ error: "User not found" });
+      const currentUser = userRes.rows[0];
+      isOwner = currentUser.role === "admin" || currentUser.username.toLowerCase() === username.toLowerCase();
+      creatorId = currentUser.id;
+    }
+
+    if (!isOwner) {
+      return res.status(403).json({ error: "Only the profile owner can update highlights" });
+    }
+
+    const hlRes = await pool.query(
+      `SELECT * FROM creator_story_highlights WHERE id = $1 AND LOWER(username) = LOWER($2)`,
+      [id, username]
+    );
+    if (hlRes.rows.length === 0) {
+      return res.status(404).json({ error: "Highlight not found" });
+    }
+
+    const currentHl = hlRes.rows[0];
+    let updatedStoryIds = [...(currentHl.story_ids || [])];
+
+    const toAdd = [];
+    if (story_id && !isNaN(Number(story_id))) {
+      toAdd.push(Number(story_id));
+    }
+    if (Array.isArray(story_ids)) {
+      story_ids.forEach(sid => {
+        const n = Number(sid);
+        if (!isNaN(n) && n > 0) toAdd.push(n);
+      });
+    }
+
+    if (toAdd.length > 0) {
+      const validRes = await pool.query(
+        `SELECT id, thumbnail_url, video_url, duration, sound_title, created_at, expires_at
+         FROM creator_stories
+         WHERE id = ANY($1::INT[]) AND LOWER(username) = LOWER($2)`,
+        [toAdd, username]
+      );
+      const validIds = validRes.rows.map(r => r.id);
+
+      toAdd.forEach(sid => {
+        if (validIds.includes(sid) && !updatedStoryIds.includes(sid)) {
+          updatedStoryIds.push(sid);
+        }
+      });
+    }
+
+    const newTitle = title !== undefined && String(title).trim() ? String(title).trim().slice(0, 100) : currentHl.title;
+    const newCover = cover_url || currentHl.cover_url;
+
+    // UPDATE with updated_at = NOW() -> Automatically pushes to front!
+    const updateRes = await pool.query(
+      `UPDATE creator_story_highlights
+       SET story_ids = $1, title = $2, cover_url = $3, updated_at = NOW()
+       WHERE id = $4 AND LOWER(username) = LOWER($5)
+       RETURNING *`,
+      [updatedStoryIds, newTitle, newCover, id, username]
+    );
+
+    const updated = updateRes.rows[0];
+
+    let stories = [];
+    if (updated.story_ids && updated.story_ids.length > 0) {
+      const sRes = await pool.query(
+        `SELECT id, thumbnail_url, video_url, duration, sound_title, created_at, expires_at
+         FROM creator_stories
+         WHERE id = ANY($1::INT[]) AND LOWER(username) = LOWER($2)
+         ORDER BY created_at ASC`,
+        [updated.story_ids, username]
+      );
+      stories = sRes.rows.map(s => ({ ...s, duration: Number(s.duration || 10.0) }));
+    }
+
+    return res.json({
+      success: true,
+      highlight: {
+        ...updated,
+        stories,
+        story_count: stories.length
+      }
+    });
+  } catch (err) {
+    console.error("[UPDATE HIGHLIGHT ERROR]", err);
+    return res.status(500).json({ error: "Failed to update highlight" });
+  }
+});
+
+/* =======================================================
+   3.11. DELETE STORY HIGHLIGHT
+   DELETE /api/creator/:username/highlights/:id
+======================================================= */
+router.delete("/:username/highlights/:id", authenticateOwnerOrApiKey, async (req, res) => {
+  const { username, id } = req.params;
+
+  try {
+    let isOwner = false;
+    if (req.isApiKey) {
+      isOwner = true;
+    } else {
+      const userRes = await pool.query(`SELECT id, username, role FROM app_users WHERE id = $1`, [req.user.id]);
+      if (userRes.rows.length === 0) return res.status(401).json({ error: "User not found" });
+
+      const currentUser = userRes.rows[0];
+      isOwner = currentUser.role === "admin" || currentUser.username.toLowerCase() === username.toLowerCase();
+    }
+
     if (!isOwner) {
       return res.status(403).json({ error: "Only the profile owner can delete highlights" });
     }
