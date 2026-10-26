@@ -15,6 +15,8 @@ import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import StoryAvatar from "./StoryAvatar";
 import StoryHighlightsTray from "./StoryHighlightsTray";
 import FollowListModal from "./FollowListModal";
+import DesktopLeftSidebar from "./DesktopLeftSidebar";
+import DesktopRightSidebar from "./DesktopRightSidebar";
 import { promptLogin, showToast } from "../utils/toast";
 
 export default function CreatorProfileModal({ 
@@ -88,6 +90,16 @@ export default function CreatorProfileModal({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && !isAnyModalOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isAnyModalOpen, onClose]);
 
   const handleOpenFollowList = useCallback((tab) => {
     followListTabRef.current = tab;
@@ -475,50 +487,10 @@ export default function CreatorProfileModal({
     }
   };
 
-  return (
-    <div style={containerStyle}>
-      {/* Top Navbar */}
-      <div style={topNavStyle}>
-        <button onClick={onClose} style={navBtnStyle} title="Back">
-          <ArrowLeft size={22} color="#d4d4d8" />
-        </button>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <span style={topNavNameStyle}>{creatorData?.username || creatorUsername}</span>
-          {creatorData?.is_verified && <TwitterVerifiedBadge size={15} style={{ flexShrink: 0 }} />}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          {!creatorData?.is_owner && isMonetizedCreator && creatorData?.allow_tips !== false && (
-            <button 
-              onClick={() => setShowTipModal(true)} 
-              style={navBtnStyle} 
-              title="Send Tip"
-            >
-              <Heart size={20} fill="#f91880" color="#f91880" />
-            </button>
-          )}
-          <button onClick={handleShare} style={navBtnStyle} title="Share Profile">
-            <Share2 size={20} color="#d4d4d8" />
-          </button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div style={loaderCenterStyle}>
-          <Loader2 size={32} className="animate-spin" color="#0095f6" />
-          <span style={{ marginTop: "12px", color: "#8e8e93", fontSize: "14px" }}>Loading profile...</span>
-        </div>
-      ) : error ? (
-        <div style={errorCenterStyle}>
-          <span style={{ fontSize: "16px", color: "#d4d4d8", fontWeight: "700" }}>Profile Not Found</span>
-          <p style={{ color: "#8e8e93", fontSize: "13px", marginTop: "4px" }}>The requested account could not be found.</p>
-          <button onClick={onClose} style={errorBackBtnStyle}>Back to Feed</button>
-        </div>
-      ) : (
-        <div style={scrollContentStyle}>
-          <div style={profileInnerContainer}>
-            
-            {/* MOBILE HEADER */}
-            {!isDesktop ? (
+  const renderProfileBody = () => (
+    <>
+      {/* MOBILE HEADER */}
+      {!isDesktop ? (
               <div style={{ padding: "16px 16px 10px 16px" }}>
                 {/* Top Row: Details on left; Avatar on right (TikTok style) */}
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "14px" }}>
@@ -814,8 +786,10 @@ export default function CreatorProfileModal({
             <div style={{ 
               ...tabsContainerStyle, 
               justifyContent: isDesktop ? "center" : "space-around",
-              gap: isDesktop ? "50px" : "0",
-              borderTop: "1px solid #262626"
+              gap: isDesktop ? "40px" : "0",
+              borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+              top: isDesktop ? "53px" : "0px",
+              zIndex: 90
             }}>
               <button 
                 onClick={() => setActiveTab("posts")} 
@@ -905,7 +879,7 @@ export default function CreatorProfileModal({
                 </div>
               ) : (
                 <div style={{ 
-                  padding: activeTab === "posts" ? (isDesktop ? "16px 0 30px 0" : "0 0 24px 0") : (isDesktop ? "20px 20px 30px 20px" : "14px 12px 24px 12px"),
+                  padding: activeTab === "posts" ? (isDesktop ? "16px 0 30px 0" : "0 0 24px 0") : (isDesktop ? "16px 12px 30px 12px" : "14px 4px 24px 4px"),
                   width: "100%",
                   boxSizing: "border-box"
                 }}>
@@ -914,8 +888,6 @@ export default function CreatorProfileModal({
                       maxWidth: "600px",
                       margin: "0 auto",
                       width: "100%",
-                      borderLeft: isDesktop ? "1px solid var(--border-color, #262626)" : "none",
-                      borderRight: isDesktop ? "1px solid var(--border-color, #262626)" : "none",
                       animation: "fadeIn 0.3s ease-out"
                     }}>
                       {displayedVideos.map((v, idx) => (
@@ -946,8 +918,8 @@ export default function CreatorProfileModal({
                   ) : (
                     <div style={{
                       display: "grid",
-                      gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))",
-                      gap: isDesktop ? "16px" : "4px",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gap: isDesktop ? "6px" : "4px",
                       alignItems: "start",
                       width: "100%",
                       animation: "fadeIn 0.3s ease-out"
@@ -992,8 +964,180 @@ export default function CreatorProfileModal({
               )
             )}
 
+    </>
+  );
+
+  return (
+    <div style={containerStyle}>
+      {isDesktop ? (
+        <div style={desktopContainerStyle}>
+          <div style={desktopInnerWrapperStyle}>
+            {/* 1. LEFT SIDEBAR */}
+            <DesktopLeftSidebar
+              user={currentUser}
+              activeNav="creators"
+              onNavigateHome={() => {
+                onClose();
+                window.location.href = "/";
+              }}
+              onProfileClick={() => {
+                onClose();
+                window.location.href = "/?tab=profile";
+              }}
+              onOpenDiscover={() => {
+                onClose();
+                window.dispatchEvent(new CustomEvent("openDiscoverCreatorsModal"));
+              }}
+              onPostClick={onClose}
+              onSelectCategory={(catId) => {
+                onClose();
+                window.location.href = `/?tab=explore&category=${catId}`;
+              }}
+              onTabSwitch={(tab) => {
+                onClose();
+                if (tab === "community") window.location.href = "/?tab=explore&sub=community";
+                else window.location.href = "/?tab=explore";
+              }}
+            />
+
+            {/* 2. MIDDLE CREATOR PROFILE COLUMN */}
+            <div
+              className="custom-scrollbar"
+              style={desktopCenterProfileRailStyle}
+            >
+              {/* Desktop Sticky Header with Back Button */}
+              <div style={desktopProfileStickyHeaderStyle}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <button 
+                    onClick={onClose} 
+                    style={desktopBackBtnStyle} 
+                    title="Back"
+                  >
+                    <ArrowLeft size={18} color="#f4f4f5" />
+                  </button>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={desktopProfileHeaderTitleStyle}>
+                        {creatorData?.display_name || creatorUsername}
+                      </span>
+                      {creatorData?.is_verified && <TwitterVerifiedBadge size={16} />}
+                    </div>
+                    {postsCount > 0 && (
+                      <span style={{ fontSize: "12px", color: "#8e8e93" }}>
+                        {postsCount} drops
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  {!creatorData?.is_owner && isMonetizedCreator && creatorData?.allow_tips !== false && (
+                    <button 
+                      onClick={() => setShowTipModal(true)} 
+                      style={desktopHeaderIconBtnStyle} 
+                      title="Send Tip"
+                    >
+                      <Heart size={18} fill="#f91880" color="#f91880" />
+                    </button>
+                  )}
+                  <button onClick={handleShare} style={desktopHeaderIconBtnStyle} title="Share Profile">
+                    <Share2 size={18} color="#d4d4d8" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Main Body */}
+              {loading ? (
+                <div style={loaderCenterStyle}>
+                  <Loader2 size={32} className="animate-spin" color="#0095f6" />
+                  <span style={{ marginTop: "12px", color: "#8e8e93", fontSize: "14px" }}>Loading profile...</span>
+                </div>
+              ) : error ? (
+                <div style={errorCenterStyle}>
+                  <span style={{ fontSize: "16px", color: "#d4d4d8", fontWeight: "700" }}>Profile Not Found</span>
+                  <p style={{ color: "#8e8e93", fontSize: "13px", marginTop: "4px" }}>The requested account could not be found.</p>
+                  <button onClick={onClose} style={errorBackBtnStyle}>Back to Feed</button>
+                </div>
+              ) : (
+                <div style={{ paddingBottom: "60px" }}>
+                  {renderProfileBody()}
+                </div>
+              )}
+            </div>
+
+            {/* 3. RIGHT SIDEBAR */}
+            <DesktopRightSidebar
+              user={currentUser}
+              onCreatorClick={(uname) => {
+                if (uname.toLowerCase() !== normalizedTarget) {
+                  onClose();
+                  window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
+                }
+              }}
+              onVideoClick={(v) => {
+                if (onVideoClick) onVideoClick(v);
+              }}
+              onOpenDiscover={() => {
+                onClose();
+                window.dispatchEvent(new CustomEvent("openDiscoverCreatorsModal"));
+              }}
+              onSelectTopic={(catId) => {
+                onClose();
+                window.location.href = `/?tab=explore&category=${catId}`;
+              }}
+              onSearchSubmit={(q) => {
+                onClose();
+                window.location.href = `/?tab=explore&q=${encodeURIComponent(q)}`;
+              }}
+            />
           </div>
         </div>
+      ) : (
+        <>
+          {/* Top Navbar */}
+          <div style={topNavStyle}>
+            <button onClick={onClose} style={navBtnStyle} title="Back">
+              <ArrowLeft size={22} color="#d4d4d8" />
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={topNavNameStyle}>{creatorData?.username || creatorUsername}</span>
+              {creatorData?.is_verified && <TwitterVerifiedBadge size={15} style={{ flexShrink: 0 }} />}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              {!creatorData?.is_owner && isMonetizedCreator && creatorData?.allow_tips !== false && (
+                <button 
+                  onClick={() => setShowTipModal(true)} 
+                  style={navBtnStyle} 
+                  title="Send Tip"
+                >
+                  <Heart size={20} fill="#f91880" color="#f91880" />
+                </button>
+              )}
+              <button onClick={handleShare} style={navBtnStyle} title="Share Profile">
+                <Share2 size={20} color="#d4d4d8" />
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div style={loaderCenterStyle}>
+              <Loader2 size={32} className="animate-spin" color="#0095f6" />
+              <span style={{ marginTop: "12px", color: "#8e8e93", fontSize: "14px" }}>Loading profile...</span>
+            </div>
+          ) : error ? (
+            <div style={errorCenterStyle}>
+              <span style={{ fontSize: "16px", color: "#d4d4d8", fontWeight: "700" }}>Profile Not Found</span>
+              <p style={{ color: "#8e8e93", fontSize: "13px", marginTop: "4px" }}>The requested account could not be found.</p>
+              <button onClick={onClose} style={errorBackBtnStyle}>Back to Feed</button>
+            </div>
+          ) : (
+            <div style={scrollContentStyle}>
+              <div style={profileInnerContainer}>
+                {renderProfileBody()}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Tip Modal */}
@@ -1466,5 +1610,90 @@ const errorBackBtnStyle = {
   cursor: "pointer",
   fontSize: "13px",
   fontWeight: "600"
+};
+
+// 🌟 DESKTOP 3-COLUMN LAYOUT STYLES (Twitter/X Inspired)
+const desktopContainerStyle = {
+  display: "flex",
+  justifyContent: "center",
+  width: "100%",
+  height: "100vh",
+  overflow: "hidden",
+  background: "var(--bg-color)"
+};
+
+const desktopInnerWrapperStyle = {
+  display: "flex",
+  justifyContent: "center",
+  width: "100%",
+  maxWidth: "1420px",
+  height: "100vh",
+  position: "relative"
+};
+
+const desktopCenterProfileRailStyle = {
+  flex: 1,
+  maxWidth: "680px",
+  width: "100%",
+  minWidth: 0,
+  height: "100vh",
+  overflowY: "auto",
+  borderLeft: "1px solid var(--border-color)",
+  borderRight: "1px solid var(--border-color)",
+  display: "flex",
+  flexDirection: "column",
+  position: "relative",
+  background: "var(--bg-color)"
+};
+
+const desktopProfileStickyHeaderStyle = {
+  position: "sticky",
+  top: 0,
+  zIndex: 95,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "10px 20px",
+  backgroundColor: "rgba(9, 9, 11, 0.82)",
+  backdropFilter: "blur(16px)",
+  WebkitBackdropFilter: "blur(16px)",
+  borderBottom: "1px solid var(--border-color)",
+  minHeight: "53px",
+  boxSizing: "border-box"
+};
+
+const desktopProfileHeaderTitleStyle = {
+  fontSize: "18px",
+  fontWeight: "800",
+  color: "#f4f4f5",
+  letterSpacing: "-0.3px",
+  margin: 0
+};
+
+const desktopBackBtnStyle = {
+  background: "rgba(255, 255, 255, 0.06)",
+  border: "1px solid rgba(255, 255, 255, 0.1)",
+  borderRadius: "50%",
+  width: "36px",
+  height: "36px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  transition: "all 0.15s ease",
+  flexShrink: 0
+};
+
+const desktopHeaderIconBtnStyle = {
+  background: "rgba(255, 255, 255, 0.06)",
+  border: "1px solid rgba(255, 255, 255, 0.1)",
+  borderRadius: "50%",
+  width: "36px",
+  height: "36px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  transition: "all 0.15s ease"
 };
 

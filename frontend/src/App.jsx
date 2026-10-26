@@ -76,7 +76,10 @@ export default function App() {
   const [activeCommentVideo, setActiveCommentVideo] = useState(null);
   const [viewingCreator, setViewingCreator] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("creator") || null;
+    if (params.get("creator")) return params.get("creator");
+    const path = window.location.pathname;
+    if (path.startsWith("/@")) return path.slice(2).trim();
+    return null;
   });
   const [creatorAutoSubscribe, setCreatorAutoSubscribe] = useState(false);
   const [isCreatorOverVideo, setIsCreatorOverVideo] = useState(false);
@@ -201,7 +204,7 @@ export default function App() {
       
       const catParam = params.get("cat");
       const legalParam = params.get("legal");
-      const creatorParam = params.get("creator");
+      const creatorParam = params.get("creator") || (window.location.pathname.startsWith("/@") ? window.location.pathname.slice(2).trim() : null);
       window.history.replaceState({
         ...currentState,
         tab: currentTab,

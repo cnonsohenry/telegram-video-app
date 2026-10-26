@@ -20,6 +20,8 @@ import FeedPost from "../components/FeedPost";
 import PostOptionsModal from "../components/PostOptionsModal";
 import ReportModal from "../components/ReportModal";
 import FollowListModal from "../components/FollowListModal";
+import DesktopLeftSidebar from "../components/DesktopLeftSidebar";
+import DesktopRightSidebar from "../components/DesktopRightSidebar";
 import { useVideos } from "../hooks/useVideos";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
@@ -684,55 +686,10 @@ export default function Profile({
   const followingCount = creatorStats.following !== undefined ? creatorStats.following : (user?.following_count !== undefined ? user.following_count : (user?.follows?.length || 0));
   const likesCount = creatorStats.likes || (liked?.length || 0);
 
-  return (
-    <div
-      ref={scrollContainerRef} 
-      style={{ 
-        ...containerStyle, 
-        paddingTop: "0", 
-        paddingLeft: "0",
-        paddingRight: "0",
-        paddingBottom: isDesktop ? "40px" : (shouldHideUI ? "0px" : "75px"),
-        transition: "padding-bottom 0.3s ease",
-        overflowY: "auto",  
-        height: "100vh"     
-      }}
-    >
-      <div style={isDesktop ? desktopInnerWrapper : {}}>
-        
-        {/* TOP NAV BAR (Mobile) */}
-        {!isDesktop && (
-          <div style={{
-            ...navGridStyle,
-            transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
-            transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)",
-            opacity: shouldHideUI ? 0 : 1,
-            pointerEvents: shouldHideUI ? "none" : "auto"
-          }}>
-            <div style={{ width: "36px" }}>
-              {activeGroup && (
-                <button onClick={handleCloseGroup} style={headerIconButton}>
-                  <ArrowLeft size={22} color="#d4d4d8" />
-                </button>
-              )}
-            </div>
-            <div style={centerTitleContainer}>
-              <h2 style={usernameStyle}>{user?.username || APP_CONFIG.defaultUploader}</h2>
-              {(user?.is_creator || user?.is_verified) && (
-                <TwitterVerifiedBadge size={15} style={{ marginLeft: "4px" }} />
-              )}
-              <ChevronDown size={14} color="#a8a8a8" style={{ marginLeft: "2px" }} />
-            </div>
-            <div style={{ display: "flex", gap: "14px", justifyContent: "flex-end", flex: 1, alignItems: "center" }}>
-              <button onClick={handleOpenSettings} style={headerIconButton} title="Settings">
-                <Settings size={21} color="#d4d4d8" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 🌟 INSTAGRAM / CREATOR STYLE PROFILE HEADER */}
-        <div style={{ padding: isDesktop ? "32px 20px 10px 20px" : "16px 16px 8px 16px" }}>
+  const renderProfileBody = () => (
+    <>
+      {/* 🌟 INSTAGRAM / CREATOR STYLE PROFILE HEADER */}
+      <div style={{ padding: isDesktop ? "28px 20px 10px 20px" : "16px 16px 8px 16px" }}>
           
           {/* MOBILE HEADER LAYOUT */}
           {!isDesktop ? (
@@ -1434,7 +1391,119 @@ export default function Profile({
           )}
 
         </div>
-      </div>
+    </>
+  );
+
+  return (
+    <>
+      {isDesktop ? (
+        <div style={desktopContainerStyle}>
+          <div style={desktopInnerWrapperStyle}>
+            {/* 1. LEFT SIDEBAR: Navigation Rail */}
+            <DesktopLeftSidebar
+              user={user}
+              activeNav="profile"
+              onNavigateHome={() => window.location.href = "/"}
+              onProfileClick={() => {}}
+              onOpenDiscover={handleOpenDiscover}
+              onPostClick={() => {
+                setUploadDefaultCategory(activeTab === "premium" && user?.is_creator ? "premium" : "community");
+                setShowUploadModal(true);
+              }}
+              onSelectCategory={(catId) => { window.location.href = `/?tab=explore&category=${catId}`; }}
+              onTabSwitch={(tab) => {
+                if (tab === "community") window.location.href = "/?tab=explore&sub=community";
+                else window.location.href = "/?tab=explore";
+              }}
+            />
+
+            {/* 2. MIDDLE COLUMN: Profile View */}
+            <div
+              ref={scrollContainerRef}
+              className="custom-scrollbar"
+              style={desktopCenterProfileRailStyle}
+            >
+              {/* Desktop Sticky Header */}
+              <div style={desktopProfileStickyHeaderStyle}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={desktopProfileHeaderTitleStyle}>
+                    {user?.display_name || user?.username || "Profile"}
+                  </span>
+                  {(user?.is_creator || user?.is_verified) && (
+                    <TwitterVerifiedBadge size={16} />
+                  )}
+                </div>
+                <button 
+                  onClick={handleOpenSettings} 
+                  style={desktopHeaderIconBtnStyle} 
+                  title="Settings"
+                >
+                  <Settings size={18} color="#d4d4d8" />
+                </button>
+              </div>
+
+              {/* Profile Body */}
+              {renderProfileBody()}
+            </div>
+
+            {/* 3. RIGHT SIDEBAR: Highlights & Trends */}
+            <DesktopRightSidebar
+              user={user}
+              onCreatorClick={onCreatorClick}
+              onVideoClick={setActiveVideo}
+              onOpenDiscover={handleOpenDiscover}
+              onSelectTopic={(catId) => { window.location.href = `/?tab=explore&category=${catId}`; }}
+              onSearchSubmit={(q) => { window.location.href = `/?tab=explore&q=${encodeURIComponent(q)}`; }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div
+          ref={scrollContainerRef} 
+          style={{ 
+            ...containerStyle, 
+            paddingTop: "0", 
+            paddingLeft: "0",
+            paddingRight: "0",
+            paddingBottom: shouldHideUI ? "0px" : "75px",
+            transition: "padding-bottom 0.3s ease",
+            overflowY: "auto",  
+            height: "100vh"     
+          }}
+        >
+          {/* TOP NAV BAR (Mobile) */}
+          <div style={{
+            ...navGridStyle,
+            transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+            transform: shouldHideUI ? "translateY(-100%)" : "translateY(0)",
+            opacity: shouldHideUI ? 0 : 1,
+            pointerEvents: shouldHideUI ? "none" : "auto"
+          }}>
+            <div style={{ width: "36px" }}>
+              {activeGroup && (
+                <button onClick={handleCloseGroup} style={headerIconButton}>
+                  <ArrowLeft size={22} color="#d4d4d8" />
+                </button>
+              )}
+            </div>
+            <div style={centerTitleContainer}>
+              <h2 style={usernameStyle}>{user?.username || APP_CONFIG.defaultUploader}</h2>
+              {(user?.is_creator || user?.is_verified) && (
+                <TwitterVerifiedBadge size={15} style={{ marginLeft: "4px" }} />
+              )}
+              <ChevronDown size={14} color="#a8a8a8" style={{ marginLeft: "2px" }} />
+            </div>
+            <div style={{ display: "flex", gap: "14px", justifyContent: "flex-end", flex: 1, alignItems: "center" }}>
+              <button onClick={handleOpenSettings} style={headerIconButton} title="Settings">
+                <Settings size={21} color="#d4d4d8" />
+              </button>
+            </div>
+          </div>
+
+          {/* Profile Body */}
+          {renderProfileBody()}
+        </div>
+      )}
 
       {/* 🌟 FOLLOWERS / FOLLOWING LIST MODAL */}
       {followListTab && user?.username && (
@@ -1579,7 +1648,7 @@ export default function Profile({
           onClose={() => setReportedVideo(null)}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -1617,6 +1686,77 @@ const containerStyle = {
   color: "#f5f5f5", 
   position: "relative", 
   overflowX: "hidden" 
+};
+
+// 🌟 DESKTOP 3-COLUMN LAYOUT STYLES (Twitter/X Inspired)
+const desktopContainerStyle = {
+  display: "flex",
+  justifyContent: "center",
+  width: "100%",
+  height: "100vh",
+  overflow: "hidden",
+  background: "var(--bg-color)"
+};
+
+const desktopInnerWrapperStyle = {
+  display: "flex",
+  justifyContent: "center",
+  width: "100%",
+  maxWidth: "1420px",
+  height: "100vh",
+  position: "relative"
+};
+
+const desktopCenterProfileRailStyle = {
+  flex: 1,
+  maxWidth: "680px",
+  width: "100%",
+  minWidth: 0,
+  height: "100vh",
+  overflowY: "auto",
+  borderLeft: "1px solid var(--border-color)",
+  borderRight: "1px solid var(--border-color)",
+  display: "flex",
+  flexDirection: "column",
+  position: "relative",
+  background: "var(--bg-color)"
+};
+
+const desktopProfileStickyHeaderStyle = {
+  position: "sticky",
+  top: 0,
+  zIndex: 95,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "10px 20px",
+  backgroundColor: "rgba(9, 9, 11, 0.82)",
+  backdropFilter: "blur(16px)",
+  WebkitBackdropFilter: "blur(16px)",
+  borderBottom: "1px solid var(--border-color)",
+  minHeight: "53px",
+  boxSizing: "border-box"
+};
+
+const desktopProfileHeaderTitleStyle = {
+  fontSize: "18px",
+  fontWeight: "800",
+  color: "#f4f4f5",
+  letterSpacing: "-0.3px",
+  margin: 0
+};
+
+const desktopHeaderIconBtnStyle = {
+  background: "rgba(255, 255, 255, 0.06)",
+  border: "1px solid rgba(255, 255, 255, 0.1)",
+  borderRadius: "50%",
+  width: "36px",
+  height: "36px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  transition: "all 0.15s ease"
 };
 
 const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%" };
