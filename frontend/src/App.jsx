@@ -708,15 +708,44 @@ export default function App() {
 
   useEffect(() => {
     const preventOverscroll = (e) => {
-      const scrollable = e.target.closest('[style*="overflow-y: auto"], [style*="overflowY: auto"]');
-      if (!scrollable) {
-        if (e.cancelable) e.preventDefault();
+      // 🟢 Never block touch gestures inside Admin Dashboard or admin viewports
+      if (
+        activeTab === "admin" ||
+        e.target.closest('.admin-dashboard-root, .admin-main-content, .content-area, .admin-sidebar, .admin-table-scroll') ||
+        document.querySelector('.admin-dashboard-root')
+      ) {
         return;
       }
+
+      // Check if user is touching a scrollable element (by class or inline style)
+      const scrollable = e.target.closest(
+        '.content-area, .admin-sidebar, .admin-table-scroll, .scrollable-content, ' +
+        '[style*="overflow-y: auto"], [style*="overflowY: auto"], [style*="overflow-y:scroll"], [style*="overflowY:scroll"], ' +
+        '[style*="overflow: auto"], [style*="overflow: scroll"], [style*="overflow: hidden auto"], [style*="overflow: auto hidden"]'
+      );
+      if (scrollable) return;
+
+      // Also inspect computedStyle up the element tree so custom-styled scroll containers are not locked
+      let el = e.target;
+      while (el && el !== document.body && el !== document.documentElement) {
+        if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth) {
+          const style = window.getComputedStyle(el);
+          if (
+            style.overflowY === 'auto' || style.overflowY === 'scroll' ||
+            style.overflowX === 'auto' || style.overflowX === 'scroll'
+          ) {
+            return;
+          }
+        }
+        el = el.parentElement;
+      }
+
+      // Block only true non-scrollable bounce touches outside any scrollable view
+      if (e.cancelable) e.preventDefault();
     };
     document.addEventListener('touchmove', preventOverscroll, { passive: false });
     return () => document.removeEventListener('touchmove', preventOverscroll);
-  }, []);
+  }, [activeTab]);
 
   const applyTheme = useCallback((theme) => {
     localStorage.setItem("theme", theme);

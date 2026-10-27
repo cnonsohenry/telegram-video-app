@@ -876,9 +876,24 @@ export default function AdminDashboard({ user, onLogout }) {
           bottom: 0 !important;
           width: 100vw !important;
           height: 100% !important;
-          max-height: 100% !important;
+          height: 100dvh !important;
+          max-height: 100dvh !important;
           overflow: hidden !important;
           z-index: 999999 !important;
+          touch-action: pan-y !important;
+        }
+
+        .admin-main-content {
+          flex: 1 1 0% !important;
+          display: flex !important;
+          flex-direction: column !important;
+          height: 100% !important;
+          max-height: 100% !important;
+          min-height: 0 !important;
+          min-width: 0 !important;
+          width: 100% !important;
+          position: relative !important;
+          overflow: hidden !important;
         }
 
         .content-area {
@@ -886,6 +901,8 @@ export default function AdminDashboard({ user, onLogout }) {
           height: 100% !important;
           max-height: 100% !important;
           min-height: 0 !important;
+          min-width: 0 !important;
+          width: 100% !important;
           overflow-y: auto !important;
           overflow-x: hidden !important;
           -webkit-overflow-scrolling: touch !important;
@@ -1021,7 +1038,7 @@ export default function AdminDashboard({ user, onLogout }) {
       </div>
 
       {/* Main Content Area */}
-      <div style={mainContentStyle}>
+      <div className="admin-main-content" style={mainContentStyle}>
         {/* Top Action Bar */}
         <div className="top-bar-container" style={topBarStyle}>
           <div className="header-title-group" style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", flex: 1 }}>
@@ -3621,7 +3638,7 @@ const sidebarStyle = { width: "260px", height: "100%", background: "#09090b", bo
 const logoStyle = { margin: 0, fontSize: "18px", fontWeight: "900", letterSpacing: "-0.5px", color: "#f4f4f5" };
 const mainContentStyle = { flex: 1, display: "flex", flexDirection: "column", height: "100%", maxHeight: "100%", minHeight: 0, minWidth: 0, width: "100%", position: "relative", overflow: "hidden" };
 const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 30px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#09090b", minWidth: 0, flexShrink: 0 };
-const contentAreaStyle = { flex: 1, height: "100%", minHeight: 0, minWidth: 0, width: "100%", overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", padding: "30px", background: "#09090b" };
+const contentAreaStyle = { flex: 1, height: "100%", minHeight: 0, minWidth: 0, width: "100%", overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", touchAction: "pan-y", padding: "30px", background: "#09090b" };
 const gridStatsStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" };
 const cardContainerStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "22px" };
 const tableContainerStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", overflow: "hidden", position: "relative" };
