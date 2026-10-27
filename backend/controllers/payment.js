@@ -58,10 +58,10 @@ export const verifyPayment = async (req, res, pool) => {
           [app_user_id]
         );
 
-        // Auto-subscribe user to official @naijahomemade VIP creator
+        // Auto-subscribe user to official @naijaxxx VIP creator
         try {
           const mainCreator = await client.query(
-            "SELECT id FROM app_users WHERE telegram_user_id IN (1881815190, -1004344719694) OR LOWER(username) = 'naijahomemade' LIMIT 1"
+            "SELECT id FROM app_users WHERE id = 458 OR LOWER(username) IN ('naijaxxx', 'naijahomemade') LIMIT 1"
           );
           if (mainCreator.rows.length > 0) {
             await client.query(

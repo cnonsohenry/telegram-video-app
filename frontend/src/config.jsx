@@ -77,9 +77,9 @@ export const APP_CONFIG = {
     { id: 'ton', label: 'Toncoin (TON)', badge: 'TON', bg: '#202024', text: '#f4f4f5', span: 2 } // spans 2 columns at the bottom
   ],
 
-  // 🟢 NEW: Admin Upload Destinations & IDs
+  // Admin Upload Destinations & IDs
   adminUsers: [
-    { id: "1881815190", label: "Main Admin" },
+    { id: "458", label: "Main Admin" },
     { id: "5441995861", label: "Secondary Admin" }
   ],
   telegramDestinations: [

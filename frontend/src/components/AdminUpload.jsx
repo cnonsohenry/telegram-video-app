@@ -11,7 +11,7 @@ import { showToast } from "../utils/toast";
 
 // Preset Creators & Channels aligned with forwarder tasks
 const PRESET_CREATORS = [
-  { username: "naijahomemade", displayName: "Naija Homemade Series", uploaderId: "1881815190", label: "🌟 Official Series (@naijahomemade)" },
+  { username: "naijaxxx", displayName: "Naija xxx", uploaderId: "458", label: "🌟 Official Series (@naijaxxx)" },
   { username: "baddies_distro", displayName: "Baddies Distro", uploaderId: "-1003754790625", label: "🔥 Baddies Distro (@baddies_distro)" },
   { username: "alphaxdash2", displayName: "Alpha Dash", uploaderId: "-1003995508694", label: "💃 Alpha Dash / NH Hotties (@alphaxdash2)" },
   { username: "nh_shorts", displayName: "NH Shorts", uploaderId: "-1003950008310", label: "⚡ NH Shorts (@nh_shorts)" },
@@ -469,10 +469,10 @@ export default function AdminUpload({ onClose }) {
 
   // Creator Attribution State (Replaced legacy Allowed Users / adminId)
   const [creatorsList, setCreatorsList] = useState(PRESET_CREATORS);
-  const [selectedCreatorKey, setSelectedCreatorKey] = useState("naijahomemade");
-  const [creatorUsername, setCreatorUsername] = useState("naijahomemade");
-  const [creatorDisplayName, setCreatorDisplayName] = useState("Naija Homemade Series");
-  const [uploaderId, setUploaderId] = useState("1881815190");
+  const [selectedCreatorKey, setSelectedCreatorKey] = useState("naijaxxx");
+  const [creatorUsername, setCreatorUsername] = useState("naijaxxx");
+  const [creatorDisplayName, setCreatorDisplayName] = useState("Naija xxx");
+  const [uploaderId, setUploaderId] = useState("458");
   const [isCustomCreator, setIsCustomCreator] = useState(false);
 
   const [category, setCategory] = useState("premium");
@@ -554,7 +554,7 @@ export default function AdminUpload({ onClose }) {
               .map(c => ({
                 username: c.username,
                 displayName: c.display_name || c.username,
-                uploaderId: String(c.telegram_user_id || c.id || ""),
+                uploaderId: String(c.id || ""),
                 label: `👤 ${c.display_name || c.username} (@${c.username})`
               }));
             setCreatorsList([...PRESET_CREATORS, ...dbCreators]);
@@ -574,7 +574,7 @@ export default function AdminUpload({ onClose }) {
       setIsCustomCreator(false);
       setCreatorUsername(found.username);
       setCreatorDisplayName(found.displayName);
-      setUploaderId(found.uploaderId || "1881815190");
+      setUploaderId(found.uploaderId || "458");
     }
   };
 
@@ -592,7 +592,7 @@ export default function AdminUpload({ onClose }) {
       if (found) {
         setCreatorUsername(found.username);
         setCreatorDisplayName(found.displayName);
-        setUploaderId(found.uploaderId || "1881815190");
+        setUploaderId(found.uploaderId || "458");
       }
     }
   };
@@ -750,9 +750,9 @@ export default function AdminUpload({ onClose }) {
     processingLock.current = true;
     setStatus("uploading");
 
-    const finalUploaderId = uploaderId || "1881815190";
-    const finalCreatorUsername = creatorUsername || "naijahomemade";
-    const finalCreatorDisplayName = creatorDisplayName || "Naija Homemade Series";
+    const finalUploaderId = uploaderId || "458";
+    const finalCreatorUsername = creatorUsername || "naijaxxx";
+    const finalCreatorDisplayName = creatorDisplayName || "Naija xxx";
 
     const formData = new FormData();
     formData.append("video", file);
@@ -825,9 +825,9 @@ export default function AdminUpload({ onClose }) {
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-twitter-telethon`;
 
-    const finalUploaderId = uploaderId || "1881815190";
-    const finalCreatorUsername = creatorUsername || "naijahomemade";
-    const finalCreatorDisplayName = creatorDisplayName || "Naija Homemade Series";
+    const finalUploaderId = uploaderId || "458";
+    const finalCreatorUsername = creatorUsername || "naijaxxx";
+    const finalCreatorDisplayName = creatorDisplayName || "Naija xxx";
 
     const { start: tStart, duration: tDur } = getTrimRange();
     const queryParams = new URLSearchParams({
@@ -906,9 +906,9 @@ export default function AdminUpload({ onClose }) {
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-telegram-link`;
 
-    const finalUploaderId = uploaderId || "1881815190";
-    const finalCreatorUsername = creatorUsername || "naijahomemade";
-    const finalCreatorDisplayName = creatorDisplayName || "Naija Homemade Series";
+    const finalUploaderId = uploaderId || "458";
+    const finalCreatorUsername = creatorUsername || "naijaxxx";
+    const finalCreatorDisplayName = creatorDisplayName || "Naija xxx";
 
     const { start: tgStart, duration: tgDur } = getTrimRange();
     const queryParams = new URLSearchParams({
@@ -988,9 +988,9 @@ export default function AdminUpload({ onClose }) {
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-instagram-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-instagram-telethon`;
 
-    const finalUploaderId = uploaderId || "1881815190";
-    const finalCreatorUsername = creatorUsername || "naijahomemade";
-    const finalCreatorDisplayName = creatorDisplayName || "Naija Homemade Series";
+    const finalUploaderId = uploaderId || "458";
+    const finalCreatorUsername = creatorUsername || "naijaxxx";
+    const finalCreatorDisplayName = creatorDisplayName || "Naija xxx";
 
     const { start: igStart, duration: igDur } = getTrimRange();
     const queryParams = new URLSearchParams({
@@ -1069,9 +1069,9 @@ export default function AdminUpload({ onClose }) {
         ? `${APP_CONFIG.apiUrl}/twitter-api/import-tiktok-direct`
         : `${APP_CONFIG.apiUrl}/twitter-api/import-tiktok-telethon`;
 
-    const finalUploaderId = uploaderId || "1881815190";
-    const finalCreatorUsername = creatorUsername || "naijahomemade";
-    const finalCreatorDisplayName = creatorDisplayName || "Naija Homemade Series";
+    const finalUploaderId = uploaderId || "458";
+    const finalCreatorUsername = creatorUsername || "naijaxxx";
+    const finalCreatorDisplayName = creatorDisplayName || "Naija xxx";
 
     const { start: ttStart, duration: ttDur } = getTrimRange();
     const queryParams = new URLSearchParams({
@@ -1238,7 +1238,7 @@ export default function AdminUpload({ onClose }) {
                   type="text" 
                   value={uploaderId} 
                   onChange={(e) => setUploaderId(e.target.value)}
-                  placeholder="e.g. -1003754790625 or 1881815190"
+                  placeholder="e.g. 458 or -1003754790625"
                   style={inputStyle}
                 />
               </div>

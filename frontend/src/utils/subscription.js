@@ -63,8 +63,8 @@ export const isUserSubscribedToCreator = (user, video) => {
         if (String(sub.creator_id) === uploaderId) return true;
         if (sub.telegram_user_id && String(sub.telegram_user_id) === uploaderId) return true;
       }
-      // If legacy VIP creator @naijahomemade
-      if (creatorHandle === "naijahomemade" && (String(sub.creator_id) === "458" || String(sub.creator_id) === "1881815190")) {
+      // If VIP creator @naijaxxx / @naijahomemade
+      if ((creatorHandle === "naijaxxx" || creatorHandle === "naijahomemade") && String(sub.creator_id) === "458") {
         return true;
       }
       return false;
@@ -73,8 +73,8 @@ export const isUserSubscribedToCreator = (user, video) => {
     if (isSubscribed) return true;
   }
 
-  // Fallback for migrated VIP users viewing @naijahomemade videos
-  if (user.is_premium && creatorHandle === "naijahomemade") {
+  // Fallback for migrated VIP users viewing @naijaxxx / @naijahomemade videos
+  if (user.is_premium && (creatorHandle === "naijaxxx" || creatorHandle === "naijahomemade")) {
     return true;
   }
 

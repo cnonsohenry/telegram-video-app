@@ -620,80 +620,88 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     if (!videoFile) return res.status(400).json({ error: "No video file provided" });
 
-    // Handle uploader ID (channel ID, user ID, or fallback)
-    const rawUploaderId = uploader_id || req.query.uploader_id || req.body.admin_id;
-    const numericUploaderId = rawUploaderId ? Number(rawUploaderId) : null;
-    const finalUploaderId = numericUploaderId || -1004344719694;
-
+    // Handle creator / uploader resolution without assuming channel ID is user ID
     const rawCategory = category || req.query.category;
     const safeCategory = rawCategory ? rawCategory.toLowerCase().trim() : "premium";
-    const cleanIdStr = String(finalUploaderId).replace('-', '');
-    const isChannel = finalUploaderId < 0;
-    const defaultUsername = (safeCategory === "premium" && !isChannel) ? "naijahomemade" : `tg_${cleanIdStr}`;
-    const defaultDisplayName = (safeCategory === "premium" && !isChannel) ? "Naija Homemade Series" : (isChannel ? `Channel ${cleanIdStr}` : `Creator ${finalUploaderId}`);
     const rawCreatorUsername = creator_username || req.query.creator_username;
-    const targetUsername = rawCreatorUsername 
-      ? String(rawCreatorUsername).trim().toLowerCase().replace(/[^a-z0-9_]/g, '')
-      : defaultUsername;
-    const targetDisplayName = creator_display_name || req.query.creator_display_name || creator_name || defaultDisplayName;
+    const rawChannelId = uploader_id || req.query.uploader_id || req.body.channel_id;
+    const cleanChannelStr = rawChannelId ? String(rawChannelId).trim() : null;
 
-    // Ensure uploader exists in users table to satisfy foreign key constraint or legacy queries
+    let targetUsername = rawCreatorUsername 
+      ? String(rawCreatorUsername).trim().toLowerCase().replace(/[^a-z0-9_]/g, '')
+      : null;
+
+    if (!targetUsername && (safeCategory === "premium" || cleanChannelStr === "-1004344719694")) {
+      targetUsername = "naijaxxx";
+    }
+
+    let creator = null;
+    if (targetUsername) {
+      const uRes = await pool.query(
+        "SELECT * FROM app_users WHERE LOWER(username) = LOWER($1) OR (LOWER($1) = 'naijahomemade' AND (LOWER(username) = 'naijaxxx' OR id = 458)) LIMIT 1",
+        [targetUsername]
+      );
+      if (uRes.rows.length > 0) creator = uRes.rows[0];
+    }
+
+    if (!creator && cleanChannelStr) {
+      const cRes = await pool.query(
+        "SELECT * FROM app_users WHERE source_channel = $1 OR telegram_user_id::text = $1 LIMIT 1",
+        [cleanChannelStr]
+      );
+      if (cRes.rows.length > 0) creator = cRes.rows[0];
+    }
+
+    // Determine randomized subscription price between $15 and $35
+    const parsedSubPrice = Number(subscription_price || req.query.subscription_price);
+    const subPrice = (!isNaN(parsedSubPrice) && parsedSubPrice >= 15 && parsedSubPrice <= 35)
+      ? parsedSubPrice
+      : Math.floor(Math.random() * (35 - 15 + 1)) + 15;
+
+    let finalUploaderId;
+    let finalDisplayName;
+
+    if (creator) {
+      finalUploaderId = creator.id;
+      targetUsername = creator.username;
+      finalDisplayName = creator.display_name || creator_display_name || req.query.creator_display_name || creator_name || targetUsername;
+
+      // Update source_channel if missing
+      if (cleanChannelStr && !creator.source_channel) {
+        await pool.query("UPDATE app_users SET source_channel = $1 WHERE id = $2", [cleanChannelStr, creator.id]);
+      }
+    } else {
+      const defaultUname = targetUsername || (cleanChannelStr ? `tg_${cleanChannelStr.replace('-', '')}` : `creator_${Date.now()}`);
+      const defaultDname = creator_display_name || req.query.creator_display_name || creator_name || (cleanChannelStr ? `Channel ${cleanChannelStr.replace('-', '')}` : defaultUname);
+      
+      const newCreatorRes = await pool.query(
+        `INSERT INTO app_users (
+           username, display_name, email, is_creator, is_managed, 
+           source_channel, creator_category, subscription_price, is_verified, 
+           banner_url, creator_bio, avatar_url
+         ) VALUES ($1, $2, $3, TRUE, TRUE, $4, $5, $6, TRUE, 
+           'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
+           'Official creator channel. Catch all exclusive drops and daily previews here.',
+           $7
+         )
+         RETURNING id, username, display_name`,
+        [defaultUname, defaultDname, `${defaultUname}@internal.naijahomemade.com`, cleanChannelStr, safeCategory, subPrice, `/api/avatar?user_id=${defaultUname}`]
+      );
+      creator = newCreatorRes.rows[0];
+      finalUploaderId = creator.id;
+      targetUsername = creator.username;
+      finalDisplayName = creator.display_name;
+    }
+
+    // Ensure uploader exists in users table to satisfy legacy JOINs
     await pool.query(
       `INSERT INTO users (user_id, username, full_name)
        VALUES ($1, $2, $3)
        ON CONFLICT (user_id) DO UPDATE 
        SET username = COALESCE(EXCLUDED.username, users.username),
            full_name = COALESCE(EXCLUDED.full_name, users.full_name)`,
-      [finalUploaderId, targetUsername, targetDisplayName]
+      [finalUploaderId, targetUsername, finalDisplayName]
     );
-
-    // Auto-upsert into app_users as managed creator
-    try {
-      const existingTg = await pool.query(
-        "SELECT id, username FROM app_users WHERE telegram_user_id = $1 OR (username IS NOT NULL AND LOWER(username) = LOWER($2))",
-        [finalUploaderId, targetUsername]
-      );
-      // Determine randomized subscription price between $15 and $35
-      const parsedSubPrice = Number(subscription_price || req.query.subscription_price);
-      const subPrice = (!isNaN(parsedSubPrice) && parsedSubPrice >= 15 && parsedSubPrice <= 35)
-        ? parsedSubPrice
-        : Math.floor(Math.random() * (35 - 15 + 1)) + 15;
-
-      if (existingTg.rows.length === 0) {
-        const uCheck = await pool.query("SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)", [targetUsername]);
-        const safeUname = uCheck.rows.length > 0 ? `${targetUsername}_${cleanIdStr.slice(-4)}` : targetUsername;
-        await pool.query(
-          `INSERT INTO app_users (
-             username, display_name, email, is_creator, is_managed, 
-             telegram_user_id, creator_category, subscription_price, is_verified, 
-             banner_url, creator_bio, avatar_url
-           ) VALUES ($1, $2, $3, TRUE, TRUE, $4, $5, $6, TRUE, 
-             'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80',
-             'Official creator channel. Catch all exclusive drops and daily previews here.',
-             $7
-           )
-           ON CONFLICT (telegram_user_id) DO UPDATE 
-           SET is_creator = TRUE, is_managed = TRUE,
-               subscription_price = COALESCE(app_users.subscription_price, EXCLUDED.subscription_price)`,
-          [safeUname, targetDisplayName, `tg_${cleanIdStr}@internal.naijahomemade.com`, finalUploaderId, safeCategory, subPrice, `/api/avatar?user_id=${finalUploaderId}`]
-        );
-      } else {
-        await pool.query(
-          `UPDATE app_users 
-           SET is_creator = TRUE, is_managed = TRUE, 
-               telegram_user_id = COALESCE(telegram_user_id, $1),
-               subscription_price = CASE 
-                 WHEN subscription_price IS NULL OR subscription_price = 0 OR subscription_price = 15 
-                 THEN $2 
-                 ELSE subscription_price 
-               END
-           WHERE id = $3`,
-          [finalUploaderId, subPrice, existingTg.rows[0].id]
-        );
-      }
-    } catch (mErr) {
-      console.warn("[UPLOAD-PREMIUM] Managed creator upsert notice:", mErr.message);
-    }
 
     let savedCloudflareId = "none";
     const internalId = `${safeCategory}_${Date.now()}`;
@@ -1101,9 +1109,10 @@ app.get("/api/video", async (req, res) => {
       }
 
       const isOfficialSeries = !video.uploader_id ||
-        String(video.uploader_id) === "1881815190" ||
         String(video.uploader_id) === "458" ||
-        (videoCreator?.username && videoCreator.username.toLowerCase().includes("naijahomemade"));
+        String(video.uploader_id) === "-1004344719694" ||
+        (videoCreator?.id && String(videoCreator.id) === "458") ||
+        (videoCreator?.username && ["naijaxxx", "naijahomemade"].includes(videoCreator.username.toLowerCase()));
 
       const creatorFee = Number(videoCreator?.subscription_price || 0);
 
@@ -1138,8 +1147,8 @@ app.get("/api/video", async (req, res) => {
 
       // 5. Active Creator Subscription Check
       if (!isAuthorized && currentUser) {
-        const uploaderTarget = String(video.uploader_id || "1881815190").trim();
-        const targetUsername = videoCreator?.username || (!video.uploader_id ? "naijahomemade" : null);
+        const uploaderTarget = String(video.uploader_id || "458").trim();
+        const targetUsername = videoCreator?.username || (!video.uploader_id ? "naijaxxx" : null);
 
         const subCheck = await pool.query(
           `SELECT 1 FROM creator_subscriptions cs
@@ -1566,15 +1575,15 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
   let uploaderName = v.uploader_name;
   let uploaderHandle = v.uploader_handle;
 
-  // Only fallback to @naijahomemade for legacy Telegram VIP videos or videos explicitly belonging to 1881815190 or -1004344719694
-  const isLegacyOrNaijaHomemade = String(v.uploader_id) === "1881815190" || String(v.uploader_id) === "-1004344719694" || (!isWebUpload && (!v.uploader_id || String(v.uploader_id) === "0"));
+  // Fallback to @naijaxxx for legacy VIP videos or videos explicitly belonging to 458 or -1004344719694
+  const isLegacyOrNaijaHomemade = String(v.uploader_id) === "458" || String(v.uploader_id) === "-1004344719694" || (!isWebUpload && (!v.uploader_id || String(v.uploader_id) === "0"));
 
   if (isPremium && isLegacyOrNaijaHomemade) {
-    if (!uploaderHandle || uploaderHandle === "creator" || uploaderHandle === "Member") {
-      uploaderHandle = "naijahomemade";
+    if (!uploaderHandle || uploaderHandle === "creator" || uploaderHandle === "Member" || uploaderHandle === "naijahomemade") {
+      uploaderHandle = "naijaxxx";
     }
-    if (!uploaderName || uploaderName === "Member" || uploaderName === "creator") {
-      uploaderName = "Naija Homemade Series";
+    if (!uploaderName || uploaderName === "Member" || uploaderName === "creator" || uploaderName === "Naija Homemade Series") {
+      uploaderName = "Naija xxx";
     }
   } else {
     uploaderName = uploaderName || "Member";
