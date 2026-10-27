@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Sparkles, ChevronLeft, ChevronRight, X, ArrowRight } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { ChevronLeft, ChevronRight, X, Loader2 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import { showToast, promptLogin } from "../utils/toast";
@@ -10,6 +10,7 @@ export default function DiscoverCreatorsSection({
   onCreatorClick, 
   onSeeAll,
   user,
+  excludeUsername,
   title = "Discover Creators",
   style = {}
 }) {
@@ -20,11 +21,11 @@ export default function DiscoverCreatorsSection({
   const [viewedStoriesSet, setViewedStoriesSet] = useState(new Set());
   const trackRef = useRef(null);
 
-  // Synchronize viewed stories on creators state change
+  // Synchronize viewed stories on creators prop update or local storage
   useEffect(() => {
     const s = new Set();
     (creators || []).forEach(c => {
-      if (c.has_viewed_story) {
+      if (c?.has_viewed_story) {
         s.add(String(c.username || '').toLowerCase());
       }
     });
@@ -38,7 +39,7 @@ export default function DiscoverCreatorsSection({
           const storageKey = `viewed_stories_${currentUserId}`;
           const views = JSON.parse(localStorage.getItem(storageKey) || "[]");
           (creators || []).forEach(c => {
-            if (c.active_story_id && views.includes(c.active_story_id)) {
+            if (c?.active_story_id && views.includes(c.active_story_id)) {
               s.add(String(c.username || '').toLowerCase());
             }
           });
@@ -65,16 +66,17 @@ export default function DiscoverCreatorsSection({
     return () => window.removeEventListener("storyViewed", handleStoryViewed);
   }, []);
 
-  // If creators prop changes or was provided
+  // If initialCreators prop changes or was provided
   useEffect(() => {
     if (initialCreators && initialCreators.length > 0) {
       setCreators(initialCreators);
     }
   }, [initialCreators]);
 
-  // If creators not provided, fetch them
+  // If creators not provided, fetch them from API
   useEffect(() => {
     if (!initialCreators || initialCreators.length === 0) {
+      let isMounted = true;
       const fetchFeatured = async () => {
         try {
           const token = localStorage.getItem("token");
@@ -82,19 +84,16 @@ export default function DiscoverCreatorsSection({
           const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/featured/list?limit=24`, { headers });
           if (res.ok) {
             const data = await res.json();
-            if (data?.creators) {
-              const tgOnly = data.creators.filter(c => {
-                const email = String(c.email || "").toLowerCase();
-                return !email.includes("@gmail.com") && !email.includes("@yahoo.com") && !email.includes("@hotmail.com");
-              });
-              setCreators(tgOnly);
+            if (isMounted && data?.creators) {
+              setCreators(data.creators);
             }
           }
         } catch (e) {
-          console.error("Failed to load creators in section:", e);
+          console.error("Failed to load creators in DiscoverCreatorsSection:", e);
         }
       };
       fetchFeatured();
+      return () => { isMounted = false; };
     }
   }, [initialCreators]);
 
@@ -150,7 +149,18 @@ export default function DiscoverCreatorsSection({
     }
   };
 
-  const visibleCreators = (creators || []).filter((c) => c && c.username && !dismissedSet.has(c.username));
+  const normExclude = String(excludeUsername || "").toLowerCase().replace(/^@/, "").trim();
+  const normUser = String(user?.username || "").toLowerCase().replace(/^@/, "").trim();
+
+  const visibleCreators = (creators || []).filter((c) => {
+    if (!c || !c.username) return false;
+    const u = String(c.username).toLowerCase().trim();
+    if (dismissedSet.has(c.username)) return false;
+    if (normExclude && u === normExclude) return false;
+    if (normUser && u === normUser) return false;
+    return true;
+  });
+
   if (visibleCreators.length === 0) return null;
 
   const scrollTrack = (direction) => {
@@ -164,31 +174,26 @@ export default function DiscoverCreatorsSection({
 
   return (
     <div style={{ ...igSuggestedWrapper, ...style }}>
-      {/* Section Header */}
       <div style={igSuggestedHeader}>
         <div style={{ display: "flex", alignItems: "center" }}>
           <span style={igSuggestedTitle}>{title}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          {/* See All Button */}
           <button 
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               if (onSeeAll) onSeeAll();
-              else {
-                window.dispatchEvent(new CustomEvent("openDiscoverCreators"));
-              }
+              else window.dispatchEvent(new CustomEvent("openDiscoverCreators"));
             }}
             style={igSeeAllBtn}
             title="See all creators"
           >
             <span>See All</span>
-            <ArrowRight size={13} style={{ marginLeft: "3px" }} />
           </button>
-
-          {/* Desktop Arrow Controls */}
           <div style={{ display: "flex", gap: "4px" }}>
             <button 
+              type="button"
               onClick={() => scrollTrack(-1)} 
               style={igArrowBtn}
               title="Scroll left"
@@ -197,6 +202,7 @@ export default function DiscoverCreatorsSection({
               <ChevronLeft size={16} />
             </button>
             <button 
+              type="button"
               onClick={() => scrollTrack(1)} 
               style={igArrowBtn}
               title="Scroll right"
@@ -208,11 +214,9 @@ export default function DiscoverCreatorsSection({
         </div>
       </div>
 
-      {/* Horizontal Carousel Track */}
       <div ref={trackRef} style={igScrollTrack}>
         {visibleCreators.map((creator) => {
-          const uname = creator?.username;
-          if (!uname) return null;
+          const uname = creator.username;
           const isFollowing = followingMap[uname] !== undefined 
             ? followingMap[uname] 
             : Boolean(creator.is_following);
@@ -226,6 +230,7 @@ export default function DiscoverCreatorsSection({
             >
               {/* Dismiss (✕) button */}
               <button 
+                type="button"
                 style={igDismissBtn} 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -237,49 +242,47 @@ export default function DiscoverCreatorsSection({
                 <X size={13} />
               </button>
 
-              {/* Center Avatar with Story Ring */}
+              {/* Center Avatar with Story Ring (Big Instagram Suggested Accounts Style) */}
               <div style={igAvatarContainer}>
                 <StoryAvatar
                   username={uname}
                   avatarUrl={creator.avatar_url}
                   displayName={creator.display_name || uname}
-                  size={60}
-                  borderWidth={2.5}
+                  size={84}
+                  borderWidth={2.8}
                   onClick={() => onCreatorClick && onCreatorClick(uname)}
                 />
               </div>
 
-              {/* Creator Names & Category */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", width: "100%", minWidth: 0 }}>
+              {/* Display Name + Twitter Verified Badge */}
+              <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "2.5px", width: "100%", minWidth: 0, marginTop: "2px" }}>
                 <span style={igDisplayName} title={creator.display_name || uname}>
                   {creator.display_name || uname}
                 </span>
                 {creator.is_verified && (
-                  <TwitterVerifiedBadge size={13} style={{ flexShrink: 0 }} />
+                  <TwitterVerifiedBadge size={13.5} style={{ flexShrink: 0 }} />
                 )}
               </div>
-              <div style={igHandleName}>
-                @{uname}
-              </div>
-              {creator.creator_category && (
-                <div style={igCategoryTag}>
-                  {creator.creator_category}
-                </div>
-              )}
 
-              {/* Instagram Follow Button */}
-              <button 
-                style={{
-                  ...igFollowBtn,
-                  backgroundColor: isFollowing ? "rgba(255, 255, 255, 0.08)" : "#c4c4c8",
-                  border: isFollowing ? "1px solid rgba(255, 255, 255, 0.3)" : "none",
-                  color: isFollowing ? "#a1a1aa" : "#09090b",
-                  fontWeight: "700"
-                }}
+              {/* Handle */}
+              <span style={igHandleName}>
+                @{uname}
+              </span>
+
+              {/* Follow Button (Instagram Style) */}
+              <button
+                type="button"
+                style={isFollowing ? igFollowingBtn : igFollowBtn}
                 onClick={(e) => handleFollowToggle(e, creator)}
                 disabled={isLoading}
               >
-                {isFollowing ? "Following" : "Follow"}
+                {isLoading ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : isFollowing ? (
+                  "Following"
+                ) : (
+                  "Follow"
+                )}
               </button>
             </div>
           );
@@ -289,7 +292,10 @@ export default function DiscoverCreatorsSection({
   );
 }
 
-// 🎨 Styles
+// 🌟 Export alias matching Explore's naming
+export { DiscoverCreatorsSection as InstagramSuggestedCreators };
+
+// 🌟 Instagram-Style Suggested Creators Styles (Exact match with Explore.jsx)
 const igSuggestedWrapper = {
   width: "100%",
   padding: "16px 12px 16px 12px",
@@ -357,13 +363,13 @@ const igScrollTrack = {
 
 const igCardBox = {
   position: "relative",
-  flex: "0 0 152px",
-  width: "152px",
-  minWidth: "152px",
-  maxWidth: "152px",
-  background: "#161616",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
-  borderRadius: "12px",
+  flex: "0 0 174px",
+  width: "174px",
+  minWidth: "174px",
+  maxWidth: "174px",
+  background: "var(--bg-color, #09090b)",
+  border: "1px solid rgba(255, 255, 255, 0.10)",
+  borderRadius: "14px",
   padding: "16px 10px 14px 10px",
   display: "flex",
   flexDirection: "column",
@@ -395,84 +401,35 @@ const igDismissBtn = {
 
 const igAvatarContainer = {
   position: "relative",
-  width: "60px",
-  height: "60px",
-  marginBottom: "10px",
+  width: "90px",
+  height: "90px",
+  marginBottom: "6px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center"
-};
-
-const igAvatarRing = {
-  width: "60px",
-  height: "60px",
-  borderRadius: "50%",
-  padding: "2px",
-  background: "linear-gradient(135deg, #00aff0 0%, #0077b5 100%)",
-  boxSizing: "border-box",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center"
-};
-
-const igAvatarImg = {
-  width: "100%",
-  height: "100%",
-  borderRadius: "50%",
-  objectFit: "cover",
-  backgroundColor: "#111",
-  border: "2px solid #161616",
-  display: "block"
-};
-
-const igVerifiedBadge = {
-  position: "absolute",
-  bottom: "-1px",
-  right: "-1px",
-  background: "#000",
-  borderRadius: "50%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "1px"
 };
 
 const igDisplayName = {
-  fontSize: "13px",
+  fontSize: "14px",
   fontWeight: "700",
   color: "#d4d4d8",
   textAlign: "center",
-  width: "100%",
+  maxWidth: "calc(100% - 18px)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
-  lineHeight: "1.3"
+  lineHeight: "1.25"
 };
 
 const igHandleName = {
-  fontSize: "11px",
+  fontSize: "12px",
   color: "#8e8e93",
   textAlign: "center",
   width: "100%",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
-  marginTop: "2px"
-};
-
-const igCategoryTag = {
-  fontSize: "10px",
-  fontWeight: "600",
-  color: "#00aff0",
-  background: "rgba(0, 175, 240, 0.12)",
-  padding: "2px 7px",
-  borderRadius: "10px",
-  marginTop: "6px",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  maxWidth: "100%",
-  display: "inline-block"
+  marginTop: "1px"
 };
 
 const igFollowBtn = {
@@ -481,8 +438,30 @@ const igFollowBtn = {
   padding: "7px 0",
   borderRadius: "8px",
   fontSize: "13px",
-  fontWeight: "600",
+  fontWeight: "700",
+  color: "#09090b",
+  backgroundColor: "#e4e4e7",
   border: "none",
   cursor: "pointer",
-  transition: "all 0.2s ease"
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "background 0.15s ease, transform 0.1s ease"
+};
+
+const igFollowingBtn = {
+  width: "100%",
+  marginTop: "12px",
+  padding: "6px 0",
+  borderRadius: "8px",
+  fontSize: "13px",
+  fontWeight: "700",
+  color: "#a1a1aa",
+  backgroundColor: "rgba(255, 255, 255, 0.08)",
+  border: "1px solid rgba(255, 255, 255, 0.12)",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "background 0.15s ease"
 };

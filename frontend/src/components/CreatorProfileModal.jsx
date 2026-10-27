@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   ArrowLeft, Share2, Heart, Lock, Grid3X3, 
   MapPin, Globe, Sparkles, Send, Play, Loader2, MessageCircle,
-  Film, Link2, ChevronDown, Plus
+  Film, Link2, ChevronDown, Plus, UserPlus
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import VideoCard from "./VideoCard";
@@ -14,6 +14,7 @@ import CreatorSubscribeModal from "./CreatorSubscribeModal";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import StoryAvatar from "./StoryAvatar";
 import StoryHighlightsTray from "./StoryHighlightsTray";
+import DiscoverCreatorsSection from "./DiscoverCreatorsSection";
 import FollowListModal from "./FollowListModal";
 import DesktopLeftSidebar from "./DesktopLeftSidebar";
 import DesktopRightSidebar from "./DesktopRightSidebar";
@@ -53,6 +54,7 @@ export default function CreatorProfileModal({
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [showDiscoverCreators, setShowDiscoverCreators] = useState(false);
   const [optionsVideo, setOptionsVideo] = useState(null);
   const [reportedVideo, setReportedVideo] = useState(null);
   const [highlights, setHighlights] = useState([]);
@@ -601,6 +603,30 @@ export default function CreatorProfileModal({
                       {isSubscribed ? "Subscribed" : "Subscribe"}
                     </button>
                   )}
+
+                  {/* User icon passport with plus sign positioned besides Subscribe button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowDiscoverCreators(prev => !prev)}
+                    style={{
+                      height: "36px",
+                      width: "36px",
+                      minWidth: "36px",
+                      borderRadius: "20px",
+                      backgroundColor: showDiscoverCreators ? "rgba(255, 255, 255, 0.18)" : "#27272a",
+                      border: showDiscoverCreators ? "1px solid rgba(255, 255, 255, 0.28)" : "1px solid rgba(255, 255, 255, 0.08)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      transition: "all 0.2s ease"
+                    }}
+                    title="Discover creators"
+                    aria-label="Discover creators"
+                  >
+                    <UserPlus size={17} color={showDiscoverCreators ? "#f4f4f5" : "#d4d4d8"} />
+                  </button>
                 </div>
 
                 {/* Links & Meta */}
@@ -726,6 +752,30 @@ export default function CreatorProfileModal({
                         {isSubscribed ? "Subscribed" : "Subscribe"}
                       </button>
                     )}
+
+                    {/* User icon passport with plus sign positioned besides Subscribe button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowDiscoverCreators(prev => !prev)}
+                      style={{
+                        height: "36px",
+                        width: "36px",
+                        minWidth: "36px",
+                        borderRadius: "20px",
+                        backgroundColor: showDiscoverCreators ? "rgba(255, 255, 255, 0.18)" : "#27272a",
+                        border: showDiscoverCreators ? "1px solid rgba(255, 255, 255, 0.28)" : "1px solid rgba(255, 255, 255, 0.08)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                        transition: "all 0.2s ease"
+                      }}
+                      title="Discover creators"
+                      aria-label="Discover creators"
+                    >
+                      <UserPlus size={18} color={showDiscoverCreators ? "#f4f4f5" : "#d4d4d8"} />
+                    </button>
                   </div>
 
                   {/* Links & Meta */}
@@ -763,6 +813,35 @@ export default function CreatorProfileModal({
                   />
                 </div>
 
+              </div>
+            )}
+
+            {/* 🌟 DISCOVER CREATORS SECTION (TOGGLED VIA INSTAGRAM USERPLUS BUTTON) */}
+            {showDiscoverCreators && (
+              <div style={{
+                width: "100%",
+                maxWidth: isDesktop ? "935px" : "100%",
+                margin: isDesktop ? "0 auto 8px auto" : "0 0 4px 0",
+                boxSizing: "border-box"
+              }}>
+                <DiscoverCreatorsSection 
+                  user={currentUser}
+                  excludeUsername={creatorData?.username || creatorUsername}
+                  onCreatorClick={(uname) => {
+                    window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
+                  }}
+                  onSeeAll={() => {
+                    window.dispatchEvent(new CustomEvent("openDiscoverCreators"));
+                  }}
+                  title="Suggested Creators"
+                  style={{
+                    margin: 0,
+                    background: "transparent",
+                    borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderBottom: "none",
+                    padding: isDesktop ? "16px 24px" : "14px 12px"
+                  }}
+                />
               </div>
             )}
 

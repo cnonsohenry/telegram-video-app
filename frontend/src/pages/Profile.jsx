@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { 
   Settings, Grid3X3, Heart, Lock, Share2, ArrowLeft, 
   Camera, Sparkles, Edit3, MapPin, Globe, Award, ExternalLink, ShieldCheck, Eye,
-  Film, Play, Plus, ChevronRight, TrendingUp, Link2, ChevronDown, Bookmark, Copy, MessageCircle
+  Film, Play, Plus, ChevronRight, TrendingUp, Link2, ChevronDown, Bookmark, Copy, MessageCircle, UserPlus
 } from "lucide-react"; 
 import TwitterVerifiedBadge from "../components/TwitterVerifiedBadge"; 
 import VideoCard from "../components/VideoCard"; 
@@ -63,6 +63,7 @@ export default function Profile({
   const [deletedVideoIds, setDeletedVideoIds] = useState(new Set());
   const [showStudioModal, setShowStudioModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showDiscoverCreators, setShowDiscoverCreators] = useState(false);
   const [uploadDefaultCategory, setUploadDefaultCategory] = useState("community");
   
   // Creator & Social Modals
@@ -812,35 +813,28 @@ export default function Profile({
                   <Plus size={16} color="#f4f4f5" />
                   <span>Upload</span>
                 </button>
-                {user?.is_creator ? (
-                  <button
-                    onClick={() => setShowStudioModal(true)}
-                    style={{
-                      ...mobileActionButton,
-                      backgroundColor: "rgba(225, 29, 72, 0.14)",
-                      color: "#f43f5e",
-                      border: "1px solid rgba(225, 29, 72, 0.28)",
-                      fontWeight: "700"
-                    }}
-                  >
-                    <TrendingUp size={15} color="#f43f5e" />
-                    <span>Studio</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setShowSetupModal(true)}
-                    style={{
-                      ...mobileActionButton,
-                      backgroundColor: "rgba(225, 29, 72, 0.14)",
-                      color: "#f43f5e",
-                      border: "1px solid rgba(225, 29, 72, 0.28)",
-                      fontWeight: "700"
-                    }}
-                  >
-                    <ShieldCheck size={15} color="#f43f5e" />
-                    <span>Monetize</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setShowDiscoverCreators(prev => !prev)}
+                  style={{
+                    height: "36px",
+                    width: "36px",
+                    minWidth: "36px",
+                    borderRadius: "20px",
+                    backgroundColor: showDiscoverCreators ? "rgba(255, 255, 255, 0.18)" : "#27272a",
+                    border: showDiscoverCreators ? "1px solid rgba(255, 255, 255, 0.28)" : "1px solid rgba(255, 255, 255, 0.08)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                    transition: "all 0.2s ease"
+                  }}
+                  title="Discover creators"
+                  aria-label="Discover creators"
+                >
+                  <UserPlus size={17} color={showDiscoverCreators ? "#f4f4f5" : "#d4d4d8"} />
+                </button>
               </div>
 
               {/* Website Link & Location */}
@@ -963,35 +957,28 @@ export default function Profile({
                     <Plus size={16} color="#f4f4f5" />
                     <span>Upload Video</span>
                   </button>
-                  {user?.is_creator ? (
-                    <button
-                      onClick={() => setShowStudioModal(true)}
-                      style={{
-                        ...desktopActionButton,
-                        backgroundColor: "rgba(225, 29, 72, 0.14)",
-                        color: "#f43f5e",
-                        border: "1px solid rgba(225, 29, 72, 0.28)",
-                        fontWeight: "700"
-                      }}
-                    >
-                      <TrendingUp size={16} color="#f43f5e" />
-                      <span>Creator Studio</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setShowSetupModal(true)}
-                      style={{
-                        ...desktopActionButton,
-                        backgroundColor: "rgba(225, 29, 72, 0.14)",
-                        color: "#f43f5e",
-                        border: "1px solid rgba(225, 29, 72, 0.28)",
-                        fontWeight: "700"
-                      }}
-                    >
-                      <ShieldCheck size={16} color="#f43f5e" />
-                      <span>Verify & Monetize</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowDiscoverCreators(prev => !prev)}
+                    style={{
+                      height: "36px",
+                      width: "36px",
+                      minWidth: "36px",
+                      borderRadius: "20px",
+                      backgroundColor: showDiscoverCreators ? "rgba(255, 255, 255, 0.18)" : "#27272a",
+                      border: showDiscoverCreators ? "1px solid rgba(255, 255, 255, 0.28)" : "1px solid rgba(255, 255, 255, 0.08)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      transition: "all 0.2s ease"
+                    }}
+                    title="Discover creators"
+                    aria-label="Discover creators"
+                  >
+                    <UserPlus size={18} color={showDiscoverCreators ? "#f4f4f5" : "#d4d4d8"} />
+                  </button>
                   <button onClick={handleOpenSettings} style={desktopIconBtnStyle} title="Settings">
                     <Settings size={18} color="#d4d4d8" />
                   </button>
@@ -1045,33 +1032,36 @@ export default function Profile({
 
         </div>
 
-        {/* 🌟 DISCOVER CREATORS (JUST ABOVE CATEGORY TABS) */}
-        <div style={{ 
-          width: "100%", 
-          maxWidth: isDesktop ? "935px" : "100%",
-          margin: isDesktop ? "0 auto 8px auto" : "0 0 4px 0",
-          boxSizing: "border-box"
-        }}>
-          <DiscoverCreatorsSection 
-            user={user}
-            onCreatorClick={(uname) => {
-              if (onCreatorClick) {
-                onCreatorClick(uname);
-              } else {
-                window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
-              }
-            }}
-            onSeeAll={handleOpenDiscover}
-            title="Discover Creators"
-            style={{
-              margin: 0,
-              background: "transparent",
-              borderTop: "1px solid #262626",
-              borderBottom: "none",
-              padding: isDesktop ? "16px 0" : "14px 12px"
-            }}
-          />
-        </div>
+        {/* 🌟 DISCOVER CREATORS (TOGGLED VIA INSTAGRAM USERPLUS BUTTON) */}
+        {showDiscoverCreators && (
+          <div style={{ 
+            width: "100%", 
+            maxWidth: isDesktop ? "935px" : "100%",
+            margin: isDesktop ? "0 auto 8px auto" : "0 0 4px 0",
+            boxSizing: "border-box"
+          }}>
+            <DiscoverCreatorsSection 
+              user={user}
+              excludeUsername={user?.username}
+              onCreatorClick={(uname) => {
+                if (onCreatorClick) {
+                  onCreatorClick(uname);
+                } else {
+                  window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
+                }
+              }}
+              onSeeAll={handleOpenDiscover}
+              title="Discover Creators"
+              style={{
+                margin: 0,
+                background: "transparent",
+                borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                borderBottom: "none",
+                padding: isDesktop ? "16px 0" : "14px 12px"
+              }}
+            />
+          </div>
+        )}
 
         {/* 🌟 INSTAGRAM STORY HIGHLIGHTS TRAY */}
         <StoryHighlightsTray
