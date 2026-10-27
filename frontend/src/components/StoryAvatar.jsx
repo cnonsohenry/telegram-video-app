@@ -30,7 +30,6 @@ export default function StoryAvatar({
       let normalized = avatarUrl
         .replace(/\/api\/avatar(?:\.jpg)?/, "/avatar.jpg")
         .replace(/\/avatar(?!\.jpg)/, "/avatar.jpg");
-      normalized = normalized.replace(/[&?]v=\d+/, "");
       return normalized;
     }
     return avatarUrl;

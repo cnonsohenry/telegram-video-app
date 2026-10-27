@@ -238,7 +238,9 @@ export async function syncTelegramCreatorProfile(creator, poolInstance, options 
   }
 
   // 2. Profile Picture
-  const avatarKey = tgUserId ? String(tgUserId) : (username || String(creatorId));
+  const avatarKey = (sourceChannel && /^-?\d+$/.test(sourceChannel))
+    ? String(sourceChannel)
+    : (tgUserId && String(tgUserId) !== '1881815190' ? String(tgUserId) : (username || String(creatorId)));
   if (photoFileId) {
     // Download and upload to R2
     await downloadAndUploadTelegramPhoto(photoFileId, avatarKey);

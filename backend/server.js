@@ -2864,10 +2864,18 @@ const handleAvatarRequest = async (req, res) => {
       return res.redirect('/assets/default-avatar.png');
     }
 
-    const cleanStr = String(rawId).trim();
+    let cleanStr = String(rawId).trim();
+
+    // Map obsolete 1881815190 directly to the active Naija Homemade Telegram channel
+    if (cleanStr === '1881815190' || cleanStr.toLowerCase() === 'naijahomemade') {
+      cleanStr = '-1003971009997';
+    }
+
+    const versionParam = req.query.v || req.query.t || req.query._;
+    const cacheKey = versionParam ? `${cleanStr.toLowerCase()}_v${versionParam}` : cleanStr.toLowerCase();
 
     // 🟢 0. Ultra Fast-Path: In-memory image buffer cache hit (< 1ms instant delivery)
-    const cachedBuf = avatarBufferCache.get(cleanStr.toLowerCase());
+    const cachedBuf = avatarBufferCache.get(cacheKey);
     if (cachedBuf && cachedBuf.expiresAt > Date.now()) {
       res.set({
         "Content-Type": "image/jpeg",
@@ -2878,7 +2886,7 @@ const handleAvatarRequest = async (req, res) => {
     }
 
     // 🟢 1. Fast-Path: In-memory redirect cache hit (1 hour TTL)
-    const cached = avatarUrlCache.get(cleanStr);
+    const cached = avatarUrlCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" });
       return res.redirect(cached.targetUrl);
@@ -2892,8 +2900,9 @@ const handleAvatarRequest = async (req, res) => {
       const userRes = await pool.query(
         `SELECT id, username, telegram_user_id, source_channel, avatar_url, creator_bio, display_name 
          FROM app_users 
-         WHERE ${numericId !== null ? "(id = $1::BIGINT OR telegram_user_id = $1::BIGINT) OR" : ""} 
-               (username IS NOT NULL AND LOWER(username) = LOWER($2)) 
+         WHERE ${numericId !== null 
+           ? "((id = $1::BIGINT OR telegram_user_id = $1::BIGINT) OR (username IS NOT NULL AND LOWER(username) = LOWER($2)))" 
+           : "(username IS NOT NULL AND LOWER(username) = LOWER($1))"} 
          LIMIT 1`,
         numericId !== null ? [numericId, cleanStr] : [cleanStr]
       );
@@ -2903,7 +2912,7 @@ const handleAvatarRequest = async (req, res) => {
             !userRow.avatar_url.includes('/api/avatar') && 
             !userRow.avatar_url.includes('/avatar?') &&
             !userRow.avatar_url.includes('default-avatar')) {
-          avatarUrlCache.set(cleanStr, { targetUrl: userRow.avatar_url, expiresAt: Date.now() + 3600000 });
+          avatarUrlCache.set(cacheKey, { targetUrl: userRow.avatar_url, expiresAt: Date.now() + 3600000 });
           res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" });
           return res.redirect(userRow.avatar_url);
         }
@@ -2970,6 +2979,7 @@ const handleAvatarRequest = async (req, res) => {
 
     // Cache image buffer in memory for 24 hours under all known aliases
     const bufferEntry = { buffer: imageBuffer, expiresAt: Date.now() + 86400000 };
+    avatarBufferCache.set(cacheKey, bufferEntry);
     avatarBufferCache.set(cleanStr.toLowerCase(), bufferEntry);
     if (numericId !== null) avatarBufferCache.set(String(numericId), bufferEntry);
     if (userRow?.telegram_user_id) avatarBufferCache.set(String(userRow.telegram_user_id), bufferEntry);
