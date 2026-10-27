@@ -132,6 +132,11 @@ body.ad-free-mode #at-sharing-guide {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes pulse {
   0% { transform: scale(1); }
   50% { transform: scale(1.02); }

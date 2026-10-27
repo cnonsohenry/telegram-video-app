@@ -5,6 +5,45 @@ import { APP_CONFIG } from "../config";
 import { showToast, promptLogin } from "../utils/toast";
 import StoryAvatar from "./StoryAvatar";
 
+// 🌟 IN-MEMORY & LOCAL STORAGE CACHE (INSTANT 0MS APPEARANCE)
+let memoryFeaturedCreators = null;
+try {
+  const cached = localStorage.getItem("cached_featured_creators");
+  if (cached) {
+    const parsed = JSON.parse(cached);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      memoryFeaturedCreators = parsed;
+    }
+  }
+} catch (e) {}
+
+// Eager background pre-fetch function
+export const prefetchFeaturedCreators = async () => {
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/featured/list?limit=24`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.creators && data.creators.length > 0) {
+        memoryFeaturedCreators = data.creators;
+        try {
+          localStorage.setItem("cached_featured_creators", JSON.stringify(data.creators));
+        } catch (e) {}
+        return data.creators;
+      }
+    }
+  } catch (e) {}
+  return memoryFeaturedCreators || [];
+};
+
+// Immediately prefetch on module load if in browser
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    prefetchFeaturedCreators();
+  }, 50);
+}
+
 export default function DiscoverCreatorsSection({ 
   creators: initialCreators, 
   onCreatorClick, 
@@ -14,7 +53,12 @@ export default function DiscoverCreatorsSection({
   title = "Discover Creators",
   style = {}
 }) {
-  const [creators, setCreators] = useState(initialCreators || []);
+  const [creators, setCreators] = useState(() => {
+    if (initialCreators && initialCreators.length > 0) return initialCreators;
+    if (memoryFeaturedCreators && memoryFeaturedCreators.length > 0) return memoryFeaturedCreators;
+    return [];
+  });
+  const [isLoadingFeatured, setIsLoadingFeatured] = useState(!creators || creators.length === 0);
   const [followingMap, setFollowingMap] = useState({});
   const [loadingMap, setLoadingMap] = useState({});
   const [dismissedSet, setDismissedSet] = useState(new Set());
@@ -70,31 +114,22 @@ export default function DiscoverCreatorsSection({
   useEffect(() => {
     if (initialCreators && initialCreators.length > 0) {
       setCreators(initialCreators);
+      setIsLoadingFeatured(false);
     }
   }, [initialCreators]);
 
-  // If creators not provided, fetch them from API
+  // Background fetch / refresh
   useEffect(() => {
+    let isMounted = true;
     if (!initialCreators || initialCreators.length === 0) {
-      let isMounted = true;
-      const fetchFeatured = async () => {
-        try {
-          const token = localStorage.getItem("token");
-          const headers = token ? { Authorization: `Bearer ${token}` } : {};
-          const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/featured/list?limit=24`, { headers });
-          if (res.ok) {
-            const data = await res.json();
-            if (isMounted && data?.creators) {
-              setCreators(data.creators);
-            }
-          }
-        } catch (e) {
-          console.error("Failed to load creators in DiscoverCreatorsSection:", e);
+      prefetchFeaturedCreators().then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setCreators(data);
+          setIsLoadingFeatured(false);
         }
-      };
-      fetchFeatured();
-      return () => { isMounted = false; };
+      });
     }
+    return () => { isMounted = false; };
   }, [initialCreators]);
 
   const handleDismiss = (username) => {
@@ -161,8 +196,6 @@ export default function DiscoverCreatorsSection({
     return true;
   });
 
-  if (visibleCreators.length === 0) return null;
-
   const scrollTrack = (direction) => {
     if (trackRef.current) {
       trackRef.current.scrollBy({
@@ -171,6 +204,31 @@ export default function DiscoverCreatorsSection({
       });
     }
   };
+
+  // If loading and no creators in cache yet, show instant skeleton placeholder cards
+  if (visibleCreators.length === 0 && isLoadingFeatured) {
+    return (
+      <div style={{ ...igSuggestedWrapper, ...style }}>
+        <div style={igSuggestedHeader}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <span style={igSuggestedTitle}>{title}</span>
+          </div>
+        </div>
+        <div style={igScrollTrack}>
+          {[1, 2, 3, 4].map((n) => (
+            <div key={n} style={igCardBox}>
+              <div style={{ width: "84px", height: "84px", borderRadius: "50%", background: "rgba(255, 255, 255, 0.08)", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "96px", height: "14px", borderRadius: "4px", background: "rgba(255, 255, 255, 0.08)", marginTop: "12px", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "64px", height: "12px", borderRadius: "4px", background: "rgba(255, 255, 255, 0.05)", marginTop: "6px", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "100%", height: "30px", borderRadius: "8px", background: "rgba(255, 255, 255, 0.08)", marginTop: "12px", animation: "skeleton-loading 1.2s infinite" }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (visibleCreators.length === 0) return null;
 
   return (
     <div style={{ ...igSuggestedWrapper, ...style }}>
@@ -303,7 +361,8 @@ const igSuggestedWrapper = {
   background: "linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)",
   borderTop: "1px solid rgba(255, 255, 255, 0.08)",
   borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-  boxSizing: "border-box"
+  boxSizing: "border-box",
+  animation: "fadeInDown 0.18s ease-out"
 };
 
 const igSuggestedHeader = {

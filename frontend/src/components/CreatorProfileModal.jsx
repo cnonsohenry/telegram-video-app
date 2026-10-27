@@ -816,34 +816,33 @@ export default function CreatorProfileModal({
               </div>
             )}
 
-            {/* 🌟 DISCOVER CREATORS SECTION (TOGGLED VIA INSTAGRAM USERPLUS BUTTON) */}
-            {showDiscoverCreators && (
-              <div style={{
-                width: "100%",
-                maxWidth: isDesktop ? "935px" : "100%",
-                margin: isDesktop ? "0 auto 8px auto" : "0 0 4px 0",
-                boxSizing: "border-box"
-              }}>
-                <DiscoverCreatorsSection 
-                  user={currentUser}
-                  excludeUsername={creatorData?.username || creatorUsername}
-                  onCreatorClick={(uname) => {
-                    window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
-                  }}
-                  onSeeAll={() => {
-                    window.dispatchEvent(new CustomEvent("openDiscoverCreators"));
-                  }}
-                  title="Suggested Creators"
-                  style={{
-                    margin: 0,
-                    background: "transparent",
-                    borderTop: "1px solid rgba(255, 255, 255, 0.08)",
-                    borderBottom: "none",
-                    padding: isDesktop ? "16px 24px" : "14px 12px"
-                  }}
-                />
-              </div>
-            )}
+            {/* 🌟 DISCOVER CREATORS SECTION (ALWAYS PRELOADED, INSTANT DISPLAY TOGGLE) */}
+            <div style={{
+              width: "100%",
+              maxWidth: isDesktop ? "935px" : "100%",
+              margin: isDesktop ? "0 auto 8px auto" : "0 0 4px 0",
+              boxSizing: "border-box",
+              display: showDiscoverCreators ? "block" : "none"
+            }}>
+              <DiscoverCreatorsSection 
+                user={currentUser}
+                excludeUsername={creatorData?.username || creatorUsername}
+                onCreatorClick={(uname) => {
+                  window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
+                }}
+                onSeeAll={() => {
+                  window.dispatchEvent(new CustomEvent("openDiscoverCreators"));
+                }}
+                title="Suggested Creators"
+                style={{
+                  margin: 0,
+                  background: "transparent",
+                  borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderBottom: "none",
+                  padding: isDesktop ? "16px 24px" : "14px 12px"
+                }}
+              />
+            </div>
 
             {/* 🌟 INSTAGRAM STORY HIGHLIGHTS TRAY */}
             <StoryHighlightsTray

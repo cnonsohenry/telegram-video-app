@@ -405,19 +405,14 @@ export default function AdminDashboard({ user, onLogout }) {
     setViewersModalPage(1);
   }, [viewerSearchFilter, viewersModalLimit]);
 
-  // Smooth Horizontal Scrolling Support on Tables (Wheel & Buttons)
+  // Smooth Horizontal Scrolling Support on Tables (Shift + Wheel)
   const handleTableWheel = (e) => {
-    const container = e.currentTarget;
-    if (container.scrollWidth > container.clientWidth) {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        const atLeft = container.scrollLeft <= 0;
-        const atRight = Math.ceil(container.scrollLeft + container.clientWidth) >= container.scrollWidth;
-        if ((e.deltaY > 0 && !atRight) || (e.deltaY < 0 && !atLeft)) {
-          e.preventDefault();
-          container.scrollLeft += e.deltaY;
-        }
-      }
+    // Only scroll table horizontally if user explicitly holds Shift
+    if (e.shiftKey && Math.abs(e.deltaY) > 0) {
+      e.currentTarget.scrollLeft += e.deltaY;
+      e.preventDefault();
     }
+    // Never hijack standard vertical wheel (e.deltaY) so the dashboard page can scroll freely and smoothly!
   };
 
   const scrollTable = (containerId, direction) => {
@@ -873,8 +868,33 @@ export default function AdminDashboard({ user, onLogout }) {
   return (
     <div style={dashboardContainerStyle} className="admin-dashboard-root">
       <style>{`
+        .admin-dashboard-root {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          width: 100vw !important;
+          height: 100% !important;
+          max-height: 100% !important;
+          overflow: hidden !important;
+          z-index: 999999 !important;
+        }
+
+        .content-area {
+          flex: 1 1 0% !important;
+          height: 100% !important;
+          max-height: 100% !important;
+          min-height: 0 !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          -webkit-overflow-scrolling: touch !important;
+          touch-action: pan-y !important;
+          overscroll-behavior-y: contain !important;
+        }
+
         .hamburger-btn, .mobile-close-btn { display: none; background: transparent; border: none; color: #f4f4f5; cursor: pointer; padding: 0; }
-        .mobile-overlay { display: none; }
+        .mobile-overlay { display: none; pointer-events: none; }
         
         /* Custom visible horizontal & vertical scrollbars for Admin Dashboard */
         .admin-dashboard-root ::-webkit-scrollbar {
@@ -900,10 +920,11 @@ export default function AdminDashboard({ user, onLogout }) {
 
         .admin-table-scroll {
           overflow-x: auto !important;
-          overflow-y: hidden !important;
+          overflow-y: visible !important;
           width: 100% !important;
           scrollbar-width: thin !important;
           scrollbar-color: #52525b #121214 !important;
+          touch-action: pan-x pan-y !important;
         }
 
         .admin-table-scroll::-webkit-scrollbar {
@@ -932,7 +953,7 @@ export default function AdminDashboard({ user, onLogout }) {
           .admin-sidebar.open { left: 0; }
           .hamburger-btn { display: block; }
           .mobile-close-btn { display: block; }
-          .mobile-overlay.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(5px); z-index: 999998; }
+          .mobile-overlay.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(5px); z-index: 999998; pointer-events: auto; }
           .top-bar-container { flex-direction: column !important; align-items: flex-start !important; gap: 14px; padding: 18px 20px !important; }
           .header-title-group { width: 100%; }
           .search-container { width: 100% !important; margin-top: 8px; }
@@ -3595,12 +3616,12 @@ const EngagementCard = ({ title, count, icon }) => (
 // -------------------------------------------------------------
 // Executive Calm Dark Styles
 // -------------------------------------------------------------
-const dashboardContainerStyle = { display: "flex", height: "100dvh", width: "100vw", background: "#09090b", color: "#f4f4f5", position: "absolute", zIndex: 999999, top: 0, left: 0, fontFamily: "system-ui, -apple-system, sans-serif" };
-const sidebarStyle = { width: "260px", background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.06)", padding: "24px 18px", display: "flex", flexDirection: "column", justifyContent: "space-between", flexShrink: 0 };
+const dashboardContainerStyle = { display: "flex", height: "100%", maxHeight: "100%", width: "100vw", background: "#09090b", color: "#f4f4f5", position: "fixed", zIndex: 999999, top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden", fontFamily: "system-ui, -apple-system, sans-serif" };
+const sidebarStyle = { width: "260px", height: "100%", background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.06)", padding: "24px 18px", display: "flex", flexDirection: "column", justifyContent: "space-between", flexShrink: 0, overflowY: "auto" };
 const logoStyle = { margin: 0, fontSize: "18px", fontWeight: "900", letterSpacing: "-0.5px", color: "#f4f4f5" };
-const mainContentStyle = { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", minWidth: 0, width: "100%" };
-const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 30px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#09090b", minWidth: 0 };
-const contentAreaStyle = { flex: 1, overflowY: "auto", overflowX: "hidden", padding: "30px", background: "#09090b", minWidth: 0, width: "100%" };
+const mainContentStyle = { flex: 1, display: "flex", flexDirection: "column", height: "100%", maxHeight: "100%", minHeight: 0, minWidth: 0, width: "100%", position: "relative", overflow: "hidden" };
+const topBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 30px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "#09090b", minWidth: 0, flexShrink: 0 };
+const contentAreaStyle = { flex: 1, height: "100%", minHeight: 0, minWidth: 0, width: "100%", overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch", overscrollBehaviorY: "contain", padding: "30px", background: "#09090b" };
 const gridStatsStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" };
 const cardContainerStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "22px" };
 const tableContainerStyle = { background: "#18181b", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", overflow: "hidden", position: "relative" };
