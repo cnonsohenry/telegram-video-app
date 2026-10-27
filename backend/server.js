@@ -638,7 +638,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     let creator = null;
     if (targetUsername) {
       const uRes = await pool.query(
-        "SELECT * FROM app_users WHERE LOWER(username) = LOWER($1) OR (LOWER($1) = 'naijahomemade' AND (LOWER(username) = 'naijaxxx' OR id = 458)) LIMIT 1",
+        "SELECT * FROM app_users WHERE LOWER(username) = LOWER($1) LIMIT 1",
         [targetUsername]
       );
       if (uRes.rows.length > 0) creator = uRes.rows[0];
@@ -1112,7 +1112,7 @@ app.get("/api/video", async (req, res) => {
         String(video.uploader_id) === "458" ||
         String(video.uploader_id) === "-1004344719694" ||
         (videoCreator?.id && String(videoCreator.id) === "458") ||
-        (videoCreator?.username && ["naijaxxx", "naijahomemade"].includes(videoCreator.username.toLowerCase()));
+        (videoCreator?.username && videoCreator.username.toLowerCase() === "naijaxxx");
 
       const creatorFee = Number(videoCreator?.subscription_price || 0);
 

@@ -559,7 +559,7 @@ router.put("/user/:id", authenticateToken, isAdmin, async (req, res) => {
     if (is_premium !== undefined) {
       try {
         const mainCreator = await pool.query(
-          "SELECT id FROM app_users WHERE id = 458 OR LOWER(username) IN ('naijaxxx', 'naijahomemade') LIMIT 1"
+          "SELECT id FROM app_users WHERE id = 458 OR LOWER(username) = 'naijaxxx' LIMIT 1"
         );
         if (mainCreator.rows.length > 0) {
           if (is_premium === true) {
@@ -800,7 +800,7 @@ export async function migrateLegacyVipToCreator(poolInstance) {
       `SELECT id, username, subscription_price 
        FROM app_users 
        WHERE id = 458
-          OR LOWER(username) IN ('naijaxxx', 'naijahomemade')
+          OR LOWER(username) = 'naijaxxx'
        ORDER BY id ASC
        LIMIT 1`
     );

@@ -61,7 +61,7 @@ export const verifyPayment = async (req, res, pool) => {
         // Auto-subscribe user to official @naijaxxx VIP creator
         try {
           const mainCreator = await client.query(
-            "SELECT id FROM app_users WHERE id = 458 OR LOWER(username) IN ('naijaxxx', 'naijahomemade') LIMIT 1"
+            "SELECT id FROM app_users WHERE id = 458 OR LOWER(username) = 'naijaxxx' LIMIT 1"
           );
           if (mainCreator.rows.length > 0) {
             await client.query(

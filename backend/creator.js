@@ -1129,7 +1129,6 @@ router.get("/:username", optionalAuth, async (req, res) => {
               COALESCE(email_verified, FALSE) as email_verified, COALESCE(kyc_status, 'unverified') as kyc_status
        FROM app_users 
        WHERE LOWER(username) = LOWER($1) 
-          OR (LOWER($1) = 'naijahomemade' AND (LOWER(username) = 'naijaxxx' OR id = 458))
           OR LOWER(COALESCE(display_name, '')) = LOWER($1)
           OR (source_channel = $1)
           OR (telegram_user_id IS NOT NULL AND CAST(telegram_user_id AS TEXT) = $1)`,
@@ -1292,8 +1291,8 @@ router.get("/:username", optionalAuth, async (req, res) => {
 
     const isOfficialCreator = 
       String(creator.id) === "458" ||
-      ["naijaxxx", "naijahomemade"].includes(String(creator.username || "").toLowerCase()) ||
-      ["naijaxxx", "naijahomemade"].includes(String(username || "").toLowerCase());
+      String(creator.username || "").toLowerCase() === "naijaxxx" ||
+      String(username || "").toLowerCase() === "naijaxxx";
 
     const legacyCondition = isOfficialCreator 
       ? "OR (LOWER(v.category) = 'premium' AND (v.uploader_id = 458 OR v.uploader_id = -1004344719694 OR v.uploader_id IS NULL OR v.uploader_id = 0 OR (v.chat_id != 'internal' AND (v.cloudflare_id IS NULL OR NOT v.cloudflare_id LIKE 'r2:%'))))"
@@ -2429,8 +2428,8 @@ router.get("/:username/videos", async (req, res) => {
 
     const isOfficialCreator = 
       String(creatorId) === "458" ||
-      ["naijaxxx", "naijahomemade"].includes(String(creatorUsername || "").toLowerCase()) ||
-      ["naijaxxx", "naijahomemade"].includes(String(username || "").toLowerCase());
+      String(creatorUsername || "").toLowerCase() === "naijaxxx" ||
+      String(username || "").toLowerCase() === "naijaxxx";
 
     const legacyCondition = isOfficialCreator 
       ? "OR (LOWER(v.category) = 'premium' AND (v.uploader_id = 458 OR v.uploader_id = -1004344719694 OR v.uploader_id IS NULL OR v.uploader_id = 0 OR (v.chat_id != 'internal' AND (v.cloudflare_id IS NULL OR NOT v.cloudflare_id LIKE 'r2:%'))))"
