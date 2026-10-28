@@ -20,6 +20,16 @@ export function promptLogin(action = "continue") {
   }
 }
 
+export function promptEmailVerification({ reason = "download", email = "", onVerified = null } = {}) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("openEmailVerification", {
+        detail: { reason, email, onVerified }
+      })
+    );
+  }
+}
+
 export async function copyToClipboard(text, successMsg = "Copied to clipboard!") {
   try {
     if (navigator?.clipboard?.writeText) {

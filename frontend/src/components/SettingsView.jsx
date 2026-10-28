@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import LegalFooter from "./LegalFooter";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
-import { showToast } from "../utils/toast";
+import { showToast, promptEmailVerification } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
@@ -452,7 +452,56 @@ export default function SettingsView({
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             <DetailRow label="Username" value={`@${user?.username || "user"}`} onCopy={() => handleCopyText(user?.username || "", "Username")} />
             <DetailRow label="Display Name" value={user?.display_name || user?.username || "Member"} />
-            <DetailRow label="Email" value={user?.email || "Connected via Telegram"} onCopy={user?.email ? () => handleCopyText(user.email, "Email") : null} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", backgroundColor: "#141416", borderRadius: "8px", border: "1px solid #222" }}>
+              <div style={{ flex: 1, minWidth: 0, marginRight: "8px" }}>
+                <div style={{ fontSize: "11px", color: "#8e8e93", textTransform: "uppercase" }}>Email Address</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "13.5px", fontWeight: "600", color: "#d4d4d8", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {user?.email && !user.email.endsWith("@internal.naijahomemade.com") ? user.email : "No email linked"}
+                  </span>
+                  {user?.email_verified ? (
+                    <span style={{ fontSize: "11px", color: "#10b981", background: "rgba(16, 185, 129, 0.12)", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" }}>
+                      Verified ✓
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "11px", color: "#f59e0b", background: "rgba(245, 158, 11, 0.12)", padding: "2px 6px", borderRadius: "4px", fontWeight: "700" }}>
+                      Unverified
+                    </span>
+                  )}
+                </div>
+              </div>
+              {!user?.email_verified ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCloseActiveModal();
+                    promptEmailVerification({
+                      reason: "account",
+                      email: user?.email
+                    });
+                  }}
+                  style={{
+                    background: "rgba(244, 63, 94, 0.15)",
+                    border: "1px solid rgba(244, 63, 94, 0.3)",
+                    color: "#f43f5e",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap"
+                  }}
+                >
+                  Verify Now
+                </button>
+              ) : (
+                user?.email && (
+                  <button onClick={() => handleCopyText(user.email, "Email")} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px" }} title="Copy">
+                    <Copy size={15} color="#8e8e93" />
+                  </button>
+                )
+              )}
+            </div>
             <DetailRow label="Account Type" value={user?.is_creator ? "Creator" : (user?.is_premium ? "VIP Passholder" : "Member")} />
             <DetailRow label="Telegram User ID" value={String(user?.id || user?.telegram_user_id || "N/A")} onCopy={() => handleCopyText(String(user?.id || user?.telegram_user_id || ""), "User ID")} />
             <DetailRow label="Status" value="Active" />

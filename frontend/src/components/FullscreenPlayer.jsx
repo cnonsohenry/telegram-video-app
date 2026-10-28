@@ -12,7 +12,7 @@ import { getVideoCreatorHandle, isUserFollowingCreator } from "../utils/subscrip
 import { shouldPlayVastAd, recordVastAdPlayed, getVastConfig } from "../utils/adManager";
 import { fetchVastAd, sendVastBeacons } from "../utils/vastParser";
 import { renderClickableCaption } from "./ClickableCaption";
-import { promptLogin, showToast } from "../utils/toast";
+import { promptLogin, showToast, promptEmailVerification } from "../utils/toast";
 import { getPostDisplayName } from "../utils/date";
 import ReportModal from "./ReportModal";
 import useModalHistory from "../hooks/useModalHistory";
@@ -723,27 +723,69 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     if (e) e.stopPropagation();
     setShowMenu(false);
     if (isPremium || isDownloading) return;
+
+    // 🛑 STRICT RULE: Only logged in and email verified users can download videos
+    const token = localStorage.getItem("token");
+    if (!token) {
+      promptLogin("download");
+      return;
+    }
+
+    if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+      promptEmailVerification({
+        reason: "download",
+        email: currentUser.email,
+        onVerified: () => handleDownload(e)
+      });
+      return;
+    }
     
     setIsDownloading(true);
     try {
-      const cacheBusterUrl = video.video_url + (video.video_url.includes('?') ? '&' : '?') + 'dl=' + Date.now();
-      const response = await fetch(cacheBusterUrl, { mode: 'cors' });
-      if (!response.ok) throw new Error("Network response was not ok");
-      
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `${APP_CONFIG.appNamePrefix.toLowerCase()}-${video.message_id}.mp4`;
-      
+      const identifier = video.id || video.message_id;
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos/${encodeURIComponent(identifier)}/download`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+
+      if (res.status === 401) {
+        promptLogin("download");
+        return;
+      }
+
+      if (res.status === 403 && data.requires_email_verification) {
+        promptEmailVerification({
+          reason: "download",
+          email: data.email || currentUser?.email,
+          onVerified: () => handleDownload(e)
+        });
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to download video");
+      }
+
+      if (!data.download_url) {
+        throw new Error("No download URL returned");
+      }
+
+      const filename = data.filename || `${APP_CONFIG.appNamePrefix.toLowerCase()}-${video.message_id || video.id}.mp4`;
+
+      const link = document.createElement("a");
+      link.href = data.download_url;
+      link.setAttribute("download", filename);
+      link.target = "_blank";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+
       showToast("Download started", "success");
     } catch (err) {
-      showToast("Download failed. Please try again.", "error");
+      console.error("Download error:", err);
+      showToast(err.message || "Download failed. Please try again.", "error");
     } finally {
       setIsDownloading(false);
     }

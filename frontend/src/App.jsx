@@ -12,6 +12,7 @@ import CommentSectionModal from "./components/CommentSectionModal";
 import CreatorProfileModal from "./components/CreatorProfileModal";
 import AppToast from "./components/AppToast";
 import LoginPromptModal from "./components/LoginPromptModal";
+import EmailVerificationModal from "./components/EmailVerificationModal";
 import DiscoverCreatorsModal from "./components/DiscoverCreatorsModal";
 import { useAdZapper } from "./hooks/useAdZapper";
 import { Home as HomeIcon, Compass, User, ShieldCheck } from "lucide-react";
@@ -84,6 +85,7 @@ export default function App() {
   const [creatorAutoSubscribe, setCreatorAutoSubscribe] = useState(false);
   const [isCreatorOverVideo, setIsCreatorOverVideo] = useState(false);
   const [loginPromptAction, setLoginPromptAction] = useState(null);
+  const [emailVerificationState, setEmailVerificationState] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const showAuthModalRef = useRef(false);
 
@@ -568,6 +570,9 @@ export default function App() {
     const handleOpenLoginPrompt = (e) => {
       setLoginPromptAction(e.detail?.action || "continue");
     };
+    const handleOpenEmailVerification = (e) => {
+      setEmailVerificationState(e.detail || { reason: "download" });
+    };
     const handleOpenAuthModal = () => {
       setShowAuthModal(true);
     };
@@ -577,6 +582,7 @@ export default function App() {
     window.addEventListener("refreshUser", refreshUser);
     window.addEventListener("openLoginPrompt", handleOpenLoginPrompt);
     window.addEventListener("promptLogin", handleOpenLoginPrompt);
+    window.addEventListener("openEmailVerification", handleOpenEmailVerification);
     window.addEventListener("openAuthModal", handleOpenAuthModal);
     return () => {
       window.removeEventListener("openCreatorProfile", handleOpenCreatorEvent);
@@ -584,6 +590,7 @@ export default function App() {
       window.removeEventListener("refreshUser", refreshUser);
       window.removeEventListener("openLoginPrompt", handleOpenLoginPrompt);
       window.removeEventListener("promptLogin", handleOpenLoginPrompt);
+      window.removeEventListener("openEmailVerification", handleOpenEmailVerification);
       window.removeEventListener("openAuthModal", handleOpenAuthModal);
     };
   }, [handleOpenCreator, handleOpenDiscoverCreators, refreshUser]);
@@ -1180,6 +1187,20 @@ export default function App() {
           setLoginPromptAction(null);
           setShowAuthModal(true);
         }} 
+      />
+
+      {/* 🟢 APP-NATIVE EMAIL VERIFICATION MODAL */}
+      <EmailVerificationModal
+        isOpen={Boolean(emailVerificationState)}
+        reason={emailVerificationState?.reason || "download"}
+        initialEmail={emailVerificationState?.email || user?.email || ""}
+        currentUser={user}
+        onClose={() => setEmailVerificationState(null)}
+        onVerified={(updatedUser) => {
+          const cb = emailVerificationState?.onVerified;
+          setEmailVerificationState(null);
+          if (cb) cb(updatedUser);
+        }}
       />
 
       {/* 🟢 TOP-LEVEL AUTH MODAL (ALWAYS ON TOP OF PLAYERS AND MODALS) */}

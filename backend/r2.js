@@ -266,3 +266,28 @@ export async function deleteMediaFromR2(cloudflareId, messageId) {
     }
   }
 }
+
+/**
+ * Generate a secure, presigned Cloudflare R2 download URL with attachment Content-Disposition
+ * Only accessible to authenticated and email-verified users.
+ */
+export async function generateDownloadUrl(cloudflareId, filename = "video.mp4") {
+  if (!cloudflareId) return null;
+  const cleanKey = cloudflareId.replace("r2:", "");
+  const safeFilename = filename.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
+
+  try {
+    const command = new GetObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: cleanKey,
+      ResponseContentDisposition: `attachment; filename="${safeFilename}"`
+    });
+    // Valid for 30 minutes (1800 seconds)
+    const signedUrl = await getSignedUrl(r2, command, { expiresIn: 1800 });
+    return signedUrl;
+  } catch (err) {
+    console.warn(`[R2 DOWNLOAD SIGN ERROR] ${cleanKey}:`, err.message);
+    const publicDomain = process.env.R2_PUBLIC_DOMAIN || "https://bucket.naijahomemade.com";
+    return `${publicDomain}/${cleanKey}`;
+  }
+}

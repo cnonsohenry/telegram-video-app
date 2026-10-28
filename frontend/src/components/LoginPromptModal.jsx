@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { 
-  X, Heart, MessageCircle, Bookmark, UserPlus, Crown, Lock, ArrowRight, Sparkles 
+  X, Heart, MessageCircle, Bookmark, UserPlus, Crown, Lock, ArrowRight, Sparkles, Download, Flag 
 } from "lucide-react";
 import useModalHistory from "../hooks/useModalHistory";
 
@@ -64,6 +64,24 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
           iconColor: "#00aff0",
           iconBg: "rgba(0, 175, 240, 0.15)",
           iconBorder: "rgba(0, 175, 240, 0.3)"
+        };
+      case "download":
+        return {
+          title: "Sign in to Download Videos",
+          subtitle: "Create a free account and verify your email to download clips and watch offline anytime.",
+          icon: Download,
+          iconColor: "#00aff0",
+          iconBg: "rgba(0, 175, 240, 0.15)",
+          iconBorder: "rgba(0, 175, 240, 0.3)"
+        };
+      case "report":
+        return {
+          title: "Sign in to Report Content",
+          subtitle: "Create a free account and verify your email to report inappropriate content and keep the community safe.",
+          icon: Flag,
+          iconColor: "#e11d48",
+          iconBg: "rgba(225, 29, 72, 0.12)",
+          iconBorder: "rgba(225, 29, 72, 0.22)"
         };
       default:
         return {

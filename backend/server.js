@@ -24,6 +24,7 @@ import { fileURLToPath } from "url";
 import prerender from "prerender-node";
 import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; 
+import { generateDownloadUrl } from "./r2.js"; 
 import adminRoutes, { syncTelegramCreators, migrateLegacyVipToCreator } from "./admin.js";
 import authRoutes, { authenticateToken, JWT_SECRET } from "./auth.js";
 import creatorRoutes from "./creator.js";
@@ -1311,6 +1312,147 @@ app.get("/api/video", async (req, res) => {
   } catch (err) {
     console.error("❌ Video API Error Detail:", err.response?.data || err.message);
     res.status(500).json({ error: "Playback failed", detail: err.message });
+  }
+});
+
+/* =====================
+   api/videos/:identifier/download (Strict Auth & Email Verification Gated)
+   Rule: Only logged in and email verified users should be able to download videos
+===================== */
+app.get(["/api/videos/:identifier/download", "/api/video/:identifier/download", "/api/video/download"], async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+
+    const identifier = req.params.identifier || req.query.message_id || req.query.id;
+    if (!identifier) {
+      return res.status(400).json({ error: "Missing video identifier" });
+    }
+
+    // 1. Authentication Check
+    const authHeader = req.headers["authorization"];
+    const token = (authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null) || req.query.token;
+
+    if (!token) {
+      return res.status(401).json({ 
+        error: "Please log in to download videos.", 
+        requires_auth: true 
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (jwtErr) {
+      return res.status(401).json({ 
+        error: "Session expired. Please log in again to download videos.", 
+        requires_auth: true 
+      });
+    }
+
+    // 2. Query user from DB for email verification & role
+    const userRes = await pool.query(
+      "SELECT id, username, email, role, is_premium, COALESCE(email_verified, FALSE) as email_verified FROM app_users WHERE id = $1",
+      [decoded.id]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(401).json({ error: "User account not found.", requires_auth: true });
+    }
+
+    const currentUser = userRes.rows[0];
+    const isAdmin = currentUser.role === "admin";
+    const isEmailVerified = Boolean(currentUser.email_verified || isAdmin);
+
+    // 🛑 STRICT RULE: Only logged in and email verified users can download videos
+    if (!isEmailVerified) {
+      return res.status(403).json({
+        error: "Email verification required. Please verify your email address to download videos.",
+        requires_email_verification: true,
+        email: currentUser.email
+      });
+    }
+
+    // 3. Locate video in DB
+    const dbRes = await pool.query(
+      `SELECT id, chat_id, message_id, file_id, cloudflare_id, category, uploader_id, caption 
+       FROM videos 
+       WHERE message_id = $1 OR id::text = $1`,
+      [String(identifier)]
+    );
+
+    if (dbRes.rows.length === 0) {
+      return res.status(404).json({ error: "Video not found in catalog." });
+    }
+
+    const video = dbRes.rows[0];
+
+    // 4. Access Control for VIP / Premium Videos
+    if (video.category === "premium") {
+      let isAuthorized = isAdmin;
+      if (!isAuthorized && video.uploader_id && Number(video.uploader_id) === Number(currentUser.id)) {
+        isAuthorized = true;
+      }
+      if (!isAuthorized && video.uploader_id) {
+        const uploaderTarget = String(video.uploader_id).trim();
+        const subCheck = await pool.query(
+          `SELECT 1 FROM creator_subscriptions cs
+           WHERE cs.subscriber_id = $1
+             AND (cs.creator_id::text = $2 OR cs.creator_id IN (SELECT id FROM app_users WHERE telegram_user_id::text = $2 OR id::text = $2))
+             AND cs.status = 'active'
+             AND (cs.expires_at IS NULL OR cs.expires_at > NOW())
+           LIMIT 1`,
+          [currentUser.id, uploaderTarget]
+        );
+        if (subCheck.rows.length > 0) isAuthorized = true;
+      }
+      if (!isAuthorized) {
+        return res.status(403).json({ error: "Active VIP subscription required to download premium videos." });
+      }
+    }
+
+    const safeFilename = `naijahomemade-${video.message_id || video.id}.mp4`;
+
+    // 5. Generate secure presigned download URL
+    if (video.cloudflare_id && video.cloudflare_id !== "none") {
+      if (video.cloudflare_id.startsWith("r2:")) {
+        const downloadUrl = await generateDownloadUrl(video.cloudflare_id, safeFilename);
+        return res.json({ 
+          success: true, 
+          download_url: downloadUrl,
+          filename: safeFilename
+        });
+      } else {
+        const cleanId = video.cloudflare_id.split('?')[0];
+        const downloadUrl = `https://videodelivery.net/${cleanId}/downloads/default.mp4`;
+        return res.json({ 
+          success: true, 
+          download_url: downloadUrl,
+          filename: safeFilename 
+        });
+      }
+    }
+
+    if (video.file_id && video.file_id !== "none") {
+      const tgRes = await axios.get(`${TELEGRAM_API}/getFile`, { 
+        params: { file_id: video.file_id },
+        timeout: 5000
+      });
+      if (tgRes.data?.result?.file_path) {
+        const filePath = tgRes.data.result.file_path;
+        const { exp, sig } = signWorkerUrl(filePath);
+        const workerUrl = `${process.env.WORKER_BASE_URL}/?file_path=${encodeURIComponent(filePath)}&exp=${exp}&sig=${sig}&download=1`;
+        return res.json({ 
+          success: true, 
+          download_url: workerUrl,
+          filename: safeFilename 
+        });
+      }
+    }
+
+    return res.status(404).json({ error: "Media source not found for download." });
+  } catch (err) {
+    console.error("❌ Video Download API Error:", err.message);
+    res.status(500).json({ error: "Failed to generate video download.", detail: err.message });
   }
 });
 

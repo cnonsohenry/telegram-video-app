@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { 
-  Flag, Frown, UserPlus, UserMinus, Link2, Share2, Trash2, X 
+  Flag, Frown, UserPlus, UserMinus, Link2, Share2, Trash2, X, Download, Loader2 
 } from "lucide-react";
-import { showToast, copyToClipboard } from "../utils/toast";
+import { showToast, copyToClipboard, promptLogin, promptEmailVerification } from "../utils/toast";
+import { APP_CONFIG } from "../config";
 import useModalHistory from "../hooks/useModalHistory";
 
 export default function PostOptionsModal({
@@ -14,9 +15,11 @@ export default function PostOptionsModal({
   onReport,
   onNotInterested,
   onFollowToggle,
-  onDelete
+  onDelete,
+  onDownload
 }) {
   const handleSafeClose = useModalHistory(isOpen && Boolean(video), onClose, "postOptions");
+  const [isDownloading, setIsDownloading] = useState(false);
 
   if (!isOpen || !video) return null;
 
@@ -82,6 +85,71 @@ export default function PostOptionsModal({
   const handleDeleteClick = () => {
     if (onDelete) onDelete(video);
     handleSafeClose();
+  };
+
+  const handleDownloadClick = async () => {
+    if (onDownload) {
+      onDownload(video);
+      handleSafeClose();
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      handleSafeClose();
+      promptLogin("download");
+      return;
+    }
+
+    if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+      handleSafeClose();
+      promptEmailVerification({
+        reason: "download",
+        email: currentUser.email,
+        onVerified: () => handleDownloadClick()
+      });
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const identifier = video.id || video.message_id;
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos/${encodeURIComponent(identifier)}/download`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+
+      if (res.status === 401) {
+        handleSafeClose();
+        promptLogin("download");
+        return;
+      }
+      if (res.status === 403 && data.requires_email_verification) {
+        handleSafeClose();
+        promptEmailVerification({
+          reason: "download",
+          email: data.email || currentUser?.email,
+          onVerified: () => handleDownloadClick()
+        });
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || "Failed to download video");
+
+      const link = document.createElement("a");
+      link.href = data.download_url;
+      link.setAttribute("download", data.filename || `naijahomemade-${video.message_id || video.id}.mp4`);
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast("Download started", "success");
+      handleSafeClose();
+    } catch (err) {
+      showToast(err.message || "Download failed. Please try again.", "error");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
@@ -165,6 +233,25 @@ export default function PostOptionsModal({
               <span style={itemTitleStyle}>Share post via...</span>
             </div>
           </button>
+
+          {/* Download Video (Non-premium or permitted) */}
+          {(!video.category || video.category !== "premium" || isOwner) && (
+            <button 
+              type="button" 
+              style={optionItemStyle} 
+              onClick={handleDownloadClick}
+              disabled={isDownloading}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+            >
+              <div style={iconBoxStyle}>
+                {isDownloading ? <Loader2 size={20} className="spin-animation" color="#e7e9ea" /> : <Download size={20} color="#e7e9ea" />}
+              </div>
+              <div style={textWrapperStyle}>
+                <span style={itemTitleStyle}>{isDownloading ? "Preparing download..." : "Download video"}</span>
+              </div>
+            </button>
+          )}
 
           {/* Delete Option (for owner or admin) */}
           {isOwner && (

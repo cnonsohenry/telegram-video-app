@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Flag, AlertTriangle, CheckCircle2, Loader2, ShieldAlert, MailCheck, LogIn } from "lucide-react";
 import { APP_CONFIG } from "../config";
-import { showToast, promptLogin } from "../utils/toast";
+import { showToast, promptLogin, promptEmailVerification } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
 
 export default function ReportModal({ isOpen, onClose, video }) {
@@ -62,7 +62,13 @@ export default function ReportModal({ isOpen, onClose, video }) {
     }
 
     if (!currentUser?.email_verified && currentUser?.role !== "admin") {
-      showToast("Please verify your email address in Settings before submitting reports.", "warning");
+      promptEmailVerification({
+        reason: "report",
+        email: currentUser?.email,
+        onVerified: () => {
+          showToast("Email verified! You can now submit your report.", "success");
+        }
+      });
       return;
     }
 
@@ -189,11 +195,17 @@ export default function ReportModal({ isOpen, onClose, video }) {
                 type="button"
                 onClick={() => {
                   handleSafeClose();
-                  window.dispatchEvent(new CustomEvent("openSettings"));
+                  promptEmailVerification({
+                    reason: "report",
+                    email: currentUser?.email,
+                    onVerified: () => {
+                      showToast("Email verified! You can now submit your report.", "success");
+                    }
+                  });
                 }}
                 style={primaryActionBtn}
               >
-                Go to Settings & Verify
+                Verify Email Now
               </button>
               <button
                 type="button"
