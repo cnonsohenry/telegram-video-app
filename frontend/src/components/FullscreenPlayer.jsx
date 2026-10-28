@@ -954,13 +954,26 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       {/* 🌟 FULLSCREEN PLAYER ACTION SHEET (Slides up from the bottom like X) */}
       {showMenu && (
         <div 
-          style={playerMenuOverlay} 
+          style={{
+            ...playerMenuOverlay,
+            alignItems: isDesktop ? "center" : "flex-end"
+          }} 
           onClick={(e) => { e.stopPropagation(); handleCloseMenu(); }}
         >
-          <div style={playerMenuSheet} onClick={(e) => e.stopPropagation()}>
-            <div style={dragHandleWrapper}>
-              <div style={dragHandlePill} />
-            </div>
+          <div 
+            style={{
+              ...playerMenuSheet,
+              borderRadius: isDesktop ? "22px" : "24px 24px 0 0",
+              border: isDesktop ? "1px solid rgba(255, 255, 255, 0.08)" : "none",
+              animation: isDesktop ? "promptFadeScale 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards" : "playerSheetSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards"
+            }} 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {!isDesktop && (
+              <div style={dragHandleWrapper}>
+                <div style={dragHandlePill} />
+              </div>
+            )}
 
             <div style={playerMenuList}>
               {canModify && (
@@ -968,19 +981,19 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                   <button 
                     style={playerMenuItem} 
                     onClick={handleEditCaption}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)"}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   >
-                    <Edit2 size={20} color="#e7e9ea" /> 
+                    <Edit2 size={18} color="#a1a1aa" /> 
                     <span>Edit Caption</span>
                   </button>
                   <button 
-                    style={{ ...playerMenuItem, color: '#f4212e' }} 
+                    style={{ ...playerMenuItem, color: '#fb7185' }} 
                     onClick={handleDeleteVideo}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(244, 33, 46, 0.1)"}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(244, 33, 46, 0.08)"}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   >
-                    <Trash2 size={20} color="#f4212e" /> 
+                    <Trash2 size={18} color="#fb7185" /> 
                     <span>Delete Video</span>
                   </button>
                 </>
@@ -991,27 +1004,27 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                   <button 
                     style={playerMenuItem} 
                     onClick={handleShare}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)"}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   >
-                    {copied ? <Check size={20} color="#f4f4f5" /> : <Share2 size={20} color="#e7e9ea" />} 
+                    {copied ? <Check size={18} color="#34d399" /> : <Share2 size={18} color="#a1a1aa" />} 
                     <span>{copied ? "Copied Link!" : "Share / Copy Link"}</span>
                   </button>
                   <button 
                     style={playerMenuItem} 
                     onClick={handleDownload}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)"}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)"}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   >
-                    {isDownloading ? <Loader2 size={20} className="spin-animation" color="#e7e9ea" /> : <Download size={20} color="#e7e9ea" />} 
-                    <span>Download Video</span>
+                    {isDownloading ? <Loader2 size={18} className="spin-animation" color="#38bdf8" /> : <Download size={18} color="#a1a1aa" />} 
+                    <span>{isDownloading ? "Preparing download..." : "Download Video"}</span>
                   </button>
                 </>
               )}
 
               {/* Report Video Option */}
               <button 
-                style={{ ...playerMenuItem, color: '#f4212e' }} 
+                style={{ ...playerMenuItem, color: '#fb7185' }} 
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowMenu(false);
@@ -1026,21 +1039,27 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                   window.history.replaceState(newState, document.title);
                   setShowReport(true);
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(244, 33, 46, 0.1)"}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(244, 33, 46, 0.08)"}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
               >
-                <Flag size={20} color="#f4212e" />
+                <Flag size={18} color="#fb7185" />
                 <span>Report Video</span>
               </button>
             </div>
 
-            <div style={{ paddingTop: "6px" }}>
+            <div style={{ paddingTop: "4px" }}>
               <button 
                 type="button" 
                 style={playerCancelBtn} 
                 onClick={(e) => { e.stopPropagation(); handleCloseMenu(); }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#323236"}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#27272a"}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
+                  e.currentTarget.style.color = "#f4f4f5";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
+                  e.currentTarget.style.color = "#a1a1aa";
+                }}
               >
                 Cancel
               </button>
@@ -1820,9 +1839,9 @@ const playerMenuOverlay = {
   position: "fixed",
   inset: 0,
   zIndex: 100020,
-  backgroundColor: "rgba(0, 0, 0, 0.72)",
-  backdropFilter: "blur(8px)",
-  WebkitBackdropFilter: "blur(8px)",
+  backgroundColor: "rgba(0, 0, 0, 0.65)",
+  backdropFilter: "blur(12px)",
+  WebkitBackdropFilter: "blur(12px)",
   display: "flex",
   flexDirection: "column",
   justifyContent: "flex-end",
@@ -1831,24 +1850,23 @@ const playerMenuOverlay = {
 
 const playerMenuSheet = {
   width: "100%",
-  maxWidth: "460px",
+  maxWidth: "400px",
   backgroundColor: "#18181b",
   border: "none",
   borderRadius: "24px 24px 0 0",
-  padding: "10px 16px max(24px, env(safe-area-inset-bottom, 24px))",
+  padding: "12px 16px max(20px, env(safe-area-inset-bottom, 20px))",
   boxSizing: "border-box",
-  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.85)",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.6), 0 20px 60px rgba(0, 0, 0, 0.7)",
   display: "flex",
   flexDirection: "column",
-  animation: "playerSheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
+  animation: "playerSheetSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1)"
 };
 
 const dragHandleWrapper = {
   width: "100%",
   display: "flex",
   justifyContent: "center",
-  paddingTop: "2px",
-  paddingBottom: "10px",
+  paddingBottom: "12px",
   cursor: "grab"
 };
 
@@ -1856,14 +1874,14 @@ const dragHandlePill = {
   width: "36px",
   height: "4px",
   borderRadius: "2px",
-  backgroundColor: "#3e4144"
+  backgroundColor: "rgba(255, 255, 255, 0.16)"
 };
 
 const playerMenuList = {
   display: "flex",
   flexDirection: "column",
-  gap: "4px",
-  marginBottom: "12px"
+  gap: "2px",
+  marginBottom: "8px"
 };
 
 const playerMenuItem = {
@@ -1873,25 +1891,25 @@ const playerMenuItem = {
   width: "100%",
   display: "flex",
   alignItems: "center",
-  gap: "14px",
-  padding: "13px 12px",
+  gap: "12px",
+  padding: "11px 12px",
   borderRadius: "12px",
-  color: "#d4d4d8",
-  fontSize: "15px",
+  color: "#f4f4f5",
+  fontSize: "14px",
   fontWeight: "600",
   textAlign: "left",
-  transition: "background-color 0.15s ease"
+  transition: "all 0.15s ease"
 };
 
 const playerCancelBtn = {
   width: "100%",
-  padding: "14px",
+  padding: "11px",
   borderRadius: "9999px",
-  backgroundColor: "#27272a",
-  border: "none",
-  color: "#d4d4d8",
-  fontSize: "15px",
-  fontWeight: "700",
+  backgroundColor: "rgba(255, 255, 255, 0.04)",
+  border: "1px solid rgba(255, 255, 255, 0.06)",
+  color: "#a1a1aa",
+  fontSize: "13.5px",
+  fontWeight: "600",
   cursor: "pointer",
-  transition: "background-color 0.15s ease"
+  transition: "all 0.15s ease"
 };

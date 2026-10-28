@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { 
   X, Heart, MessageCircle, Bookmark, UserPlus, Crown, Lock, ArrowRight, Sparkles, Download, Flag 
@@ -6,6 +7,13 @@ import useModalHistory from "../hooks/useModalHistory";
 
 export default function LoginPromptModal({ isOpen, action = "continue", onClose, onLogin }) {
   const handleSafeClose = useModalHistory(isOpen, onClose, "loginPrompt");
+  const [isDesktop, setIsDesktop] = useState(typeof window !== "undefined" ? window.innerWidth >= 640 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 640);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -16,81 +24,81 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
           title: "Sign in to Like Videos",
           subtitle: "Create a free account to like videos, support creators, and personalize your feed.",
           icon: Heart,
-          iconColor: "#e11d48",
-          iconBg: "rgba(225, 29, 72, 0.12)",
-          iconBorder: "rgba(225, 29, 72, 0.22)"
+          iconColor: "#f43f5e",
+          iconBg: "rgba(244, 63, 94, 0.08)",
+          iconBorder: "rgba(244, 63, 94, 0.18)"
         };
       case "comment":
         return {
           title: "Join the Conversation",
           subtitle: "Sign in to share your thoughts, drop reactions, and interact directly with creators.",
           icon: MessageCircle,
-          iconColor: "#00aff0",
-          iconBg: "rgba(0, 175, 240, 0.15)",
-          iconBorder: "rgba(0, 175, 240, 0.3)"
+          iconColor: "#38bdf8",
+          iconBg: "rgba(56, 189, 248, 0.08)",
+          iconBorder: "rgba(56, 189, 248, 0.18)"
         };
       case "save":
         return {
           title: "Save to Your Profile",
-          subtitle: "Sign in to bookmark this video and access your private saved collection anytime.",
+          subtitle: "Sign in to bookmark videos and access your private saved collection anytime.",
           icon: Bookmark,
-          iconColor: "#ffd700",
-          iconBg: "rgba(255, 215, 0, 0.15)",
-          iconBorder: "rgba(255, 215, 0, 0.3)"
+          iconColor: "#fbbf24",
+          iconBg: "rgba(251, 191, 36, 0.08)",
+          iconBorder: "rgba(251, 191, 36, 0.18)"
         };
       case "follow":
         return {
           title: "Follow This Creator",
           subtitle: "Sign in to follow creators, get notified of fresh uploads, and see their latest drops.",
           icon: UserPlus,
-          iconColor: "#00aff0",
-          iconBg: "rgba(0, 175, 240, 0.15)",
-          iconBorder: "rgba(0, 175, 240, 0.3)"
+          iconColor: "#38bdf8",
+          iconBg: "rgba(56, 189, 248, 0.08)",
+          iconBorder: "rgba(56, 189, 248, 0.18)"
         };
       case "subscribe":
         return {
           title: "Unlock VIP Access",
           subtitle: "Sign in to subscribe to VIP exclusive series, uncut episodes, and premium creator perks.",
           icon: Crown,
-          iconColor: "#ffd700",
-          iconBg: "rgba(255, 215, 0, 0.15)",
-          iconBorder: "rgba(255, 215, 0, 0.3)"
+          iconColor: "#fbbf24",
+          iconBg: "rgba(251, 191, 36, 0.08)",
+          iconBorder: "rgba(251, 191, 36, 0.18)"
         };
       case "upload":
         return {
           title: "Publish on Naija Homemade",
           subtitle: "Sign in or set up your creator profile to upload videos directly to the Community feed.",
           icon: Lock,
-          iconColor: "#00aff0",
-          iconBg: "rgba(0, 175, 240, 0.15)",
-          iconBorder: "rgba(0, 175, 240, 0.3)"
+          iconColor: "#38bdf8",
+          iconBg: "rgba(56, 189, 248, 0.08)",
+          iconBorder: "rgba(56, 189, 248, 0.18)"
         };
       case "download":
         return {
           title: "Sign in to Download Videos",
           subtitle: "Create a free account and verify your email to download clips and watch offline anytime.",
           icon: Download,
-          iconColor: "#00aff0",
-          iconBg: "rgba(0, 175, 240, 0.15)",
-          iconBorder: "rgba(0, 175, 240, 0.3)"
+          iconColor: "#38bdf8",
+          iconBg: "rgba(56, 189, 248, 0.08)",
+          iconBorder: "rgba(56, 189, 248, 0.18)"
         };
       case "report":
         return {
           title: "Sign in to Report Content",
           subtitle: "Create a free account and verify your email to report inappropriate content and keep the community safe.",
           icon: Flag,
-          iconColor: "#e11d48",
-          iconBg: "rgba(225, 29, 72, 0.12)",
-          iconBorder: "rgba(225, 29, 72, 0.22)"
+          iconColor: "#fb7185",
+          iconBg: "rgba(251, 113, 133, 0.08)",
+          iconBorder: "rgba(251, 113, 133, 0.18)"
         };
       default:
         return {
           title: "Account Required",
           subtitle: "Sign in or create a free account to unlock interactive features and access your dashboard.",
           icon: Lock,
-          iconColor: "var(--primary-color, #00aff0)",
-          iconBg: "rgba(0, 175, 240, 0.15)",
-          iconBorder: "rgba(0, 175, 240, 0.3)"
+          iconColor: "#38bdf8",
+          iconBg: "rgba(56, 189, 248, 0.08)",
+          iconBorder: "rgba(56, 189, 248, 0.18)"
         };
     }
   };
@@ -99,22 +107,37 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
   const Icon = config.icon;
 
   const content = (
-    <div style={overlayStyle} onClick={handleSafeClose}>
+    <div 
+      style={{
+        ...overlayStyle,
+        alignItems: isDesktop ? "center" : "flex-end"
+      }} 
+      onClick={handleSafeClose}
+    >
       <div 
-        style={cardStyle} 
+        style={{
+          ...cardStyle,
+          borderRadius: isDesktop ? "22px" : "24px 24px 0 0",
+          border: isDesktop ? "1px solid rgba(255, 255, 255, 0.08)" : "none",
+          animation: isDesktop ? "promptFadeScale 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards" : "promptSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards"
+        }} 
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top Drag Handle Indicator */}
-        <div style={dragHandleWrapper}>
-          <div style={dragHandlePill} />
-        </div>
+        {/* Mobile Top Drag Handle Indicator */}
+        {!isDesktop && (
+          <div style={dragHandleWrapper}>
+            <div style={dragHandlePill} />
+          </div>
+        )}
 
         <button 
           onClick={handleSafeClose}
           style={closeBtnStyle}
           aria-label="Close"
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.12)"}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)"}
         >
-          <X size={18} color="#aaa" />
+          <X size={17} color="#a1a1aa" />
         </button>
 
         <div style={{
@@ -122,7 +145,7 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
           backgroundColor: config.iconBg,
           borderColor: config.iconBorder
         }}>
-          <Icon size={26} color={config.iconColor} />
+          <Icon size={22} color={config.iconColor} />
         </div>
 
         <div style={titleStyle}>
@@ -135,7 +158,7 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
 
         <div style={perksRowStyle}>
           <div style={perkPillStyle}>
-            <Sparkles size={12} color="#ffd700" />
+            <Sparkles size={12} color="#fbbf24" />
             <span>100% Free Account</span>
           </div>
           <div style={perkPillStyle}>
@@ -154,15 +177,19 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
               if (onLogin) onLogin();
             }}
             style={primaryBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#ffffff"}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#f4f4f5"}
           >
             <span>Sign In / Create Account</span>
-            <ArrowRight size={16} />
+            <ArrowRight size={15} />
           </button>
 
           <button 
             type="button" 
             onClick={handleSafeClose}
             style={secondaryBtnStyle}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#f4f4f5"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#71717a"}
           >
             Maybe Later
           </button>
@@ -170,13 +197,13 @@ export default function LoginPromptModal({ isOpen, action = "continue", onClose,
       </div>
 
       <style>{`
-        @keyframes loginSheetSlideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
+        @keyframes promptSlideUp {
+          from { transform: translateY(100%); opacity: 0.9; }
+          to { transform: translateY(0); opacity: 1; }
         }
-        @keyframes loginBackdropFade {
-          from { opacity: 0; }
-          to { opacity: 1; }
+        @keyframes promptFadeScale {
+          from { transform: scale(0.96); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
         }
       `}</style>
     </div>
@@ -191,39 +218,33 @@ const overlayStyle = {
   position: "fixed",
   inset: 0,
   zIndex: 1000300,
-  backgroundColor: "rgba(0, 0, 0, 0.72)",
-  backdropFilter: "blur(8px)",
-  WebkitBackdropFilter: "blur(8px)",
+  backgroundColor: "rgba(0, 0, 0, 0.65)",
+  backdropFilter: "blur(12px)",
+  WebkitBackdropFilter: "blur(12px)",
   display: "flex",
-  flexDirection: "column",
-  justifyContent: "flex-end",
-  alignItems: "center",
-  animation: "loginBackdropFade 0.2s ease"
+  justifyContent: "center",
+  padding: "0"
 };
 
 const cardStyle = {
   width: "100%",
-  maxWidth: "480px",
+  maxWidth: "420px",
   backgroundColor: "#18181b",
-  border: "none",
-  borderRadius: "24px 24px 0 0",
-  padding: "10px 20px max(24px, env(safe-area-inset-bottom, 24px))",
+  padding: "16px 20px max(24px, env(safe-area-inset-bottom, 24px))",
   boxSizing: "border-box",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
   textAlign: "center",
   position: "relative",
-  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.85)",
-  animation: "loginSheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.6), 0 20px 60px rgba(0, 0, 0, 0.7)"
 };
 
 const dragHandleWrapper = {
   width: "100%",
   display: "flex",
   justifyContent: "center",
-  paddingTop: "2px",
-  paddingBottom: "12px",
+  paddingBottom: "14px",
   cursor: "grab"
 };
 
@@ -231,51 +252,52 @@ const dragHandlePill = {
   width: "36px",
   height: "4px",
   borderRadius: "2px",
-  backgroundColor: "#3e4144"
+  backgroundColor: "rgba(255, 255, 255, 0.16)"
 };
 
 const closeBtnStyle = {
   position: "absolute",
   top: "16px",
   right: "16px",
-  background: "rgba(255, 255, 255, 0.08)",
+  background: "rgba(255, 255, 255, 0.06)",
   border: "none",
   borderRadius: "50%",
-  width: "32px",
-  height: "32px",
+  width: "30px",
+  height: "30px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   cursor: "pointer",
-  transition: "0.2s"
+  transition: "all 0.15s ease"
 };
 
 const iconContainerStyle = {
-  width: "56px",
-  height: "56px",
-  borderRadius: "18px",
+  width: "48px",
+  height: "48px",
+  borderRadius: "16px",
   border: "1px solid",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  marginBottom: "14px",
-  marginTop: "4px"
+  marginBottom: "12px",
+  marginTop: "2px",
+  boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)"
 };
 
 const titleStyle = {
-  fontSize: "19px",
-  fontWeight: "800",
-  color: "#d4d4d8",
-  letterSpacing: "-0.3px",
-  marginBottom: "8px"
+  fontSize: "18px",
+  fontWeight: "700",
+  color: "#f4f4f5",
+  letterSpacing: "-0.015em",
+  marginBottom: "6px"
 };
 
 const subtitleStyle = {
-  fontSize: "13.5px",
-  color: "#8e8e93",
+  fontSize: "13px",
+  color: "#a1a1aa",
   lineHeight: "1.45",
   marginBottom: "16px",
-  padding: "0 10px"
+  maxWidth: "340px"
 };
 
 const perksRowStyle = {
@@ -285,52 +307,52 @@ const perksRowStyle = {
 };
 
 const perkPillStyle = {
-  background: "#27272a",
-  border: "1px solid rgba(255, 255, 255, 0.08)",
-  borderRadius: "100px",
+  background: "rgba(255, 255, 255, 0.04)",
+  border: "1px solid rgba(255, 255, 255, 0.07)",
+  borderRadius: "9999px",
   padding: "5px 12px",
   fontSize: "11.5px",
-  color: "#e7e9ea",
+  color: "#d4d4d8",
   display: "flex",
   alignItems: "center",
   gap: "6px",
-  fontWeight: "600"
+  fontWeight: "500"
 };
 
 const actionsContainerStyle = {
   width: "100%",
   display: "flex",
   flexDirection: "column",
-  gap: "10px"
+  gap: "8px"
 };
 
 const primaryBtnStyle = {
   width: "100%",
-  padding: "14px",
+  padding: "13px",
   borderRadius: "9999px",
   border: "none",
-  background: "#e4e4e7",
+  background: "#f4f4f5",
   color: "#09090b",
-  fontSize: "15px",
+  fontSize: "14px",
   fontWeight: "700",
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   gap: "8px",
-  boxShadow: "0 2px 10px rgba(0, 0, 0, 0.2)",
-  transition: "0.2s"
+  boxShadow: "0 2px 10px rgba(0, 0, 0, 0.25)",
+  transition: "all 0.15s ease"
 };
 
 const secondaryBtnStyle = {
   width: "100%",
-  padding: "13px",
+  padding: "11px",
   borderRadius: "9999px",
   border: "none",
-  background: "#27272a",
-  color: "#d4d4d8",
-  fontSize: "14px",
-  fontWeight: "600",
+  background: "transparent",
+  color: "#71717a",
+  fontSize: "13px",
+  fontWeight: "500",
   cursor: "pointer",
-  transition: "0.2s"
+  transition: "all 0.15s ease"
 };

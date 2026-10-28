@@ -49,34 +49,20 @@ export default function AppToast() {
   const isSuccess = toast.type === "success";
   const isError = toast.type === "error";
 
-  // White for success (#f4f4f5), Rose for error/unfollow (#f43f5e), Cyan for info (#00aff0)
-  const accentColor = isSuccess ? "#f4f4f5" : isError ? "#f43f5e" : "#00aff0";
-  const glowColor = isSuccess 
-    ? "rgba(255, 255, 255, 0.18)" 
-    : isError 
-    ? "rgba(244, 63, 94, 0.22)" 
-    : "rgba(0, 175, 240, 0.28)";
-
   return (
     <div 
       style={{
         ...toastWrapperStyle,
         opacity: isExiting ? 0 : 1,
-        transform: isExiting ? "translateX(-50%) translateY(-14px) scale(0.96)" : "translateX(-50%) translateY(0) scale(1)",
-        transition: "opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)"
+        transform: isExiting ? "translateX(-50%) translateY(-12px) scale(0.96)" : "translateX(-50%) translateY(0) scale(1)",
+        transition: "opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1), transform 0.24s cubic-bezier(0.16, 1, 0.3, 1)"
       }}
     >
-      <div 
-        style={{
-          ...toastCardStyle,
-          borderColor: accentColor,
-          boxShadow: `0 8px 30px ${glowColor}, 0 2px 10px rgba(0, 0, 0, 0.7)`
-        }}
-      >
+      <div style={toastCardStyle}>
         <div style={iconBoxStyle}>
-          {isSuccess && <CheckCircle2 size={19} color="#f4f4f5" />}
-          {isError && <AlertCircle size={19} color="#f43f5e" />}
-          {!isSuccess && !isError && <Info size={19} color="#00aff0" />}
+          {isSuccess && <CheckCircle2 size={17} color="#34d399" />}
+          {isError && <AlertCircle size={17} color="#fb7185" />}
+          {!isSuccess && !isError && <Info size={17} color="#38bdf8" />}
         </div>
 
         <div style={textStyle}>
@@ -89,7 +75,7 @@ export default function AppToast() {
           aria-label="Close"
           title="Dismiss"
         >
-          <X size={14} color="#a8a8a8" />
+          <X size={13} color="#a1a1aa" />
         </button>
       </div>
     </div>
@@ -102,7 +88,7 @@ const toastWrapperStyle = {
   left: "50%",
   zIndex: 9999999,
   width: "calc(100% - 32px)",
-  maxWidth: "420px",
+  maxWidth: "380px",
   pointerEvents: "none",
   display: "flex",
   justifyContent: "center",
@@ -111,18 +97,17 @@ const toastWrapperStyle = {
 
 const toastCardStyle = {
   pointerEvents: "auto",
-  background: "rgba(20, 20, 22, 0.96)",
-  backdropFilter: "blur(18px)",
-  WebkitBackdropFilter: "blur(18px)",
-  border: "1.5px solid #333",
-  borderRadius: "14px",
-  padding: "11px 16px",
+  background: "rgba(24, 24, 27, 0.94)",
+  backdropFilter: "blur(16px)",
+  WebkitBackdropFilter: "blur(16px)",
+  border: "1px solid rgba(255, 255, 255, 0.1)",
+  borderRadius: "9999px",
+  padding: "9px 16px",
   display: "flex",
   alignItems: "center",
-  gap: "12px",
-  width: "100%",
-  boxSizing: "border-box",
-  transition: "border-color 0.2s ease, box-shadow 0.2s ease"
+  gap: "10px",
+  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)",
+  boxSizing: "border-box"
 };
 
 const iconBoxStyle = {
@@ -133,24 +118,23 @@ const iconBoxStyle = {
 };
 
 const textStyle = {
-  fontSize: "13.5px",
-  fontWeight: "600",
-  color: "#d4d4d8",
+  fontSize: "13px",
+  fontWeight: "500",
+  color: "#f4f4f5",
   flex: 1,
-  lineHeight: "1.4",
-  wordBreak: "break-word",
-  letterSpacing: "0.1px"
+  lineHeight: "1.35",
+  wordBreak: "break-word"
 };
 
 const closeBtnStyle = {
   background: "none",
   border: "none",
   cursor: "pointer",
-  padding: "4px",
+  padding: "2px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   flexShrink: 0,
-  opacity: 0.8,
+  opacity: 0.7,
   transition: "opacity 0.15s ease"
 };

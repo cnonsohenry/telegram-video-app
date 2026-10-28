@@ -26,8 +26,15 @@ export default function EmailVerificationModal({
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [isVerified, setIsVerified] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(typeof window !== "undefined" ? window.innerWidth >= 640 : false);
 
   const otpInputRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 640);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Initialize email from props/currentUser
   useEffect(() => {
@@ -72,20 +79,20 @@ export default function EmailVerificationModal({
     switch (reason) {
       case "download":
         return {
-          title: "Verify Email to Download",
-          subtitle: "To download videos and save clips for offline watching, please verify your email address.",
+          title: "Verify to Download",
+          subtitle: "Confirm your email address once to unlock fast video downloads and offline clips.",
           badgeIcon: Download
         };
       case "report":
         return {
-          title: "Verify Email to Report",
-          subtitle: "To prevent spam and submit content reports, please verify your email address.",
+          title: "Verify to Report",
+          subtitle: "Confirm your email to submit content feedback and help keep our community safe.",
           badgeIcon: ShieldCheck
         };
       default:
         return {
           title: "Email Verification",
-          subtitle: "Please verify your email address with a 6-digit confirmation code.",
+          subtitle: "Verify your email address with a 6-digit verification code.",
           badgeIcon: Mail
         };
     }
@@ -136,7 +143,7 @@ export default function EmailVerificationModal({
       setOtpSent(true);
       setIsEditingEmail(false);
       setResendCooldown(60);
-      setSuccessMsg(`We sent a 6-digit verification code to ${cleanEmail}`);
+      setSuccessMsg(`We sent a 6-digit code to ${cleanEmail}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -195,35 +202,53 @@ export default function EmailVerificationModal({
   };
 
   const modalContent = (
-    <div style={overlayStyle} onClick={handleSafeClose}>
-      <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
-        {/* Top Drag Handle Indicator */}
-        <div style={dragHandleWrapper}>
-          <div style={dragHandlePill} />
-        </div>
+    <div 
+      style={{
+        ...overlayStyle,
+        alignItems: isDesktop ? "center" : "flex-end"
+      }} 
+      onClick={handleSafeClose}
+    >
+      <div 
+        style={{
+          ...cardStyle,
+          borderRadius: isDesktop ? "22px" : "24px 24px 0 0",
+          border: isDesktop ? "1px solid rgba(255, 255, 255, 0.08)" : "none",
+          animation: isDesktop ? "promptFadeScale 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards" : "promptSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards"
+        }} 
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Mobile Top Drag Handle Indicator */}
+        {!isDesktop && (
+          <div style={dragHandleWrapper}>
+            <div style={dragHandlePill} />
+          </div>
+        )}
 
         {/* Close Button */}
         <button 
           onClick={handleSafeClose}
           style={closeBtnStyle}
           aria-label="Close"
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.12)"}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.06)"}
         >
-          <X size={18} color="#a1a1aa" />
+          <X size={17} color="#a1a1aa" />
         </button>
 
         {/* Icon & Title */}
         <div style={headerSection}>
-          <div style={iconBadgeRose}>
+          <div style={isVerified ? iconBadgeEmerald : iconBadgeSleek}>
             {isVerified ? (
-              <CheckCircle2 size={26} color="#10b981" />
+              <CheckCircle2 size={24} color="#34d399" />
             ) : (
-              <BadgeIcon size={26} color="#f43f5e" />
+              <BadgeIcon size={22} color="#38bdf8" />
             )}
           </div>
-          <h2 style={modalTitle}>{isVerified ? "Email Verified!" : reasonConfig.title}</h2>
+          <h2 style={modalTitle}>{isVerified ? "Email Verified" : reasonConfig.title}</h2>
           <p style={modalSubtitle}>
             {isVerified 
-              ? "Your account is verified. You can now download videos anytime." 
+              ? "Your account is verified. You can now download clips freely." 
               : reasonConfig.subtitle}
           </p>
         </div>
@@ -231,7 +256,7 @@ export default function EmailVerificationModal({
         {/* Error Alert */}
         {error && (
           <div style={errorBanner}>
-            <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0 }} />
+            <AlertCircle size={15} color="#f87171" style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
         )}
@@ -239,7 +264,7 @@ export default function EmailVerificationModal({
         {/* Success Alert */}
         {successMsg && !isVerified && (
           <div style={successBanner}>
-            <CheckCircle2 size={16} color="#10b981" style={{ flexShrink: 0 }} />
+            <CheckCircle2 size={15} color="#34d399" style={{ flexShrink: 0 }} />
             <span>{successMsg}</span>
           </div>
         )}
@@ -251,12 +276,12 @@ export default function EmailVerificationModal({
               <div>
                 <label style={labelStyle}>Email Address</label>
                 <div style={inputWrapper}>
-                  <Mail size={18} color="#71717a" style={inputIconStyle} />
+                  <Mail size={16} color="#71717a" style={inputIconStyle} />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
+                    placeholder="Enter your email"
                     autoFocus
                     required
                     style={textInputStyle}
@@ -265,9 +290,9 @@ export default function EmailVerificationModal({
               </div>
             ) : (
               <div style={emailPreviewCard}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, overflow: "hidden" }}>
-                  <Mail size={18} color="#f43f5e" />
-                  <span style={{ fontSize: "14px", fontWeight: "600", color: "#f4f4f5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
+                  <Mail size={16} color="#38bdf8" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: "13.5px", fontWeight: "600", color: "#f4f4f5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {email}
                   </span>
                 </div>
@@ -275,8 +300,10 @@ export default function EmailVerificationModal({
                   type="button"
                   onClick={() => setIsEditingEmail(true)}
                   style={changeBtnStyle}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.05)"}
                 >
-                  <Edit2 size={13} style={{ marginRight: "4px" }} />
+                  <Edit2 size={12} style={{ marginRight: "4px" }} />
                   Change
                 </button>
               </div>
@@ -287,19 +314,25 @@ export default function EmailVerificationModal({
               disabled={loading}
               style={{
                 ...primaryActionBtn,
-                opacity: loading ? 0.7 : 1,
+                opacity: loading ? 0.6 : 1,
                 cursor: loading ? "not-allowed" : "pointer"
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) e.currentTarget.style.backgroundColor = "#ffffff";
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) e.currentTarget.style.backgroundColor = "#f4f4f5";
               }}
             >
               {loading ? (
                 <>
-                  <Loader2 size={18} className="spin-animation" style={{ marginRight: "8px" }} />
-                  Sending Code...
+                  <Loader2 size={16} className="spin-animation" style={{ marginRight: "8px" }} />
+                  Sending code...
                 </>
               ) : (
                 <>
-                  Send 6-Digit Code
-                  <ArrowRight size={17} style={{ marginLeft: "8px" }} />
+                  Send Verification Code
+                  <ArrowRight size={15} style={{ marginLeft: "8px" }} />
                 </>
               )}
             </button>
@@ -318,7 +351,7 @@ export default function EmailVerificationModal({
                     setOtpSent(false);
                     setIsEditingEmail(true);
                   }}
-                  style={{ background: "none", border: "none", color: "#a1a1aa", fontSize: "12px", cursor: "pointer", textDecoration: "underline" }}
+                  style={{ background: "none", border: "none", color: "#71717a", fontSize: "12px", cursor: "pointer", textDecoration: "underline" }}
                 >
                   Change email
                 </button>
@@ -334,7 +367,7 @@ export default function EmailVerificationModal({
                   const val = e.target.value.replace(/\D/g, "").slice(0, 6);
                   setOtpCode(val);
                 }}
-                placeholder="• • • • • •"
+                placeholder="0 0 0 0 0 0"
                 style={otpInputStyle}
                 required
               />
@@ -345,13 +378,19 @@ export default function EmailVerificationModal({
               disabled={loading || otpCode.length < 6}
               style={{
                 ...primaryActionBtn,
-                opacity: loading || otpCode.length < 6 ? 0.6 : 1,
+                opacity: loading || otpCode.length < 6 ? 0.45 : 1,
                 cursor: loading || otpCode.length < 6 ? "not-allowed" : "pointer"
+              }}
+              onMouseEnter={(e) => {
+                if (!loading && otpCode.length >= 6) e.currentTarget.style.backgroundColor = "#ffffff";
+              }}
+              onMouseLeave={(e) => {
+                if (!loading && otpCode.length >= 6) e.currentTarget.style.backgroundColor = "#f4f4f5";
               }}
             >
               {loading ? (
                 <>
-                  <Loader2 size={18} className="spin-animation" style={{ marginRight: "8px" }} />
+                  <Loader2 size={16} className="spin-animation" style={{ marginRight: "8px" }} />
                   Verifying...
                 </>
               ) : (
@@ -360,9 +399,9 @@ export default function EmailVerificationModal({
             </button>
 
             {/* Resend Cooldown */}
-            <div style={{ textAlign: "center", marginTop: "4px" }}>
+            <div style={{ textAlign: "center", marginTop: "2px" }}>
               {resendCooldown > 0 ? (
-                <span style={{ fontSize: "13px", color: "#71717a" }}>
+                <span style={{ fontSize: "12.5px", color: "#71717a" }}>
                   Resend code in <strong style={{ color: "#a1a1aa" }}>{resendCooldown}s</strong>
                 </span>
               ) : (
@@ -372,7 +411,7 @@ export default function EmailVerificationModal({
                   disabled={loading}
                   style={resendBtnStyle}
                 >
-                  <RefreshCw size={13} style={{ marginRight: "5px" }} />
+                  <RefreshCw size={12} style={{ marginRight: "5px" }} />
                   Resend verification code
                 </button>
               )}
@@ -382,16 +421,24 @@ export default function EmailVerificationModal({
 
         {/* STEP 3: Verified Checkmark Screen */}
         {isVerified && (
-          <div style={{ textAlign: "center", padding: "10px 0" }}>
-            <div style={{ fontSize: "14px", color: "#10b981", fontWeight: "600", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-              <CheckCircle2 size={18} />
-              Verified successfully! Unlocking...
+          <div style={{ textAlign: "center", padding: "12px 0 6px 0" }}>
+            <div style={{ fontSize: "13.5px", color: "#34d399", fontWeight: "600", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+              <CheckCircle2 size={16} />
+              Unlocked! Ready to continue...
             </div>
           </div>
         )}
       </div>
 
       <style>{`
+        @keyframes promptSlideUp {
+          from { transform: translateY(100%); opacity: 0.9; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes promptFadeScale {
+          from { transform: scale(0.96); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
@@ -408,28 +455,25 @@ export default function EmailVerificationModal({
     : modalContent;
 }
 
-// 🖌 STYLES (Strictly conforming to Calm Black #09090b, elevated #18181b, interactive #27272a, smooth crimson #f43f5e)
+// 🖌 SLEEK, LIGHT, AIRY STYLING (Calm Black #09090b, elevated #18181b, clean zinc surfaces, soft sky accent)
 const overlayStyle = {
   position: "fixed",
   inset: 0,
   zIndex: 1000320,
-  backgroundColor: "rgba(0, 0, 0, 0.75)",
-  backdropFilter: "blur(8px)",
-  WebkitBackdropFilter: "blur(8px)",
+  backgroundColor: "rgba(0, 0, 0, 0.65)",
+  backdropFilter: "blur(12px)",
+  WebkitBackdropFilter: "blur(12px)",
   display: "flex",
-  alignItems: "flex-end",
-  justifyContent: "center"
+  justifyContent: "center",
+  padding: "0"
 };
 
 const cardStyle = {
   width: "100%",
-  maxWidth: "460px",
+  maxWidth: "420px",
   backgroundColor: "#18181b",
-  borderTopLeftRadius: "24px",
-  borderTopRightRadius: "24px",
-  border: "none",
-  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.85)",
-  padding: "16px 20px 28px 20px",
+  boxShadow: "0 -10px 40px rgba(0, 0, 0, 0.6), 0 20px 60px rgba(0, 0, 0, 0.7)",
+  padding: "16px 20px 24px 20px",
   position: "relative",
   boxSizing: "border-box",
   color: "#f4f4f5",
@@ -440,30 +484,30 @@ const dragHandleWrapper = {
   width: "100%",
   display: "flex",
   justifyContent: "center",
-  paddingBottom: "12px"
+  paddingBottom: "14px"
 };
 
 const dragHandlePill = {
   width: "36px",
   height: "4px",
   borderRadius: "2px",
-  backgroundColor: "rgba(255, 255, 255, 0.2)"
+  backgroundColor: "rgba(255, 255, 255, 0.16)"
 };
 
 const closeBtnStyle = {
   position: "absolute",
   top: "16px",
   right: "16px",
-  background: "rgba(255, 255, 255, 0.08)",
+  background: "rgba(255, 255, 255, 0.06)",
   border: "none",
   borderRadius: "50%",
-  width: "32px",
-  height: "32px",
+  width: "30px",
+  height: "30px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   cursor: "pointer",
-  transition: "background 0.2s ease"
+  transition: "all 0.15s ease"
 };
 
 const headerSection = {
@@ -474,24 +518,38 @@ const headerSection = {
   marginBottom: "18px"
 };
 
-const iconBadgeRose = {
-  width: "56px",
-  height: "56px",
-  borderRadius: "50%",
-  backgroundColor: "rgba(244, 63, 94, 0.12)",
-  border: "1px solid rgba(244, 63, 94, 0.25)",
+const iconBadgeSleek = {
+  width: "48px",
+  height: "48px",
+  borderRadius: "16px",
+  backgroundColor: "rgba(56, 189, 248, 0.08)",
+  border: "1px solid rgba(56, 189, 248, 0.18)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  marginBottom: "12px"
+  marginBottom: "12px",
+  boxShadow: "0 4px 16px rgba(56, 189, 248, 0.06)"
+};
+
+const iconBadgeEmerald = {
+  width: "48px",
+  height: "48px",
+  borderRadius: "16px",
+  backgroundColor: "rgba(16, 185, 129, 0.1)",
+  border: "1px solid rgba(16, 185, 129, 0.25)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  marginBottom: "12px",
+  boxShadow: "0 4px 16px rgba(16, 185, 129, 0.08)"
 };
 
 const modalTitle = {
-  fontSize: "19px",
-  fontWeight: "800",
+  fontSize: "18px",
+  fontWeight: "700",
   color: "#f4f4f5",
-  margin: "0 0 6px 0",
-  letterSpacing: "-0.01em"
+  margin: "0 0 5px 0",
+  letterSpacing: "-0.015em"
 };
 
 const modalSubtitle = {
@@ -499,17 +557,17 @@ const modalSubtitle = {
   color: "#a1a1aa",
   margin: 0,
   lineHeight: "1.45",
-  maxWidth: "360px"
+  maxWidth: "340px"
 };
 
 const labelStyle = {
   display: "block",
-  fontSize: "12px",
+  fontSize: "11px",
   fontWeight: "600",
-  color: "#a1a1aa",
+  color: "#71717a",
   marginBottom: "6px",
   textTransform: "uppercase",
-  letterSpacing: "0.04em"
+  letterSpacing: "0.05em"
 };
 
 const inputWrapper = {
@@ -527,14 +585,15 @@ const inputIconStyle = {
 
 const textInputStyle = {
   width: "100%",
-  padding: "12px 14px 12px 42px",
-  backgroundColor: "#27272a",
+  padding: "11px 14px 11px 40px",
+  backgroundColor: "rgba(255, 255, 255, 0.04)",
   border: "1px solid rgba(255, 255, 255, 0.08)",
   borderRadius: "12px",
   color: "#f4f4f5",
   fontSize: "14px",
   outline: "none",
-  boxSizing: "border-box"
+  boxSizing: "border-box",
+  transition: "border-color 0.15s ease"
 };
 
 const emailPreviewCard = {
@@ -542,80 +601,83 @@ const emailPreviewCard = {
   alignItems: "center",
   justifyContent: "space-between",
   padding: "10px 14px",
-  backgroundColor: "#27272a",
-  border: "1px solid rgba(255, 255, 255, 0.08)",
+  backgroundColor: "rgba(255, 255, 255, 0.04)",
+  border: "1px solid rgba(255, 255, 255, 0.07)",
   borderRadius: "12px",
   width: "100%",
   boxSizing: "border-box"
 };
 
 const changeBtnStyle = {
-  background: "rgba(255, 255, 255, 0.08)",
-  border: "none",
-  color: "#e4e4e7",
+  background: "rgba(255, 255, 255, 0.05)",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
+  color: "#d4d4d8",
   fontSize: "12px",
   fontWeight: "600",
   padding: "5px 10px",
-  borderRadius: "6px",
+  borderRadius: "8px",
   cursor: "pointer",
   display: "flex",
-  alignItems: "center"
+  alignItems: "center",
+  transition: "all 0.15s ease"
 };
 
 const otpInputStyle = {
   width: "100%",
   padding: "12px 14px",
-  backgroundColor: "#27272a",
-  border: "1px solid rgba(255, 255, 255, 0.12)",
-  borderRadius: "12px",
+  backgroundColor: "rgba(255, 255, 255, 0.04)",
+  border: "1px solid rgba(255, 255, 255, 0.1)",
+  borderRadius: "14px",
   color: "#f4f4f5",
-  fontSize: "22px",
-  fontWeight: "800",
-  letterSpacing: "8px",
+  fontSize: "20px",
+  fontWeight: "700",
+  letterSpacing: "10px",
   textAlign: "center",
-  fontFamily: "monospace",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
   outline: "none",
-  boxSizing: "border-box"
+  boxSizing: "border-box",
+  transition: "border-color 0.15s ease"
 };
 
 const primaryActionBtn = {
   width: "100%",
   padding: "12px",
-  backgroundColor: "#f43f5e",
+  backgroundColor: "#f4f4f5",
   border: "none",
-  borderRadius: "12px",
-  color: "#ffffff",
+  borderRadius: "9999px",
+  color: "#09090b",
   fontWeight: "700",
   fontSize: "14px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  transition: "all 0.2s ease",
-  boxShadow: "0 2px 12px rgba(225, 29, 72, 0.25)"
+  transition: "all 0.15s ease",
+  boxShadow: "0 2px 10px rgba(0, 0, 0, 0.25)"
 };
 
 const resendBtnStyle = {
   background: "none",
   border: "none",
-  color: "#f43f5e",
-  fontSize: "13px",
+  color: "#38bdf8",
+  fontSize: "12.5px",
   fontWeight: "600",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
-  padding: "4px"
+  padding: "4px",
+  transition: "opacity 0.15s ease"
 };
 
 const errorBanner = {
   display: "flex",
   alignItems: "center",
   gap: "8px",
-  backgroundColor: "rgba(239, 68, 68, 0.1)",
-  border: "1px solid rgba(239, 68, 68, 0.25)",
+  backgroundColor: "rgba(239, 68, 68, 0.08)",
+  border: "1px solid rgba(239, 68, 68, 0.2)",
   borderRadius: "10px",
-  padding: "10px 12px",
+  padding: "9px 12px",
   color: "#fca5a5",
-  fontSize: "13px",
+  fontSize: "12.5px",
   marginBottom: "12px"
 };
 
@@ -623,11 +685,11 @@ const successBanner = {
   display: "flex",
   alignItems: "center",
   gap: "8px",
-  backgroundColor: "rgba(16, 185, 129, 0.1)",
-  border: "1px solid rgba(16, 185, 129, 0.25)",
+  backgroundColor: "rgba(16, 185, 129, 0.08)",
+  border: "1px solid rgba(16, 185, 129, 0.2)",
   borderRadius: "10px",
-  padding: "10px 12px",
+  padding: "9px 12px",
   color: "#6ee7b7",
-  fontSize: "13px",
+  fontSize: "12.5px",
   marginBottom: "12px"
 };
