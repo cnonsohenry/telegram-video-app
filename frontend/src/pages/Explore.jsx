@@ -264,7 +264,13 @@ export default function Explore({
   const [showDiscoverModal, setShowDiscoverModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [reportedVideo, setReportedVideo] = useState(null);
-  const handleOpenReport = useCallback((v) => setReportedVideo(v), []);
+  const handleOpenReport = useCallback((v) => {
+    if (!localStorage.getItem("token")) {
+      promptLogin("report");
+      return;
+    }
+    setReportedVideo(v);
+  }, []);
   const [optionsVideo, setOptionsVideo] = useState(null);
   const handleOpenOptions = useCallback((v) => setOptionsVideo(v), []);
 
@@ -1786,6 +1792,10 @@ export default function Explore({
           onClose={() => setOptionsVideo(null)}
           onReport={(v) => {
             setOptionsVideo(null);
+            if (!localStorage.getItem("token")) {
+              promptLogin("report");
+              return;
+            }
             setReportedVideo(v);
           }}
           onNotInterested={handleNotInterested}

@@ -462,51 +462,101 @@ router.put("/video/:identifier", authenticateToken, isAdmin, async (req, res) =>
   }
 });
 
-// 🟢 7. DELETE VIDEO (With Transaction)
-router.delete("/video/:identifier", authenticateToken, isAdmin, async (req, res) => {
-  const client = await pool.connect();
-  try {
-    const { identifier } = req.params;
-    await client.query('BEGIN');
+// 🟢 HELPER: Purge Video, Album Siblings, Interactions, and Cloudflare R2 Media
+export async function purgeVideoAndInteractions(identifier) {
+  if (!identifier) return { deletedCount: 0 };
 
-    // Find the exact message_id first to cleanly wipe dependencies
-    const videoQuery = await client.query(
-      "SELECT message_id, cloudflare_id FROM videos WHERE message_id = $1 OR id::text = $1",
-      [identifier]
-    );
+  // 1. Locate video by message_id or id
+  const videoQuery = await pool.query(
+    "SELECT id, message_id, media_group_id, cloudflare_id FROM videos WHERE message_id = $1 OR id::text = $1",
+    [String(identifier)]
+  );
 
-    if (videoQuery.rowCount === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: "Video not found" });
+  let targetIds = [];
+  let targetMessageIds = [];
+  let targetCloudflareIds = [];
+
+  if (videoQuery.rows.length > 0) {
+    const primary = videoQuery.rows[0];
+    const mediaGroupId = primary.media_group_id;
+
+    if (mediaGroupId && mediaGroupId !== 'none') {
+      // Find all sibling clips in this album/post to prevent partial album remnants
+      const groupRes = await pool.query(
+        "SELECT id, message_id, cloudflare_id FROM videos WHERE media_group_id = $1",
+        [mediaGroupId]
+      );
+      targetIds = groupRes.rows.map(r => r.id);
+      targetMessageIds = [...new Set(groupRes.rows.map(r => r.message_id).filter(Boolean))];
+      targetCloudflareIds = [...new Set(groupRes.rows.map(r => r.cloudflare_id).filter(Boolean))];
+    } else {
+      targetIds = videoQuery.rows.map(r => r.id);
+      targetMessageIds = [...new Set(videoQuery.rows.map(r => r.message_id).filter(Boolean))];
+      targetCloudflareIds = [...new Set(videoQuery.rows.map(r => r.cloudflare_id).filter(Boolean))];
     }
+  } else {
+    targetMessageIds = [String(identifier)];
+  }
 
-    const targetMessageId = videoQuery.rows[0].message_id;
-    const targetCloudflareId = videoQuery.rows[0].cloudflare_id;
+  // 2. Delete all interactions tied to this video
+  if (targetMessageIds.length > 0) {
+    await pool.query("DELETE FROM likes WHERE message_id = ANY($1::text[])", [targetMessageIds]);
+    await pool.query("DELETE FROM saves WHERE message_id = ANY($1::text[])", [targetMessageIds]);
+    await pool.query("DELETE FROM comments WHERE message_id = ANY($1::text[])", [targetMessageIds]);
+    await pool.query("DELETE FROM video_play_tokens WHERE message_id::text = ANY($1::text[])", [targetMessageIds]);
+  }
 
-    // Delete interactions tied to this video to prevent foreign key constraint errors
-    await client.query("DELETE FROM likes WHERE message_id = $1", [targetMessageId]);
-    await client.query("DELETE FROM saves WHERE message_id = $1", [targetMessageId]);
-    await client.query("DELETE FROM comments WHERE message_id = $1", [targetMessageId]);
+  // 3. Delete from videos table
+  let deletedCount = 0;
+  if (targetIds.length > 0) {
+    const delRes = await pool.query(
+      "DELETE FROM videos WHERE id = ANY($1::int[]) OR message_id = ANY($2::text[])",
+      [targetIds, targetMessageIds]
+    );
+    deletedCount = delRes.rowCount;
+  } else if (targetMessageIds.length > 0) {
+    const delRes = await pool.query(
+      "DELETE FROM videos WHERE message_id = ANY($1::text[])",
+      [targetMessageIds]
+    );
+    deletedCount = delRes.rowCount;
+  }
 
-    // Now delete the actual video
-    await client.query("DELETE FROM videos WHERE message_id = $1", [targetMessageId]);
-
-    await client.query('COMMIT');
-
-    // Clean up R2 objects if hosted on R2
-    if (targetCloudflareId && targetCloudflareId.startsWith("r2:")) {
-      deleteMediaFromR2(targetCloudflareId, targetMessageId).catch(e => 
-        console.warn("R2 async delete warning:", e.message)
+  // 4. Clean up Cloudflare R2 video and thumbnail assets
+  for (let i = 0; i < targetCloudflareIds.length; i++) {
+    const cfId = targetCloudflareIds[i];
+    const mId = targetMessageIds[i] || "";
+    if (cfId && cfId.startsWith("r2:")) {
+      deleteMediaFromR2(cfId, mId).catch(e => 
+        console.warn(`[PURGE R2 WARNING] ${cfId}:`, e.message)
       );
     }
+  }
 
-    res.json({ success: true });
+  // 5. Automatically mark any pending reports on this video as actioned_deleted
+  if (targetMessageIds.length > 0 || targetIds.length > 0) {
+    const reportMatchTerms = [...targetMessageIds, ...targetIds.map(String)];
+    await pool.query(
+      "UPDATE video_reports SET status = 'actioned_deleted' WHERE message_id = ANY($1::text[])",
+      [reportMatchTerms]
+    );
+  }
+
+  return { deletedCount, targetIds, targetMessageIds };
+}
+
+// 🟢 7. DELETE VIDEO (With Complete Cascade & R2 Cleanup)
+router.delete("/video/:identifier", authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const result = await purgeVideoAndInteractions(identifier);
+    if (result.deletedCount === 0 && (!result.targetIds || result.targetIds.length === 0)) {
+      return res.status(404).json({ error: "Video not found or already deleted." });
+    }
+    res.json({ success: true, message: "Video and associated assets permanently deleted.", deletedCount: result.deletedCount });
   } catch (err) {
-    await client.query('ROLLBACK');
     console.error("Delete failed", err);
     res.status(500).json({ error: "Delete failed" });
-  } finally {
-    client.release();
   }
 });
 
@@ -1243,23 +1293,50 @@ router.get("/search", authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-// 🟢 12. GET REPORTS
+// 🟢 12. GET REPORTS (With Status Filtering & Aggregate Counts)
 router.get("/reports", authenticateToken, isAdmin, async (req, res) => {
   try {
+    const status = req.query.status || "pending";
+    let statusClause = "WHERE r.status = 'pending'";
+    let queryParams = [];
+
+    if (status === "all") {
+      statusClause = "";
+    } else if (status === "actioned_deleted" || status === "dismissed" || status === "actioned_banned") {
+      statusClause = "WHERE r.status = $1";
+      queryParams = [status];
+    } else if (status === "resolved") {
+      statusClause = "WHERE r.status IN ('actioned_deleted', 'actioned_banned', 'dismissed')";
+    }
+
     const reports = await pool.query(`
       SELECT r.*, 
              v.caption, v.category, v.views, v.cloudflare_id, v.chat_id, v.status as video_status,
              u.username as uploader_username, u.display_name as uploader_display_name,
              rep.username as reporter_username, rep.email as reporter_email
       FROM video_reports r
-      LEFT JOIN videos v ON r.message_id = v.message_id
+      LEFT JOIN videos v ON (r.message_id = v.message_id OR r.message_id = v.id::text)
       LEFT JOIN app_users u ON (v.uploader_id = u.id OR v.uploader_id = u.telegram_user_id)
       LEFT JOIN app_users rep ON r.reporter_id = rep.id
+      ${statusClause}
       ORDER BY r.created_at DESC
       LIMIT 100
+    `, queryParams);
+
+    const countsRes = await pool.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'pending') as pending_count,
+        COUNT(*) FILTER (WHERE status = 'actioned_deleted' OR status = 'actioned_banned') as actioned_count,
+        COUNT(*) FILTER (WHERE status = 'dismissed') as dismissed_count,
+        COUNT(*) as total_count
+      FROM video_reports
     `);
 
-    res.json({ success: true, reports: reports.rows });
+    res.json({ 
+      success: true, 
+      reports: reports.rows,
+      counts: countsRes.rows[0]
+    });
   } catch (err) {
     console.error("[GET REPORTS ERROR]", err);
     res.status(500).json({ error: "Failed to fetch reports" });
@@ -1277,7 +1354,7 @@ router.post("/reports/:id/dismiss", authenticateToken, isAdmin, async (req, res)
   }
 });
 
-// 🟢 14. ACTION REPORT: DELETE VIDEO
+// 🟢 14. ACTION REPORT: DELETE VIDEO (Cascade Purge + R2 Asset Deletion)
 router.post("/reports/:id/delete-video", authenticateToken, isAdmin, async (req, res) => {
   try {
     const reportId = req.params.id;
@@ -1286,15 +1363,19 @@ router.post("/reports/:id/delete-video", authenticateToken, isAdmin, async (req,
 
     const message_id = rRes.rows[0].message_id;
 
-    // Delete interactions and video
-    await pool.query("DELETE FROM likes WHERE message_id = $1", [message_id]);
-    await pool.query("DELETE FROM saves WHERE message_id = $1", [message_id]);
-    await pool.query("DELETE FROM comments WHERE message_id = $1", [message_id]);
-    await pool.query("DELETE FROM videos WHERE message_id = $1", [message_id]);
-    await pool.query("UPDATE video_reports SET status = 'actioned_deleted' WHERE message_id = $1", [message_id]);
+    // Purge video, album siblings, interactions, and Cloudflare R2 media
+    const purgeRes = await purgeVideoAndInteractions(message_id);
 
-    res.json({ success: true, message: "Video deleted and reports resolved." });
+    // Explicitly update report status to actioned_deleted
+    await pool.query("UPDATE video_reports SET status = 'actioned_deleted' WHERE id = $1", [reportId]);
+
+    res.json({ 
+      success: true, 
+      message: "Video and Cloudflare R2 assets permanently deleted, and report marked resolved.",
+      deletedCount: purgeRes.deletedCount
+    });
   } catch (err) {
+    console.error("[REPORT DELETE-VIDEO ERROR]", err);
     res.status(500).json({ error: "Failed to delete reported video" });
   }
 });
@@ -1306,7 +1387,7 @@ router.post("/reports/:id/ban-creator", authenticateToken, isAdmin, async (req, 
     const rRes = await pool.query(`
       SELECT r.message_id, v.uploader_id 
       FROM video_reports r
-      LEFT JOIN videos v ON r.message_id = v.message_id
+      LEFT JOIN videos v ON (r.message_id = v.message_id OR r.message_id = v.id::text)
       WHERE r.id = $1
     `, [reportId]);
 
@@ -1322,15 +1403,14 @@ router.post("/reports/:id/ban-creator", authenticateToken, isAdmin, async (req, 
     }
 
     if (message_id) {
-      await pool.query("DELETE FROM likes WHERE message_id = $1", [message_id]);
-      await pool.query("DELETE FROM saves WHERE message_id = $1", [message_id]);
-      await pool.query("DELETE FROM comments WHERE message_id = $1", [message_id]);
-      await pool.query("DELETE FROM videos WHERE message_id = $1", [message_id]);
-      await pool.query("UPDATE video_reports SET status = 'actioned_banned' WHERE message_id = $1", [message_id]);
+      await purgeVideoAndInteractions(message_id);
     }
 
-    res.json({ success: true, message: "Creator banned and reported video deleted." });
+    await pool.query("UPDATE video_reports SET status = 'actioned_banned' WHERE id = $1", [reportId]);
+
+    res.json({ success: true, message: "Creator banned and reported video permanently deleted." });
   } catch (err) {
+    console.error("[REPORT BAN-CREATOR ERROR]", err);
     res.status(500).json({ error: "Failed to ban creator" });
   }
 });

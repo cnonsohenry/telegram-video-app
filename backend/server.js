@@ -1430,7 +1430,11 @@ app.get('/v/:message_id', async (req, res) => {
       SELECT v.*, u.username as uploader_name
       FROM videos v
       LEFT JOIN users u ON v.uploader_id = u.user_id
-      WHERE v.message_id = $1 LIMIT 1
+      WHERE (v.message_id = $1 OR v.id::text = $1)
+        AND (v.status = 'ready' OR v.status IS NULL)
+        AND (v.status != 'flagged' AND v.status != 'deleted')
+        AND (v.flags_count < 5 OR v.flags_count IS NULL)
+      LIMIT 1
     `, [message_id]);
 
     if (!result.rows.length) return res.redirect(302, '/');
@@ -1647,10 +1651,16 @@ app.get('/embed/:message_id', async (req, res) => {
 });
 
 /* =====================
+   HELPER: Universal Content Safety Filter
+   Strictly hides deleted, flagged, high-flag, or banned-creator videos across all feeds
+===================== */
+const VIDEO_SAFE_SQL = `(v.status = 'ready' OR v.status IS NULL) AND (v.status != 'flagged' AND v.status != 'deleted') AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au_ban WHERE (v.uploader_id::text = au_ban.id::text OR v.uploader_id::text = au_ban.telegram_user_id::text) AND au_ban.is_banned = TRUE)`;
+
+/* =====================
    HELPER: Community Content Filter
    Matches all contents posted by web creators (flagged is_community)
 ===================== */
-const IS_COMMUNITY_SQL = `(v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND (au.is_banned IS NOT TRUE OR au.is_banned IS NULL))`;
+const IS_COMMUNITY_SQL = `(v.is_community = TRUE AND ${VIDEO_SAFE_SQL})`;
 
 /* =====================
    HELPER: Base Mapper (Used by Videos, Suggestions & Groups)
@@ -1781,10 +1791,10 @@ app.get("/api/videos", async (req, res) => {
     
     const isCommunity = req.query.community === "true" || category === "community";
     const communityCondition = isCommunity 
-      ? "(v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au WHERE (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text) AND au.is_banned = TRUE))" 
+      ? `(v.is_community = TRUE AND ${VIDEO_SAFE_SQL})` 
       : (category === "amateurs" || category === "amateur")
-        ? "((v.is_community IS NOT TRUE) OR (v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND NOT EXISTS (SELECT 1 FROM app_users au WHERE (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text) AND au.is_banned = TRUE)))"
-        : "(v.is_community IS NOT TRUE)";
+        ? `(${VIDEO_SAFE_SQL})`
+        : `(v.is_community IS NOT TRUE AND ${VIDEO_SAFE_SQL})`;
     
     const apiBaseUrl = process.env.API_BASE_URL;
 
@@ -2086,6 +2096,9 @@ app.get("/api/group", async (req, res) => {
       LEFT JOIN users u ON v.uploader_id = u.user_id 
       LEFT JOIN app_users au ON (v.uploader_id = au.id OR v.uploader_id = au.telegram_user_id)
       WHERE v.media_group_id = $1 
+        AND (v.status = 'ready' OR v.status IS NULL)
+        AND (v.status != 'flagged' AND v.status != 'deleted')
+        AND (v.flags_count < 5 OR v.flags_count IS NULL) 
       ORDER BY v.created_at ASC
     `;
     const { rows } = await pool.query(query, [media_group_id]);
@@ -2243,7 +2256,9 @@ app.get("/api/search", async (req, res) => {
     // 2. Search Videos if type is 'all' or 'videos'
     if (type === "all" || type === "videos") {
       const isCommunity = req.query.community === "true" || req.query.category === "community";
-      const communityCondition = isCommunity ? "v.is_community = TRUE AND (v.status = 'ready' OR v.status IS NULL) AND (v.flags_count < 5 OR v.flags_count IS NULL) AND (au.is_banned IS NOT TRUE OR au.is_banned IS NULL)" : "(v.is_community IS NOT TRUE)";
+      const communityCondition = isCommunity 
+        ? `(v.is_community = TRUE AND ${VIDEO_SAFE_SQL})` 
+        : `(${VIDEO_SAFE_SQL})`;
 
       const videoParams = [searchParam]; // $1 = '%cleanQ%'
       const videoTokenConditions = [];
@@ -2648,8 +2663,8 @@ app.post("/api/comments/:comment_id/like", authenticateToken, async (req, res) =
   }
 });
 
-// 🟢 REPORT A VIDEO FOR ABUSE / COPYRIGHT / ILLEGAL CONTENT (Deduplicated & Rate-Limited)
-app.post("/api/videos/:message_id/report", reportLimiter, async (req, res) => {
+// 🟢 REPORT A VIDEO FOR ABUSE / COPYRIGHT / ILLEGAL CONTENT (Strictly Registered & Email Verified Only)
+app.post("/api/videos/:message_id/report", authenticateToken, reportLimiter, async (req, res) => {
   try {
     const { message_id } = req.params;
     const { reason, details } = req.body;
@@ -2658,14 +2673,31 @@ app.post("/api/videos/:message_id/report", reportLimiter, async (req, res) => {
       return res.status(400).json({ error: "Please select a reason for reporting." });
     }
 
-    // Extract user id if logged in
-    let reporterId = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
-      try {
-        const decoded = jwt.verify(authHeader.split(" ")[1], JWT_SECRET);
-        reporterId = decoded.id;
-      } catch (e) {}
+    // 🛑 STRICT REQUIREMENT: Only registered, email-verified accounts can report posts
+    const reporterId = req.user?.id;
+    if (!reporterId) {
+      return res.status(401).json({ error: "Please log in to report content." });
+    }
+
+    const userRes = await pool.query(
+      "SELECT id, username, email, COALESCE(email_verified, FALSE) as email_verified, role, is_banned FROM app_users WHERE id = $1",
+      [reporterId]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(401).json({ error: "Account not found. Please log in." });
+    }
+
+    const reporter = userRes.rows[0];
+    if (reporter.is_banned) {
+      return res.status(403).json({ error: "Your account is suspended." });
+    }
+
+    if (!reporter.email_verified && reporter.role !== "admin") {
+      return res.status(403).json({
+        error: "Only registered and email-verified accounts can report content. Please verify your email in Settings.",
+        requires_email_verification: true
+      });
     }
 
     const rawIp = req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "";
@@ -2673,48 +2705,50 @@ app.post("/api/videos/:message_id/report", reportLimiter, async (req, res) => {
     const cleanReason = String(reason).trim().slice(0, 100);
     const cleanDetails = details ? String(details).trim().slice(0, 500) : "";
 
-    // Verify video exists
-    const vidCheck = await pool.query("SELECT id, message_id, flags_count FROM videos WHERE message_id = $1 LIMIT 1", [message_id]);
+    // Verify video exists by message_id OR id
+    const vidCheck = await pool.query(
+      "SELECT id, message_id, flags_count FROM videos WHERE message_id = $1 OR id::text = $1 LIMIT 1",
+      [message_id]
+    );
     if (vidCheck.rows.length === 0) {
       return res.status(404).json({ error: "Video not found." });
     }
 
-    // 🛑 ANTI-ABUSE DEDUPLICATION: Check if this user OR this IP has already reported this video
+    const actualMessageId = vidCheck.rows[0].message_id;
+
+    // 🛑 ANTI-ABUSE DEDUPLICATION: Check if this verified user has already reported this video
     const dupCheck = await pool.query(
       `SELECT id FROM video_reports 
-       WHERE message_id = $1 AND (
-         ($2::BIGINT IS NOT NULL AND reporter_id = $2::BIGINT) OR 
-         ($3::TEXT != '' AND reporter_ip = $3::TEXT AND created_at > NOW() - INTERVAL '30 days')
-       ) LIMIT 1`,
-      [message_id, reporterId, reporterIp]
+       WHERE message_id = $1 AND reporter_id = $2::BIGINT LIMIT 1`,
+      [actualMessageId, reporterId]
     );
 
     if (dupCheck.rows.length > 0) {
-      return res.json({ success: true, message: "A report for this video has already been recorded and is under review." });
+      return res.json({ 
+        success: true, 
+        message: "You have already submitted a report for this video. Our moderation team is reviewing it." 
+      });
     }
 
     // Insert unique report
     await pool.query(
       `INSERT INTO video_reports (message_id, reporter_id, reporter_ip, reason, details, status)
        VALUES ($1, $2, $3, $4, $5, 'pending')`,
-      [message_id, reporterId, reporterIp, cleanReason, cleanDetails]
+      [actualMessageId, reporterId, reporterIp, cleanReason, cleanDetails]
     );
 
-    // 🛑 ANTI-CENSORSHIP GUARD: Only increment flags_count if reported by an AUTHENTICATED account
-    // This prevents anonymous bot IP rotation from suppressing community creator content
-    if (reporterId) {
-      const updateRes = await pool.query(
-        `UPDATE videos 
-         SET flags_count = COALESCE(flags_count, 0) + 1,
-             status = CASE WHEN COALESCE(flags_count, 0) + 1 >= 10 THEN 'flagged' ELSE status END
-         WHERE message_id = $1 
-         RETURNING flags_count, status`,
-        [message_id]
-      );
+    // Increment flags_count on the video and flag automatically if threshold reached
+    const updateRes = await pool.query(
+      `UPDATE videos 
+       SET flags_count = COALESCE(flags_count, 0) + 1,
+           status = CASE WHEN COALESCE(flags_count, 0) + 1 >= 5 THEN 'flagged' ELSE status END
+       WHERE message_id = $1 OR id::text = $1
+       RETURNING flags_count, status`,
+      [actualMessageId]
+    );
 
-      if (updateRes.rows.length > 0 && updateRes.rows[0].flags_count >= 10) {
-        console.warn(`⚠️ [AUTO-MODERATION] Video ${message_id} reached 10 authenticated flags and was flagged for review.`);
-      }
+    if (updateRes.rows.length > 0 && updateRes.rows[0].flags_count >= 5) {
+      console.warn(`⚠️ [AUTO-MODERATION] Video ${actualMessageId} reached 5 authenticated flags and was flagged for moderation review.`);
     }
 
     return res.json({ 

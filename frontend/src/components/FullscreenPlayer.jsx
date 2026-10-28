@@ -965,12 +965,16 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 style={{ ...playerMenuItem, color: '#f4212e' }} 
                 onClick={(e) => {
                   e.stopPropagation();
+                  setShowMenu(false);
+                  if (!localStorage.getItem("token")) {
+                    promptLogin("report");
+                    return;
+                  }
                   const currentState = window.history.state || {};
                   const newState = { ...currentState };
                   delete newState.playerMenu;
                   newState.reportModal = true;
                   window.history.replaceState(newState, document.title);
-                  setShowMenu(false);
                   setShowReport(true);
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(244, 33, 46, 0.1)"}

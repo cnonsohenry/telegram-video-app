@@ -1,7 +1,7 @@
-import React, { useState } from "react";
-import { X, Flag, AlertTriangle, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Flag, AlertTriangle, CheckCircle2, Loader2, ShieldAlert, MailCheck, LogIn } from "lucide-react";
 import { APP_CONFIG } from "../config";
-import { showToast } from "../utils/toast";
+import { showToast, promptLogin } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
 
 export default function ReportModal({ isOpen, onClose, video }) {
@@ -10,6 +10,35 @@ export default function ReportModal({ isOpen, onClose, video }) {
   const [details, setDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  // Authentication & Email Verification State
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setCurrentUser(null);
+      setCheckingAuth(false);
+      return;
+    }
+
+    setCheckingAuth(true);
+    fetch(`${APP_CONFIG.apiUrl}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        setCurrentUser(data);
+        setCheckingAuth(false);
+      })
+      .catch(() => {
+        setCurrentUser(null);
+        setCheckingAuth(false);
+      });
+  }, [isOpen]);
 
   if (!isOpen || !video) return null;
 
@@ -25,8 +54,19 @@ export default function ReportModal({ isOpen, onClose, video }) {
     e.preventDefault();
     if (!reason) return;
 
-    setSubmitting(true);
     const token = localStorage.getItem("token");
+    if (!token) {
+      handleSafeClose();
+      promptLogin("report");
+      return;
+    }
+
+    if (!currentUser?.email_verified && currentUser?.role !== "admin") {
+      showToast("Please verify your email address in Settings before submitting reports.", "warning");
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const messageId = video.message_id || video.id;
@@ -34,7 +74,7 @@ export default function ReportModal({ isOpen, onClose, video }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           reason,
@@ -44,7 +84,12 @@ export default function ReportModal({ isOpen, onClose, video }) {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to submit report");
+        if (data.requires_email_verification) {
+          showToast(data.error || "Email verification required to report posts.", "warning");
+        } else {
+          throw new Error(data.error || "Failed to submit report");
+        }
+        return;
       }
 
       setSubmitted(true);
@@ -54,13 +99,15 @@ export default function ReportModal({ isOpen, onClose, video }) {
         setDetails("");
         setReason("inappropriate");
         handleSafeClose();
-      }, 1500);
+      }, 1600);
     } catch (err) {
       showToast(err.message || "Failed to submit report. Please try again.", "error");
     } finally {
       setSubmitting(false);
     }
   };
+
+  const isEmailVerified = Boolean(currentUser?.email_verified || currentUser?.role === "admin");
 
   return (
     <div style={modalBackdrop} onClick={handleSafeClose}>
@@ -73,7 +120,7 @@ export default function ReportModal({ isOpen, onClose, video }) {
         {/* Header */}
         <div style={modalHeader}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Flag size={18} color="#f4212e" />
+            <Flag size={18} color="#f43f5e" />
             <h3 style={modalTitle}>Report Post</h3>
           </div>
           <button 
@@ -86,14 +133,85 @@ export default function ReportModal({ isOpen, onClose, video }) {
           </button>
         </div>
 
-        {submitted ? (
+        {checkingAuth ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+            <Loader2 size={32} color="#f43f5e" className="animate-spin" />
+            <p style={{ color: "#71717a", fontSize: "13px", marginTop: "12px" }}>Checking verification status...</p>
+          </div>
+        ) : !currentUser ? (
+          /* 🛑 Guest Prompt: Login Required */
+          <div style={authPromptContainer}>
+            <div style={iconBadgeRose}>
+              <LogIn size={28} color="#f43f5e" />
+            </div>
+            <h4 style={authPromptTitle}>Account Required</h4>
+            <p style={authPromptDesc}>
+              To prevent abuse and maintain community safety, only registered and email-verified members can submit moderation reports.
+            </p>
+            <div style={actionRowFull}>
+              <button
+                type="button"
+                onClick={() => {
+                  handleSafeClose();
+                  promptLogin("report");
+                }}
+                style={primaryActionBtn}
+              >
+                Log In or Sign Up
+              </button>
+              <button
+                type="button"
+                onClick={handleSafeClose}
+                style={secondaryActionBtn}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : !isEmailVerified ? (
+          /* 🛑 Unverified Account: Email Verification Required */
+          <div style={authPromptContainer}>
+            <div style={iconBadgeAmber}>
+              <MailCheck size={28} color="#fbbf24" />
+            </div>
+            <h4 style={authPromptTitle}>Email Verification Required</h4>
+            <p style={authPromptDesc}>
+              Your account <strong>({currentUser.email || currentUser.username})</strong> must have a verified email address before you can flag or report content.
+            </p>
+            <div style={{ ...warningCard, marginBottom: "20px" }}>
+              <AlertTriangle size={16} color="#fbbf24" style={{ flexShrink: 0, marginTop: "2px" }} />
+              <span style={{ fontSize: "12.5px", color: "#d4d4d8", lineHeight: "1.4" }}>
+                Check your inbox for your verification OTP code, or verify your address in your Profile Settings.
+              </span>
+            </div>
+            <div style={actionRowFull}>
+              <button
+                type="button"
+                onClick={() => {
+                  handleSafeClose();
+                  window.dispatchEvent(new CustomEvent("openSettings"));
+                }}
+                style={primaryActionBtn}
+              >
+                Go to Settings & Verify
+              </button>
+              <button
+                type="button"
+                onClick={handleSafeClose}
+                style={secondaryActionBtn}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ) : submitted ? (
           <div style={successContainer}>
-            <CheckCircle2 size={42} color="#f43f5e" />
-            <h4 style={{ color: "#d4d4d8", fontSize: "17px", fontWeight: "700", marginTop: "12px", marginBottom: "6px" }}>
+            <CheckCircle2 size={44} color="#10b981" />
+            <h4 style={{ color: "#f4f4f5", fontSize: "17px", fontWeight: "700", marginTop: "14px", marginBottom: "6px" }}>
               Report Received
             </h4>
-            <p style={{ color: "#71767b", fontSize: "13.5px", margin: 0, textAlign: "center", lineHeight: "1.4" }}>
-              Our moderation team will review this content against our Community Guidelines.
+            <p style={{ color: "#a1a1aa", fontSize: "13px", margin: 0, textAlign: "center", lineHeight: "1.4" }}>
+              Thank you. Our moderation team will review this content against our Community Guidelines.
             </p>
           </div>
         ) : (
@@ -111,8 +229,8 @@ export default function ReportModal({ isOpen, onClose, video }) {
                     key={item.id}
                     style={{
                       ...reasonOption,
-                      border: isSelected ? "1px solid #ffffff" : "1px solid rgba(255, 255, 255, 0.08)",
-                      background: isSelected ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.02)"
+                      border: isSelected ? "1px solid #f43f5e" : "1px solid rgba(255, 255, 255, 0.08)",
+                      background: isSelected ? "rgba(244, 63, 94, 0.08)" : "rgba(255, 255, 255, 0.02)"
                     }}
                   >
                     <input
@@ -121,13 +239,13 @@ export default function ReportModal({ isOpen, onClose, video }) {
                       value={item.id}
                       checked={isSelected}
                       onChange={() => setReason(item.id)}
-                      style={{ accentColor: "#d4d4d8", marginTop: "2px" }}
+                      style={{ accentColor: "#f43f5e", marginTop: "2px" }}
                     />
                     <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                      <span style={{ fontSize: "13.5px", fontWeight: isSelected ? "700" : "500", color: "#d4d4d8" }}>
+                      <span style={{ fontSize: "13.5px", fontWeight: isSelected ? "700" : "500", color: "#f4f4f5" }}>
                         {item.label}
                       </span>
-                      <span style={{ fontSize: "11.5px", color: "#71767b", lineHeight: "1.3" }}>
+                      <span style={{ fontSize: "11.5px", color: "#a1a1aa", lineHeight: "1.3" }}>
                         {item.desc}
                       </span>
                     </div>
@@ -138,13 +256,13 @@ export default function ReportModal({ isOpen, onClose, video }) {
 
             {/* Additional details */}
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <label style={{ fontSize: "12px", color: "#71767b", fontWeight: "600" }}>
+              <label style={{ fontSize: "12px", color: "#a1a1aa", fontWeight: "600" }}>
                 Additional Details (Optional)
               </label>
               <textarea
                 value={details}
                 onChange={(e) => setDetails(e.target.value.slice(0, 500))}
-                placeholder="Provide any additional context for moderators..."
+                placeholder="Provide any specific context or timestamps for moderators..."
                 rows={3}
                 style={detailsTextarea}
               />
@@ -234,7 +352,7 @@ const dragHandlePill = {
   width: "36px",
   height: "4px",
   borderRadius: "2px",
-  backgroundColor: "#3e4144"
+  backgroundColor: "rgba(255, 255, 255, 0.16)"
 };
 
 const modalHeader = {
@@ -249,14 +367,14 @@ const modalHeader = {
 const modalTitle = {
   fontSize: "17px",
   fontWeight: "800",
-  color: "#d4d4d8",
+  color: "#f4f4f5",
   margin: 0
 };
 
 const closeBtn = {
   background: "rgba(255, 255, 255, 0.08)",
   border: "none",
-  color: "#71767b",
+  color: "#a1a1aa",
   cursor: "pointer",
   padding: "6px",
   borderRadius: "50%",
@@ -266,7 +384,7 @@ const closeBtn = {
 };
 
 const subText = {
-  color: "#e7e9ea",
+  color: "#f4f4f5",
   fontSize: "13.5px",
   margin: "0 0 4px 0",
   lineHeight: "1.4"
@@ -288,7 +406,7 @@ const detailsTextarea = {
   border: "1px solid rgba(255, 255, 255, 0.08)",
   borderRadius: "8px",
   padding: "10px 12px",
-  color: "#d4d4d8",
+  color: "#f4f4f5",
   fontSize: "13px",
   resize: "none",
   outline: "none",
@@ -306,7 +424,7 @@ const actionRow = {
 const cancelBtn = {
   background: "#27272a",
   border: "none",
-  color: "#d4d4d8",
+  color: "#f4f4f5",
   padding: "11px 20px",
   borderRadius: "9999px",
   fontSize: "14px",
@@ -318,9 +436,9 @@ const submitBtn = {
   display: "flex",
   alignItems: "center",
   gap: "6px",
-  background: "#c4c4c8",
+  background: "#f43f5e",
   border: "none",
-  color: "#09090b",
+  color: "#ffffff",
   padding: "11px 24px",
   borderRadius: "9999px",
   fontSize: "14px",
@@ -333,4 +451,94 @@ const successContainer = {
   flexDirection: "column",
   alignItems: "center",
   padding: "24px 16px"
+};
+
+const authPromptContainer = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  textAlign: "center",
+  padding: "20px 10px 10px 10px"
+};
+
+const authPromptTitle = {
+  margin: "12px 0 6px 0",
+  color: "#f4f4f5",
+  fontSize: "17px",
+  fontWeight: "800"
+};
+
+const authPromptDesc = {
+  margin: "0 0 16px 0",
+  color: "#a1a1aa",
+  fontSize: "13px",
+  lineHeight: "1.5",
+  maxWidth: "380px"
+};
+
+const iconBadgeRose = {
+  width: "56px",
+  height: "56px",
+  borderRadius: "50%",
+  background: "rgba(244, 63, 94, 0.12)",
+  border: "1px solid rgba(244, 63, 94, 0.25)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center"
+};
+
+const iconBadgeAmber = {
+  width: "56px",
+  height: "56px",
+  borderRadius: "50%",
+  background: "rgba(245, 158, 11, 0.12)",
+  border: "1px solid rgba(245, 158, 11, 0.25)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center"
+};
+
+const warningCard = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "10px",
+  background: "rgba(245, 158, 11, 0.08)",
+  border: "1px solid rgba(245, 158, 11, 0.2)",
+  borderRadius: "10px",
+  padding: "10px 14px",
+  textAlign: "left",
+  width: "100%",
+  boxSizing: "border-box"
+};
+
+const actionRowFull = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "10px",
+  width: "100%",
+  marginTop: "8px"
+};
+
+const primaryActionBtn = {
+  width: "100%",
+  padding: "12px",
+  background: "#f43f5e",
+  border: "none",
+  borderRadius: "10px",
+  color: "#ffffff",
+  fontWeight: "700",
+  fontSize: "14px",
+  cursor: "pointer"
+};
+
+const secondaryActionBtn = {
+  width: "100%",
+  padding: "12px",
+  background: "#27272a",
+  border: "1px solid rgba(255, 255, 255, 0.08)",
+  borderRadius: "10px",
+  color: "#f4f4f5",
+  fontWeight: "600",
+  fontSize: "14px",
+  cursor: "pointer"
 };

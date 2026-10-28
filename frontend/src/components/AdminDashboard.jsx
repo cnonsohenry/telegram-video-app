@@ -82,6 +82,8 @@ export default function AdminDashboard({ user, onLogout }) {
 
   const [reportsList, setReportsList] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportStatusFilter, setReportStatusFilter] = useState("pending");
+  const [reportCounts, setReportCounts] = useState({ pending_count: 0, actioned_count: 0, dismissed_count: 0, total_count: 0 });
 
   // Debounced Global Search
   useEffect(() => {
@@ -192,10 +194,11 @@ export default function AdminDashboard({ user, onLogout }) {
         }
       } else if (activeTab === "moderation") {
         setReportsLoading(true);
-        const res = await fetch(`${baseUrl}/api/admin/reports`, { headers });
+        const res = await fetch(`${baseUrl}/api/admin/reports?status=${reportStatusFilter}`, { headers });
         if (res.ok) {
           const data = await res.json();
           setReportsList(data.reports || []);
+          if (data.counts) setReportCounts(data.counts);
         }
         setReportsLoading(false);
       }
@@ -217,6 +220,12 @@ export default function AdminDashboard({ user, onLogout }) {
       fetchData();
     }
   }, [currentPage, videoCategoryFilter, txCurrencyFilter, txStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab === "moderation") {
+      fetchData();
+    }
+  }, [reportStatusFilter]);
 
   // Story catalog page/filter reload
   const fetchStoriesCatalogOnly = async () => {
@@ -760,6 +769,7 @@ export default function AdminDashboard({ user, onLogout }) {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem("token")}` }
       });
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         if (deleteWarning.type === 'video') {
@@ -776,9 +786,9 @@ export default function AdminDashboard({ user, onLogout }) {
           }));
         }
         setDeleteWarning(null);
-        showToast("Item deleted successfully!", "info");
+        showToast("Item and associated assets permanently deleted!", "info");
       } else {
-        showToast("Failed to delete item.", "error");
+        showToast(data.error || "Failed to delete item.", "error");
       }
     } catch (err) { 
       showToast("Error deleting item.", "error"); 
@@ -793,9 +803,21 @@ export default function AdminDashboard({ user, onLogout }) {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setReportsList(prev => prev.filter(r => r.id !== reportId));
+        setReportCounts(prev => ({
+          ...prev,
+          pending_count: Math.max(0, (prev.pending_count || 1) - 1),
+          dismissed_count: (prev.dismissed_count || 0) + 1
+        }));
+        setOverview(prev => ({
+          ...prev,
+          pending_reports: Math.max(0, (prev.pending_reports || 1) - 1)
+        }));
         showToast("Report dismissed.", "info");
+      } else {
+        showToast(data.error || "Failed to dismiss report", "error");
       }
     } catch (err) {
       showToast("Failed to dismiss report", "error");
@@ -811,9 +833,22 @@ export default function AdminDashboard({ user, onLogout }) {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setReportsList(prev => prev.filter(r => r.id !== reportId));
-        showToast("Video deleted and report resolved.", "success");
+        setReportCounts(prev => ({
+          ...prev,
+          pending_count: Math.max(0, (prev.pending_count || 1) - 1),
+          actioned_count: (prev.actioned_count || 0) + 1
+        }));
+        setOverview(prev => ({
+          ...prev,
+          pending_reports: Math.max(0, (prev.pending_reports || 1) - 1),
+          total_videos: Math.max(0, (prev.total_videos || 1) - 1)
+        }));
+        showToast(data.message || "Video permanently deleted and R2 purged.", "success");
+      } else {
+        showToast(data.error || "Failed to delete video", "error");
       }
     } catch (err) {
       showToast("Failed to delete video", "error");
@@ -829,9 +864,21 @@ export default function AdminDashboard({ user, onLogout }) {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setReportsList(prev => prev.filter(r => r.id !== reportId));
+        setReportCounts(prev => ({
+          ...prev,
+          pending_count: Math.max(0, (prev.pending_count || 1) - 1),
+          actioned_count: (prev.actioned_count || 0) + 1
+        }));
+        setOverview(prev => ({
+          ...prev,
+          pending_reports: Math.max(0, (prev.pending_reports || 1) - 1)
+        }));
         showToast("Creator banned and video removed.", "success");
+      } else {
+        showToast(data.error || "Failed to ban creator", "error");
       }
     } catch (err) {
       showToast("Failed to ban creator", "error");
@@ -2172,7 +2219,7 @@ export default function AdminDashboard({ user, onLogout }) {
               {/* 🟢 MODERATION & REPORTS QUEUE TAB */}
               {activeTab === "moderation" && (
                 <div>
-                  <div style={{ ...cardContainerStyle, marginBottom: "24px" }}>
+                  <div style={{ ...cardContainerStyle, marginBottom: "20px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -2186,10 +2233,35 @@ export default function AdminDashboard({ user, onLogout }) {
                         </p>
                       </div>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "12px", background: "rgba(244, 63, 94, 0.12)", color: "#f43f5e", border: "1px solid rgba(244, 63, 94, 0.25)", padding: "4px 10px", borderRadius: "8px", fontWeight: "700" }}>
-                          {reportsList.length} Pending Actions
-                        </span>
+                      {/* Status Filter Tabs */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                        {[
+                          { id: "pending", label: "Pending", count: reportCounts.pending_count },
+                          { id: "actioned_deleted", label: "Deleted", count: reportCounts.actioned_count },
+                          { id: "dismissed", label: "Dismissed", count: reportCounts.dismissed_count },
+                          { id: "all", label: "All Reports", count: reportCounts.total_count }
+                        ].map(f => {
+                          const isActive = reportStatusFilter === f.id;
+                          return (
+                            <button
+                              key={f.id}
+                              onClick={() => setReportStatusFilter(f.id)}
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: "8px",
+                                fontSize: "12px",
+                                fontWeight: isActive ? "700" : "500",
+                                border: isActive ? "1px solid #f43f5e" : "1px solid rgba(255, 255, 255, 0.08)",
+                                background: isActive ? "rgba(244, 63, 94, 0.12)" : "rgba(255, 255, 255, 0.03)",
+                                color: isActive ? "#f43f5e" : "#a1a1aa",
+                                cursor: "pointer",
+                                transition: "all 0.15s ease"
+                              }}
+                            >
+                              {f.label} ({f.count || 0})
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -2200,7 +2272,9 @@ export default function AdminDashboard({ user, onLogout }) {
                     <div style={{ ...cardContainerStyle, textAlign: "center", padding: "60px 20px" }}>
                       <CheckCircle size={44} color="#34d399" style={{ margin: "0 auto 12px auto" }} />
                       <h3 style={{ margin: "0 0 6px 0", color: "#f4f4f5", fontSize: "16px" }}>Clean Moderation Queue</h3>
-                      <p style={{ color: "#71717a", fontSize: "13px", margin: 0 }}>All reported items have been reviewed and resolved.</p>
+                      <p style={{ color: "#71717a", fontSize: "13px", margin: 0 }}>
+                        {reportStatusFilter === "pending" ? "All reported items have been reviewed and resolved." : "No reports found under this filter."}
+                      </p>
                     </div>
                   ) : (
                     <div style={tableContainerStyle}>
@@ -2263,32 +2337,46 @@ export default function AdminDashboard({ user, onLogout }) {
                                   {new Date(r.created_at).toLocaleDateString()}
                                 </td>
                                 <td style={tdStyle}>
-                                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                                    <button
-                                      disabled={actioningReportId === r.id}
-                                      onClick={() => handleDismissReport(r.id)}
-                                      style={{ ...reportActionBtn, background: "rgba(255,255,255,0.06)", color: "#a1a1aa", borderColor: "rgba(255,255,255,0.12)" }}
-                                      title="Ignore and dismiss this report"
-                                    >
-                                      Dismiss
-                                    </button>
-                                    <button
-                                      disabled={actioningReportId === r.id}
-                                      onClick={() => handleDeleteReportedVideo(r.id)}
-                                      style={{ ...reportActionBtn, background: "rgba(245, 158, 11, 0.12)", color: "#fbbf24", borderColor: "rgba(245, 158, 11, 0.25)" }}
-                                      title="Remove video from catalog"
-                                    >
-                                      Delete Video
-                                    </button>
-                                    <button
-                                      disabled={actioningReportId === r.id}
-                                      onClick={() => handleBanCreatorReport(r.id)}
-                                      style={{ ...reportActionBtn, background: "rgba(244, 63, 94, 0.15)", color: "#f43f5e", borderColor: "rgba(244, 63, 94, 0.3)" }}
-                                      title="Ban creator account & delete video"
-                                    >
-                                      Ban Creator
-                                    </button>
-                                  </div>
+                                  {r.status === "actioned_deleted" ? (
+                                    <span style={{ background: "rgba(16, 185, 129, 0.12)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.25)", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "700" }}>
+                                      Deleted
+                                    </span>
+                                  ) : r.status === "actioned_banned" ? (
+                                    <span style={{ background: "rgba(244, 63, 94, 0.15)", color: "#f43f5e", border: "1px solid rgba(244, 63, 94, 0.3)", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "700" }}>
+                                      Banned
+                                    </span>
+                                  ) : r.status === "dismissed" ? (
+                                    <span style={{ background: "rgba(255, 255, 255, 0.06)", color: "#71717a", border: "1px solid rgba(255, 255, 255, 0.1)", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "600" }}>
+                                      Dismissed
+                                    </span>
+                                  ) : (
+                                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                                      <button
+                                        disabled={actioningReportId === r.id}
+                                        onClick={() => handleDismissReport(r.id)}
+                                        style={{ ...reportActionBtn, background: "rgba(255,255,255,0.06)", color: "#a1a1aa", borderColor: "rgba(255,255,255,0.12)" }}
+                                        title="Ignore and dismiss this report"
+                                      >
+                                        Dismiss
+                                      </button>
+                                      <button
+                                        disabled={actioningReportId === r.id}
+                                        onClick={() => handleDeleteReportedVideo(r.id)}
+                                        style={{ ...reportActionBtn, background: "rgba(245, 158, 11, 0.12)", color: "#fbbf24", borderColor: "rgba(245, 158, 11, 0.25)" }}
+                                        title="Remove video from catalog and purge R2"
+                                      >
+                                        Delete Video
+                                      </button>
+                                      <button
+                                        disabled={actioningReportId === r.id}
+                                        onClick={() => handleBanCreatorReport(r.id)}
+                                        style={{ ...reportActionBtn, background: "rgba(244, 63, 94, 0.15)", color: "#f43f5e", borderColor: "rgba(244, 63, 94, 0.3)" }}
+                                        title="Ban creator account & delete video"
+                                      >
+                                        Ban Creator
+                                      </button>
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             ))}

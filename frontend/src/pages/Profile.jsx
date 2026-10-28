@@ -1261,7 +1261,10 @@ export default function Profile({
                       }} 
                       isAnyModalOpen={isAnyModalOpen} 
                       onCreatorClick={onCreatorClick} 
-                      onReportClick={(vData) => setReportedVideo(vData)} 
+                      onReportClick={(vData) => {
+                        if (!localStorage.getItem("token")) return promptLogin("report");
+                        setReportedVideo(vData);
+                      }} 
                       onOptionsClick={(vData) => setOptionsVideo(vData)} 
                       user={user} 
                     />
@@ -1617,6 +1620,7 @@ export default function Profile({
           onClose={() => setOptionsVideo(null)}
           onReport={(v) => {
             setOptionsVideo(null);
+            if (!localStorage.getItem("token")) return promptLogin("report");
             setReportedVideo(v || optionsVideo);
           }}
           onNotInterested={() => setOptionsVideo(null)}

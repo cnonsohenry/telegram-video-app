@@ -987,7 +987,10 @@ export default function CreatorProfileModal({
                               setShowSubscribeModal(true);
                             }
                           }}
-                          onReportClick={(vData) => setReportedVideo(vData)}
+                          onReportClick={(vData) => {
+                            if (!localStorage.getItem("token")) return promptLogin("report");
+                            setReportedVideo(vData);
+                          }}
                           onOptionsClick={(vData) => setOptionsVideo(vData)}
                           user={currentUser}
                         />
@@ -1253,6 +1256,7 @@ export default function CreatorProfileModal({
           onClose={() => setOptionsVideo(null)}
           onReport={(v) => {
             setOptionsVideo(null);
+            if (!localStorage.getItem("token")) return promptLogin("report");
             setReportedVideo(v || optionsVideo);
           }}
           onNotInterested={() => setOptionsVideo(null)}

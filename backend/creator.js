@@ -746,8 +746,11 @@ router.get("/studio/insights", authenticateToken, async (req, res) => {
       `SELECT v.id, v.chat_id, v.message_id, v.caption, v.category, v.views, v.likes_count, v.comments_count, v.created_at, v.cloudflare_id
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
-       WHERE CAST(v.uploader_id AS TEXT) = CAST($1 AS TEXT) 
-          OR LOWER(COALESCE(u.username, '')) = LOWER($2)
+       WHERE (CAST(v.uploader_id AS TEXT) = CAST($1 AS TEXT) 
+          OR LOWER(COALESCE(u.username, '')) = LOWER($2))
+          AND (v.status = 'ready' OR v.status IS NULL)
+          AND (v.status != 'flagged' AND v.status != 'deleted')
+          AND (v.flags_count < 5 OR v.flags_count IS NULL)
        ORDER BY v.views DESC
        LIMIT 30`,
       [userId, creator.username]
@@ -757,8 +760,11 @@ router.get("/studio/insights", authenticateToken, async (req, res) => {
       `SELECT COUNT(*) as posts_count, COALESCE(SUM(v.views), 0) as total_views, COALESCE(SUM(v.likes_count), 0) as total_likes
        FROM videos v
        LEFT JOIN users u ON v.uploader_id = u.user_id
-       WHERE CAST(v.uploader_id AS TEXT) = CAST($1 AS TEXT) 
-          OR LOWER(COALESCE(u.username, '')) = LOWER($2)`,
+       WHERE (CAST(v.uploader_id AS TEXT) = CAST($1 AS TEXT) 
+          OR LOWER(COALESCE(u.username, '')) = LOWER($2))
+          AND (v.status = 'ready' OR v.status IS NULL)
+          AND (v.status != 'flagged' AND v.status != 'deleted')
+          AND (v.flags_count < 5 OR v.flags_count IS NULL)`,
       [userId, creator.username]
     );
 
@@ -1515,7 +1521,11 @@ router.get("/:username", optionalAuth, async (req, res) => {
           OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
           OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)
           ${legacyCondition}
-        ) ${tabFilter}
+        ) 
+        AND (v.status = 'ready' OR v.status IS NULL)
+        AND (v.status != 'flagged' AND v.status != 'deleted')
+        AND (v.flags_count < 5 OR v.flags_count IS NULL)
+        ${tabFilter}
       )
       SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT 12`,
       [creator.username, username, String(creator.id || '0'), creator.telegram_user_id || null]
@@ -2559,7 +2569,11 @@ router.get("/:username/videos", async (req, res) => {
           OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
           OR ($6::BIGINT IS NOT NULL AND v.uploader_id = $6::BIGINT)
           ${legacyCondition}
-        ) ${tabFilter}
+        )
+        AND (v.status = 'ready' OR v.status IS NULL)
+        AND (v.status != 'flagged' AND v.status != 'deleted')
+        AND (v.flags_count < 5 OR v.flags_count IS NULL)
+        ${tabFilter}
       )
       SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY created_at DESC LIMIT $4 OFFSET $5`,
       [username, creatorUsername, String(creatorId || '0'), limit, offset, creatorTgId]
@@ -2577,7 +2591,11 @@ router.get("/:username/videos", async (req, res) => {
          OR CAST(v.uploader_id AS TEXT) = CAST($3 AS TEXT)
          OR ($4::BIGINT IS NOT NULL AND v.uploader_id = $4::BIGINT)
          ${legacyCondition}
-       ) ${tabFilterCount}`,
+       )
+       AND (v.status = 'ready' OR v.status IS NULL)
+       AND (v.status != 'flagged' AND v.status != 'deleted')
+       AND (v.flags_count < 5 OR v.flags_count IS NULL)
+       ${tabFilterCount}`,
       [username, creatorUsername, String(creatorId || '0'), creatorTgId]
     );
 
