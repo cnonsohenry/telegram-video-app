@@ -78,19 +78,25 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
     setDeletingMessageId(messageId);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/videos/${encodeURIComponent(messageId)}`, {
+      let res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/videos/${encodeURIComponent(messageId)}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to delete video");
+        res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/video/${encodeURIComponent(messageId)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete video");
       }
       setData(prev => {
         if (!prev) return prev;
         return {
           ...prev,
-          top_videos: prev.top_videos.filter(v => v.message_id !== messageId),
+          top_videos: prev.top_videos.filter(v => String(v.message_id || v.id) !== String(messageId)),
           stats: {
             ...prev.stats,
             posts_count: Math.max(0, (prev.stats?.posts_count || 1) - 1)
@@ -98,7 +104,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
         };
       });
       window.dispatchEvent(new CustomEvent("videoDeleted", { detail: messageId }));
-      showToast("Video deleted successfully", "info");
+      showToast(data.message || "Video deleted successfully", "success");
     } catch (err) {
       showToast(err.message || "Failed to delete video", "error");
     } finally {

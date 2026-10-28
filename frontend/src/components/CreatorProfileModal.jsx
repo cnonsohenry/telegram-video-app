@@ -303,6 +303,62 @@ export default function CreatorProfileModal({
     }
   }, [autoOpenSubscribe, isSubscribed, creatorData]);
 
+  useEffect(() => {
+    const handleVideoDeleted = (event) => {
+      const deletedId = String(event.detail);
+      setVideos(prev => prev.filter(item => String(item.message_id || item.id) !== deletedId));
+      setTabVideos(prev => ({
+        ...prev,
+        posts: (prev.posts || []).filter(item => String(item.message_id || item.id) !== deletedId),
+        reels: (prev.reels || []).filter(item => String(item.message_id || item.id) !== deletedId),
+        premium: (prev.premium || []).filter(item => String(item.message_id || item.id) !== deletedId),
+      }));
+    };
+
+    window.addEventListener("videoDeleted", handleVideoDeleted);
+    return () => window.removeEventListener("videoDeleted", handleVideoDeleted);
+  }, []);
+
+  const handleDeletePost = useCallback(async (targetVideo) => {
+    if (!targetVideo) return;
+    const v = typeof targetVideo === 'object' ? targetVideo : { id: targetVideo, message_id: targetVideo };
+    const videoId = v.message_id || v.id;
+    if (!videoId) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      let res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/videos/${encodeURIComponent(videoId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/video/${encodeURIComponent(videoId)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const deletedId = String(videoId);
+        setVideos(prev => prev.filter(item => String(item.message_id || item.id) !== deletedId));
+        setTabVideos(prev => ({
+          ...prev,
+          posts: (prev.posts || []).filter(item => String(item.message_id || item.id) !== deletedId),
+          reels: (prev.reels || []).filter(item => String(item.message_id || item.id) !== deletedId),
+          premium: (prev.premium || []).filter(item => String(item.message_id || item.id) !== deletedId),
+        }));
+        window.dispatchEvent(new CustomEvent('videoDeleted', { detail: videoId }));
+        showToast(data.message || "Post deleted successfully", "success");
+      } else {
+        showToast(data.error || "Failed to delete post", "error");
+      }
+    } catch (e) {
+      showToast("Error deleting post", "error");
+    } finally {
+      setOptionsVideo(null);
+    }
+  }, []);
+
   const handleLoadMoreVideos = () => {
     const curLoading = tabLoading[activeTab];
     const curHasMore = tabHasMore[activeTab];
@@ -1261,13 +1317,7 @@ export default function CreatorProfileModal({
           }}
           onNotInterested={() => setOptionsVideo(null)}
           onFollowToggle={handleFollowToggle}
-          onDelete={(id) => {
-            setTabVideos(prev => ({
-              ...prev,
-              posts: (prev.posts || []).filter(item => String(item.message_id || item.id) !== String(id))
-            }));
-            setOptionsVideo(null);
-          }}
+          onDelete={handleDeletePost}
         />
       )}
 

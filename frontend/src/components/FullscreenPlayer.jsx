@@ -786,22 +786,29 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     e?.stopPropagation();
     handleCloseMenu();
     
-    if(window.confirm("Are you sure you want to delete this video? This cannot be undone.")) {
+    if (window.confirm("Are you sure you want to delete this video? This cannot be undone.")) {
       try {
         const token = localStorage.getItem("token");
         const identifier = video.id || video.message_id;
         
-        const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/video/${identifier}`, {
+        let res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/videos/${encodeURIComponent(identifier)}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` }
         });
+        if (!res.ok) {
+          res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/video/${encodeURIComponent(identifier)}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
         
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
           onClose(); 
           window.dispatchEvent(new CustomEvent('videoDeleted', { detail: identifier }));
-          showToast("Video deleted successfully", "info");
+          showToast(data.message || "Video deleted successfully", "success");
         } else {
-          showToast("Failed to delete video. Make sure you have the right permissions.", "error");
+          showToast(data.error || "Failed to delete video. Make sure you have the right permissions.", "error");
         }
       } catch (err) {
         console.error(err);

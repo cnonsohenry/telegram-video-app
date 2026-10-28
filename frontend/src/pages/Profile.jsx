@@ -414,7 +414,7 @@ export default function Profile({
         if (!prevGroup) return null;
         return {
           ...prevGroup,
-          videos: prevGroup.videos.filter(v => String(v.id || v.message_id) !== deletedId)
+          videos: prevGroup.videos.filter(v => String(v.id) !== deletedId && String(v.message_id) !== deletedId)
         };
       });
     };
@@ -423,8 +423,41 @@ export default function Profile({
     return () => window.removeEventListener("videoDeleted", handleVideoDeleted);
   }, []);
 
+  const handleDeletePost = useCallback(async (targetVideo) => {
+    if (!targetVideo) return;
+    const v = typeof targetVideo === 'object' ? targetVideo : { id: targetVideo, message_id: targetVideo };
+    const videoId = v.message_id || v.id;
+    if (!videoId) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      let res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/videos/${encodeURIComponent(videoId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/video/${encodeURIComponent(videoId)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setDeletedVideoIds(prev => new Set([...prev, String(videoId)]));
+        window.dispatchEvent(new CustomEvent('videoDeleted', { detail: videoId }));
+        showToast(data.message || "Post deleted successfully", "success");
+      } else {
+        showToast(data.error || "Failed to delete post", "error");
+      }
+    } catch (e) {
+      showToast("Error deleting post", "error");
+    } finally {
+      setOptionsVideo(null);
+    }
+  }, []);
+
   const filteredRawVideos = rawVideosToDisplay.filter(v => 
-    !deletedVideoIds.has(String(v.id || v.message_id))
+    !deletedVideoIds.has(String(v.id)) && !deletedVideoIds.has(String(v.message_id))
   );
 
   const videosToDisplay = useMemo(() => {
@@ -1624,12 +1657,7 @@ export default function Profile({
             setReportedVideo(v || optionsVideo);
           }}
           onNotInterested={() => setOptionsVideo(null)}
-          onDelete={(id) => {
-            if (id) {
-              setDeletedVideoIds(prev => new Set([...prev, String(id)]));
-            }
-            setOptionsVideo(null);
-          }}
+          onDelete={handleDeletePost}
         />
       )}
 

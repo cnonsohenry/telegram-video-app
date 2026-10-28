@@ -773,25 +773,30 @@ export default function AdminDashboard({ user, onLogout }) {
 
       if (res.ok) {
         if (deleteWarning.type === 'video') {
+          const delIdStr = String(deleteWarning.id);
           setVideosData(prev => ({
             ...prev,
-            videos: prev.videos.filter(v => v.id !== deleteWarning.id),
+            videos: prev.videos.filter(v => String(v.id) !== delIdStr && String(v.message_id) !== delIdStr),
             total: Math.max(0, prev.total - 1)
           }));
+          window.dispatchEvent(new CustomEvent('videoDeleted', { detail: deleteWarning.id }));
         } else {
+          const delUserIdStr = String(deleteWarning.id);
           setUsersData(prev => ({
             ...prev,
-            users: prev.users.filter(u => u.id !== deleteWarning.id),
+            users: prev.users.filter(u => String(u.id) !== delUserIdStr),
             total: Math.max(0, prev.total - 1)
           }));
         }
         setDeleteWarning(null);
-        showToast("Item and associated assets permanently deleted!", "info");
+        showToast(data.message || "Item and associated assets permanently deleted!", "success");
       } else {
         showToast(data.error || "Failed to delete item.", "error");
+        setDeleteWarning(null);
       }
     } catch (err) { 
       showToast("Error deleting item.", "error"); 
+      setDeleteWarning(null);
     }
   };
 
@@ -815,7 +820,7 @@ export default function AdminDashboard({ user, onLogout }) {
           ...prev,
           pending_reports: Math.max(0, (prev.pending_reports || 1) - 1)
         }));
-        showToast("Report dismissed.", "info");
+        showToast(data.message || "Report dismissed.", "info");
       } else {
         showToast(data.error || "Failed to dismiss report", "error");
       }
@@ -829,6 +834,9 @@ export default function AdminDashboard({ user, onLogout }) {
   const handleDeleteReportedVideo = async (reportId) => {
     setActioningReportId(reportId);
     try {
+      const targetReport = reportsList.find(r => r.id === reportId);
+      const targetMessageId = targetReport?.message_id;
+
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/reports/${reportId}/delete-video`, {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -846,6 +854,9 @@ export default function AdminDashboard({ user, onLogout }) {
           pending_reports: Math.max(0, (prev.pending_reports || 1) - 1),
           total_videos: Math.max(0, (prev.total_videos || 1) - 1)
         }));
+        if (targetMessageId) {
+          window.dispatchEvent(new CustomEvent('videoDeleted', { detail: targetMessageId }));
+        }
         showToast(data.message || "Video permanently deleted and R2 purged.", "success");
       } else {
         showToast(data.error || "Failed to delete video", "error");
@@ -860,6 +871,9 @@ export default function AdminDashboard({ user, onLogout }) {
   const handleBanCreatorReport = async (reportId) => {
     setActioningReportId(reportId);
     try {
+      const targetReport = reportsList.find(r => r.id === reportId);
+      const targetMessageId = targetReport?.message_id;
+
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/reports/${reportId}/ban-creator`, {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
@@ -876,7 +890,10 @@ export default function AdminDashboard({ user, onLogout }) {
           ...prev,
           pending_reports: Math.max(0, (prev.pending_reports || 1) - 1)
         }));
-        showToast("Creator banned and video removed.", "success");
+        if (targetMessageId) {
+          window.dispatchEvent(new CustomEvent('videoDeleted', { detail: targetMessageId }));
+        }
+        showToast(data.message || "Creator banned and video removed.", "success");
       } else {
         showToast(data.error || "Failed to ban creator", "error");
       }

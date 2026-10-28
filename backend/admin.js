@@ -546,14 +546,17 @@ export async function purgeVideoAndInteractions(identifier) {
 }
 
 // 🟢 7. DELETE VIDEO (With Complete Cascade & R2 Cleanup)
-router.delete("/video/:identifier", authenticateToken, isAdmin, async (req, res) => {
+router.delete(["/video/:identifier", "/videos/:identifier"], authenticateToken, isAdmin, async (req, res) => {
   try {
     const { identifier } = req.params;
     const result = await purgeVideoAndInteractions(identifier);
-    if (result.deletedCount === 0 && (!result.targetIds || result.targetIds.length === 0)) {
-      return res.status(404).json({ error: "Video not found or already deleted." });
-    }
-    res.json({ success: true, message: "Video and associated assets permanently deleted.", deletedCount: result.deletedCount });
+    res.json({ 
+      success: true, 
+      message: "Video and associated assets permanently deleted.", 
+      deletedCount: result.deletedCount,
+      targetMessageIds: result.targetMessageIds,
+      targetIds: result.targetIds
+    });
   } catch (err) {
     console.error("Delete failed", err);
     res.status(500).json({ error: "Delete failed" });
@@ -1359,7 +1362,9 @@ router.post("/reports/:id/delete-video", authenticateToken, isAdmin, async (req,
   try {
     const reportId = req.params.id;
     const rRes = await pool.query("SELECT message_id FROM video_reports WHERE id = $1", [reportId]);
-    if (rRes.rows.length === 0) return res.status(404).json({ error: "Report not found" });
+    if (rRes.rows.length === 0) {
+      return res.json({ success: true, message: "Report already resolved or video deleted." });
+    }
 
     const message_id = rRes.rows[0].message_id;
 
@@ -1372,7 +1377,8 @@ router.post("/reports/:id/delete-video", authenticateToken, isAdmin, async (req,
     res.json({ 
       success: true, 
       message: "Video and Cloudflare R2 assets permanently deleted, and report marked resolved.",
-      deletedCount: purgeRes.deletedCount
+      deletedCount: purgeRes.deletedCount,
+      targetMessageId: message_id
     });
   } catch (err) {
     console.error("[REPORT DELETE-VIDEO ERROR]", err);
@@ -1391,7 +1397,9 @@ router.post("/reports/:id/ban-creator", authenticateToken, isAdmin, async (req, 
       WHERE r.id = $1
     `, [reportId]);
 
-    if (rRes.rows.length === 0) return res.status(404).json({ error: "Report not found" });
+    if (rRes.rows.length === 0) {
+      return res.json({ success: true, message: "Report already resolved." });
+    }
 
     const { message_id, uploader_id } = rRes.rows[0];
 
@@ -1408,7 +1416,11 @@ router.post("/reports/:id/ban-creator", authenticateToken, isAdmin, async (req, 
 
     await pool.query("UPDATE video_reports SET status = 'actioned_banned' WHERE id = $1", [reportId]);
 
-    res.json({ success: true, message: "Creator banned and reported video permanently deleted." });
+    res.json({ 
+      success: true, 
+      message: "Creator banned and reported video permanently deleted.",
+      targetMessageId: message_id
+    });
   } catch (err) {
     console.error("[REPORT BAN-CREATOR ERROR]", err);
     res.status(500).json({ error: "Failed to ban creator" });

@@ -21,6 +21,7 @@ import {
   R2_PUBLIC_DOMAIN 
 } from "./r2.js";
 import { syncTelegramCreatorProfile } from "./telegramCreatorSync.js";
+import { purgeVideoAndInteractions } from "./admin.js";
 
 const router = express.Router();
 
@@ -1155,22 +1156,22 @@ router.post("/complete-upload", authenticateToken, async (req, res) => {
 
 /* =======================================================
    2D. CREATOR DELETE VIDEO
-   DELETE /api/creator/videos/:message_id
+   DELETE /api/creator/videos/:identifier & /api/creator/video/:identifier
 ======================================================= */
-router.delete("/videos/:message_id", authenticateToken, async (req, res) => {
+router.delete(["/videos/:identifier", "/video/:identifier"], authenticateToken, async (req, res) => {
   const userId = req.user.id;
-  const { message_id } = req.params;
+  const { identifier } = req.params;
 
   try {
     const videoRes = await pool.query(
       `SELECT id, chat_id, message_id, uploader_id, cloudflare_id 
        FROM videos 
-       WHERE message_id = $1`,
-      [message_id]
+       WHERE message_id = $1 OR id::text = $1`,
+      [String(identifier)]
     );
 
     if (videoRes.rows.length === 0) {
-      return res.status(404).json({ error: "Video not found." });
+      return res.json({ success: true, message: "Video already deleted." });
     }
 
     const video = videoRes.rows[0];
@@ -1183,33 +1184,14 @@ router.delete("/videos/:message_id", authenticateToken, async (req, res) => {
       return res.status(403).json({ error: "You are not authorized to delete this video." });
     }
 
-    // Delete related rows
-    await pool.query(`DELETE FROM likes WHERE message_id = $1`, [message_id]);
-    await pool.query(`DELETE FROM comments WHERE message_id = $1`, [message_id]);
-    await pool.query(`DELETE FROM bookmarks WHERE message_id = $1`, [message_id]);
-    await pool.query(`DELETE FROM videos WHERE message_id = $1`, [message_id]);
+    // Purge video, album siblings, interactions, and Cloudflare R2 media
+    const purgeRes = await purgeVideoAndInteractions(video.message_id || video.id);
 
-    // Attempt deletion from Cloudflare R2 bucket or Cloudflare Stream
-    if (video.cloudflare_id && video.cloudflare_id.startsWith("r2:")) {
-      await deleteMediaFromR2(video.cloudflare_id, video.message_id);
-    } else if (video.cloudflare_id && video.cloudflare_id !== "none") {
-      const cleanId = video.cloudflare_id.split("?")[0];
-      const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
-      const CF_API_TOKEN = process.env.CLOUDFLARE_STREAM_TOKEN;
-      if (CF_ACCOUNT_ID && CF_API_TOKEN) {
-        try {
-          await fetch(`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream/${cleanId}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${CF_API_TOKEN}` }
-          });
-          console.log(`[CREATOR DELETE] Deleted Cloudflare Stream video: ${cleanId}`);
-        } catch (cfErr) {
-          console.warn("[CREATOR DELETE] Cloudflare delete warning:", cfErr.message);
-        }
-      }
-    }
-
-    return res.json({ success: true, message: "Video deleted successfully." });
+    return res.json({ 
+      success: true, 
+      message: "Video deleted successfully.",
+      deletedCount: purgeRes.deletedCount
+    });
   } catch (err) {
     console.error("[CREATOR DELETE ERROR]", err);
     return res.status(500).json({ error: "Failed to delete video." });

@@ -710,13 +710,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
   useEffect(() => {
     const handleVideoDeleted = (event) => {
-      const deletedId = event.detail;
+      const deletedId = String(event.detail);
 
       setVideoCache(prevCache => {
         const newCache = { ...prevCache };
         Object.keys(newCache).forEach(category => {
           newCache[category] = newCache[category].filter(v => 
-            (v.id || v.message_id) !== deletedId
+            String(v.id) !== deletedId && String(v.message_id) !== deletedId
           );
         });
         return newCache;
@@ -727,13 +727,13 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         return {
           ...prevGroup,
           videos: prevGroup.videos.filter(v => 
-            (v.id || v.message_id) !== deletedId
+            String(v.id) !== deletedId && String(v.message_id) !== deletedId
           )
         };
       });
       
       setPremiumPool(prevPool => 
-        prevPool.filter(v => (v.id || v.message_id) !== deletedId)
+        prevPool.filter(v => String(v.id) !== deletedId && String(v.message_id) !== deletedId)
       );
     };
 

@@ -287,24 +287,23 @@ export default function Explore({
     const videoId = v.message_id || v.id;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/video/${encodeURIComponent(videoId)}`, {
+      let res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/videos/${encodeURIComponent(videoId)}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        handleNotInterested(v);
-        showToast("Post deleted successfully", "info");
-      } else {
-        const adminRes = await fetch(`${APP_CONFIG.apiUrl}/api/admin/video/${encodeURIComponent(videoId)}`, {
+      if (!res.ok) {
+        res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/video/${encodeURIComponent(videoId)}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (adminRes.ok) {
-          handleNotInterested(v);
-          showToast("Post deleted successfully", "info");
-        } else {
-          showToast("Failed to delete post", "error");
-        }
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        handleNotInterested(v);
+        window.dispatchEvent(new CustomEvent('videoDeleted', { detail: videoId }));
+        showToast(data.message || "Post deleted successfully", "success");
+      } else {
+        showToast(data.error || "Failed to delete post", "error");
       }
     } catch (e) {
       showToast("Error deleting post", "error");
@@ -439,9 +438,9 @@ export default function Explore({
   useEffect(() => {
     const handleVideoDeleted = (event) => {
       const deletedId = String(event.detail);
-      setForYouFeed(prev => prev.filter(v => String(v.id || v.message_id) !== deletedId));
-      setCommunityFeed(prev => prev.filter(v => String(v.id || v.message_id) !== deletedId));
-      setSearchFeed(prev => prev.filter(v => String(v.id || v.message_id) !== deletedId));
+      setForYouFeed(prev => prev.filter(v => String(v.id) !== deletedId && String(v.message_id) !== deletedId));
+      setCommunityFeed(prev => prev.filter(v => String(v.id) !== deletedId && String(v.message_id) !== deletedId));
+      setSearchFeed(prev => prev.filter(v => String(v.id) !== deletedId && String(v.message_id) !== deletedId));
     };
 
     window.addEventListener('videoDeleted', handleVideoDeleted);
