@@ -1382,7 +1382,12 @@ router.get("/:username", optionalAuth, async (req, res) => {
       String(creator.username || "").toLowerCase() === "naijahomemade" ||
       String(username || "").toLowerCase() === "naijahomemade";
 
-    const legacyCondition = isOfficialCreator 
+    const isNaijaXxx = 
+      String(creator.id) === "458" ||
+      String(creator.username || "").toLowerCase() === "naijaxxx" ||
+      String(username || "").toLowerCase() === "naijaxxx";
+
+    const legacyCondition = isNaijaXxx 
       ? "OR (LOWER(v.category) = 'premium' AND (v.uploader_id = 458 OR v.uploader_id = -1004344719694 OR v.uploader_id IS NULL OR v.uploader_id = 0 OR (v.chat_id != 'internal' AND (v.cloudflare_id IS NULL OR NOT v.cloudflare_id LIKE 'r2:%'))))"
       : "";
 
@@ -2525,7 +2530,12 @@ router.get("/:username/videos", async (req, res) => {
       String(creatorUsername || "").toLowerCase() === "naijahomemade" ||
       String(username || "").toLowerCase() === "naijahomemade";
 
-    const legacyCondition = isOfficialCreator 
+    const isNaijaXxx = 
+      String(creatorId) === "458" ||
+      String(creatorUsername || "").toLowerCase() === "naijaxxx" ||
+      String(username || "").toLowerCase() === "naijaxxx";
+
+    const legacyCondition = isNaijaXxx 
       ? "OR (LOWER(v.category) = 'premium' AND (v.uploader_id = 458 OR v.uploader_id = -1004344719694 OR v.uploader_id IS NULL OR v.uploader_id = 0 OR (v.chat_id != 'internal' AND (v.cloudflare_id IS NULL OR NOT v.cloudflare_id LIKE 'r2:%'))))"
       : "";
 
