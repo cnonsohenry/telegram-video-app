@@ -2,6 +2,7 @@ import axios from "axios";
 import { pool } from "./db.js";
 import { r2, R2_BUCKET_NAME, R2_PUBLIC_DOMAIN } from "./r2.js";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { isAiRefusal } from "./sanitizer.js";
 
 const BOT_TOKEN = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
@@ -224,12 +225,12 @@ export async function syncTelegramCreatorProfile(creator, poolInstance, options 
 
   // 1. Bio / Description
   const rawBio = chatData?.description || chatData?.bio;
-  if (rawBio && rawBio.trim()) {
+  if (rawBio && rawBio.trim() && !isAiRefusal(rawBio)) {
     const cleanBio = rawBio.trim().slice(0, 500);
     updates.push(`creator_bio = $${paramIdx++}`);
     values.push(cleanBio);
     creator.creator_bio = cleanBio;
-  } else if (!creator.creator_bio || creator.creator_bio.startsWith("Official creator channel") || creator.creator_bio.startsWith("Official Telegram channel")) {
+  } else if (!creator.creator_bio || isAiRefusal(creator.creator_bio) || creator.creator_bio.startsWith("Official creator channel") || creator.creator_bio.startsWith("Official Telegram channel")) {
     const channelName = chatData?.title || chatData?.first_name || creator.display_name || creator.username;
     const fallbackBio = `Official channel of ${channelName}. Catch all exclusive drops and daily previews here.`;
     updates.push(`creator_bio = $${paramIdx++}`);

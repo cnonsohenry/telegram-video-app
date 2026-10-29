@@ -22,98 +22,9 @@ import {
 } from "./r2.js";
 import { syncTelegramCreatorProfile } from "./telegramCreatorSync.js";
 import { purgeVideoAndInteractions } from "./admin.js";
+import { isAiRefusal } from "./sanitizer.js";
 
 const router = express.Router();
-
-function isAiRefusal(text) {
-  if (!text || typeof text !== "string") return false;
-  const lower = text.trim().toLowerCase();
-  if (!lower) return false;
-
-  const refusalPhrases = [
-    "cannot fulfill this request",
-    "can't fulfill this request",
-    "unable to fulfill this request",
-    "unable to fulfill your request",
-    "cannot fulfill your request",
-    "can't fulfill your request",
-    "cannot generate content",
-    "can't generate content",
-    "unable to generate content",
-    "cannot assist with this request",
-    "can't assist with this request",
-    "unable to assist with this request",
-    "cannot create content that",
-    "can't create content that",
-    "unable to create content that",
-    "cannot write content that",
-    "can't write content that",
-    "i must decline this request",
-    "i must decline",
-    "i have to decline",
-    "safety guidelines",
-    "safety policy",
-    "safety policies",
-    "content policy",
-    "content policies",
-    "content guidelines",
-    "usage policy",
-    "usage guidelines",
-    "community guidelines",
-    "community standards",
-    "ethical guidelines",
-    "terms of service",
-    "sexually explicit",
-    "adult content",
-    "nsfw content",
-    "as an ai",
-    "as a language model",
-    "as an artificial intelligence",
-    "i am an ai",
-    "i'm an ai",
-    "my programming",
-    "violates my policy",
-    "violates our policy",
-    "violates the policy",
-    "against my policy",
-    "against our policy",
-    "against the policy",
-    "against my guidelines",
-    "against our guidelines",
-    "against the guidelines",
-    "i am programmed to follow",
-    "i'm programmed to follow",
-    "i am not permitted to",
-    "i'm not permitted to",
-    "i am not allowed to",
-    "i'm not allowed to",
-    "cannot comply with",
-    "can't comply with",
-    "cannot help with that",
-    "can't help with that",
-    "unable to assist with that",
-    "cannot fulfill requests",
-    "can't fulfill requests",
-    "unable to fulfill requests",
-    "cannot write captions for adult",
-    "cannot generate captions for adult"
-  ];
-
-  if (refusalPhrases.some(phrase => lower.includes(phrase))) {
-    return true;
-  }
-
-  const refusalActionRegex = /(?:i\s+(?:can(?:not|'t)|am\s+unable\s+to|must\s+decline)|unable\s+to)\s+(?:fulfill|generate|create|write|assist|provide|comply|produce|process|help\s+with)/i;
-  if (refusalActionRegex.test(lower)) return true;
-
-  const apologyRefusalRegex = /(?:sorr(?:y|ies)|apolog(?:y|ize|ies))\b.*?\b(?:can(?:not|'t)|unable\s+to|not\s+allowed|not\s+permitted|cannot\s+assist)/i;
-  if (apologyRefusalRegex.test(lower)) return true;
-
-  const policyRegex = /(?:polic(?:y|ies)|guidelines?)\s+(?:prevents?|prohibits?|restricts?|forbids?|does\s+not\s+allow)/i;
-  if (policyRegex.test(lower)) return true;
-
-  return false;
-}
 
 /**
  * Enforces upload abuse protection:
@@ -539,7 +450,10 @@ router.post("/upgrade", authenticateToken, async (req, res) => {
 
     const finalDisplayName = (display_name ? String(display_name).trim().slice(0, 100) : null) || existing.display_name || existing.username;
     const finalCategory = (creator_category ? String(creator_category).trim().slice(0, 50) : null) || existing.creator_category || "Model & Creator";
-    const finalBio = creator_bio !== undefined ? String(creator_bio).trim().slice(0, 500) : (existing.creator_bio || "");
+    let finalBio = creator_bio !== undefined ? String(creator_bio).trim().slice(0, 500) : (existing.creator_bio || "");
+    if (isAiRefusal(finalBio)) {
+      finalBio = "Official creator channel. Catch all exclusive drops and daily previews here.";
+    }
     const finalPrice = subscription_price !== undefined ? Math.max(0, Math.min(10000000, Number(subscription_price) || 0)) : (Number(existing.subscription_price) || 0);
     const finalBanner = banner_url && typeof banner_url === "string" && (banner_url.startsWith("http://") || banner_url.startsWith("https://") || banner_url.startsWith("/"))
       ? banner_url.slice(0, 500)
@@ -614,7 +528,10 @@ const handleUpdateProfile = async (req, res) => {
     const existing = userCheck.rows[0];
 
     const cleanDisplayName = display_name !== undefined ? String(display_name).trim().slice(0, 100) : null;
-    const cleanBio = creator_bio !== undefined ? String(creator_bio).trim().slice(0, 500) : null;
+    let cleanBio = creator_bio !== undefined ? String(creator_bio).trim().slice(0, 500) : null;
+    if (cleanBio && isAiRefusal(cleanBio)) {
+      cleanBio = null;
+    }
     const cleanCategory = creator_category !== undefined ? String(creator_category).trim().slice(0, 50) : null;
     const cleanPrice = subscription_price !== undefined ? Math.max(0, Math.min(10000000, Number(subscription_price) || 0)) : null;
 
