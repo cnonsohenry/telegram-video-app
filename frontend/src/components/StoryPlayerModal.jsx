@@ -814,7 +814,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                   </svg>
                 </div>
 
-                {/* Song Details & Time Ago */}
+                {/* Song / Audio Details & Time Ago */}
                 <div
                   style={{
                     display: "flex",
@@ -824,9 +824,16 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                     minWidth: 0
                   }}
                 >
-                  <svg width="12" height="12" fill="#ff007f" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                  </svg>
+                  {/original\s*(audio|sound)/i.test(soundTitle || "") ? (
+                    <svg width="12" height="12" fill="#38bdf8" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                      <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" fill="#ff007f" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                    </svg>
+                  )}
                   <span
                     style={{
                       color: "rgba(255, 255, 255, 0.88)",
