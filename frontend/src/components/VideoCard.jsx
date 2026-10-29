@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Play, Copy, Lock } from 'lucide-react';
 
 import { APP_CONFIG } from "../config";
@@ -6,28 +6,52 @@ import { renderClickableCaption } from "./ClickableCaption";
 import { formatTwitterDate, getPostDisplayName } from "../utils/date";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 
-export default function VideoCard({ video, onOpen, showDetails = true, priority = false, onCreatorClick }) {
+// Global loaded image cache to guarantee 0ms instant display without blink on re-mounts/scroll
+export const loadedThumbnailsCache = new Set();
+
+function VideoCard({ video, onOpen, showDetails = true, priority = false, onCreatorClick }) {
   const videoRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [isImgLoaded, setIsImgLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
 
-  const thumbSrc = React.useMemo(() => {
+  const thumbSrc = useMemo(() => {
     let url = video.thumbnail_url;
     if (!url && video.chat_id && video.message_id) {
-      url = `/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}`;
+      if (video.chat_id === "internal") {
+        url = `https://bucket.naijahomemade.com/thumbs/internal_${video.message_id}.jpg`;
+      } else {
+        url = `/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}`;
+      }
     }
     if (!url) return '';
+    // Canonicalize internal URLs directly to CDN (bypasses 301 redirects completely)
+    if (url.includes('chat_id=internal') && url.includes('message_id=')) {
+      const match = url.match(/message_id=([^&]+)/);
+      if (match && match[1]) {
+        return `https://bucket.naijahomemade.com/thumbs/internal_${match[1]}.jpg`;
+      }
+    }
     if (url.includes('/api/thumb?')) {
       url = url.replace('/api/thumb?', '/api/thumbnail?');
     }
     if (url.startsWith('/')) {
       url = `${APP_CONFIG.apiUrl}${url}`;
     }
-    return url.includes('?') ? `${url}&w=400` : `${url}?w=400`;
+    return url;
   }, [video.thumbnail_url, video.chat_id, video.message_id]);
+
+  const [isImgLoaded, setIsImgLoaded] = useState(() => {
+    if (!thumbSrc) return false;
+    return loadedThumbnailsCache.has(thumbSrc);
+  });
+
+  useEffect(() => {
+    if (thumbSrc && loadedThumbnailsCache.has(thumbSrc)) {
+      setIsImgLoaded(true);
+    }
+  }, [thumbSrc]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -108,16 +132,22 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
         width: "100%", 
         aspectRatio: "9/16",
         objectFit: "cover", 
-        background: "#080808", 
+        background: "#18181b", 
         overflow: "hidden",
         borderRadius: showDetails ? "12px" : "6px",
-        flexShrink: 0 
+        flexShrink: 0,
+        transform: "translateZ(0)",
+        WebkitTransform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+        WebkitBackfaceVisibility: "hidden",
+        contain: "paint"
       }}>
         
-        {!isImgLoaded && (
+        {!isImgLoaded && !hasError && (
           <div style={{
             position: "absolute", inset: 0, zIndex: 1,
-            background: "linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.03) 50%, transparent 75%)",
+            backgroundColor: "#18181b",
+            background: "linear-gradient(90deg, #18181b 25%, #27272a 50%, #18181b 75%)",
             backgroundSize: "200% 100%",
             animation: "skeleton-loading 1.5s infinite"
           }} />
@@ -129,8 +159,12 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
             alt={video.caption ? `${video.caption} - Naija video thumbnail` : "Naija video thumbnail"}
             aria-label="Thumbnail"
             loading={priority ? "eager" : "lazy"}
+            decoding="async"
             fetchPriority={priority ? "high" : "auto"}
-            onLoad={() => setIsImgLoaded(true)}
+            onLoad={() => {
+              loadedThumbnailsCache.add(thumbSrc);
+              setIsImgLoaded(true);
+            }}
             onError={() => { 
               setIsImgLoaded(true); 
               setHasError(true);
@@ -139,9 +173,12 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
               width: "100%", height: "100%", 
               objectFit: "cover", 
               position: "absolute", inset: 0, zIndex: 2,
-              opacity: 1, 
-              // 🟢 FIX: Removed the dulling filters. Let the natural image POP.
-              transition: "opacity 0.2s ease-in"
+              opacity: isImgLoaded ? 1 : 0,
+              transition: loadedThumbnailsCache.has(thumbSrc) ? "none" : "opacity 0.2s ease-out",
+              transform: "translateZ(0)",
+              WebkitTransform: "translateZ(0)",
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden"
             }}
           />
         )}
@@ -293,6 +330,18 @@ export default function VideoCard({ video, onOpen, showDetails = true, priority 
     </a>
   );
 }
+
+export default React.memo(VideoCard, (prevProps, nextProps) => {
+  return (
+    prevProps.video.id === nextProps.video.id &&
+    prevProps.video.message_id === nextProps.video.message_id &&
+    prevProps.video.views === nextProps.video.views &&
+    prevProps.video.likes === nextProps.video.likes &&
+    prevProps.priority === nextProps.priority &&
+    prevProps.showDetails === nextProps.showDetails &&
+    prevProps.video.thumbnail_url === nextProps.video.thumbnail_url
+  );
+});
 
 const captionTextStyle = { margin: "0 0 6px 0", fontSize: "12px", color: "#c4c4c8", lineHeight: "1.4", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: "500" };
 const userInfoRowStyle = { display: "flex", alignItems: "center", gap: "8px" };

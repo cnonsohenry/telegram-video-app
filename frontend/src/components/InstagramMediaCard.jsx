@@ -1,14 +1,14 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Play, Copy, Lock, Heart, MessageCircle, Film } from "lucide-react";
 import { APP_CONFIG } from "../config";
+import { loadedThumbnailsCache } from "./VideoCard";
 
-export default function InstagramMediaCard({ 
+function InstagramMediaCard({ 
   video, 
   onClick, 
   isDesktop = false 
 }) {
   const [isHovered, setIsHovered] = useState(false);
-  const [isImgLoaded, setIsImgLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -16,20 +16,41 @@ export default function InstagramMediaCard({
   const hlsRef = useRef(null);
   const cardRef = useRef(null);
 
-  const thumbSrc = React.useMemo(() => {
+  const thumbSrc = useMemo(() => {
     let url = video.thumbnail_url;
     if (!url && video.chat_id && video.message_id) {
-      url = `/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}`;
+      if (video.chat_id === "internal") {
+        url = `https://bucket.naijahomemade.com/thumbs/internal_${video.message_id}.jpg`;
+      } else {
+        url = `/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}`;
+      }
     }
     if (!url) return "";
+    if (url.includes('chat_id=internal') && url.includes('message_id=')) {
+      const match = url.match(/message_id=([^&]+)/);
+      if (match && match[1]) {
+        return `https://bucket.naijahomemade.com/thumbs/internal_${match[1]}.jpg`;
+      }
+    }
     if (url.includes("/api/thumb?")) {
       url = url.replace("/api/thumb?", "/api/thumbnail?");
     }
     if (url.startsWith("/")) {
       url = `${APP_CONFIG.apiUrl}${url}`;
     }
-    return url.includes("?") ? `${url}&w=500` : `${url}?w=500`;
+    return url;
   }, [video.thumbnail_url, video.chat_id, video.message_id]);
+
+  const [isImgLoaded, setIsImgLoaded] = useState(() => {
+    if (!thumbSrc) return false;
+    return loadedThumbnailsCache.has(thumbSrc);
+  });
+
+  useEffect(() => {
+    if (thumbSrc && loadedThumbnailsCache.has(thumbSrc)) {
+      setIsImgLoaded(true);
+    }
+  }, [thumbSrc]);
 
   useEffect(() => {
     const el = cardRef.current;
@@ -106,11 +127,15 @@ export default function InstagramMediaCard({
         position: "relative",
         width: "100%",
         aspectRatio: "1 / 1",
-        backgroundColor: "#121214",
+        backgroundColor: "#18181b",
         cursor: "pointer",
         overflow: "hidden",
         userSelect: "none",
-        transition: "opacity 0.2s ease"
+        transform: "translateZ(0)",
+        WebkitTransform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+        WebkitBackfaceVisibility: "hidden",
+        contain: "paint"
       }}
     >
       {/* Skeleton loader */}
@@ -120,7 +145,10 @@ export default function InstagramMediaCard({
             position: "absolute",
             inset: 0,
             zIndex: 1,
-            backgroundColor: "#1a1a1c"
+            backgroundColor: "#18181b",
+            background: "linear-gradient(90deg, #18181b 25%, #27272a 50%, #18181b 75%)",
+            backgroundSize: "200% 100%",
+            animation: "skeleton-loading 1.5s infinite"
           }}
         />
       )}
@@ -149,7 +177,11 @@ export default function InstagramMediaCard({
           alt=""
           aria-label="Post thumbnail"
           loading="lazy"
-          onLoad={() => setIsImgLoaded(true)}
+          decoding="async"
+          onLoad={() => {
+            loadedThumbnailsCache.add(thumbSrc);
+            setIsImgLoaded(true);
+          }}
           onError={() => {
             setIsImgLoaded(true);
             setHasError(true);
@@ -161,8 +193,12 @@ export default function InstagramMediaCard({
             position: "absolute",
             inset: 0,
             zIndex: 2,
-            transition: "transform 0.25s ease, filter 0.2s ease",
-            transform: isHovered && isDesktop ? "scale(1.02)" : "scale(1)"
+            opacity: isImgLoaded ? 1 : 0,
+            transition: loadedThumbnailsCache.has(thumbSrc) ? "none" : "opacity 0.2s ease-out, transform 0.25s ease",
+            transform: isHovered && isDesktop ? "scale(1.02) translateZ(0)" : "scale(1) translateZ(0)",
+            WebkitTransform: isHovered && isDesktop ? "scale(1.02) translateZ(0)" : "scale(1) translateZ(0)",
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden"
           }}
         />
       )}
@@ -269,6 +305,17 @@ export default function InstagramMediaCard({
     </div>
   );
 }
+
+export default React.memo(InstagramMediaCard, (prevProps, nextProps) => {
+  return (
+    prevProps.video.id === nextProps.video.id &&
+    prevProps.video.message_id === nextProps.video.message_id &&
+    prevProps.video.views === nextProps.video.views &&
+    prevProps.video.likes === nextProps.video.likes &&
+    prevProps.isDesktop === nextProps.isDesktop &&
+    prevProps.video.thumbnail_url === nextProps.video.thumbnail_url
+  );
+});
 
 const badgeStyle = {
   backgroundColor: "rgba(0, 0, 0, 0.5)",

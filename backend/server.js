@@ -1468,6 +1468,21 @@ function signThumbnail(chatId, messageId) {
 }
 
 /* =====================
+   HELPER: Direct Thumbnail URL Generator (Zero-Redirect CDN Fast-Path)
+===================== */
+const getDirectThumbnailUrl = (v, apiBaseUrl) => {
+  if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
+    const cleanId = v.cloudflare_id.split('?')[0];
+    return `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
+  }
+  if (v.chat_id === "internal") {
+    return `https://bucket.naijahomemade.com/thumbs/internal_${v.message_id}.jpg`;
+  }
+  const sig = signThumbnail(v.chat_id, v.message_id);
+  return `${apiBaseUrl}/thumbnail?chat_id=${encodeURIComponent(v.chat_id)}&message_id=${encodeURIComponent(v.message_id)}&sig=${sig}`;
+};
+
+/* =====================
    HELPER: SEO template cache + escaping
 ===================== */
 const INDEX_PATH = path.join(__dirname, '../frontend/dist', 'index.html');
@@ -1587,11 +1602,7 @@ app.get('/v/:message_id', async (req, res) => {
       ? 'noindex, follow'
       : 'index, follow, max-image-preview:large, max-video-preview:-1';
 
-    const sig = signThumbnail(video.chat_id, video.message_id);
-
-    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== 'none' && !video.cloudflare_id.startsWith('r2:'))
-      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=1280`
-      : `${process.env.API_BASE_URL}/api/thumbnail?chat_id=${encodeURIComponent(video.chat_id)}&message_id=${encodeURIComponent(video.message_id)}&sig=${sig}`;
+    const thumbUrl = getDirectThumbnailUrl(video, process.env.API_BASE_URL);
 
     const safeCategory = video.category
       ? video.category.charAt(0).toUpperCase() + video.category.slice(1)
@@ -1720,10 +1731,7 @@ app.get('/embed/:message_id', async (req, res) => {
       videoUrl = `${apiBaseUrl}/api/video?chat_id=${encodeURIComponent(video.chat_id)}&message_id=${encodeURIComponent(video.message_id)}&noview=1`;
     }
 
-    const sig = signThumbnail(video.chat_id, video.message_id);
-    const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== 'none' && !video.cloudflare_id.startsWith('r2:'))
-      ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=720`
-      : `${apiBaseUrl}/api/thumbnail?chat_id=${encodeURIComponent(video.chat_id)}&message_id=${encodeURIComponent(video.message_id)}&sig=${sig}`;
+    const thumbUrl = getDirectThumbnailUrl(video, apiBaseUrl);
 
     const title = escapeHtml(video.caption || 'NaijaHomemade Video');
     const watchUrl = `${frontendUrl}/v/${encodeURIComponent(message_id)}`;
@@ -1808,15 +1816,7 @@ const IS_COMMUNITY_SQL = `(v.is_community = TRUE AND ${VIDEO_SAFE_SQL})`;
    HELPER: Base Mapper (Used by Videos, Suggestions & Groups)
 ===================== */
 const mapVideoToResponse = (v, apiBaseUrl) => {
-  let thumbnailUrl = "";
-  
-  if (v.cloudflare_id && v.cloudflare_id !== "none" && !v.cloudflare_id.startsWith("r2:")) {
-      const cleanId = v.cloudflare_id.split('?')[0];
-      thumbnailUrl = `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
-  } else {
-      const sig = signThumbnail(v.chat_id, v.message_id);
-      thumbnailUrl = `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}&sig=${sig}`;
-  }
+  const thumbnailUrl = getDirectThumbnailUrl(v, apiBaseUrl);
 
   const isPremium = v.category === "premium";
   const isWebUpload = v.chat_id === "internal" || (v.cloudflare_id && v.cloudflare_id.startsWith("r2:"));
@@ -2919,21 +2919,21 @@ const existingR2Thumbs = new Set();
 const avatarUrlCache = new Map(); // identifier -> { targetUrl, expiresAt }
 const avatarBufferCache = new Map(); // identifier -> { buffer, expiresAt }
 
-app.get("/api/thumbnail", async (req, res) => {
+const handleThumbnailRequest = async (req, res) => {
   const { chat_id, message_id } = req.query;
   // If invalid request, return clean dark SVG fallback
   if (!chat_id || !message_id) {
-    res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*" });
+    res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=31536000, immutable", "Access-Control-Allow-Origin": "*" });
     return res.send(FALLBACK_THUMB_SVG);
   }
   
   const fileName = `thumbs/${chat_id}_${message_id}.jpg`;
   const r2PublicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://bucket.naijahomemade.com';
 
-  // 🟢 1. Fast-Path: If already verified in R2, redirect to Cloudflare R2 CDN instantly (< 1ms)
-  if (existingR2Thumbs.has(fileName)) {
+  // 🟢 1. Fast-Path: If internal video or verified in R2, redirect to Cloudflare R2 CDN instantly (< 1ms)
+  if (chat_id === "internal" || existingR2Thumbs.has(fileName)) {
     res.set({
-      "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
+      "Cache-Control": "public, max-age=31536000, immutable",
       "Access-Control-Allow-Origin": "*"
     });
     return res.redirect(301, `${r2PublicDomain}/${fileName}`);
@@ -2948,7 +2948,7 @@ app.get("/api/thumbnail", async (req, res) => {
       }));
       existingR2Thumbs.add(fileName);
       res.set({
-        "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
+        "Cache-Control": "public, max-age=31536000, immutable",
         "Access-Control-Allow-Origin": "*"
       });
       return res.redirect(301, `${r2PublicDomain}/${fileName}`);
@@ -2966,14 +2966,14 @@ app.get("/api/thumbnail", async (req, res) => {
     if (dbRes.rows[0]?.cloudflare_id && dbRes.rows[0].cloudflare_id !== "none" && !dbRes.rows[0].cloudflare_id.startsWith("r2:")) {
       const cleanId = dbRes.rows[0].cloudflare_id.split('?')[0];
       res.set({
-        "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
+        "Cache-Control": "public, max-age=31536000, immutable",
         "Access-Control-Allow-Origin": "*"
       });
       return res.redirect(301, `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`);
     }
 
     if (!dbRes.rows.length || !dbRes.rows[0].thumb_file_id) {
-      res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*" });
+      res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=31536000, immutable", "Access-Control-Allow-Origin": "*" });
       return res.send(FALLBACK_THUMB_SVG);
     }
 
@@ -2993,14 +2993,15 @@ app.get("/api/thumbnail", async (req, res) => {
       Bucket: process.env.R2_BUCKET_NAME,
       Key: fileName,
       Body: buffer,
-      ContentType: "image/jpeg"
+      ContentType: "image/jpeg",
+      CacheControl: "public, max-age=31536000, immutable"
     }))
     .then(() => existingR2Thumbs.add(fileName))
     .catch(e => console.error("R2 Background Upload Failed:", e.message));
 
     res.set({
       "Content-Type": "image/jpeg",
-      "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
+      "Cache-Control": "public, max-age=31536000, immutable",
       "Access-Control-Allow-Origin": "*"
     });
     return res.send(buffer);
@@ -3010,17 +3011,12 @@ app.get("/api/thumbnail", async (req, res) => {
     res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*" });
     return res.send(FALLBACK_THUMB_SVG);
   }
-});
+};
 
-// Alias for /api/thumb to /api/thumbnail
-app.get("/api/thumb", (req, res) => {
-  const { chat_id, message_id } = req.query;
-  if (!chat_id || !message_id) {
-    res.set({ "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400", "Access-Control-Allow-Origin": "*" });
-    return res.send(FALLBACK_THUMB_SVG);
-  }
-  return res.redirect(301, `/api/thumbnail?chat_id=${encodeURIComponent(chat_id)}&message_id=${encodeURIComponent(message_id)}`);
-});
+app.get("/api/thumbnail", handleThumbnailRequest);
+app.get("/thumbnail", handleThumbnailRequest);
+app.get("/api/thumb", handleThumbnailRequest);
+app.get("/thumb", handleThumbnailRequest);
 
 /* =======================================================
    🟢 BULLETPROOF AVATAR ROUTE (Cached & Timeout-Protected)
@@ -3248,10 +3244,7 @@ app.get('/sitemap.xml', async (req, res) => {
     });
 
     result.rows.forEach(video => {
-      const sig = signThumbnail(video.chat_id, video.message_id);
-      const thumbUrl = (video.cloudflare_id && video.cloudflare_id !== 'none' && !video.cloudflare_id.startsWith('r2:'))
-        ? `https://videodelivery.net/${video.cloudflare_id.split('?')[0]}/thumbnails/thumbnail.jpg?time=1s&height=720`
-        : `${apiBaseUrl}/api/thumbnail?chat_id=${encodeURIComponent(video.chat_id)}&message_id=${encodeURIComponent(video.message_id)}&sig=${sig}`;
+      const thumbUrl = getDirectThumbnailUrl(video, apiBaseUrl);
 
       const safeCategory = video.category
         ? video.category.charAt(0).toUpperCase() + video.category.slice(1)

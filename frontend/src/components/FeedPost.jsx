@@ -10,6 +10,7 @@ import { promptLogin, showToast } from "../utils/toast";
 import { formatTwitterDate, getPostDisplayName } from "../utils/date";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import StoryAvatar from "./StoryAvatar";
+import { loadedThumbnailsCache } from "./VideoCard";
 
 export const postStyle = { 
   padding: "16px", 
@@ -291,7 +292,7 @@ const carouselNavBtnStyle = {
   boxShadow: "0 2px 8px rgba(0,0,0,0.5)"
 };
 
-export default function FeedPost({ 
+function FeedPost({ 
   video, 
   isLast = false, 
   lastElementRef = null, 
@@ -308,11 +309,39 @@ export default function FeedPost({
   
   // Track vertical vs landscape orientation. Default to true (portrait card).
   const [isPortrait, setIsPortrait] = useState(true);
-  const [imgLoaded, setImgLoaded] = useState(false);
+
+  const thumbSrc = React.useMemo(() => {
+    let url = video.thumbnail_url;
+    if (!url && video.chat_id && video.message_id) {
+      if (video.chat_id === "internal") {
+        url = `https://bucket.naijahomemade.com/thumbs/internal_${video.message_id}.jpg`;
+      } else {
+        url = `/api/thumbnail?chat_id=${video.chat_id}&message_id=${video.message_id}`;
+      }
+    }
+    if (!url) return '/assets/default-thumbnail.jpg';
+    if (url.includes('chat_id=internal') && url.includes('message_id=')) {
+      const match = url.match(/message_id=([^&]+)/);
+      if (match && match[1]) {
+        return `https://bucket.naijahomemade.com/thumbs/internal_${match[1]}.jpg`;
+      }
+    }
+    if (url.includes('/api/thumb?')) {
+      url = url.replace('/api/thumb?', '/api/thumbnail?');
+    }
+    if (url.startsWith('/')) {
+      url = `${APP_CONFIG.apiUrl}${url}`;
+    }
+    return url;
+  }, [video.thumbnail_url, video.chat_id, video.message_id]);
+
+  const [imgLoaded, setImgLoaded] = useState(() => loadedThumbnailsCache.has(thumbSrc));
 
   useEffect(() => {
-    setImgLoaded(false);
-  }, [video.message_id, video.id]);
+    if (thumbSrc && loadedThumbnailsCache.has(thumbSrc)) {
+      setImgLoaded(true);
+    }
+  }, [thumbSrc]);
   
   const [likesCount, setLikesCount] = useState(Number(video.likes_count || 0));
   const [isLiked, setIsLiked] = useState(false);
@@ -965,10 +994,56 @@ export default function FeedPost({
               />
             )}
 
-            {isPlaying && videoUrl && isUnlocked ? (
+            {/* Permanent static thumbnail underneath */}
+            <img 
+              src={thumbSrc} 
+              alt="thumbnail" 
+              loading="lazy" 
+              decoding="async"
+              onLoad={(e) => {
+                loadedThumbnailsCache.add(thumbSrc);
+                setImgLoaded(true);
+                handleMediaLoad(e);
+              }} 
+              onError={() => setImgLoaded(true)}
+              style={{
+                width: "100%", 
+                height: "100%", 
+                maxHeight: "560px", 
+                objectFit: "cover", 
+                display: "block",
+                position: "absolute",
+                inset: 0,
+                zIndex: 2,
+                opacity: imgLoaded ? 1 : 0,
+                transition: loadedThumbnailsCache.has(thumbSrc) ? "none" : "opacity 0.2s ease-out",
+                transform: "translateZ(0)",
+                WebkitTransform: "translateZ(0)",
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden"
+              }} 
+            />
+
+            {/* Video preview layered smoothly on top of image */}
+            {isUnlocked && (
               <video 
                 ref={videoRef} 
-                style={{ ...thumbnailImgStyle, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }} 
+                style={{ 
+                  width: "100%", 
+                  height: "100%", 
+                  maxHeight: "560px", 
+                  objectFit: "cover", 
+                  display: "block",
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 3,
+                  opacity: (isPlaying && videoUrl) ? 1 : 0,
+                  pointerEvents: (isPlaying && videoUrl) ? "auto" : "none",
+                  transition: "opacity 0.25s ease",
+                  userSelect: "none", 
+                  WebkitUserSelect: "none", 
+                  WebkitTouchCallout: "none" 
+                }} 
                 muted 
                 loop 
                 playsInline 
@@ -977,25 +1052,9 @@ export default function FeedPost({
                 disableRemotePlayback
                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDragStart={(e) => e.preventDefault()}
-                poster={video.thumbnail_url} 
-                preload="metadata" 
+                poster={thumbSrc} 
+                preload="none" 
                 onLoadedMetadata={handleMediaLoad} 
-              />
-            ) : (
-              <img 
-                src={video.thumbnail_url || (video.message_id ? `${APP_CONFIG.apiUrl}/api/thumb/${video.chat_id}/${video.message_id}` : '/assets/default-thumbnail.jpg')} 
-                alt="thumbnail" 
-                style={{
-                  ...thumbnailImgStyle,
-                  opacity: imgLoaded ? 1 : 0,
-                  transition: "opacity 0.2s ease"
-                }} 
-                loading="lazy" 
-                onLoad={(e) => {
-                  setImgLoaded(true);
-                  handleMediaLoad(e);
-                }} 
-                onError={() => setImgLoaded(true)}
               />
             )}
 
@@ -1085,3 +1144,18 @@ export default function FeedPost({
     </div>
   );
 }
+
+export default React.memo(FeedPost, (prevProps, nextProps) => {
+  return (
+    prevProps.video.id === nextProps.video.id &&
+    prevProps.video.message_id === nextProps.video.message_id &&
+    prevProps.video.likes_count === nextProps.video.likes_count &&
+    prevProps.video.comments_count === nextProps.video.comments_count &&
+    prevProps.video.shares_count === nextProps.video.shares_count &&
+    prevProps.video.saves_count === nextProps.video.saves_count &&
+    prevProps.isLast === nextProps.isLast &&
+    prevProps.isAnyModalOpen === nextProps.isAnyModalOpen &&
+    prevProps.user?.id === nextProps.user?.id &&
+    prevProps.video.thumbnail_url === nextProps.video.thumbnail_url
+  );
+});

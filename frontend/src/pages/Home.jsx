@@ -679,14 +679,17 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
 
     const handleScroll = () => {
       const currentY = container.scrollTop;
-      setShowScrollTop(currentY > 400);
+      setShowScrollTop(prev => {
+        const next = currentY > 400;
+        return prev !== next ? next : prev;
+      });
 
       if (currentY < 50) {
-        setIsUIHidden(false);
-      } else if (currentY > lastScrollY.current + 15) {
-        setIsUIHidden(true);
-      } else if (currentY < lastScrollY.current - 15) {
-        setIsUIHidden(false);
+        setIsUIHidden(prev => prev ? false : prev);
+      } else if (currentY > lastScrollY.current + 30) {
+        setIsUIHidden(prev => !prev ? true : prev);
+      } else if (currentY < lastScrollY.current - 30) {
+        setIsUIHidden(prev => prev ? false : prev);
       }
 
       lastScrollY.current = currentY;
@@ -771,7 +774,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       if (url.startsWith('/')) {
         url = `${APP_CONFIG.apiUrl}${url}`;
       }
-      url = url.includes('?') ? `${url}&w=100` : `${url}?w=100`; 
       return url;
     }).filter(Boolean); 
   }, [actualVideosToDisplay]);

@@ -200,7 +200,10 @@ const formatThumbnailUrl = (v, apiBaseUrl) => {
     const cleanId = v.cloudflare_id.split("?")[0];
     return `https://videodelivery.net/${cleanId}/thumbnails/thumbnail.jpg?time=1s&height=600`;
   }
-  return `${apiBaseUrl}/api/thumbnail?chat_id=${v.chat_id}&message_id=${v.message_id}`;
+  if (v.chat_id === "internal") {
+    return `https://bucket.naijahomemade.com/thumbs/internal_${v.message_id}.jpg`;
+  }
+  return `${apiBaseUrl}/api/thumbnail?chat_id=${encodeURIComponent(v.chat_id)}&message_id=${encodeURIComponent(v.message_id)}`;
 };
 
 /* =======================================================

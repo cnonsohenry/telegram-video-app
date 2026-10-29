@@ -182,6 +182,7 @@ export async function generatePresignedUploadUrls(category = "community", origin
     Bucket: R2_BUCKET_NAME,
     Key: r2Key,
     ContentType: mimeType,
+    CacheControl: "public, max-age=31536000, immutable"
   });
   const videoUploadUrl = await getSignedUrl(r2, videoCommand, { expiresIn: 7200 });
 
@@ -190,6 +191,7 @@ export async function generatePresignedUploadUrls(category = "community", origin
     Bucket: R2_BUCKET_NAME,
     Key: thumbKey,
     ContentType: "image/jpeg",
+    CacheControl: "public, max-age=31536000, immutable"
   });
   const thumbUploadUrl = await getSignedUrl(r2, thumbCommand, { expiresIn: 7200 });
 
