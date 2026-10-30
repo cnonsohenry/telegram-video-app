@@ -11,6 +11,7 @@ import { z } from "zod"; // 🟢 IMPORT ZOD
 import { rateLimit } from "express-rate-limit";
 import { sendReactEmail, sendHtmlEmail } from "./utils/mailer.js";
 import WelcomeEmail from "./emails/WelcomeEmail.jsx";
+import { buildVerificationOtpEmail } from "./emails/emailTemplate.js";
 import React from "react";
 import pool from "./db.js";
 
@@ -448,20 +449,8 @@ router.post("/send-email-verification", authenticateToken, otpSendLimiter, async
       [userId, targetEmail, code]
     );
 
-    const html = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; background: #09090b; color: #f4f4f5; padding: 32px 24px; border-radius: 16px; border: 1px solid #27272a;">
-        <h2 style="margin: 0 0 12px 0; color: #ffffff; font-size: 20px;">Verify Your Email Address</h2>
-        <p style="color: #a1a1aa; font-size: 14px; line-height: 1.5; margin: 0 0 24px 0;">
-          Hi <strong>${user.display_name || user.username}</strong>, use the 6-digit verification code below to verify your email and unlock Creator capabilities on NaijaHomemade:
-        </p>
-        <div style="background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 18px; text-align: center; letter-spacing: 8px; font-size: 28px; font-weight: 800; color: #f43f5e; margin-bottom: 24px;">
-          ${code}
-        </div>
-        <p style="color: #71717a; font-size: 12px; margin: 0;">
-          This code expires in 15 minutes. If you did not request this verification, you can safely ignore this email.
-        </p>
-      </div>
-    `;
+    const recipientName = user.display_name || user.username || "Creator";
+    const html = buildVerificationOtpEmail({ recipientName, code, expiresMinutes: 15 });
 
     const mailRes = await sendHtmlEmail(targetEmail, `${code} is your NaijaHomemade verification code`, html);
     if (!mailRes.success) {
