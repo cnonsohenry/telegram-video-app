@@ -363,9 +363,6 @@ export default function FollowListModal({
                           </svg>
                         </span>
                       )}
-                      {u.is_creator && (
-                        <span style={styles.creatorTag}>Creator</span>
-                      )}
                     </div>
                     <div style={styles.handleRow}>
                       <span style={styles.handleText}>@{u.username}</span>
@@ -373,6 +370,11 @@ export default function FollowListModal({
                         <span style={styles.followsYouBadge}>Follows you</span>
                       )}
                     </div>
+                    {Boolean(u.creator_bio && u.creator_bio.trim()) && (
+                      <div style={styles.bioText} title={u.creator_bio}>
+                        {u.creator_bio}
+                      </div>
+                    )}
                   </div>
 
                   {/* Action Buttons */}
@@ -381,9 +383,19 @@ export default function FollowListModal({
                       <button
                         onClick={(e) => handleToggleFollow(u, e)}
                         disabled={Boolean(pendingActionIds[u.id])}
-                        style={u.is_following ? styles.followingBtn : styles.followBtn}
+                        style={
+                          u.is_following
+                            ? styles.followingBtn
+                            : u.follows_you
+                            ? styles.followBackBtn
+                            : styles.followBtn
+                        }
                       >
-                        {u.is_following ? "Following" : "Follow"}
+                        {u.is_following
+                          ? "Following"
+                          : u.follows_you
+                          ? "Follow back"
+                          : "Follow"}
                       </button>
                     )}
 
@@ -547,19 +559,20 @@ const styles = {
   },
   userRow: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: "12px",
-    padding: "11px 4px",
-    borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+    padding: "13px 4px",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
     cursor: "pointer"
   },
   avatar: {
-    width: "46px",
-    height: "46px",
+    width: "44px",
+    height: "44px",
     borderRadius: "50%",
     objectFit: "cover",
     background: "#27272a",
-    flexShrink: 0
+    flexShrink: 0,
+    marginTop: "2px"
   },
   userInfo: {
     flex: 1,
@@ -571,7 +584,7 @@ const styles = {
     gap: "5px"
   },
   displayName: {
-    fontSize: "14px",
+    fontSize: "14.5px",
     fontWeight: "700",
     color: "#f4f4f5",
     whiteSpace: "nowrap",
@@ -581,15 +594,6 @@ const styles = {
   verifiedBadge: {
     display: "inline-flex",
     alignItems: "center",
-    flexShrink: 0
-  },
-  creatorTag: {
-    fontSize: "10px",
-    fontWeight: "700",
-    padding: "1px 6px",
-    borderRadius: "4px",
-    background: "rgba(225, 29, 72, 0.14)",
-    color: "#f43f5e",
     flexShrink: 0
   },
   handleRow: {
@@ -615,40 +619,93 @@ const styles = {
     letterSpacing: "0.2px",
     flexShrink: 0
   },
+  bioText: {
+    fontSize: "12.5px",
+    lineHeight: "1.38",
+    color: "#a1a1aa",
+    marginTop: "4px",
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    wordBreak: "break-word"
+  },
   actionsWrap: {
     display: "flex",
     alignItems: "center",
     gap: "6px",
-    flexShrink: 0
+    flexShrink: 0,
+    marginTop: "2px"
   },
   followBtn: {
     background: "#e4e4e7",
     color: "#09090b",
     border: "none",
-    borderRadius: "8px",
-    padding: "7px 14px",
-    fontSize: "12px",
+    borderRadius: "9999px",
+    height: "36px",
+    minWidth: "86px",
+    padding: "0 16px",
+    fontSize: "13px",
     fontWeight: "700",
-    cursor: "pointer"
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    letterSpacing: "-0.2px",
+    transition: "all 0.15s ease",
+    userSelect: "none"
+  },
+  followBackBtn: {
+    background: "#e4e4e7",
+    color: "#09090b",
+    border: "none",
+    borderRadius: "9999px",
+    height: "36px",
+    minWidth: "100px",
+    padding: "0 16px",
+    fontSize: "13px",
+    fontWeight: "700",
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    letterSpacing: "-0.2px",
+    transition: "all 0.15s ease",
+    userSelect: "none"
   },
   followingBtn: {
-    background: "rgba(255, 255, 255, 0.08)",
-    color: "#a1a1aa",
-    border: "1px solid rgba(255, 255, 255, 0.12)",
-    borderRadius: "8px",
-    padding: "6px 12px",
-    fontSize: "12px",
+    background: "rgba(255, 255, 255, 0.06)",
+    color: "#f4f4f5",
+    border: "1px solid rgba(255, 255, 255, 0.2)",
+    borderRadius: "9999px",
+    height: "36px",
+    minWidth: "96px",
+    padding: "0 16px",
+    fontSize: "13px",
     fontWeight: "600",
-    cursor: "pointer"
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    letterSpacing: "-0.2px",
+    transition: "all 0.15s ease",
+    userSelect: "none"
   },
   removeBtn: {
     background: "#27272a",
     color: "#a1a1aa",
     border: "1px solid rgba(255, 255, 255, 0.08)",
-    borderRadius: "8px",
-    padding: "6px 10px",
-    fontSize: "11px",
+    borderRadius: "9999px",
+    height: "36px",
+    padding: "0 14px",
+    fontSize: "12px",
     fontWeight: "600",
-    cursor: "pointer"
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.15s ease",
+    userSelect: "none"
   }
 };
