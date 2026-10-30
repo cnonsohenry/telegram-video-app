@@ -1,9 +1,13 @@
 /* ============================================================================
    Component: FollowListModal.jsx
-   Instagram-Style Followers & Following List Modal with Privacy Support
+   Instagram / Twitter-Style Followers & Following List Modal with Privacy Support
+   Supports Mobile Fullscreen & Desktop 3-Pane Modular Sidebar Layout
 ============================================================================ */
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { ArrowLeft } from "lucide-react";
+import DesktopLeftSidebar from "./DesktopLeftSidebar";
+import DesktopRightSidebar from "./DesktopRightSidebar";
 import { APP_CONFIG } from "../config";
 import { promptLogin } from "../utils/toast";
 
@@ -49,6 +53,30 @@ export default function FollowListModal({
   const [privateMessage, setPrivateMessage] = useState(initialCached?.privateMessage || "");
   const [totalCount, setTotalCount] = useState(initialCached?.totalCount ?? 0);
   const [pendingActionIds, setPendingActionIds] = useState({});
+
+  // Responsive desktop detection (standard breakpoint: 1024px)
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth > 1024 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth > 1024);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Keyboard navigation (Escape key to close modal)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        onClose?.();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     const nextTab = initialTab === "following" ? "following" : "followers";
@@ -214,215 +242,338 @@ export default function FollowListModal({
       onSelectUser(u.username);
     } else {
       onClose?.();
-      window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: u.username }));
+      window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: { username: u.username } }));
     }
   };
 
   if (typeof document === "undefined") return null;
 
-  return createPortal(
-    <div style={styles.pageContainer}>
-      {/* Top Navbar matching CreatorProfileModal & SettingsView */}
-      <div style={styles.topNav}>
-        <button onClick={onClose} style={styles.backBtn} title="Back" aria-label="Back">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f4f4f5" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg>
+  // Render the core follow list contents (Tabs, Search, and User items)
+  const renderFollowListBody = () => (
+    <>
+      {/* Segmented Tabs: Followers | Following */}
+      <div style={isDesktop ? styles.tabsRowDesktop : styles.tabsRow}>
+        <button
+          onClick={() => handleSwitchTab("followers")}
+          className="follow-tab-btn"
+          style={{
+            ...styles.tabBtn,
+            color: activeTab === "followers" ? "#f4f4f5" : "#71717a",
+            borderBottom: activeTab === "followers" ? "2px solid #f4f4f5" : "2px solid transparent"
+          }}
+        >
+          <span style={{ fontWeight: "800", color: activeTab === "followers" ? "#f4f4f5" : "#a1a1aa" }}>
+            {activeTab === "followers" && !loading && !isPrivate ? totalCount : followersCount}
+          </span>{" "}
+          Followers
         </button>
-        <div style={styles.headerTitle}>
-          @{String(username || "").replace(/^@/, "")}
-        </div>
-        <div style={{ width: 34 }} />
+        <button
+          onClick={() => handleSwitchTab("following")}
+          className="follow-tab-btn"
+          style={{
+            ...styles.tabBtn,
+            color: activeTab === "following" ? "#f4f4f5" : "#71717a",
+            borderBottom: activeTab === "following" ? "2px solid #f4f4f5" : "2px solid transparent"
+          }}
+        >
+          <span style={{ fontWeight: "800", color: activeTab === "following" ? "#f4f4f5" : "#a1a1aa" }}>
+            {activeTab === "following" && !loading && !isPrivate ? totalCount : followingCount}
+          </span>{" "}
+          Following
+        </button>
       </div>
 
-      {/* Centered Content Container */}
-      <div style={styles.contentWrapper}>
-        {/* Segmented Tabs: Followers | Following */}
-        <div style={styles.tabsRow}>
-          <button
-            onClick={() => handleSwitchTab("followers")}
-            style={{
-              ...styles.tabBtn,
-              color: activeTab === "followers" ? "#f4f4f5" : "#71717a",
-              borderBottom: activeTab === "followers" ? "2px solid #f4f4f5" : "2px solid transparent"
-            }}
-          >
-            <span>{activeTab === "followers" && !loading && !isPrivate ? totalCount : followersCount}</span>{" "}
-            Followers
-          </button>
-          <button
-            onClick={() => handleSwitchTab("following")}
-            style={{
-              ...styles.tabBtn,
-              color: activeTab === "following" ? "#f4f4f5" : "#71717a",
-              borderBottom: activeTab === "following" ? "2px solid #f4f4f5" : "2px solid transparent"
-            }}
-          >
-            <span>{activeTab === "following" && !loading && !isPrivate ? totalCount : followingCount}</span>{" "}
-            Following
-          </button>
+      {/* Search Input (hidden if private) */}
+      {!isPrivate && (
+        <div style={isDesktop ? styles.searchWrapDesktop : styles.searchWrap}>
+          <div style={styles.searchBox}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={`Search ${activeTab}...`}
+              style={styles.searchInput}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                style={styles.clearSearchBtn}
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
+      )}
 
-        {/* Search Input (hidden if private) */}
-        {!isPrivate && (
-          <div style={styles.searchWrap}>
-            <div style={styles.searchBox}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      {/* List Body */}
+      <div style={isDesktop ? styles.listContainerDesktop : styles.listContainer}>
+        {loading ? (
+          <div style={styles.centerState}>
+            <div className="spinner" style={{ width: 26, height: 26, borderWidth: 2 }} />
+            <span style={{ color: "#71717a", fontSize: 13, marginTop: 10 }}>
+              Loading {activeTab}...
+            </span>
+          </div>
+        ) : isPrivate ? (
+          <div style={styles.privateState}>
+            <div style={styles.lockCircle}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`Search ${activeTab}...`}
-                style={styles.searchInput}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  style={styles.clearSearchBtn}
-                >
-                  ✕
-                </button>
-              )}
+            </div>
+            <h4 style={{ margin: "12px 0 6px", fontSize: 16, fontWeight: 700, color: "#f4f4f5" }}>
+              This List is Private
+            </h4>
+            <p style={{ margin: 0, fontSize: 13, color: "#a1a1aa", lineHeight: 1.5, maxWidth: 280 }}>
+              {privateMessage || `Only @${cleanUname} can see who they follow or who follows them.`}
+            </p>
+          </div>
+        ) : users.length === 0 ? (
+          <div style={styles.centerState}>
+            <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.6 }}>👥</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#e4e4e7" }}>
+              {searchQuery ? "No matching accounts found" : activeTab === "followers" ? "No followers yet" : "Not following anyone yet"}
+            </div>
+            <div style={{ fontSize: 12, color: "#71717a", marginTop: 4 }}>
+              {searchQuery
+                ? "Try searching for a different username or name."
+                : activeTab === "followers"
+                ? `When people follow @${cleanUname}, they'll appear here.`
+                : `Accounts followed by @${cleanUname} will appear here.`}
             </div>
           </div>
-        )}
+        ) : (
+          users.map((u) => {
+            const isMe = currentUser && Number(currentUser.id) === Number(u.id);
+            const avatarSrc = resolveAssetUrl(u.avatar_url) || "/assets/default-avatar.png";
 
-        {/* List Body */}
-        <div style={styles.listContainer}>
-          {loading ? (
-            <div style={styles.centerState}>
-              <div className="spinner" style={{ width: 26, height: 26, borderWidth: 2 }} />
-              <span style={{ color: "#71717a", fontSize: 13, marginTop: 10 }}>
-                Loading {activeTab}...
-              </span>
-            </div>
-          ) : isPrivate ? (
-            <div style={styles.privateState}>
-              <div style={styles.lockCircle}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-              </div>
-              <h4 style={{ margin: "12px 0 6px", fontSize: 16, fontWeight: 700, color: "#f4f4f5" }}>
-                This List is Private
-              </h4>
-              <p style={{ margin: 0, fontSize: 13, color: "#a1a1aa", lineHeight: 1.5, maxWidth: 280 }}>
-                {privateMessage || `Only @${String(username || "").replace(/^@/, "")} can see who they follow or who follows them.`}
-              </p>
-            </div>
-          ) : users.length === 0 ? (
-            <div style={styles.centerState}>
-              <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.6 }}>👥</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#e4e4e7" }}>
-                {searchQuery ? "No matching accounts found" : activeTab === "followers" ? "No followers yet" : "Not following anyone yet"}
-              </div>
-              <div style={{ fontSize: 12, color: "#71717a", marginTop: 4 }}>
-                {searchQuery
-                  ? "Try searching for a different username or name."
-                  : activeTab === "followers"
-                  ? `When people follow @${String(username || "").replace(/^@/, "")}, they'll appear here.`
-                  : `Accounts followed by @${String(username || "").replace(/^@/, "")} will appear here.`}
-              </div>
-            </div>
-          ) : (
-            users.map((u) => {
-              const isMe = currentUser && Number(currentUser.id) === Number(u.id);
-              const avatarSrc = resolveAssetUrl(u.avatar_url) || "/assets/default-avatar.png";
+            return (
+              <div
+                key={`${activeTab}_${u.id}_${u.username}`}
+                className="follow-user-row"
+                style={isDesktop ? styles.userRowDesktop : styles.userRow}
+                onClick={() => handleUserRowClick(u)}
+              >
+                <img
+                  src={avatarSrc}
+                  alt={u.username}
+                  style={styles.avatar}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.display_name || u.username || "U")}&background=27272a&color=f4f4f5&bold=true`;
+                  }}
+                />
 
-              return (
-                <div
-                  key={`${activeTab}_${u.id}_${u.username}`}
-                  style={styles.userRow}
-                  onClick={() => handleUserRowClick(u)}
-                >
-                  <img
-                    src={avatarSrc}
-                    alt={u.username}
-                    style={styles.avatar}
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.display_name || u.username || "U")}&background=27272a&color=f4f4f5&bold=true`;
-                    }}
-                  />
-
-                  <div style={styles.userMainCol}>
-                    {/* Top Row: Name & Handle on Left, Action Button on Right */}
-                    <div style={styles.userTopRow}>
-                      <div style={styles.userInfo}>
-                        <div style={styles.nameRow}>
-                          <span style={styles.displayName}>
-                            {u.display_name || u.username}
+                <div style={styles.userMainCol}>
+                  {/* Top Row: Name & Handle on Left, Action Button on Right */}
+                  <div style={styles.userTopRow}>
+                    <div style={styles.userInfo}>
+                      <div style={styles.nameRow}>
+                        <span style={styles.displayName}>
+                          {u.display_name || u.username}
+                        </span>
+                        {u.is_verified && (
+                          <span style={styles.verifiedBadge} title="Verified">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" fill="#3897f0" />
+                              <path d="M8 12.5L10.8 15.3L16 9.5" stroke="#d4d4d8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
                           </span>
-                          {u.is_verified && (
-                            <span style={styles.verifiedBadge} title="Verified">
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                                <circle cx="12" cy="12" r="10" fill="#3897f0" />
-                                <path d="M8 12.5L10.8 15.3L16 9.5" stroke="#d4d4d8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            </span>
-                          )}
-                        </div>
-                        <div style={styles.handleRow}>
-                          <span style={styles.handleText}>@{u.username}</span>
-                          {u.follows_you && !isMe && (
-                            <span style={styles.followsYouBadge}>Follows you</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action Buttons at Top Right */}
-                      <div style={styles.actionsWrap} onClick={(e) => e.stopPropagation()}>
-                        {!isMe && (
-                          <button
-                            onClick={(e) => handleToggleFollow(u, e)}
-                            disabled={Boolean(pendingActionIds[u.id])}
-                            style={
-                              u.is_following
-                                ? styles.followingBtn
-                                : u.follows_you
-                                ? styles.followBackBtn
-                                : styles.followBtn
-                            }
-                          >
-                            {u.is_following
-                              ? "Following"
-                              : u.follows_you
-                              ? "Follow back"
-                              : "Follow"}
-                          </button>
                         )}
-
-                        {isOwner && activeTab === "followers" && !isMe && (
-                          <button
-                            onClick={(e) => handleRemoveFollower(u, e)}
-                            disabled={Boolean(pendingActionIds[`rm_${u.id}`])}
-                            style={styles.removeBtn}
-                            title="Remove follower"
-                          >
-                            Remove
-                          </button>
+                      </div>
+                      <div style={styles.handleRow}>
+                        <span style={styles.handleText}>@{u.username}</span>
+                        {u.follows_you && !isMe && (
+                          <span style={styles.followsYouBadge}>Follows you</span>
                         )}
                       </div>
                     </div>
 
-                    {/* Bio flows across full width below the button */}
-                    {Boolean(u.creator_bio && u.creator_bio.trim()) && (
-                      <div style={styles.bioText} title={u.creator_bio}>
-                        {u.creator_bio}
-                      </div>
-                    )}
+                    {/* Action Buttons at Top Right */}
+                    <div style={styles.actionsWrap} onClick={(e) => e.stopPropagation()}>
+                      {!isMe && (
+                        <button
+                          onClick={(e) => handleToggleFollow(u, e)}
+                          disabled={Boolean(pendingActionIds[u.id])}
+                          style={
+                            u.is_following
+                              ? styles.followingBtn
+                              : u.follows_you
+                              ? styles.followBackBtn
+                              : styles.followBtn
+                          }
+                        >
+                          {u.is_following
+                            ? "Following"
+                            : u.follows_you
+                            ? "Follow back"
+                            : "Follow"}
+                        </button>
+                      )}
+
+                      {isOwner && activeTab === "followers" && !isMe && (
+                        <button
+                          onClick={(e) => handleRemoveFollower(u, e)}
+                          disabled={Boolean(pendingActionIds[`rm_${u.id}`])}
+                          style={styles.removeBtn}
+                          title="Remove follower"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Bio flows across full width below the button */}
+                  {Boolean(u.creator_bio && u.creator_bio.trim()) && (
+                    <div style={styles.bioText} title={u.creator_bio}>
+                      {u.creator_bio}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </>
+  );
+
+  return createPortal(
+    <div style={styles.pageContainer}>
+      {isDesktop ? (
+        /* 🌟 DESKTOP 3-PANE MODULAR LAYOUT (Twitter/X Inspired) */
+        <div style={styles.desktopContainerStyle}>
+          <div style={styles.desktopInnerWrapperStyle}>
+            {/* 1. LEFT SIDEBAR: Navigation Rail */}
+            <DesktopLeftSidebar
+              user={currentUser}
+              activeNav={isOwner ? "profile" : "creators"}
+              onNavigateHome={() => {
+                onClose?.();
+                window.location.href = "/";
+              }}
+              onProfileClick={() => {
+                onClose?.();
+                window.location.href = "/?tab=profile";
+              }}
+              onOpenDiscover={() => {
+                onClose?.();
+                window.dispatchEvent(new CustomEvent("openDiscoverCreatorsModal"));
+              }}
+              onPostClick={onClose}
+              onSelectCategory={(catId) => {
+                onClose?.();
+                window.location.href = `/?tab=explore&category=${catId}`;
+              }}
+              onTabSwitch={(tab) => {
+                onClose?.();
+                if (tab === "community") window.location.href = "/?tab=explore&sub=community";
+                else window.location.href = "/?tab=explore";
+              }}
+            />
+
+            {/* 2. MIDDLE COLUMN: Follow List Rail */}
+            <div
+              className="custom-scrollbar"
+              style={styles.desktopCenterRailStyle}
+            >
+              {/* Desktop Sticky Header with Back Button */}
+              <div style={styles.desktopStickyHeaderStyle}>
+                <div style={{ display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
+                  <button
+                    onClick={onClose}
+                    className="desktop-back-btn"
+                    style={styles.desktopBackBtnStyle}
+                    title="Back"
+                    aria-label="Back"
+                  >
+                    <ArrowLeft size={18} color="#f4f4f5" />
+                  </button>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={styles.desktopHeaderTitleStyle}>
+                        {displayName || `@${cleanUname}`}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "12px", color: "#8e8e93" }}>
+                      @{cleanUname}
+                    </span>
                   </div>
                 </div>
-              );
-            })
-          )}
+              </div>
+
+              {/* Main List Body */}
+              {renderFollowListBody()}
+            </div>
+
+            {/* 3. RIGHT SIDEBAR: Highlights, Trends & Featured Creators */}
+            <DesktopRightSidebar
+              user={currentUser}
+              onCreatorClick={(uname) => {
+                const cleanTarget = String(uname || "").replace(/^@/, "").trim();
+                if (!cleanTarget) return;
+                if (cleanTarget.toLowerCase() === cleanUname) {
+                  onClose?.();
+                  return;
+                }
+                if (onSelectUser) {
+                  onSelectUser(cleanTarget);
+                } else {
+                  onClose?.();
+                  window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: { username: cleanTarget } }));
+                }
+              }}
+              onVideoClick={(v) => {
+                onClose?.();
+                window.dispatchEvent(new CustomEvent("openVideoModal", { detail: v }));
+              }}
+              onOpenDiscover={() => {
+                onClose?.();
+                window.dispatchEvent(new CustomEvent("openDiscoverCreatorsModal"));
+              }}
+              onSelectTopic={(catId) => {
+                onClose?.();
+                window.location.href = `/?tab=explore&category=${catId}`;
+              }}
+              onSearchSubmit={(q) => {
+                onClose?.();
+                window.location.href = `/?tab=explore&q=${encodeURIComponent(q)}`;
+              }}
+            />
+          </div>
         </div>
-      </div>
+      ) : (
+        /* 📱 MOBILE VIEW (Full-Screen Clean Instagram-Style View) */
+        <>
+          {/* Top Navbar matching CreatorProfileModal & SettingsView */}
+          <div style={styles.topNav}>
+            <button onClick={onClose} style={styles.backBtn} title="Back" aria-label="Back">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f4f4f5" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+            </button>
+            <div style={styles.headerTitle}>
+              @{cleanUname}
+            </div>
+            <div style={{ width: 34 }} />
+          </div>
+
+          {/* Centered Content Container */}
+          <div style={styles.contentWrapper}>
+            {renderFollowListBody()}
+          </div>
+        </>
+      )}
 
       <style>{`
         @keyframes followPageSlideUp {
@@ -434,6 +585,15 @@ export default function FollowListModal({
             opacity: 1;
             transform: translateY(0);
           }
+        }
+        .follow-user-row:hover {
+          background-color: rgba(255, 255, 255, 0.025);
+        }
+        .desktop-back-btn:hover {
+          background-color: rgba(255, 255, 255, 0.12) !important;
+        }
+        .follow-tab-btn:hover {
+          background-color: rgba(255, 255, 255, 0.03);
         }
       `}</style>
     </div>,
@@ -453,6 +613,73 @@ const styles = {
     color: "#f4f4f5",
     animation: "followPageSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards"
   },
+  // 🌟 DESKTOP 3-PANE LAYOUT STYLES
+  desktopContainerStyle: {
+    display: "flex",
+    justifyContent: "center",
+    width: "100%",
+    height: "100vh",
+    overflow: "hidden",
+    backgroundColor: "#09090b"
+  },
+  desktopInnerWrapperStyle: {
+    display: "flex",
+    justifyContent: "center",
+    width: "100%",
+    maxWidth: "1420px",
+    height: "100vh",
+    position: "relative"
+  },
+  desktopCenterRailStyle: {
+    flex: 1,
+    maxWidth: "680px",
+    width: "100%",
+    minWidth: 0,
+    height: "100vh",
+    overflowY: "auto",
+    borderLeft: "1px solid rgba(255, 255, 255, 0.08)",
+    borderRight: "1px solid rgba(255, 255, 255, 0.08)",
+    display: "flex",
+    flexDirection: "column",
+    position: "relative",
+    backgroundColor: "#09090b"
+  },
+  desktopStickyHeaderStyle: {
+    position: "sticky",
+    top: 0,
+    zIndex: 95,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "10px 20px",
+    backgroundColor: "rgba(9, 9, 11, 0.85)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+    minHeight: "53px",
+    boxSizing: "border-box"
+  },
+  desktopHeaderTitleStyle: {
+    fontSize: "18px",
+    fontWeight: "800",
+    color: "#f4f4f5",
+    letterSpacing: "-0.3px",
+    margin: 0
+  },
+  desktopBackBtnStyle: {
+    background: "rgba(255, 255, 255, 0.06)",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    borderRadius: "50%",
+    width: "36px",
+    height: "36px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+    flexShrink: 0
+  },
+  // MOBILE NAVIGATION & WRAPPER
   topNav: {
     height: "48px",
     padding: "0 16px",
@@ -489,23 +716,45 @@ const styles = {
     flexDirection: "column",
     overflow: "hidden"
   },
+  // TABS
   tabsRow: {
     display: "flex",
     borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-    flexShrink: 0
+    flexShrink: 0,
+    backgroundColor: "#09090b"
+  },
+  tabsRowDesktop: {
+    display: "flex",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+    flexShrink: 0,
+    position: "sticky",
+    top: "53px",
+    zIndex: 90,
+    backgroundColor: "rgba(9, 9, 11, 0.88)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)"
   },
   tabBtn: {
     flex: 1,
     background: "transparent",
     border: "none",
-    padding: "13px 10px",
-    fontSize: "14px",
+    padding: "14px 10px",
+    fontSize: "14.5px",
     fontWeight: "700",
     cursor: "pointer",
-    transition: "all 0.15s ease"
+    transition: "all 0.15s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px"
   },
+  // SEARCH
   searchWrap: {
     padding: "12px 16px 8px",
+    flexShrink: 0
+  },
+  searchWrapDesktop: {
+    padding: "14px 20px 10px",
     flexShrink: 0
   },
   searchBox: {
@@ -533,10 +782,15 @@ const styles = {
     fontSize: "12px",
     padding: "2px 4px"
   },
+  // LIST CONTAINERS
   listContainer: {
     flex: 1,
     overflowY: "auto",
     padding: "6px 16px 40px"
+  },
+  listContainerDesktop: {
+    flex: 1,
+    padding: "6px 20px 60px"
   },
   centerState: {
     display: "flex",
@@ -564,13 +818,25 @@ const styles = {
     alignItems: "center",
     justifyContent: "center"
   },
+  // ROWS & ITEMS
   userRow: {
     display: "flex",
     alignItems: "flex-start",
     gap: "12px",
     padding: "13px 4px",
     borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
-    cursor: "pointer"
+    cursor: "pointer",
+    transition: "background-color 0.15s ease"
+  },
+  userRowDesktop: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "14px",
+    padding: "14px 8px",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+    cursor: "pointer",
+    borderRadius: "8px",
+    transition: "background-color 0.15s ease"
   },
   avatar: {
     width: "44px",
