@@ -350,64 +350,71 @@ export default function FollowListModal({
                     }}
                   />
 
-                  <div style={styles.userInfo}>
-                    <div style={styles.nameRow}>
-                      <span style={styles.displayName}>
-                        {u.display_name || u.username}
-                      </span>
-                      {u.is_verified && (
-                        <span style={styles.verifiedBadge} title="Verified">
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="10" fill="#3897f0" />
-                            <path d="M8 12.5L10.8 15.3L16 9.5" stroke="#d4d4d8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </span>
-                      )}
+                  <div style={styles.userMainCol}>
+                    {/* Top Row: Name & Handle on Left, Action Button on Right */}
+                    <div style={styles.userTopRow}>
+                      <div style={styles.userInfo}>
+                        <div style={styles.nameRow}>
+                          <span style={styles.displayName}>
+                            {u.display_name || u.username}
+                          </span>
+                          {u.is_verified && (
+                            <span style={styles.verifiedBadge} title="Verified">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" fill="#3897f0" />
+                                <path d="M8 12.5L10.8 15.3L16 9.5" stroke="#d4d4d8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </span>
+                          )}
+                        </div>
+                        <div style={styles.handleRow}>
+                          <span style={styles.handleText}>@{u.username}</span>
+                          {u.follows_you && !isMe && (
+                            <span style={styles.followsYouBadge}>Follows you</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons at Top Right */}
+                      <div style={styles.actionsWrap} onClick={(e) => e.stopPropagation()}>
+                        {!isMe && (
+                          <button
+                            onClick={(e) => handleToggleFollow(u, e)}
+                            disabled={Boolean(pendingActionIds[u.id])}
+                            style={
+                              u.is_following
+                                ? styles.followingBtn
+                                : u.follows_you
+                                ? styles.followBackBtn
+                                : styles.followBtn
+                            }
+                          >
+                            {u.is_following
+                              ? "Following"
+                              : u.follows_you
+                              ? "Follow back"
+                              : "Follow"}
+                          </button>
+                        )}
+
+                        {isOwner && activeTab === "followers" && !isMe && (
+                          <button
+                            onClick={(e) => handleRemoveFollower(u, e)}
+                            disabled={Boolean(pendingActionIds[`rm_${u.id}`])}
+                            style={styles.removeBtn}
+                            title="Remove follower"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div style={styles.handleRow}>
-                      <span style={styles.handleText}>@{u.username}</span>
-                      {u.follows_you && !isMe && (
-                        <span style={styles.followsYouBadge}>Follows you</span>
-                      )}
-                    </div>
+
+                    {/* Bio flows across full width below the button */}
                     {Boolean(u.creator_bio && u.creator_bio.trim()) && (
                       <div style={styles.bioText} title={u.creator_bio}>
                         {u.creator_bio}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div style={styles.actionsWrap} onClick={(e) => e.stopPropagation()}>
-                    {!isMe && (
-                      <button
-                        onClick={(e) => handleToggleFollow(u, e)}
-                        disabled={Boolean(pendingActionIds[u.id])}
-                        style={
-                          u.is_following
-                            ? styles.followingBtn
-                            : u.follows_you
-                            ? styles.followBackBtn
-                            : styles.followBtn
-                        }
-                      >
-                        {u.is_following
-                          ? "Following"
-                          : u.follows_you
-                          ? "Follow back"
-                          : "Follow"}
-                      </button>
-                    )}
-
-                    {isOwner && activeTab === "followers" && !isMe && (
-                      <button
-                        onClick={(e) => handleRemoveFollower(u, e)}
-                        disabled={Boolean(pendingActionIds[`rm_${u.id}`])}
-                        style={styles.removeBtn}
-                        title="Remove follower"
-                      >
-                        Remove
-                      </button>
                     )}
                   </div>
                 </div>
@@ -574,6 +581,19 @@ const styles = {
     flexShrink: 0,
     marginTop: "2px"
   },
+  userMainCol: {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column"
+  },
+  userTopRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    width: "100%"
+  },
   userInfo: {
     flex: 1,
     minWidth: 0
@@ -621,25 +641,25 @@ const styles = {
   },
   bioText: {
     fontSize: "12.5px",
-    lineHeight: "1.38",
+    lineHeight: "1.4",
     color: "#a1a1aa",
-    marginTop: "4px",
+    marginTop: "6px",
     display: "-webkit-box",
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical",
     overflow: "hidden",
     textOverflow: "ellipsis",
-    wordBreak: "break-word"
+    wordBreak: "break-word",
+    width: "100%"
   },
   actionsWrap: {
     display: "flex",
     alignItems: "center",
     gap: "6px",
-    flexShrink: 0,
-    marginTop: "2px"
+    flexShrink: 0
   },
   followBtn: {
-    background: "#e4e4e7",
+    background: "#f4f4f5",
     color: "#09090b",
     border: "none",
     borderRadius: "9999px",
@@ -657,7 +677,7 @@ const styles = {
     userSelect: "none"
   },
   followBackBtn: {
-    background: "#e4e4e7",
+    background: "#f4f4f5",
     color: "#09090b",
     border: "none",
     borderRadius: "9999px",
