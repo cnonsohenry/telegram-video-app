@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { ArrowUp, ArrowLeft, ChevronsDown } from "lucide-react";
 import AppHeader from "../components/AppHeader";
-import SuggestedSidebar from "../components/SuggestedSidebar";
+import DesktopRightSidebar from "../components/DesktopRightSidebar";
 import VideoCard from "../components/VideoCard";
 import PullToRefresh from "../components/PullToRefresh"; 
 import { useVideos } from "../hooks/useVideos";
@@ -447,6 +447,19 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
       window.history.replaceState(newState, document.title, `/?cat=${encodeURIComponent(catName)}`);
     }
   }, [scrollToTop]);
+
+  // 🟢 Handle topic / category selection from DesktopRightSidebar
+  const handleSelectTopic = useCallback((catId) => {
+    if (!catId) return;
+    const catIndex = APP_CONFIG.categories.findIndex(
+      (c) => c.toLowerCase() === String(catId).toLowerCase()
+    );
+    if (catIndex !== -1) {
+      handleTabClick(catIndex);
+    } else {
+      window.location.href = `/?tab=explore&category=${encodeURIComponent(catId)}`;
+    }
+  }, [handleTabClick]);
 
   // 🟢 Normalize initial history state for Home category
   useEffect(() => {
@@ -995,21 +1008,25 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         </div>
 
         {isDesktop && (
-          <aside
+          <DesktopRightSidebar
+            user={user}
+            onCreatorClick={onCreatorClick}
+            onVideoClick={(v) => handleOpenVideo(v)}
+            onOpenDiscover={() => {
+              window.dispatchEvent(new CustomEvent("openDiscoverCreatorsModal"));
+            }}
+            onSelectTopic={handleSelectTopic}
+            onSearchSubmit={(q) => {
+              window.dispatchEvent(new CustomEvent("openSearchModal", { detail: { query: q } }));
+            }}
             style={{
-              ...suggestedSidebarRail,
               top: shouldHideUI ? "0px" : "70px",
               height: shouldHideUI ? "100vh" : "calc(100vh - 70px)",
-              transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+              transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              borderLeft: "1px solid var(--border-color)",
+              flexShrink: 0
             }}
-            className="custom-scrollbar"
-          >
-            <SuggestedSidebar 
-              suggestions={sidebarSuggestions}
-              loading={loading} 
-              onVideoClick={(v, e) => handleOpenVideo(v, e)} 
-            />
-          </aside>
+          />
         )}
       </div>
 
@@ -1051,7 +1068,6 @@ const indicatorPillStyle = { width: "22px", height: "3px", borderRadius: "3px", 
 const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "rgba(9, 9, 11, 0.85)", backdropFilter: "blur(12px)", padding: "20px 0" };
 const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
-const suggestedSidebarRail = { width: "320px", height: "calc(100vh - 70px)", position: "sticky", top: "70px", borderLeft: "1px solid var(--border-color)", padding: "30px 15px", background: "transparent", overflowY: "auto", flexShrink: 0 };
 const showMoreButtonStyle = { 
   position: "relative", 
   display: "flex", 
