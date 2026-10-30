@@ -35,7 +35,6 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   const [cacheOrder, setCacheOrder] = useState([]); 
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isChangingTab, setIsChangingTab] = useState(false);
-  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [activeGroup, setActiveGroup] = useState(null);
 
   // 🟢 Refs to keep track of current category & open album for history popstate events
@@ -868,20 +867,24 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
             zIndex: 110,
             transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
           }}>
-            <nav 
-              onMouseEnter={() => setIsSidebarHovered(true)}
-              onMouseLeave={() => setIsSidebarHovered(false)}
-              style={{ ...sidebarStyle, width: isSidebarHovered ? "240px" : "80px", boxShadow: isSidebarHovered ? "10px 0 30px rgba(0,0,0,0.5)" : "none", borderRight: isSidebarHovered ? "1px solid #333" : "1px solid var(--border-color)" }}
-            >
+            <nav style={sidebarStyle}>
               {APP_CONFIG.tabs.map((tab, index) => (
                 <button 
                   key={index} 
                   onClick={() => handleTabClick(index)} 
-                  style={{ ...desktopTabButtonStyle, background: activeTab === index ? "rgba(255,255,255,0.08)" : "transparent", color: activeTab === index ? "var(--primary-color)" : "#f4f4f5", justifyContent: isSidebarHovered ? "flex-start" : "center", paddingLeft: isSidebarHovered ? "24px" : "0" }}
+                  className="desktop-category-btn"
+                  style={{ 
+                    ...desktopTabButtonStyle, 
+                    background: activeTab === index ? "rgba(255,255,255,0.08)" : "transparent", 
+                    color: activeTab === index ? "var(--primary-color)" : "#f4f4f5" 
+                  }}
+                  aria-label={formatCategoryLabel(tab.label)}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                     {tab.icon} 
-                     {isSidebarHovered && <span style={sidebarLabelStyle}>{formatCategoryLabel(tab.label)}</span>}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {tab.icon}
+                  </div>
+                  <div className="desktop-category-popout">
+                    {formatCategoryLabel(tab.label)}
                   </div>
                 </button>
               ))}
@@ -1054,6 +1057,47 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
         .slidable-category-tabs::-webkit-scrollbar { display: none; width: 0; height: 0; }
+        .desktop-category-btn { position: relative; }
+        .desktop-category-btn:hover { background-color: rgba(255, 255, 255, 0.08) !important; }
+        .desktop-category-popout {
+          position: absolute;
+          left: calc(100% + 10px);
+          top: 50%;
+          transform: translateY(-50%) translateX(-6px);
+          background-color: #18181b;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: #f4f4f5;
+          font-size: 13px;
+          font-weight: 700;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          letter-spacing: -0.1px;
+          padding: 6px 12px;
+          border-radius: 8px;
+          white-space: nowrap;
+          pointer-events: none;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.65);
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+          z-index: 1000;
+        }
+        .desktop-category-popout::before {
+          content: "";
+          position: absolute;
+          left: -5px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 0;
+          height: 0;
+          border-top: 5px solid transparent;
+          border-bottom: 5px solid transparent;
+          border-right: 5px solid #18181b;
+        }
+        .desktop-category-btn:hover .desktop-category-popout {
+          opacity: 1;
+          visibility: visible;
+          transform: translateY(-50%) translateX(0);
+        }
       `}</style>
     </div>
   );
@@ -1066,9 +1110,8 @@ const mobileNavStyle = { display: "flex", alignItems: "center", overflowX: "auto
 const tabButtonStyle = { flexShrink: 0, padding: "12px 9px 11px 9px", background: "none", border: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer", WebkitTapHighlightColor: "transparent", outline: "none" };
 const indicatorStyle = { position: "absolute", bottom: 0, left: 0, display: "flex", justifyContent: "center", transition: "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), width 0.3s cubic-bezier(0.25, 1, 0.5, 1)", pointerEvents: "none", zIndex: 2 };
 const indicatorPillStyle = { width: "22px", height: "3px", borderRadius: "3px", background: "var(--primary-color)" };
-const sidebarStyle = { height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)", background: "rgba(9, 9, 11, 0.85)", backdropFilter: "blur(12px)", padding: "20px 0" };
-const desktopTabButtonStyle = { display: "flex", alignItems: "center", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
-const sidebarLabelStyle = { fontSize: "15px", fontWeight: "800", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif", letterSpacing: "0.4px", animation: "fadeIn 0.2s ease-in" };
+const sidebarStyle = { width: "80px", height: "100%", position: "absolute", top: 0, left: 0, display: "flex", flexDirection: "column", gap: "8px", background: "rgba(9, 9, 11, 0.85)", backdropFilter: "blur(12px)", borderRight: "1px solid var(--border-color)", padding: "20px 0", boxSizing: "border-box" };
+const desktopTabButtonStyle = { display: "flex", alignItems: "center", justifyContent: "center", position: "relative", border: "none", borderRadius: "12px", cursor: "pointer", width: "calc(100% - 16px)", margin: "0 8px", height: "50px", transition: "all 0.15s ease", outline: "none" };
 const showMoreButtonStyle = { 
   position: "relative", 
   display: "flex", 

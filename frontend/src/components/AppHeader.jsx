@@ -642,7 +642,7 @@ export default function AppHeader({
 // 🎨 Styles (Remain exactly the same!)
 const desktopHeaderStyle = { position: "sticky", top: 0, zIndex: 100, height: "70px", background: "rgba(9, 9, 11, 0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between" };
 const logoStyle = { color: "#d4d4d8", fontSize: "24px", fontWeight: "900", letterSpacing: "-1px", margin: 0 };
-const searchBarStyle = { display: "flex", alignItems: "center", background: "#1c1c1e", borderRadius: "20px", padding: "0 15px", width: "400px", border: "1px solid #333", cursor: "text" };
+const searchBarStyle = { display: "flex", alignItems: "center", background: "var(--bg-color, #09090b)", borderRadius: "9999px", padding: "0 16px", width: "400px", height: "42px", border: "1px solid rgba(255, 255, 255, 0.08)", cursor: "text", boxSizing: "border-box", transition: "border-color 0.2s ease, background 0.2s ease" };
 const inputStyle = { background: "none", border: "none", color: "#d4d4d8", padding: "10px", width: "100%", outline: "none", fontSize: "14px" };
 const profileBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: 0 };
 const avatarStyle = (isDesktop) => ({ width: isDesktop ? "36px" : "30px", height: isDesktop ? "36px" : "30px", borderRadius: "50%", border: "2px solid var(--primary-color)", objectFit: "cover" });
@@ -652,7 +652,7 @@ const mobileHeaderStyle = { zIndex: 100, padding: "12px 15px", display: "flex", 
 const searchOverlayStyle = { position: "fixed", inset: 0, zIndex: 1000100, background: "var(--bg-color)", display: "flex", flexDirection: "column", animation: "fadeIn 0.2s ease-out" };
 const overlayHeaderStyle = { display: "flex", alignItems: "center", gap: "12px", padding: "15px", borderBottom: "1px solid #222" };
 const iconBtnStyle = { background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex" };
-const activeSearchBarStyle = { display: "flex", alignItems: "center", background: "#1c1c1e", borderRadius: "8px", padding: "0 10px", flex: 1, height: "40px" };
+const activeSearchBarStyle = { display: "flex", alignItems: "center", background: "var(--bg-color, #09090b)", borderRadius: "8px", padding: "0 12px", flex: 1, height: "42px", border: "1px solid rgba(255, 255, 255, 0.12)" };
 const searchActionBtnStyle = { background: "none", border: "none", color: "var(--primary-color)", fontWeight: "700", fontSize: "14px", cursor: "pointer" };
 const overlayContentStyle = { flex: 1, overflowY: "auto", padding: "20px" };
 const sectionStyle = { marginBottom: "20px" };
