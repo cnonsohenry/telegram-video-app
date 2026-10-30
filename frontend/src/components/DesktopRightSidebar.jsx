@@ -4,7 +4,6 @@ import {
   X, 
   Play, 
   Loader2, 
-  ChevronRight, 
   RefreshCw 
 } from "lucide-react";
 import StoryAvatar from "./StoryAvatar";
@@ -32,6 +31,7 @@ export default function DesktopRightSidebar({
   onVideoClick = null,
   onOpenDiscover = null,
   user = null,
+  showSearch = true,
   style = {}
 }) {
   // 1. Search state (internal fallback if not controlled)
@@ -210,30 +210,32 @@ export default function DesktopRightSidebar({
   return (
     <aside style={{ ...desktopRightRailStyle, ...style }} className="custom-scrollbar">
       {/* 1. Twitter-style Search Bar */}
-      <div style={desktopSearchBoxWrapper}>
-        <Search size={18} color="#71767b" style={{ flexShrink: 0 }} />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={handleSearchKey}
-          placeholder="Search Explore & Creators..."
-          style={desktopSearchInput}
-        />
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => {
-              if (onClear) onClear();
-              else setSearchQuery("");
-            }}
-            style={desktopSearchInputClearBtn}
-            title="Clear search"
-          >
-            <X size={14} color="#000" />
-          </button>
-        )}
-      </div>
+      {showSearch && (
+        <div style={desktopSearchBoxWrapper}>
+          <Search size={18} color="#71767b" style={{ flexShrink: 0 }} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearchKey}
+            placeholder="Search Explore & Creators..."
+            style={desktopSearchInput}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                if (onClear) onClear();
+                else setSearchQuery("");
+              }}
+              style={desktopSearchInputClearBtn}
+              title="Clear search"
+            >
+              <X size={14} color="#000" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 2. Top Creator Card */}
       <div style={desktopCardStyle}>
@@ -508,17 +510,6 @@ export default function DesktopRightSidebar({
                 </div>
               );
             })}
-
-            <button
-              type="button"
-              onClick={() => onOpenDiscover && onOpenDiscover()}
-              style={desktopCardShowMoreBtn}
-              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-            >
-              <span>Show more creators</span>
-              <ChevronRight size={15} />
-            </button>
           </div>
         )}
       </div>
@@ -663,7 +654,8 @@ const desktopRightRailStyle = {
   display: "flex",
   flexDirection: "column",
   gap: "16px",
-  boxSizing: "border-box"
+  boxSizing: "border-box",
+  background: "var(--bg-color, #09090b)"
 };
 
 const desktopSearchBoxWrapper = {
@@ -672,7 +664,7 @@ const desktopSearchBoxWrapper = {
   gap: "10px",
   padding: "10px 16px",
   borderRadius: "9999px",
-  background: "#16181c",
+  background: "var(--bg-color, #09090b)",
   border: "1px solid rgba(255, 255, 255, 0.08)",
   boxSizing: "border-box",
   transition: "border-color 0.2s ease, background 0.2s ease",
@@ -703,7 +695,7 @@ const desktopSearchInputClearBtn = {
 };
 
 const desktopCardStyle = {
-  background: "#16181c",
+  background: "var(--bg-color, #09090b)",
   borderRadius: "16px",
   border: "1px solid rgba(255, 255, 255, 0.08)",
   overflow: "hidden",
@@ -842,23 +834,6 @@ const desktopHighlightSkeleton = {
   gap: "12px",
   padding: "10px 16px",
   alignItems: "center"
-};
-
-const desktopCardShowMoreBtn = {
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
-  padding: "14px 16px",
-  background: "none",
-  border: "none",
-  borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-  color: "var(--primary-color, #f43f5e)",
-  fontSize: "14px",
-  fontWeight: "600",
-  cursor: "pointer",
-  transition: "background 0.15s ease",
-  textAlign: "left",
-  width: "100%"
 };
 
 const desktopFooterStyle = {

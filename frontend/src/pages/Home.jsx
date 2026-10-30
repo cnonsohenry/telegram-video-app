@@ -1010,6 +1010,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         {isDesktop && (
           <DesktopRightSidebar
             user={user}
+            showSearch={false}
             onCreatorClick={onCreatorClick}
             onVideoClick={(v) => handleOpenVideo(v)}
             onOpenDiscover={() => {
