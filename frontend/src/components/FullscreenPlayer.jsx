@@ -226,6 +226,10 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       return;
     }
 
+    if (!currentUser.email_verified && currentUser.role !== "admin") {
+      return promptEmailVerification({ reason: "follow", email: currentUser.email });
+    }
+
     setIsFollowLoading(true);
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(creatorHandle)}/follow`, {
@@ -237,6 +241,10 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
       });
 
       const data = await res.json();
+
+      if (res.status === 403 && data.requires_email_verification) {
+        return promptEmailVerification({ reason: "follow", email: data.email || currentUser?.email });
+      }
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to follow creator");
@@ -651,15 +659,28 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     const token = localStorage.getItem("token");
     if (!token) return promptLogin("like");
 
-    setIsLiked(!isLiked);
+    if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+      return promptEmailVerification({ reason: "like", email: currentUser.email });
+    }
+
+    const nextLiked = !isLiked;
+    setIsLiked(nextLiked);
     setLikesCount(prev => isLiked ? Math.max(0, prev - 1) : prev + 1);
 
     try {
-      await fetch(`${APP_CONFIG.apiUrl}/api/interactions/like`, {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/interactions/like`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message_id: video.message_id })
       });
+      if (res.status === 403) {
+        const data = await res.json();
+        if (data.requires_email_verification) {
+          setIsLiked(!nextLiked);
+          setLikesCount(prev => nextLiked ? Math.max(0, prev - 1) : prev + 1);
+          return promptEmailVerification({ reason: "like", email: data.email || currentUser?.email });
+        }
+      }
     } catch (err) {}
   };
 
@@ -668,15 +689,28 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
     const token = localStorage.getItem("token");
     if (!token) return promptLogin("save");
 
-    setIsSaved(!isSaved);
+    if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+      return promptEmailVerification({ reason: "save", email: currentUser.email });
+    }
+
+    const nextSaved = !isSaved;
+    setIsSaved(nextSaved);
     setSavesCount(prev => isSaved ? Math.max(0, prev - 1) : prev + 1);
 
     try {
-      await fetch(`${APP_CONFIG.apiUrl}/api/interactions/save`, {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/interactions/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message_id: video.message_id })
       });
+      if (res.status === 403) {
+        const data = await res.json();
+        if (data.requires_email_verification) {
+          setIsSaved(!nextSaved);
+          setSavesCount(prev => nextSaved ? Math.max(0, prev - 1) : prev + 1);
+          return promptEmailVerification({ reason: "save", email: data.email || currentUser?.email });
+        }
+      }
     } catch (err) {}
   };
 

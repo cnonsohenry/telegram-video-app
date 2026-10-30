@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { 
-  X, Mail, CheckCircle2, AlertCircle, Loader2, ArrowRight, RefreshCw, Edit2, ShieldCheck, Download
+  X, Mail, CheckCircle2, AlertCircle, Loader2, ArrowRight, RefreshCw, Edit2, ShieldCheck, Download,
+  Film, MessageSquare, Heart, Bookmark, UserPlus, CreditCard
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { showToast } from "../utils/toast";
@@ -77,6 +78,44 @@ export default function EmailVerificationModal({
 
   const getReasonConfig = () => {
     switch (reason) {
+      case "story":
+        return {
+          title: "Verify to Watch Stories",
+          subtitle: "Confirm your email address once to unlock 24-hour creator status stories.",
+          badgeIcon: Film
+        };
+      case "comment":
+        return {
+          title: "Verify to Comment",
+          subtitle: "Confirm your email address once to join discussions and post replies.",
+          badgeIcon: MessageSquare
+        };
+      case "like":
+        return {
+          title: "Verify to Like",
+          subtitle: "Confirm your email address once to like videos and comments.",
+          badgeIcon: Heart
+        };
+      case "save":
+        return {
+          title: "Verify to Bookmark",
+          subtitle: "Confirm your email address once to save your favorite clips to your profile.",
+          badgeIcon: Bookmark
+        };
+      case "follow":
+        return {
+          title: "Verify to Follow",
+          subtitle: "Confirm your email address once to follow your favorite creators.",
+          badgeIcon: UserPlus
+        };
+      case "payment":
+      case "subscribe":
+      case "tip":
+        return {
+          title: "Verify for VIP & Payments",
+          subtitle: "Confirm your email address to unlock creator subscriptions, VIP passes, and fan tipping.",
+          badgeIcon: CreditCard
+        };
       case "download":
         return {
           title: "Verify to Download",

@@ -9,7 +9,7 @@ import { ArrowLeft } from "lucide-react";
 import DesktopLeftSidebar from "./DesktopLeftSidebar";
 import DesktopRightSidebar from "./DesktopRightSidebar";
 import { APP_CONFIG } from "../config";
-import { promptLogin } from "../utils/toast";
+import { promptLogin, promptEmailVerification } from "../utils/toast";
 
 const API_BASE_URL = APP_CONFIG.apiUrl || "";
 const getAuthHeaders = (json = false) => {
@@ -152,6 +152,10 @@ export default function FollowListModal({
     if (!currentUser) {
       onClose?.();
       promptLogin("follow");
+      return;
+    }
+    if (!currentUser.email_verified && currentUser.role !== "admin") {
+      promptEmailVerification({ reason: "follow", email: currentUser.email });
       return;
     }
     const uid = targetUser.id;

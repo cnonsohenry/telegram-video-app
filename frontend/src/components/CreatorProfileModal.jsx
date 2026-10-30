@@ -18,7 +18,7 @@ import DiscoverCreatorsSection from "./DiscoverCreatorsSection";
 import FollowListModal from "./FollowListModal";
 import DesktopLeftSidebar from "./DesktopLeftSidebar";
 import DesktopRightSidebar from "./DesktopRightSidebar";
-import { promptLogin, showToast } from "../utils/toast";
+import { promptLogin, showToast, promptEmailVerification } from "../utils/toast";
 
 export default function CreatorProfileModal({ 
   creatorUsername, 
@@ -54,6 +54,14 @@ export default function CreatorProfileModal({
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+
+  const handleOpenTipModal = () => {
+    if (!currentUser) return promptLogin("tip");
+    if (!currentUser.email_verified && currentUser.role !== "admin") {
+      return promptEmailVerification({ reason: "tip", email: currentUser.email });
+    }
+    setShowTipModal(true);
+  };
   const [showDiscoverCreators, setShowDiscoverCreators] = useState(false);
   const [optionsVideo, setOptionsVideo] = useState(null);
   const [reportedVideo, setReportedVideo] = useState(null);
@@ -374,6 +382,11 @@ export default function CreatorProfileModal({
       return;
     }
 
+    if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+      promptEmailVerification({ reason: "follow", email: currentUser.email });
+      return;
+    }
+
     if (creatorData?.is_owner) {
       showToast("This is your own profile!", "info");
       return;
@@ -389,6 +402,10 @@ export default function CreatorProfileModal({
         }
       });
       const data = await res.json();
+      if (res.status === 403 && data.requires_email_verification) {
+        promptEmailVerification({ reason: "follow", email: data.email || currentUser?.email });
+        return;
+      }
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to update follow");
       }
@@ -409,6 +426,11 @@ export default function CreatorProfileModal({
     const token = localStorage.getItem("token");
     if (!token) {
       promptLogin("subscribe");
+      return;
+    }
+
+    if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+      promptEmailVerification({ reason: "subscribe", email: currentUser.email });
       return;
     }
 
@@ -434,6 +456,10 @@ export default function CreatorProfileModal({
           }
         });
         const data = await res.json();
+        if (res.status === 403 && data.requires_email_verification) {
+          promptEmailVerification({ reason: "subscribe", email: data.email || currentUser?.email });
+          return;
+        }
         if (!res.ok || !data.success) {
           throw new Error(data.error || "Failed to cancel subscription");
         }
@@ -467,6 +493,10 @@ export default function CreatorProfileModal({
         }
       });
       const data = await res.json();
+      if (res.status === 403 && data.requires_email_verification) {
+        promptEmailVerification({ reason: "subscribe", email: data.email || currentUser?.email });
+        return;
+      }
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed to update subscription");
       }
@@ -476,7 +506,7 @@ export default function CreatorProfileModal({
       if (onSubscriptionUpdated) onSubscriptionUpdated();
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (e) {
-      showToast(e.message || "Failed to update subscription", "error");
+      showToast(e.message || "Failed to subscribe", "error");
     } finally {
       setIsSubscribing(false);
     }
@@ -1170,7 +1200,7 @@ export default function CreatorProfileModal({
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   {!creatorData?.is_owner && isMonetizedCreator && creatorData?.allow_tips !== false && (
                     <button 
-                      onClick={() => setShowTipModal(true)} 
+                      onClick={handleOpenTipModal} 
                       style={desktopHeaderIconBtnStyle} 
                       title="Send Tip"
                     >
@@ -1243,7 +1273,7 @@ export default function CreatorProfileModal({
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               {!creatorData?.is_owner && isMonetizedCreator && creatorData?.allow_tips !== false && (
                 <button 
-                  onClick={() => setShowTipModal(true)} 
+                  onClick={handleOpenTipModal} 
                   style={navBtnStyle} 
                   title="Send Tip"
                 >

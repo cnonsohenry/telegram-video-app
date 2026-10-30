@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
-import { promptLogin } from "../utils/toast";
+import { promptLogin, promptEmailVerification } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
 import { getNetworkBadge, getWalletDeepLink, getQrData, formatCountdown } from "../utils/cryptoHelpers";
 
@@ -27,7 +27,16 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
     if (!token) {
       promptLogin("subscribe");
       onClose();
+      return;
     }
+    const userStr = localStorage.getItem("user");
+    try {
+      const u = userStr ? JSON.parse(userStr) : null;
+      if (u && !u.email_verified && u.role !== "admin") {
+        promptEmailVerification({ reason: "subscribe", email: u.email || "" });
+        onClose();
+      }
+    } catch (_) {}
   }, [onClose]);
 
   // Prevent background scroll while modal is open

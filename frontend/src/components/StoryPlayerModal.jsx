@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { createPortal } from "react-dom";
 import useModalHistory from "../hooks/useModalHistory";
 import { APP_CONFIG } from "../config";
-import { promptLogin } from "../utils/toast";
+import { promptLogin, promptEmailVerification } from "../utils/toast";
 
 function formatStoryTimeAgo(story) {
   if (!story) return "";
@@ -57,7 +57,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     return activeSlot === 0 ? videoRef0.current : videoRef1.current;
   }, [activeSlot]);
 
-  // Enforce authentication: Only logged-in users can view stories
+  // Enforce authentication & email verification: Only verified users can view stories
   useEffect(() => {
     if (isOpen) {
       const token = localStorage.getItem("token");
@@ -66,6 +66,15 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
         handleSafeClose();
         return;
       }
+      const userStr = localStorage.getItem("user");
+      try {
+        const u = userStr ? JSON.parse(userStr) : null;
+        if (u && !u.email_verified && u.role !== "admin") {
+          promptEmailVerification({ reason: "story", email: u.email || "" });
+          handleSafeClose();
+          return;
+        }
+      } catch (_) {}
     }
   }, [isOpen, handleSafeClose]);
 

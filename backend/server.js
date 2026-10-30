@@ -26,7 +26,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from 
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; 
 import { generateDownloadUrl } from "./r2.js"; 
 import adminRoutes, { syncTelegramCreators, migrateLegacyVipToCreator } from "./admin.js";
-import authRoutes, { authenticateToken, JWT_SECRET } from "./auth.js";
+import authRoutes, { authenticateToken, requireEmailVerified, JWT_SECRET } from "./auth.js";
 import creatorRoutes from "./creator.js";
 import pool from "./db.js";
 import { fetchTelegramChat } from "./telegramCreatorSync.js";
@@ -520,8 +520,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/creator", creatorRoutes);
 app.use("/api/creators", creatorRoutes);
 
-app.post("/api/verify-payment", authenticateToken, (req, res) => verifyPayment(req, res, pool));
-app.post("/api/crypto/create", authenticateToken, (req, res) => createCryptoPayment(req, res, pool));
+app.post("/api/verify-payment", authenticateToken, requireEmailVerified, (req, res) => verifyPayment(req, res, pool));
+app.post("/api/crypto/create", authenticateToken, requireEmailVerified, (req, res) => createCryptoPayment(req, res, pool));
 app.post("/api/crypto/webhook", (req, res) => cryptoWebhook(req, res, pool));
 app.get("/api/crypto/status/:order_id", (req, res) => checkCryptoTransaction(req, res, pool));
 
@@ -2535,7 +2535,7 @@ app.get("/api/interactions/saved", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/interactions/like", authenticateToken, async (req, res) => {
+app.post("/api/interactions/like", authenticateToken, requireEmailVerified, async (req, res) => {
   try {
     const { message_id } = req.body;
     const user_id = req.user.id; 
@@ -2555,7 +2555,7 @@ app.post("/api/interactions/like", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/interactions/save", authenticateToken, async (req, res) => {
+app.post("/api/interactions/save", authenticateToken, requireEmailVerified, async (req, res) => {
   try {
     const { message_id } = req.body;
     const user_id = req.user.id; 
@@ -2586,7 +2586,7 @@ app.post("/api/interactions/share", shareLimiter, async (req, res) => {
   }
 });
 
-app.post("/api/comments", authenticateToken, commentLimiter, async (req, res) => {
+app.post("/api/comments", authenticateToken, commentLimiter, requireEmailVerified, async (req, res) => {
   try {
     const { message_id, content, parent_id } = req.body;
     const user_id = req.user.id;
@@ -2672,7 +2672,7 @@ app.get("/api/comments/:message_id", async (req, res) => {
   }
 });
 
-app.post("/api/comments/:comment_id/like", authenticateToken, async (req, res) => {
+app.post("/api/comments/:comment_id/like", authenticateToken, requireEmailVerified, async (req, res) => {
   try {
     const { comment_id } = req.params;
     const user_id = req.user.id;

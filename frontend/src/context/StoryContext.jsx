@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { APP_CONFIG } from "../config";
-import { promptLogin } from "../utils/toast";
+import { promptLogin, promptEmailVerification } from "../utils/toast";
 import StoryPlayerModal from "../components/StoryPlayerModal";
 
 const StoryContext = createContext(null);
@@ -192,6 +192,14 @@ export function StoryProvider({ children }) {
         return;
       }
 
+      const userStr = localStorage.getItem("user");
+      let currentUser = null;
+      try { currentUser = userStr ? JSON.parse(userStr) : null; } catch (_) {}
+      if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+        promptEmailVerification({ reason: "story", email: currentUser.email || "" });
+        return;
+      }
+
       const cleanUname = String(username || "").replace(/^@/, "").trim();
       if (!cleanUname) return;
 
@@ -202,6 +210,13 @@ export function StoryProvider({ children }) {
         const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUname)}/story`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        if (res.status === 403) {
+          const errData = await res.json();
+          if (errData.requires_email_verification) {
+            promptEmailVerification({ reason: "story", email: errData.email || currentUser?.email || "" });
+            return;
+          }
+        }
         if (res.ok) {
           const data = await res.json();
           if (data.has_active_story && (Array.isArray(data.stories) || data.story)) {
@@ -268,6 +283,13 @@ export function StoryProvider({ children }) {
     const token = localStorage.getItem("token");
     if (!token) {
       promptLogin("view highlights");
+      return;
+    }
+    const userStr = localStorage.getItem("user");
+    let currentUser = null;
+    try { currentUser = userStr ? JSON.parse(userStr) : null; } catch (_) {}
+    if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+      promptEmailVerification({ reason: "story", email: currentUser.email || "" });
       return;
     }
     if (!stories || stories.length === 0) return;

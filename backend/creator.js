@@ -8,7 +8,7 @@ import path from "path";
 import multer from "multer";
 import jwt from "jsonwebtoken";
 import pool from "./db.js";
-import { authenticateToken, JWT_SECRET } from "./auth.js";
+import { authenticateToken, requireEmailVerified, JWT_SECRET } from "./auth.js";
 import { 
   uploadVideoToR2, 
   uploadImageToR2,
@@ -1472,9 +1472,19 @@ router.get("/:username", optionalAuth, async (req, res) => {
     let hasViewedStory = false;
     try {
       const currentUserId = req.user?.id || null;
+      let isVerifiedViewer = false;
+      if (currentUserId) {
+        if (req.user?.role === "admin") {
+          isVerifiedViewer = true;
+        } else {
+          const vRes = await pool.query("SELECT COALESCE(email_verified, FALSE) as email_verified, is_managed, is_verified FROM app_users WHERE id = $1", [currentUserId]);
+          isVerifiedViewer = Boolean(vRes.rows[0]?.email_verified || vRes.rows[0]?.is_managed || vRes.rows[0]?.is_verified);
+        }
+      }
+      const canAccessVideo = currentUserId && isVerifiedViewer;
       const storyRes = await pool.query(
         `SELECT s.id, s.creator_id, s.username, s.thumbnail_url, s.duration, s.sound_title, s.created_at, s.expires_at
-                ${currentUserId ? ", s.video_url, CASE WHEN v.id IS NOT NULL THEN TRUE ELSE FALSE END as has_viewed" : ", NULL as video_url, FALSE as has_viewed, TRUE as requires_auth"}
+                ${canAccessVideo ? ", s.video_url, CASE WHEN v.id IS NOT NULL THEN TRUE ELSE FALSE END as has_viewed" : ", NULL as video_url, FALSE as has_viewed, " + (!currentUserId ? "TRUE as requires_auth" : "TRUE as requires_email_verification")}
          FROM creator_stories s
          ${currentUserId ? "LEFT JOIN creator_story_views v ON (v.story_id = s.id AND v.user_id = $2)" : ""}
          WHERE LOWER(s.username) = LOWER($1) 
@@ -1495,6 +1505,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
           created_at: s.created_at,
           expires_at: s.expires_at,
           requires_auth: !currentUserId,
+          requires_email_verification: Boolean(currentUserId && !isVerifiedViewer),
           has_viewed: Boolean(s.has_viewed)
         }));
         const hasViewedAll = currentUserId ? activeStories.every(s => s.has_viewed) : false;
@@ -1875,6 +1886,22 @@ router.get("/:username/story", optionalAuth, async (req, res) => {
       error: "Authentication required to view story post", 
       requires_auth: true 
     });
+  }
+
+  // 🛑 Strict check: User must be email verified to view stories
+  if (req.user?.role !== "admin") {
+    const userCheck = await pool.query(
+      "SELECT email, COALESCE(email_verified, FALSE) as email_verified, is_managed, is_verified FROM app_users WHERE id = $1",
+      [currentUserId]
+    );
+    const u = userCheck.rows[0];
+    if (!u || (!u.email_verified && !u.is_managed && !u.is_verified)) {
+      return res.status(403).json({
+        error: "Email verification required to view creator status stories.",
+        requires_email_verification: true,
+        email: u?.email || ""
+      });
+    }
   }
 
   try {
@@ -2704,6 +2731,22 @@ router.post("/:username/follow", authenticateOwnerOrApiKey, async (req, res) => 
     return res.status(401).json({ error: "Unauthorized" });
   }
 
+  // 🛑 Strict check: User must be email verified to follow creators
+  if (!req.isApiKey && req.user?.role !== "admin") {
+    const userRes = await pool.query(
+      "SELECT email, COALESCE(email_verified, FALSE) as email_verified, is_managed, is_verified FROM app_users WHERE id = $1",
+      [followerId]
+    );
+    const u = userRes.rows[0];
+    if (!u || (!u.email_verified && !u.is_managed && !u.is_verified)) {
+      return res.status(403).json({
+        error: "Email verification required to follow creators.",
+        requires_email_verification: true,
+        email: u?.email || ""
+      });
+    }
+  }
+
   try {
     let creatorRes = await pool.query(
       "SELECT id, username FROM app_users WHERE LOWER(username) = LOWER($1) OR LOWER(COALESCE(display_name, '')) = LOWER($1)",
@@ -2773,6 +2816,22 @@ router.post("/:username/follow", authenticateOwnerOrApiKey, async (req, res) => 
 router.post("/:username/subscribe", authenticateToken, async (req, res) => {
   const { username } = req.params;
   const subscriberId = req.user.id;
+
+  // 🛑 Strict check: User must be email verified to subscribe to creators
+  if (req.user?.role !== "admin") {
+    const userRes = await pool.query(
+      "SELECT email, COALESCE(email_verified, FALSE) as email_verified, is_managed, is_verified FROM app_users WHERE id = $1",
+      [subscriberId]
+    );
+    const u = userRes.rows[0];
+    if (!u || (!u.email_verified && !u.is_managed && !u.is_verified)) {
+      return res.status(403).json({
+        error: "Email verification required to subscribe to creators.",
+        requires_email_verification: true,
+        email: u?.email || ""
+      });
+    }
+  }
 
   try {
     // Find creator ID

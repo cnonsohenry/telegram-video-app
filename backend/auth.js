@@ -79,6 +79,40 @@ export const authenticateToken = (req, res, next) => {
   }
 };
 
+// 🟢 Middleware to strictly enforce email verification
+export const requireEmailVerified = async (req, res, next) => {
+  if (!req.user?.id) {
+    return res.status(401).json({ error: "Unauthorized", requires_auth: true });
+  }
+  if (req.user.role === "admin") {
+    return next();
+  }
+  try {
+    const userRes = await pool.query(
+      "SELECT id, email, username, COALESCE(email_verified, FALSE) as email_verified, is_managed, is_verified FROM app_users WHERE id = $1",
+      [req.user.id]
+    );
+    const user = userRes.rows[0];
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const isVerified = Boolean(user.email_verified || user.is_managed || user.is_verified);
+    if (!isVerified) {
+      return res.status(403).json({
+        error: "Email verification required to perform this action.",
+        requires_email_verification: true,
+        email: user.email
+      });
+    }
+    req.user.email_verified = true;
+    req.user.email = user.email;
+    next();
+  } catch (err) {
+    console.error("[REQUIRE EMAIL VERIFIED ERROR]", err);
+    res.status(500).json({ error: "Failed to verify email status" });
+  }
+};
+
 /* =====================
    VALIDATION SCHEMAS
 ===================== */

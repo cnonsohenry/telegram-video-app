@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { X, Send, Loader2, Heart, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { APP_CONFIG } from "../config";
+import { promptEmailVerification } from "../utils/toast";
 import { renderClickableCaption } from "./ClickableCaption";
 
 export function generateSearchPhrase(video) {
@@ -158,6 +159,15 @@ export default function CommentSectionModal({ video, onClose }) {
       window.dispatchEvent(new CustomEvent("promptLogin", { detail: { action: "comment" } }));
       return;
     }
+
+    const userStr = localStorage.getItem("user");
+    let currentUser = null;
+    try { currentUser = userStr ? JSON.parse(userStr) : null; } catch (_) {}
+    if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+      promptEmailVerification({ reason: "comment", email: currentUser.email || "" });
+      return;
+    }
+
     setIsPosting(true);
 
     const parentIdToSend = replyingTo ? replyingTo.parentId : null;
@@ -176,6 +186,13 @@ export default function CommentSectionModal({ video, onClose }) {
           parent_id: parentIdToSend
         })
       });
+      if (res.status === 403) {
+        const errData = await res.json();
+        if (errData.requires_email_verification) {
+          promptEmailVerification({ reason: "comment", email: errData.email || currentUser?.email || "" });
+          return;
+        }
+      }
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -237,6 +254,14 @@ export default function CommentSectionModal({ video, onClose }) {
       return;
     }
 
+    const userStr = localStorage.getItem("user");
+    let currentUser = null;
+    try { currentUser = userStr ? JSON.parse(userStr) : null; } catch (_) {}
+    if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+      promptEmailVerification({ reason: "like", email: currentUser.email || "" });
+      return;
+    }
+
     // Optimistic UI update
     setComments(prevComments =>
       prevComments.map(c => {
@@ -261,6 +286,28 @@ export default function CommentSectionModal({ video, onClose }) {
           Authorization: `Bearer ${token}`
         }
       });
+      if (res.status === 403) {
+        const errData = await res.json();
+        if (errData.requires_email_verification) {
+          // Revert optimistic update
+          setComments(prevComments =>
+            prevComments.map(c => {
+              if (c.id === commentId) {
+                const wasLiked = Boolean(c.user_liked);
+                const currentLikes = Number(c.likes_count || 0);
+                return {
+                  ...c,
+                  user_liked: !wasLiked,
+                  likes_count: wasLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1
+                };
+              }
+              return c;
+            })
+          );
+          promptEmailVerification({ reason: "like", email: errData.email || currentUser?.email || "" });
+          return;
+        }
+      }
       if (res.ok) {
         const data = await res.json();
         if (typeof data.likes_count !== "undefined") {

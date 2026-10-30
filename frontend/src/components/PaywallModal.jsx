@@ -6,7 +6,7 @@ import {
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
-import { showToast, promptLogin } from "../utils/toast";
+import { showToast, promptLogin, promptEmailVerification } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
 import { getNetworkBadge, getWalletDeepLink, getQrData, formatCountdown } from "../utils/cryptoHelpers";
 
@@ -31,6 +31,9 @@ export default function PaywallModal({ onClose, user }) {
     if (!user || !user.id || !token) {
       promptLogin("subscribe");
       handleSafeClose();
+    } else if (!user.email_verified && user.role !== "admin") {
+      promptEmailVerification({ reason: "payment", email: user.email || "" });
+      handleSafeClose();
     }
   }, [user, handleSafeClose]);
 
@@ -47,6 +50,11 @@ export default function PaywallModal({ onClose, user }) {
     const token = localStorage.getItem("token");
     if (!user || !user.id || !token) {
       promptLogin("subscribe");
+      handleSafeClose();
+      return;
+    }
+    if (!user.email_verified && user.role !== "admin") {
+      promptEmailVerification({ reason: "payment", email: user.email || "" });
       handleSafeClose();
       return;
     }

@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
+import { promptLogin, promptEmailVerification } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
 import { getNetworkBadge, getWalletDeepLink, getQrData, formatCountdown } from "../utils/cryptoHelpers";
 
@@ -33,11 +34,25 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
     ? Math.max(2, Number(customAmount)) 
     : (selectedPreset?.amountUsd || 5);
 
-  // Prevent background scroll while modal is active
+  // Prevent background scroll while modal is active & enforce email verification
   useEffect(() => {
     document.body.style.overflow = "hidden";
+    const token = localStorage.getItem("token");
+    if (!token) {
+      promptLogin("tip");
+      onClose();
+      return;
+    }
+    const userStr = localStorage.getItem("user");
+    try {
+      const u = userStr ? JSON.parse(userStr) : null;
+      if (u && !u.email_verified && u.role !== "admin") {
+        promptEmailVerification({ reason: "tip", email: u.email || "" });
+        onClose();
+      }
+    } catch (_) {}
     return () => { document.body.style.overflow = ""; };
-  }, []);
+  }, [onClose]);
 
   // 20-minute countdown timer
   useEffect(() => {
@@ -98,6 +113,15 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
         throw new Error("Please log in to send a tip.");
       }
 
+      const userStr = localStorage.getItem("user");
+      let u = null;
+      try { u = userStr ? JSON.parse(userStr) : null; } catch (_) {}
+      if (u && !u.email_verified && u.role !== "admin") {
+        promptEmailVerification({ reason: "tip", email: u.email || "" });
+        onClose();
+        return;
+      }
+
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/crypto/create`, {
         method: "POST",
         headers: {
@@ -112,6 +136,15 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
           message: message.trim()
         })
       });
+
+      if (res.status === 403) {
+        const data = await res.json();
+        if (data.requires_email_verification) {
+          promptEmailVerification({ reason: "tip", email: data.email || u?.email || "" });
+          onClose();
+          return;
+        }
+      }
 
       const data = await res.json();
       if (!res.ok || !data.success) {
