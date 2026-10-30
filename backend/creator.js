@@ -1707,10 +1707,12 @@ router.get("/:username/followers", optionalAuth, async (req, res) => {
              COALESCE(u.is_creator, FALSE) as is_creator,
              u.creator_bio,
              cf.created_at as followed_at,
-             CASE WHEN $3::INTEGER IS NOT NULL AND my_f.id IS NOT NULL THEN TRUE ELSE FALSE END as is_following
+             CASE WHEN $3::INTEGER IS NOT NULL AND my_f.id IS NOT NULL THEN TRUE ELSE FALSE END as is_following,
+             CASE WHEN $3::INTEGER IS NOT NULL AND f_back.id IS NOT NULL THEN TRUE ELSE FALSE END as follows_you
       FROM creator_follows cf
       JOIN app_users u ON cf.follower_id = u.id
       LEFT JOIN creator_follows my_f ON (my_f.follower_id = $3::INTEGER AND my_f.creator_id = u.id)
+      LEFT JOIN creator_follows f_back ON (f_back.follower_id = u.id AND f_back.creator_id = $3::INTEGER)
       WHERE (cf.creator_id = $1 OR ($2::BIGINT IS NOT NULL AND cf.creator_id = $2::BIGINT))
         ${searchFilter}
       ORDER BY cf.created_at DESC
@@ -1823,11 +1825,13 @@ router.get("/:username/following", optionalAuth, async (req, res) => {
              COALESCE(u.is_creator, CASE WHEN tu.user_id IS NOT NULL THEN TRUE ELSE FALSE END) as is_creator,
              u.creator_bio,
              cf.created_at as followed_at,
-             CASE WHEN $2::INTEGER IS NOT NULL AND my_f.id IS NOT NULL THEN TRUE ELSE FALSE END as is_following
+             CASE WHEN $2::INTEGER IS NOT NULL AND my_f.id IS NOT NULL THEN TRUE ELSE FALSE END as is_following,
+             CASE WHEN $2::INTEGER IS NOT NULL AND f_back.id IS NOT NULL THEN TRUE ELSE FALSE END as follows_you
       FROM creator_follows cf
       LEFT JOIN app_users u ON (cf.creator_id = u.id OR (u.telegram_user_id IS NOT NULL AND cf.creator_id = u.telegram_user_id))
       LEFT JOIN users tu ON cf.creator_id = tu.user_id
       LEFT JOIN creator_follows my_f ON (my_f.follower_id = $2::INTEGER AND my_f.creator_id = cf.creator_id)
+      LEFT JOIN creator_follows f_back ON (f_back.follower_id = cf.creator_id AND f_back.creator_id = $2::INTEGER)
       WHERE cf.follower_id = $1
         AND COALESCE(u.username, tu.username) IS NOT NULL
         ${searchFilter}
@@ -2556,12 +2560,149 @@ router.get("/:username/videos", async (req, res) => {
 });
 
 /* =======================================================
+   4.8. MANAGED CREATOR SOCIAL FOLLOWING DISCOVERY & SYNC
+   GET /api/creator/managed/candidates
+   POST /api/creator/managed/sync-follows
+======================================================= */
+router.get("/managed/candidates", authenticateOwnerOrApiKey, async (req, res) => {
+  try {
+    if (!req.isApiKey && req.user?.role !== "admin") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // 1. Fetch all managed creators
+    const creatorsRes = await pool.query(`
+      SELECT u.id, u.username, u.display_name, u.creator_category, u.created_at,
+             COUNT(DISTINCT cf_in.id)::int as followers_count,
+             COUNT(DISTINCT cf_out.id)::int as following_count
+      FROM app_users u
+      LEFT JOIN creator_follows cf_in ON (cf_in.creator_id = u.id)
+      LEFT JOIN creator_follows cf_out ON (cf_out.follower_id = u.id)
+      WHERE u.is_managed = TRUE AND u.is_creator = TRUE
+      GROUP BY u.id, u.username, u.display_name, u.creator_category, u.created_at
+      ORDER BY followers_count DESC, u.id ASC
+    `);
+
+    // 2. Fetch existing follower IDs per creator
+    const followersRes = await pool.query(`
+      SELECT cf.creator_id, cf.follower_id, cf.created_at
+      FROM creator_follows cf
+      JOIN app_users u ON cf.creator_id = u.id
+      WHERE u.is_managed = TRUE AND u.is_creator = TRUE
+      ORDER BY cf.created_at ASC
+    `);
+
+    // 3. Fetch existing following IDs per creator
+    const followingRes = await pool.query(`
+      SELECT cf.follower_id as creator_id, cf.creator_id as followed_id, cf.created_at
+      FROM creator_follows cf
+      JOIN app_users u ON cf.follower_id = u.id
+      WHERE u.is_managed = TRUE AND u.is_creator = TRUE
+      ORDER BY cf.created_at ASC
+    `);
+
+    const followersMap = {};
+    for (const row of followersRes.rows) {
+      if (!followersMap[row.creator_id]) followersMap[row.creator_id] = [];
+      followersMap[row.creator_id].push({
+        follower_id: row.follower_id,
+        created_at: row.created_at
+      });
+    }
+
+    const followingMap = {};
+    for (const row of followingRes.rows) {
+      if (!followingMap[row.creator_id]) followingMap[row.creator_id] = [];
+      followingMap[row.creator_id].push({
+        followed_id: Number(row.followed_id),
+        created_at: row.created_at
+      });
+    }
+
+    const result = creatorsRes.rows.map(c => ({
+      ...c,
+      followers: followersMap[c.id] || [],
+      following: followingMap[c.id] || []
+    }));
+
+    return res.json({ success: true, count: result.length, creators: result });
+  } catch (err) {
+    console.error("[MANAGED CANDIDATES ERROR]", err);
+    return res.status(500).json({ error: "Failed to fetch managed creator candidates" });
+  }
+});
+
+router.post("/managed/sync-follows", authenticateOwnerOrApiKey, async (req, res) => {
+  try {
+    if (!req.isApiKey && req.user?.role !== "admin") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const follows = req.body.follows;
+    if (!Array.isArray(follows) || follows.length === 0) {
+      return res.status(400).json({ error: "No follows provided" });
+    }
+
+    let inserted = 0;
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < follows.length; i += CHUNK_SIZE) {
+      const chunk = follows.slice(i, i + CHUNK_SIZE);
+      const values = [];
+      const params = [];
+      let pIdx = 1;
+
+      for (const item of chunk) {
+        const followerId = parseInt(item.follower_id, 10);
+        const creatorId = parseInt(item.creator_id, 10);
+        const createdAt = item.created_at ? new Date(item.created_at) : new Date();
+
+        if (followerId && creatorId && followerId !== creatorId) {
+          values.push(`($${pIdx++}, $${pIdx++}, $${pIdx++})`);
+          params.push(followerId, creatorId, createdAt);
+        }
+      }
+
+      if (values.length > 0) {
+        const insertQuery = `
+          INSERT INTO creator_follows (follower_id, creator_id, created_at)
+          VALUES ${values.join(", ")}
+          ON CONFLICT (follower_id, creator_id) DO NOTHING
+        `;
+        const resQuery = await pool.query(insertQuery, params);
+        inserted += resQuery.rowCount || 0;
+      }
+    }
+
+    return res.json({ success: true, inserted });
+  } catch (err) {
+    console.error("[MANAGED SYNC FOLLOWS ERROR]", err);
+    return res.status(500).json({ error: "Failed to sync managed creator follows" });
+  }
+});
+
+/* =======================================================
    5. FOLLOW / UNFOLLOW CREATOR (FREE GENERAL FOLLOWING)
    POST /api/creator/:username/follow
 ======================================================= */
-router.post("/:username/follow", authenticateToken, async (req, res) => {
+router.post("/:username/follow", authenticateOwnerOrApiKey, async (req, res) => {
   const { username } = req.params;
-  const followerId = req.user.id;
+  let followerId = req.user?.id;
+
+  if (req.isApiKey) {
+    if (req.body?.follower_id) {
+      followerId = parseInt(req.body.follower_id, 10);
+    } else if (req.body?.follower_username) {
+      const fRes = await pool.query(
+        "SELECT id FROM app_users WHERE LOWER(username) = LOWER($1)",
+        [req.body.follower_username]
+      );
+      if (fRes.rows.length > 0) followerId = fRes.rows[0].id;
+    }
+  }
+
+  if (!followerId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
   try {
     let creatorRes = await pool.query(

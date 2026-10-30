@@ -367,7 +367,12 @@ export default function FollowListModal({
                         <span style={styles.creatorTag}>Creator</span>
                       )}
                     </div>
-                    <div style={styles.handleText}>@{u.username}</div>
+                    <div style={styles.handleRow}>
+                      <span style={styles.handleText}>@{u.username}</span>
+                      {u.follows_you && !isMe && (
+                        <span style={styles.followsYouBadge}>Follows you</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Action Buttons */}
@@ -587,13 +592,28 @@ const styles = {
     color: "#f43f5e",
     flexShrink: 0
   },
+  handleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    marginTop: "1px"
+  },
   handleText: {
     fontSize: "12.5px",
     color: "#a1a1aa",
-    marginTop: "1px",
     whiteSpace: "nowrap",
     overflow: "hidden",
     textOverflow: "ellipsis"
+  },
+  followsYouBadge: {
+    fontSize: "10px",
+    fontWeight: "600",
+    color: "#a1a1aa",
+    background: "rgba(255, 255, 255, 0.08)",
+    padding: "1px 6px",
+    borderRadius: "4px",
+    letterSpacing: "0.2px",
+    flexShrink: 0
   },
   actionsWrap: {
     display: "flex",
