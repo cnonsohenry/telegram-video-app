@@ -624,7 +624,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     // Handle creator / uploader resolution without assuming channel ID is user ID
     const rawCategory = category || req.query.category;
-    let safeCategory = rawCategory ? rawCategory.toLowerCase().trim() : "premium";
+    let safeCategory = rawCategory ? rawCategory.toLowerCase().trim() : "baddies";
     const rawCreatorUsername = creator_username || req.query.creator_username;
     const rawChannelId = uploader_id || req.query.uploader_id || req.body.channel_id;
     const cleanChannelStr = rawChannelId ? String(rawChannelId).trim() : null;
@@ -766,11 +766,18 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
       }
     }
 
-    // 🛑 MANDATORY RULE: For managed creators, any posted video above 90sec MUST default to 'premium'
+    // 🛑 MANDATORY RULE: Managed Creator Duration Policy
+    // - Videos ABOVE 90s (> 90s) MUST default to 'premium'
+    // - Videos <= 90s MUST NEVER be 'premium'! If 'premium' was requested/sent, demote to 'baddies'.
     const isManagedCreator = Boolean(creator?.is_managed);
-    if (isManagedCreator && videoDuration > 90) {
-      safeCategory = "premium";
-      console.log(`💎 [MANAGED CREATOR DURATION] Video duration ${videoDuration.toFixed(1)}s > 90s for @${targetUsername}. Defaulted category to 'premium'.`);
+    if (isManagedCreator) {
+      if (videoDuration > 90) {
+        safeCategory = "premium";
+        console.log(`💎 [MANAGED CREATOR DURATION] Video duration ${videoDuration.toFixed(1)}s > 90s for @${targetUsername}. Defaulted category to 'premium'.`);
+      } else if (safeCategory === "premium" || safeCategory === "vip") {
+        safeCategory = "baddies";
+        console.log(`⏱️ [MANAGED CREATOR DURATION] Video duration ${videoDuration.toFixed(1)}s <= 90s for @${targetUsername}. Demoted 'premium' to 'baddies'.`);
+      }
     }
 
     try {
@@ -793,7 +800,9 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     let cleanCaption = caption ? String(caption).trim() : "";
     if (!cleanCaption || isAiRefusal(cleanCaption)) {
       console.warn(`[UPLOAD-PREMIUM] ⚠️ AI refusal or empty caption detected: '${cleanCaption}'. Replacing with fallback.`);
-      cleanCaption = "Exclusive VIP drop 🔥 Catch the full view now 👀";
+      cleanCaption = safeCategory === "premium"
+        ? "Exclusive VIP drop 🔥 Catch the full view now 👀"
+        : "Catch this exclusive drop 🔥 Watch the full view now 👀";
     }
 
     const useR2 = !upload_target || upload_target === "r2";

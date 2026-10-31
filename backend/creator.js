@@ -793,10 +793,15 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
     const isManagedCreator = Boolean(creator.is_managed);
     let isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
 
-    // 🛑 Rule: For managed creators, any posted video above 90sec should default to premium
-    if (isManagedCreator && videoDuration > 90) {
-      isVip = true;
-      console.log(`💎 [CREATOR UPLOAD] Video duration ${videoDuration.toFixed(1)}s > 90s for managed creator @${creator.username}. Defaulted to 'premium'.`);
+    // 🛑 Rule: For managed creators, any posted video above 90sec should default to premium, and clips <= 90s must NOT be VIP
+    if (isManagedCreator) {
+      if (videoDuration > 90) {
+        isVip = true;
+        console.log(`💎 [CREATOR UPLOAD] Video duration ${videoDuration.toFixed(1)}s > 90s for managed creator @${creator.username}. Defaulted to 'premium'.`);
+      } else if (videoDuration > 0 && videoDuration <= 90) {
+        isVip = false;
+        console.log(`⏱️ [CREATOR UPLOAD] Video duration ${videoDuration.toFixed(1)}s <= 90s for managed creator @${creator.username}. Demoted to public.`);
+      }
     }
 
     // 🛑 GUARD: Require verified Creator status + subscription price for VIP Exclusive content
@@ -1037,10 +1042,15 @@ router.post("/complete-upload", authenticateToken, async (req, res) => {
     const clientDuration = Number(req.body.duration || 0);
     let isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
 
-    // 🛑 Rule: For managed creators, any posted video above 90sec should default to premium
-    if (isManagedCreator && clientDuration > 90) {
-      isVip = true;
-      console.log(`💎 [CREATOR COMPLETE] Video duration ${clientDuration.toFixed(1)}s > 90s for managed creator @${creator.username}. Defaulted to 'premium'.`);
+    // 🛑 Rule: For managed creators, any posted video above 90sec should default to premium, and clips <= 90s must NOT be VIP
+    if (isManagedCreator) {
+      if (clientDuration > 90) {
+        isVip = true;
+        console.log(`💎 [CREATOR COMPLETE] Video duration ${clientDuration.toFixed(1)}s > 90s for managed creator @${creator.username}. Defaulted to 'premium'.`);
+      } else if (clientDuration > 0 && clientDuration <= 90) {
+        isVip = false;
+        console.log(`⏱️ [CREATOR COMPLETE] Video duration ${clientDuration.toFixed(1)}s <= 90s for managed creator @${creator.username}. Demoted to public.`);
+      }
     }
     const safeCategory = isVip ? "premium" : "community";
     let sanitizedCaption = caption ? String(caption).trim().slice(0, 1000) : "";
