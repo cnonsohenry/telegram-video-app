@@ -26,6 +26,7 @@ export default function CreatorUploadModal({
   const [errorMessage, setErrorMessage] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const [thumbBlob, setThumbBlob] = useState(null);
+  const [videoDuration, setVideoDuration] = useState(0);
 
   // VIP Subscription Price
   const [newPriceInput, setNewPriceInput] = useState("");
@@ -143,6 +144,7 @@ export default function CreatorUploadModal({
     setVideoFile(null);
     setVideoPreviewUrl(null);
     setThumbBlob(null);
+    setVideoDuration(0);
     setCaption("");
     setUploadProgress(0);
     setUploadStatus("idle");
@@ -204,6 +206,14 @@ export default function CreatorUploadModal({
         setErrorMessage("Video exceeds maximum allowed duration of 60 minutes.");
         setVideoFile(null);
         return;
+      }
+
+      setVideoDuration(duration);
+
+      // 🛑 Rule: For managed creators, any posted video above 90sec should default to premium
+      if (user?.is_managed && duration > 90) {
+        setIsVip(true);
+        showToast("Videos over 90s for managed creators default to VIP Exclusive", "info");
       }
 
       setErrorMessage("");
@@ -386,6 +396,7 @@ export default function CreatorUploadModal({
           internalId,
           category: safeCategory,
           is_premium: isVip,
+          duration: videoDuration,
           caption: caption.trim(),
           r2Key,
           thumbKey

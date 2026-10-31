@@ -7,7 +7,11 @@ import fs from "fs";
 import path from "path";
 import multer from "multer";
 import jwt from "jsonwebtoken";
+import { exec } from "child_process";
+import { promisify } from "util";
 import pool from "./db.js";
+
+const execPromise = promisify(exec);
 import { authenticateToken, requireEmailVerified, JWT_SECRET } from "./auth.js";
 import { 
   uploadVideoToR2, 
@@ -737,7 +741,7 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
   try {
     // 1. Fetch user
     const userRes = await pool.query(
-      `SELECT id, username, display_name, is_creator, role, is_verified, subscription_price,
+      `SELECT id, username, display_name, is_creator, role, is_verified, is_managed, subscription_price,
               COALESCE(email_verified, FALSE) as email_verified, COALESCE(kyc_status, 'unverified') as kyc_status,
               COALESCE(is_banned, FALSE) as is_banned, ban_reason
        FROM app_users WHERE id = $1`,
@@ -763,6 +767,15 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
       });
     }
 
+    // Probe video duration with ffprobe
+    let videoDuration = 0;
+    try {
+      const { stdout } = await execPromise(
+        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoFile.path}"`
+      );
+      videoDuration = parseFloat(stdout.trim()) || 0;
+    } catch (_) {}
+
     // 2. Ensure uploader exists in users table to satisfy any joins or legacy references
     try {
       await pool.query(
@@ -777,7 +790,14 @@ router.post("/upload", authenticateToken, upload.single("video"), async (req, re
     }
 
     // 3. Determine category (VIP / Premium vs Public Category)
-    const isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
+    const isManagedCreator = Boolean(creator.is_managed);
+    let isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
+
+    // 🛑 Rule: For managed creators, any posted video above 90sec should default to premium
+    if (isManagedCreator && videoDuration > 90) {
+      isVip = true;
+      console.log(`💎 [CREATOR UPLOAD] Video duration ${videoDuration.toFixed(1)}s > 90s for managed creator @${creator.username}. Defaulted to 'premium'.`);
+    }
 
     // 🛑 GUARD: Require verified Creator status + subscription price for VIP Exclusive content
     if (isVip) {
@@ -964,7 +984,7 @@ router.post("/complete-upload", authenticateToken, async (req, res) => {
 
   try {
     const userRes = await pool.query(
-      `SELECT id, username, display_name, is_creator, role, is_verified, subscription_price,
+      `SELECT id, username, display_name, is_creator, role, is_verified, is_managed, subscription_price,
               COALESCE(is_banned, FALSE) as is_banned, ban_reason
        FROM app_users WHERE id = $1`,
       [userId]
@@ -1013,7 +1033,15 @@ router.post("/complete-upload", authenticateToken, async (req, res) => {
       console.warn("[CREATOR COMPLETE] Could not sync to users table:", uErr.message);
     }
 
-    const isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
+    const isManagedCreator = Boolean(creator.is_managed);
+    const clientDuration = Number(req.body.duration || 0);
+    let isVip = is_premium === true || is_premium === "true" || String(category).toLowerCase() === "premium";
+
+    // 🛑 Rule: For managed creators, any posted video above 90sec should default to premium
+    if (isManagedCreator && clientDuration > 90) {
+      isVip = true;
+      console.log(`💎 [CREATOR COMPLETE] Video duration ${clientDuration.toFixed(1)}s > 90s for managed creator @${creator.username}. Defaulted to 'premium'.`);
+    }
     const safeCategory = isVip ? "premium" : "community";
     let sanitizedCaption = caption ? String(caption).trim().slice(0, 1000) : "";
     if (isAiRefusal(sanitizedCaption)) {

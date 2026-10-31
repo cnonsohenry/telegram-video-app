@@ -624,7 +624,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     // Handle creator / uploader resolution without assuming channel ID is user ID
     const rawCategory = category || req.query.category;
-    const safeCategory = rawCategory ? rawCategory.toLowerCase().trim() : "premium";
+    let safeCategory = rawCategory ? rawCategory.toLowerCase().trim() : "premium";
     const rawCreatorUsername = creator_username || req.query.creator_username;
     const rawChannelId = uploader_id || req.query.uploader_id || req.body.channel_id;
     const cleanChannelStr = rawChannelId ? String(rawChannelId).trim() : null;
@@ -708,6 +708,19 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
     let savedCloudflareId = "none";
     const internalId = `${safeCategory}_${Date.now()}`;
 
+    // 🛑 Probe video duration via ffprobe
+    let videoDuration = 0;
+    if (videoFile && fs.existsSync(videoFile.path)) {
+      try {
+        const { stdout } = await execPromise(
+          `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoFile.path}"`
+        );
+        videoDuration = parseFloat(stdout.trim()) || 0;
+      } catch (probeErr) {
+        console.warn("[UPLOAD-PREMIUM] ffprobe duration check notice:", probeErr.message);
+      }
+    }
+
     // 🟢 Trimming / Clipping Feature (Beginning, Center, Ending)
     const trimMode = (req.body.trim_mode || req.query.trim_mode || "full").toLowerCase().trim();
     const reqTrimDuration = parseFloat(req.body.trim_duration || req.query.trim_duration || 0);
@@ -715,10 +728,7 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
 
     if (trimMode && trimMode !== "full" && videoFile && fs.existsSync(videoFile.path)) {
       try {
-        const { stdout } = await execPromise(
-          `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoFile.path}"`
-        );
-        const totalDuration = parseFloat(stdout.trim()) || 0;
+        const totalDuration = videoDuration;
         console.log(`[TRIM] Total video duration: ${totalDuration}s, mode: ${trimMode}, requested duration: ${reqTrimDuration}s`);
 
         if (totalDuration > 0) {
@@ -747,12 +757,20 @@ app.post("/api/admin/upload-premium", upload.single("video"), async (req, res) =
           if (fs.existsSync(trimmedPath)) {
             fs.unlinkSync(videoFile.path);
             fs.renameSync(trimmedPath, videoFile.path);
+            videoDuration = clipDuration;
             console.log(`✅ [TRIM] Video successfully trimmed to ${clipDuration.toFixed(2)}s!`);
           }
         }
       } catch (trimErr) {
         console.error("⚠️ [TRIM] Video trimming failed, keeping original:", trimErr.message);
       }
+    }
+
+    // 🛑 MANDATORY RULE: For managed creators, any posted video above 90sec MUST default to 'premium'
+    const isManagedCreator = Boolean(creator?.is_managed);
+    if (isManagedCreator && videoDuration > 90) {
+      safeCategory = "premium";
+      console.log(`💎 [MANAGED CREATOR DURATION] Video duration ${videoDuration.toFixed(1)}s > 90s for @${targetUsername}. Defaulted category to 'premium'.`);
     }
 
     try {
