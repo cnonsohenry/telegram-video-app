@@ -728,30 +728,30 @@ export default function Profile({
           {/* MOBILE HEADER LAYOUT */}
           {!isDesktop ? (
             <div>
-              {/* Top Row: Details on left; Avatar on right */}
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "14px" }}>
+              {/* Top Row: Details on left; Avatar on right (TikTok style) */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", marginBottom: "14px" }}>
                 
-                {/* Display Name, Bio, Inline Stats */}
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                {/* Display Name, Bio */}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
                   {/* Line 1: Display Name */}
                   <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
                     <h1 style={{
                       margin: 0,
                       fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-                      fontSize: "20px",
+                      fontSize: "24px",
                       fontWeight: "800",
-                      letterSpacing: "-0.3px",
-                      color: "#d4d4d8",
-                      lineHeight: "1.25"
+                      letterSpacing: "-0.4px",
+                      color: "#f4f4f5",
+                      lineHeight: "1.2"
                     }}>
                       {user?.display_name || user?.username || "Member"}
                     </h1>
                   </div>
 
-                  {/* Line 2: Bio directly next under display name */}
+                  {/* Line 2: Bio directly under display name */}
                   {(user?.creator_bio || user?.bio || user?.is_creator) && (
                     <p style={{
-                      fontSize: "13px",
+                      fontSize: "13.5px",
                       color: "#c8c8c8",
                       lineHeight: "1.4",
                       margin: "2px 0 0 0",
@@ -760,47 +760,15 @@ export default function Profile({
                       {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
                     </p>
                   )}
-
-                  {/* Line 3: Followers, following, likes count */}
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    flexWrap: "wrap",
-                    fontSize: "12.5px",
-                    color: "#8e8e93",
-                    marginTop: "6px"
-                  }}>
-                    <span
-                      onClick={() => handleOpenFollowList("followers")}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <strong style={{ color: "#d4d4d8", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
-                      <span>followers</span>
-                    </span>
-                    <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                    <span
-                      onClick={() => handleOpenFollowList("following")}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <strong style={{ color: "#d4d4d8", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
-                      <span>following</span>
-                    </span>
-                    <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                    <span>
-                      <strong style={{ color: "#d4d4d8", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
-                      <span>likes</span>
-                    </span>
-                  </div>
                 </div>
 
-                {/* Avatar on Right (Story ring if active) + Camera Edit Badge */}
+                {/* Avatar on Right (Bigger TikTok style) + Camera Edit Badge */}
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   <StoryAvatar
                     username={user?.username}
                     avatarUrl={user?.avatar_url}
                     displayName={user?.display_name || user?.username}
-                    size={84}
+                    size={98}
                     borderWidth={3}
                     onClick={() => setShowEditModal(true)}
                   />
@@ -811,10 +779,57 @@ export default function Profile({
                     style={mobileAvatarEditBadge}
                     title="Change Profile Photo"
                   >
-                    <Camera size={13} color="#d4d4d8" />
+                    <Camera size={14} color="#d4d4d8" />
                   </button>
                 </div>
 
+              </div>
+
+              {/* TikTok-Style Stats Row: Followers, Following, Likes with numbers on top & labels below */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-around",
+                padding: "10px 0 6px 0",
+                marginTop: "2px",
+                marginBottom: "4px"
+              }}>
+                <div
+                  onClick={() => handleOpenFollowList("followers")}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer", flex: 1 }}
+                  title="View followers"
+                >
+                  <span style={{ fontSize: "18px", fontWeight: "800", color: "#f4f4f5", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+                    {formatStat(followersCount)}
+                  </span>
+                  <span style={{ fontSize: "12.5px", color: "#a1a1aa", fontWeight: "500", marginTop: "3px" }}>
+                    Followers
+                  </span>
+                </div>
+
+                <div
+                  onClick={() => handleOpenFollowList("following")}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer", flex: 1 }}
+                  title="View following"
+                >
+                  <span style={{ fontSize: "18px", fontWeight: "800", color: "#f4f4f5", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+                    {formatStat(followingCount)}
+                  </span>
+                  <span style={{ fontSize: "12.5px", color: "#a1a1aa", fontWeight: "500", marginTop: "3px" }}>
+                    Following
+                  </span>
+                </div>
+
+                <div
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}
+                >
+                  <span style={{ fontSize: "18px", fontWeight: "800", color: "#f4f4f5", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+                    {formatStat(likesCount)}
+                  </span>
+                  <span style={{ fontSize: "12.5px", color: "#a1a1aa", fontWeight: "500", marginTop: "3px" }}>
+                    Likes
+                  </span>
+                </div>
               </div>
 
               {/* Action Buttons Row */}
@@ -843,17 +858,17 @@ export default function Profile({
                     fontWeight: "700"
                   }}
                 >
-                  <Plus size={16} color="#f4f4f5" />
+                  <Plus size={18} color="#f4f4f5" />
                   <span>Upload</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowDiscoverCreators(prev => !prev)}
                   style={{
-                    height: "36px",
-                    width: "36px",
-                    minWidth: "36px",
-                    borderRadius: "20px",
+                    height: "44px",
+                    width: "44px",
+                    minWidth: "44px",
+                    borderRadius: "22px",
                     backgroundColor: showDiscoverCreators ? "rgba(255, 255, 255, 0.18)" : "#27272a",
                     border: showDiscoverCreators ? "1px solid rgba(255, 255, 255, 0.28)" : "1px solid rgba(255, 255, 255, 0.08)",
                     display: "flex",
@@ -866,7 +881,7 @@ export default function Profile({
                   title="Discover creators"
                   aria-label="Discover creators"
                 >
-                  <UserPlus size={17} color={showDiscoverCreators ? "#f4f4f5" : "#d4d4d8"} />
+                  <UserPlus size={19} color={showDiscoverCreators ? "#f4f4f5" : "#d4d4d8"} />
                 </button>
               </div>
 
@@ -895,19 +910,19 @@ export default function Profile({
             </div>
           ) : (
             /* DESKTOP HEADER LAYOUT */
-            <div style={{ display: "flex", gap: "36px", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "24px" }}>
+            <div style={{ display: "flex", gap: "40px", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "24px" }}>
               
               {/* Desktop Details (Left column) */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 
                 {/* Line 1: Display Name */}
-                <div style={{ display: "flex", alignItems: "center", marginBottom: "6px" }}>
+                <div style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}>
                   <h1 style={{
                     fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-                    fontSize: "28px",
+                    fontSize: "34px",
                     fontWeight: "800",
-                    letterSpacing: "-0.5px",
-                    color: "#d4d4d8",
+                    letterSpacing: "-0.6px",
+                    color: "#f4f4f5",
                     margin: 0,
                     lineHeight: "1.15"
                   }}>
@@ -918,10 +933,10 @@ export default function Profile({
                 {/* Line 2: Bio directly under display name */}
                 {(user?.creator_bio || user?.bio || user?.is_creator) && (
                   <p style={{
-                    fontSize: "14px",
+                    fontSize: "14.5px",
                     color: "#c8c8c8",
                     lineHeight: "1.45",
-                    margin: "4px 0 6px 0",
+                    margin: "4px 0 8px 0",
                     maxWidth: "600px",
                     wordBreak: "break-word"
                   }}>
@@ -929,40 +944,52 @@ export default function Profile({
                   </p>
                 )}
 
-                {/* Line 3: Followers, following, likes count */}
+                {/* Line 3: Followers, following, likes count (TikTok style with labels below) */}
                 <div style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "16px",
-                  fontSize: "14px",
-                  color: "#8e8e93",
-                  marginTop: "6px",
-                  marginBottom: "16px"
+                  gap: "36px",
+                  marginTop: "12px",
+                  marginBottom: "20px"
                 }}>
-                  <span
+                  <div
                     onClick={() => handleOpenFollowList("followers")}
-                    style={{ cursor: "pointer" }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", cursor: "pointer" }}
+                    title="View followers"
                   >
-                    <strong style={{ color: "#d4d4d8", fontSize: "16px", fontWeight: "700" }}>{formatStat(followersCount)}</strong>{" "}
-                    <span>followers</span>
-                  </span>
-                  <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                  <span
+                    <span style={{ color: "#f4f4f5", fontSize: "20px", fontWeight: "800", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+                      {formatStat(followersCount)}
+                    </span>
+                    <span style={{ color: "#a1a1aa", fontSize: "13px", fontWeight: "500", marginTop: "2px" }}>
+                      Followers
+                    </span>
+                  </div>
+
+                  <div
                     onClick={() => handleOpenFollowList("following")}
-                    style={{ cursor: "pointer" }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", cursor: "pointer" }}
+                    title="View following"
                   >
-                    <strong style={{ color: "#d4d4d8", fontSize: "16px", fontWeight: "700" }}>{formatStat(followingCount)}</strong>{" "}
-                    <span>following</span>
-                  </span>
-                  <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>·</span>
-                  <span>
-                    <strong style={{ color: "#d4d4d8", fontSize: "16px", fontWeight: "700" }}>{formatStat(likesCount)}</strong>{" "}
-                    <span>likes</span>
-                  </span>
+                    <span style={{ color: "#f4f4f5", fontSize: "20px", fontWeight: "800", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+                      {formatStat(followingCount)}
+                    </span>
+                    <span style={{ color: "#a1a1aa", fontSize: "13px", fontWeight: "500", marginTop: "2px" }}>
+                      Following
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                    <span style={{ color: "#f4f4f5", fontSize: "20px", fontWeight: "800", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+                      {formatStat(likesCount)}
+                    </span>
+                    <span style={{ color: "#a1a1aa", fontSize: "13px", fontWeight: "500", marginTop: "2px" }}>
+                      Likes
+                    </span>
+                  </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
                   <button 
                     onClick={() => setShowEditModal(true)} 
                     style={{
@@ -987,17 +1014,17 @@ export default function Profile({
                       fontWeight: "700"
                     }}
                   >
-                    <Plus size={16} color="#f4f4f5" />
+                    <Plus size={18} color="#f4f4f5" />
                     <span>Upload Video</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowDiscoverCreators(prev => !prev)}
                     style={{
-                      height: "36px",
-                      width: "36px",
-                      minWidth: "36px",
-                      borderRadius: "20px",
+                      height: "44px",
+                      width: "44px",
+                      minWidth: "44px",
+                      borderRadius: "22px",
                       backgroundColor: showDiscoverCreators ? "rgba(255, 255, 255, 0.18)" : "#27272a",
                       border: showDiscoverCreators ? "1px solid rgba(255, 255, 255, 0.28)" : "1px solid rgba(255, 255, 255, 0.08)",
                       display: "flex",
@@ -1010,7 +1037,7 @@ export default function Profile({
                     title="Discover creators"
                     aria-label="Discover creators"
                   >
-                    <UserPlus size={18} color={showDiscoverCreators ? "#f4f4f5" : "#d4d4d8"} />
+                    <UserPlus size={19} color={showDiscoverCreators ? "#f4f4f5" : "#d4d4d8"} />
                   </button>
                   <button onClick={handleOpenSettings} style={desktopIconBtnStyle} title="Settings">
                     <Settings size={18} color="#d4d4d8" />
@@ -1041,14 +1068,14 @@ export default function Profile({
                 )}
               </div>
 
-              {/* Desktop Avatar (Right column 132px, Story ring if active) */}
+              {/* Desktop Avatar (Right column 150px, Story ring if active) */}
               <div style={{ flexShrink: 0, position: "relative" }}>
                 <StoryAvatar
                   username={user?.username}
                   avatarUrl={user?.avatar_url}
                   displayName={user?.display_name || user?.username}
-                  size={132}
-                  borderWidth={3.5}
+                  size={150}
+                  borderWidth={4}
                   onClick={() => setShowEditModal(true)}
                 />
                 <button 
@@ -1056,7 +1083,7 @@ export default function Profile({
                   style={desktopAvatarEditBadge}
                   title="Change Profile Photo"
                 >
-                  <Camera size={15} color="#d4d4d8" />
+                  <Camera size={16} color="#d4d4d8" />
                 </button>
               </div>
 
@@ -1800,7 +1827,7 @@ const groupTitleStyle = {
 };
 
 const headerIconButton = { background: "none", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: "4px" };
-const desktopIconBtnStyle = { background: "#262626", border: "1px solid #363636", borderRadius: "8px", width: "36px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
+const desktopIconBtnStyle = { background: "#27272a", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "22px", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s ease" };
 
 // TikTok / Creator Avatars (Clean, no story blue outline)
 const storyGradientRingMobile = {
@@ -1809,8 +1836,8 @@ const storyGradientRingMobile = {
 };
 
 const avatarInnerCircleMobile = {
-  width: "84px",
-  height: "84px",
+  width: "98px",
+  height: "98px",
   borderRadius: "50%",
   border: "1.5px solid rgba(255, 255, 255, 0.12)",
   overflow: "hidden",
@@ -1823,8 +1850,8 @@ const storyGradientRingDesktop = {
 };
 
 const avatarInnerCircleDesktop = {
-  width: "132px",
-  height: "132px",
+  width: "150px",
+  height: "150px",
   borderRadius: "50%",
   border: "2px solid rgba(255, 255, 255, 0.12)",
   overflow: "hidden",
@@ -1833,10 +1860,10 @@ const avatarInnerCircleDesktop = {
 
 const mobileAvatarEditBadge = {
   position: "absolute",
-  bottom: "2px",
-  right: "2px",
-  width: "26px",
-  height: "26px",
+  bottom: "4px",
+  right: "4px",
+  width: "28px",
+  height: "28px",
   borderRadius: "50%",
   backgroundColor: "#00aff0",
   border: "2px solid #000000",
@@ -1849,10 +1876,10 @@ const mobileAvatarEditBadge = {
 
 const desktopAvatarEditBadge = {
   position: "absolute",
-  bottom: "6px",
-  right: "6px",
-  width: "34px",
-  height: "34px",
+  bottom: "8px",
+  right: "8px",
+  width: "36px",
+  height: "36px",
   borderRadius: "50%",
   backgroundColor: "#00aff0",
   border: "2.5px solid #000000",
@@ -1964,12 +1991,12 @@ const mobileActionButtonsRow = {
 
 const mobileActionButton = {
   flex: 1,
-  height: "36px",
+  height: "44px",
   backgroundColor: "#262626",
   color: "#d4d4d8",
   border: "1px solid #363636",
-  borderRadius: "20px",
-  fontSize: "13px",
+  borderRadius: "22px",
+  fontSize: "15px",
   fontWeight: "700",
   display: "flex",
   alignItems: "center",
@@ -1980,13 +2007,13 @@ const mobileActionButton = {
 };
 
 const desktopActionButton = {
-  height: "36px",
-  padding: "0 20px",
+  height: "44px",
+  padding: "0 28px",
   backgroundColor: "#262626",
   color: "#d4d4d8",
   border: "1px solid #363636",
-  borderRadius: "20px",
-  fontSize: "13px",
+  borderRadius: "22px",
+  fontSize: "15px",
   fontWeight: "700",
   display: "flex",
   alignItems: "center",
