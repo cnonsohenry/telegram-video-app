@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
-  X, ArrowLeft, Search, 
+  X, MoveLeft, Search, 
   Users, Play 
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
@@ -293,7 +293,7 @@ export default function DiscoverCreatorsModal({
               title="Back"
               aria-label="Back"
             >
-              <ArrowLeft size={22} color="#d4d4d8" />
+              <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
             </button>
             <div style={{ display: "flex", alignItems: "center" }}>
               <h2 style={titleStyle}>Discover Creators</h2>

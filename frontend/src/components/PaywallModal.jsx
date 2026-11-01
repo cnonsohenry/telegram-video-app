@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { 
-  X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, ArrowLeft, 
+  X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, MoveLeft, 
   Copy, QrCode, ShieldCheck, Wallet, UserX, AlertTriangle, ExternalLink 
 } from "lucide-react";
 
@@ -245,7 +245,7 @@ export default function PaywallModal({ onClose, user }) {
           style={navBackBtnStyle}
           aria-label="Back"
         >
-          <ArrowLeft size={24} color="#d4d4d8" />
+          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
         </button>
 
         <span style={topNavTitleStyle}>

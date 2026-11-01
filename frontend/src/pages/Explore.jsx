@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, 
   Sparkles, Lock, ChevronLeft, ChevronRight, X, ArrowRight, Users, Film, Plus,
-  Home, Compass, Flame, TrendingUp, User, Search, MoreHorizontal, MoreVertical, Grid3X3, ArrowLeft, RefreshCw, Flag
+  Home, Compass, Flame, TrendingUp, User, Search, MoreHorizontal, MoreVertical, Grid3X3, MoveLeft, RefreshCw, Flag
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
@@ -1317,7 +1317,7 @@ export default function Explore({
                   title="Back to Explore"
                   aria-label="Back to Explore"
                 >
-                  <ArrowLeft size={22} />
+                  <MoveLeft size={24} strokeWidth={2.3} color="#f4f4f5" />
                 </button>
 
                 <div

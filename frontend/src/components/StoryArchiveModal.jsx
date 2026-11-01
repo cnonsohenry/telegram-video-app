@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, ArrowLeft, Check, Film, Loader2 } from "lucide-react";
+import { X, MoveLeft, Check, Film, Loader2 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { showToast } from "../utils/toast";
 
@@ -188,7 +188,7 @@ export default function StoryArchiveModal({
                   padding: 0
                 }}
               >
-                <ArrowLeft size={22} />
+                <MoveLeft size={24} strokeWidth={2.3} color="#f4f4f5" />
               </button>
             ) : (
               <button

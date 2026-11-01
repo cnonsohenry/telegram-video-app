@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
-  ArrowLeft, Share2, Heart, Lock, Grid3X3, 
+  MoveLeft, Share2, Heart, Lock, Grid3X3, 
   MapPin, Globe, Sparkles, Send, Play, Loader2, MessageCircle,
   Film, Link2, ChevronDown, Plus, UserPlus
 } from "lucide-react";
@@ -579,9 +579,9 @@ export default function CreatorProfileModal({
     <>
       {/* MOBILE HEADER */}
       {!isDesktop ? (
-              <div style={{ padding: "16px 16px 10px 16px" }}>
+              <div style={{ padding: "4px 16px 6px 16px" }}>
                 {/* Top Row: Details on left (Display Name, @username, 3-column stats); Avatar on right */}
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "12px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "6px" }}>
                   <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
                     {/* Line 1: Display Name */}
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
@@ -762,7 +762,7 @@ export default function CreatorProfileModal({
               </div>
             ) : (
               /* DESKTOP HEADER */
-              <div style={{ display: "flex", gap: "40px", alignItems: "flex-start", justifyContent: "space-between", padding: "32px 24px 20px 24px", marginBottom: "16px" }}>
+              <div style={{ display: "flex", gap: "40px", alignItems: "flex-start", justifyContent: "space-between", padding: "14px 24px 10px 24px", marginBottom: "8px" }}>
                 
                 {/* Desktop Details on Left */}
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1224,7 +1224,7 @@ export default function CreatorProfileModal({
                     style={desktopBackBtnStyle} 
                     title="Back"
                   >
-                    <ArrowLeft size={18} color="#f4f4f5" />
+                    <MoveLeft size={22} strokeWidth={2.3} color="#f4f4f5" />
                   </button>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -1308,7 +1308,7 @@ export default function CreatorProfileModal({
           {/* Top Navbar */}
           <div style={topNavStyle}>
             <button onClick={onClose} style={navBtnStyle} title="Back">
-              <ArrowLeft size={22} color="#d4d4d8" />
+              <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               {!creatorData?.is_owner && isMonetizedCreator && creatorData?.allow_tips !== false && (
@@ -1459,7 +1459,7 @@ const containerStyle = {
 };
 
 const topNavStyle = {
-  height: "48px",
+  height: "44px",
   padding: "0 16px",
   display: "flex",
   alignItems: "center",

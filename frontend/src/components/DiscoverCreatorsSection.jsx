@@ -217,10 +217,10 @@ export default function DiscoverCreatorsSection({
         <div style={igScrollTrack}>
           {[1, 2, 3, 4].map((n) => (
             <div key={n} style={igCardBox}>
-              <div style={{ width: "58px", height: "58px", borderRadius: "50%", background: "rgba(255, 255, 255, 0.08)", animation: "skeleton-loading 1.2s infinite" }} />
-              <div style={{ width: "70px", height: "12px", borderRadius: "4px", background: "rgba(255, 255, 255, 0.08)", marginTop: "8px", animation: "skeleton-loading 1.2s infinite" }} />
-              <div style={{ width: "50px", height: "10px", borderRadius: "4px", background: "rgba(255, 255, 255, 0.05)", marginTop: "4px", animation: "skeleton-loading 1.2s infinite" }} />
-              <div style={{ width: "86%", height: "28px", borderRadius: "14px", background: "rgba(255, 255, 255, 0.08)", marginTop: "8px", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "78px", height: "78px", borderRadius: "50%", background: "rgba(255, 255, 255, 0.08)", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "86px", height: "13px", borderRadius: "4px", background: "rgba(255, 255, 255, 0.08)", marginTop: "8px", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "60px", height: "11px", borderRadius: "4px", background: "rgba(255, 255, 255, 0.05)", marginTop: "4px", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "88%", height: "32px", borderRadius: "16px", background: "rgba(255, 255, 255, 0.08)", marginTop: "8px", animation: "skeleton-loading 1.2s infinite" }} />
             </div>
           ))}
         </div>
@@ -297,17 +297,17 @@ export default function DiscoverCreatorsSection({
                 title="Dismiss"
                 aria-label="Dismiss"
               >
-                <X size={11} />
+                <X size={12} />
               </button>
 
-              {/* Center Avatar with Story Ring (Compact TikTok Suggested Accounts Style) */}
+              {/* Center Avatar with Story Ring (Big TikTok Suggested Accounts Style) */}
               <div style={igAvatarContainer}>
                 <StoryAvatar
                   username={uname}
                   avatarUrl={creator.avatar_url}
                   displayName={creator.display_name || uname}
-                  size={58}
-                  borderWidth={2}
+                  size={78}
+                  borderWidth={2.5}
                   onClick={() => onCreatorClick && onCreatorClick(uname)}
                 />
               </div>
@@ -318,7 +318,7 @@ export default function DiscoverCreatorsSection({
                   {creator.display_name || uname}
                 </span>
                 {creator.is_verified && (
-                  <TwitterVerifiedBadge size={12} style={{ flexShrink: 0 }} />
+                  <TwitterVerifiedBadge size={13} style={{ flexShrink: 0 }} />
                 )}
               </div>
 
@@ -335,7 +335,7 @@ export default function DiscoverCreatorsSection({
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <Loader2 size={12} className="animate-spin" />
+                  <Loader2 size={13} className="animate-spin" />
                 ) : isFollowing ? (
                   "Following"
                 ) : (
@@ -422,14 +422,14 @@ const igScrollTrack = {
 
 const igCardBox = {
   position: "relative",
-  flex: "0 0 116px",
-  width: "116px",
-  minWidth: "116px",
-  maxWidth: "116px",
+  flex: "0 0 142px",
+  width: "142px",
+  minWidth: "142px",
+  maxWidth: "142px",
   background: "var(--bg-color, #09090b)",
   border: "1px solid rgba(255, 255, 255, 0.10)",
-  borderRadius: "12px",
-  padding: "10px 6px 10px 6px",
+  borderRadius: "14px",
+  padding: "12px 8px 12px 8px",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
@@ -441,10 +441,10 @@ const igCardBox = {
 
 const igDismissBtn = {
   position: "absolute",
-  top: "4px",
-  right: "4px",
-  width: "18px",
-  height: "18px",
+  top: "6px",
+  right: "6px",
+  width: "20px",
+  height: "20px",
   borderRadius: "50%",
   background: "transparent",
   border: "none",
@@ -460,28 +460,28 @@ const igDismissBtn = {
 
 const igAvatarContainer = {
   position: "relative",
-  width: "62px",
-  height: "62px",
-  marginBottom: "4px",
+  width: "84px",
+  height: "84px",
+  marginBottom: "6px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center"
 };
 
 const igDisplayName = {
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: "700",
   color: "#f4f4f5",
   textAlign: "center",
-  maxWidth: "calc(100% - 14px)",
+  maxWidth: "calc(100% - 16px)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
-  lineHeight: "1.2"
+  lineHeight: "1.25"
 };
 
 const igHandleName = {
-  fontSize: "11px",
+  fontSize: "11.5px",
   color: "#8e8e93",
   textAlign: "center",
   width: "100%",
@@ -492,12 +492,12 @@ const igHandleName = {
 };
 
 const igFollowBtn = {
-  width: "86%",
-  minWidth: "70px",
+  width: "88%",
+  minWidth: "80px",
   marginTop: "8px",
-  height: "28px",
-  borderRadius: "14px",
-  fontSize: "12px",
+  height: "32px",
+  borderRadius: "16px",
+  fontSize: "12.5px",
   fontWeight: "700",
   color: "#09090b",
   backgroundColor: "#e4e4e7",
@@ -510,12 +510,12 @@ const igFollowBtn = {
 };
 
 const igFollowingBtn = {
-  width: "86%",
-  minWidth: "70px",
+  width: "88%",
+  minWidth: "80px",
   marginTop: "8px",
-  height: "28px",
-  borderRadius: "14px",
-  fontSize: "12px",
+  height: "32px",
+  borderRadius: "16px",
+  fontSize: "12.5px",
   fontWeight: "700",
   color: "#a1a1aa",
   backgroundColor: "rgba(255, 255, 255, 0.08)",

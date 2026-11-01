@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowLeft, Camera, Loader2, Lock, ShieldCheck } from "lucide-react";
+import { MoveLeft, Camera, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import useModalHistory from "../hooks/useModalHistory";
 
@@ -139,7 +139,7 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess, onOpe
       {/* Top Navigation Bar */}
       <div style={topNavStyle}>
         <button onClick={handleSafeClose} style={navBackBtnStyle} aria-label="Back">
-          <ArrowLeft size={22} color="#f4f4f5" />
+          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
         </button>
 
         <span style={topNavTitleStyle}>Edit Profile</span>

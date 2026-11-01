@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { 
-  X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, 
+  X, MoveLeft, Play, Pause, Loader2, Maximize, Minimize, 
   Share2, Download, Check, Heart, MessageCircle, Bookmark, 
   Volume2, VolumeX, MoreVertical, Edit2, Trash2, RotateCw,
   UserPlus, SkipForward, ExternalLink, Eye, Flag, Link2
@@ -947,7 +947,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)"}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
         >
-          <ArrowLeft size={28} />
+          <MoveLeft size={28} strokeWidth={2.4} color="#f4f4f5" />
         </button>
       ) : (
         <button 
@@ -1605,7 +1605,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
               style={editNavBackBtnStyle}
               aria-label="Back"
             >
-              <ArrowLeft size={24} color="#d4d4d8" />
+              <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
             </button>
             <span style={editTopNavTitleStyle}>Edit Info</span>
             <button 

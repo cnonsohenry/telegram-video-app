@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   X, Heart, CheckCircle2, Copy, QrCode, 
-  Loader2, Sparkles, ArrowLeft, ShieldCheck, DollarSign, AlertTriangle, ExternalLink
+  Loader2, Sparkles, MoveLeft, ShieldCheck, DollarSign, AlertTriangle, ExternalLink
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
@@ -186,7 +186,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
           style={navBackBtnStyle}
           aria-label="Back"
         >
-          <ArrowLeft size={24} color="#d4d4d8" />
+          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
         </button>
 
         <div style={{ textAlign: "center", flex: 1 }}>

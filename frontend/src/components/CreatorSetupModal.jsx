@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
-  ArrowLeft,
+  MoveLeft,
   Sparkles,
   CheckCircle,
   ShieldCheck,
@@ -370,7 +370,7 @@ export default function CreatorSetupModal({ user, onClose, onSetupSuccess }) {
       {/* Top Navigation Bar */}
       <div style={topNavStyle}>
         <button onClick={handleSafeClose} style={navBackBtnStyle} aria-label="Back">
-          <ArrowLeft size={22} color="#f4f4f5" />
+          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
         </button>
 
         <span style={topNavTitleStyle}>Creator Verification & Monetization</span>

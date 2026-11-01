@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { ArrowUp, ArrowLeft, ChevronsDown } from "lucide-react";
+import { ArrowUp, MoveLeft, ChevronsDown } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import DesktopRightSidebar from "../components/DesktopRightSidebar";
 import VideoCard from "../components/VideoCard";
@@ -916,7 +916,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                  {activeGroup && (
                    <div style={groupHeaderStyle}>
                      <button onClick={handleCloseGroup} style={backButtonStyle}>
-                       <ArrowLeft size={20} />
+                       <MoveLeft size={22} strokeWidth={2.3} color="#f4f4f5" />
                        <span>Back to {currentCategory.toUpperCase()}</span>
                      </button>
                      <span style={groupTitleStyle}>{activeGroup.videos.length} clips in collection</span>

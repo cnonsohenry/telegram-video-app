@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { 
-  ArrowLeft, X, Sparkles, Users, DollarSign, Heart, Eye, ThumbsUp, 
+  MoveLeft, X, Sparkles, Users, DollarSign, Heart, Eye, ThumbsUp, 
   MessageCircle, Settings, Calendar, Lock, 
   CheckCircle2, Clock, TrendingUp, Edit3, Save, ExternalLink, 
   Loader2, AlertCircle, ShieldCheck, Plus, UploadCloud, Trash2
@@ -162,7 +162,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
       <div style={topNavStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <button onClick={handleSafeClose} style={navBackBtnStyle} aria-label="Back">
-            <ArrowLeft size={24} color="#d4d4d8" />
+            <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
           </button>
           <div style={studioLogoBadgeStyle}>
             <Sparkles size={18} color="#FFD700" />

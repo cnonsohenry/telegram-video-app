@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock, Users } from "lucide-react";
+import { Search, X, MoveLeft, Flame, TrendingUp, Play, Clock, Users } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import StoryAvatar from "./StoryAvatar";
 
@@ -259,7 +259,7 @@ export default function AppHeader({
         <div style={searchOverlayStyle}>
           <div style={overlayHeaderStyle}>
             <button onClick={handleCloseSearch} style={iconBtnStyle}>
-              <ArrowLeft size={24} color="#d4d4d8" />
+              <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
             </button>
             <div style={activeSearchBarStyle}>
               <Search size={16} color="#8e8e8e" />

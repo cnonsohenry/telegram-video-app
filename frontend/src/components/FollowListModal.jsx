@@ -5,7 +5,7 @@
 ============================================================================ */
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft } from "lucide-react";
+import { MoveLeft } from "lucide-react";
 import DesktopLeftSidebar from "./DesktopLeftSidebar";
 import DesktopRightSidebar from "./DesktopRightSidebar";
 import { APP_CONFIG } from "../config";
@@ -500,7 +500,7 @@ export default function FollowListModal({
                     title="Back"
                     aria-label="Back"
                   >
-                    <ArrowLeft size={18} color="#f4f4f5" />
+                    <MoveLeft size={22} strokeWidth={2.3} color="#f4f4f5" />
                   </button>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -561,10 +561,7 @@ export default function FollowListModal({
           {/* Top Navbar matching CreatorProfileModal & SettingsView */}
           <div style={styles.topNav}>
             <button onClick={onClose} style={styles.backBtn} title="Back" aria-label="Back">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f4f4f5" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="19" y1="12" x2="5" y2="12" />
-                <polyline points="12 19 5 12 12 5" />
-              </svg>
+              <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
             </button>
             <div style={styles.headerTitle}>
               @{cleanUname}

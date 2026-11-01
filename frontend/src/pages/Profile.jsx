@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { 
-  Settings, Grid3X3, Heart, Lock, Share2, ArrowLeft, 
+  Settings, Grid3X3, Heart, Lock, Share2, MoveLeft,
   Camera, Sparkles, Edit3, MapPin, Globe, Award, ExternalLink, ShieldCheck, Eye,
   Film, Play, Plus, ChevronRight, TrendingUp, Link2, ChevronDown, Bookmark, Copy, MessageCircle, UserPlus
 } from "lucide-react"; 
@@ -723,13 +723,13 @@ export default function Profile({
   const renderProfileBody = () => (
     <>
       {/* 🌟 INSTAGRAM / CREATOR STYLE PROFILE HEADER */}
-      <div style={{ padding: isDesktop ? "28px 20px 10px 20px" : "16px 16px 8px 16px" }}>
+      <div style={{ padding: isDesktop ? "16px 20px 8px 20px" : "4px 16px 6px 16px" }}>
           
           {/* MOBILE HEADER LAYOUT */}
           {!isDesktop ? (
             <div>
               {/* Top Row: Details on left (Display Name, @username, 3-column stats); Avatar on right */}
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "12px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "6px" }}>
                 
                 {/* Display Name, @username, and 3-column stats */}
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
@@ -921,7 +921,7 @@ export default function Profile({
             </div>
           ) : (
             /* DESKTOP HEADER LAYOUT */
-            <div style={{ display: "flex", gap: "40px", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "24px" }}>
+            <div style={{ display: "flex", gap: "40px", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
               
               {/* Desktop Details (Left column) */}
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -1224,7 +1224,7 @@ export default function Profile({
           {activeGroup && (
             <div style={groupHeaderStyle}>
               <button onClick={handleCloseGroup} style={backButtonStyle}>
-                <ArrowLeft size={20} />
+                <MoveLeft size={22} strokeWidth={2.3} color="#f4f4f5" />
                 <span>Back to profile</span>
               </button>
               <span 
@@ -1559,7 +1559,7 @@ export default function Profile({
             <div style={{ width: "36px" }}>
               {activeGroup && (
                 <button onClick={handleCloseGroup} style={headerIconButton}>
-                  <ArrowLeft size={22} color="#d4d4d8" />
+                  <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
                 </button>
               )}
             </div>
@@ -1827,7 +1827,7 @@ const desktopHeaderIconBtnStyle = {
 };
 
 const desktopInnerWrapper = { maxWidth: "935px", margin: "0 auto", width: "100%" };
-const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", position: "sticky", top: 0, background: "#09090b", zIndex: 100, backdropFilter: "blur(20px)" };
+const navGridStyle = { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", padding: "6px 16px", minHeight: "44px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", position: "sticky", top: 0, background: "#09090b", zIndex: 100, backdropFilter: "blur(20px)" };
 const centerTitleContainer = { display: "flex", alignItems: "center", cursor: "pointer" };
 const usernameStyle = { fontSize: "16px", fontWeight: "700", margin: 0, color: "#d4d4d8" };
 const tabsContainerStyle = { display: "flex", position: "sticky", background: "#09090b", zIndex: 90 };

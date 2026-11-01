@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
-  ArrowLeft, Upload, CheckCircle, AlertCircle, Loader2, Video, 
+  MoveLeft, Upload, CheckCircle, AlertCircle, Loader2, Video, 
   FileVideo, Twitter, Link, X, Send, Instagram, Scissors, Play, Pause, Clock,
   ChevronDown, Check, Plus, Search, Sparkles, Bot, Zap, HardDrive, Droplets
 } from "lucide-react";
@@ -1140,7 +1140,7 @@ export default function AdminUpload({ onClose }) {
       {/* Instagram-style Top Navigation Bar */}
       <div style={topNavStyle}>
         <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
-          <ArrowLeft size={24} color="#d4d4d8" />
+          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
         </button>
 
         <span style={topNavTitleStyle}>
