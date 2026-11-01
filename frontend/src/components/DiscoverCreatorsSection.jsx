@@ -51,14 +51,18 @@ export default function DiscoverCreatorsSection({
   user,
   excludeUsername,
   title = "Discover Creators",
-  style = {}
+  style = {},
+  isSearch = false,
+  hideSeeAll = false,
+  hideDismiss = false
 }) {
+  const isControlled = initialCreators !== undefined;
   const [creators, setCreators] = useState(() => {
-    if (initialCreators && initialCreators.length > 0) return initialCreators;
+    if (isControlled) return initialCreators || [];
     if (memoryFeaturedCreators && memoryFeaturedCreators.length > 0) return memoryFeaturedCreators;
     return [];
   });
-  const [isLoadingFeatured, setIsLoadingFeatured] = useState(!creators || creators.length === 0);
+  const [isLoadingFeatured, setIsLoadingFeatured] = useState(!isControlled && (!creators || creators.length === 0));
   const [followingMap, setFollowingMap] = useState({});
   const [loadingMap, setLoadingMap] = useState({});
   const [dismissedSet, setDismissedSet] = useState(new Set());
@@ -112,16 +116,16 @@ export default function DiscoverCreatorsSection({
 
   // If initialCreators prop changes or was provided
   useEffect(() => {
-    if (initialCreators && initialCreators.length > 0) {
-      setCreators(initialCreators);
+    if (isControlled) {
+      setCreators(initialCreators || []);
       setIsLoadingFeatured(false);
     }
-  }, [initialCreators]);
+  }, [initialCreators, isControlled]);
 
   // Background fetch / refresh
   useEffect(() => {
     let isMounted = true;
-    if (!initialCreators || initialCreators.length === 0) {
+    if (!isControlled) {
       prefetchFeaturedCreators().then((data) => {
         if (isMounted && data && data.length > 0) {
           setCreators(data);
@@ -130,7 +134,7 @@ export default function DiscoverCreatorsSection({
       });
     }
     return () => { isMounted = false; };
-  }, [initialCreators]);
+  }, [isControlled]);
 
   const handleDismiss = (username) => {
     setDismissedSet((prev) => {
@@ -190,7 +194,7 @@ export default function DiscoverCreatorsSection({
   const visibleCreators = (creators || []).filter((c) => {
     if (!c || !c.username) return false;
     const u = String(c.username).toLowerCase().trim();
-    if (dismissedSet.has(c.username)) return false;
+    if (!hideDismiss && dismissedSet.has(c.username)) return false;
     if (normExclude && u === normExclude) return false;
     if (normUser && u === normUser) return false;
     return true;
@@ -237,38 +241,42 @@ export default function DiscoverCreatorsSection({
           <span style={igSuggestedTitle}>{title}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button 
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onSeeAll) onSeeAll();
-              else window.dispatchEvent(new CustomEvent("openDiscoverCreators"));
-            }}
-            style={igSeeAllBtn}
-            title="See all creators"
-          >
-            <span>See All</span>
-          </button>
-          <div style={{ display: "flex", gap: "4px" }}>
+          {!hideSeeAll && (
             <button 
               type="button"
-              onClick={() => scrollTrack(-1)} 
-              style={igArrowBtn}
-              title="Scroll left"
-              aria-label="Scroll left"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onSeeAll) onSeeAll();
+                else window.dispatchEvent(new CustomEvent("openDiscoverCreators"));
+              }}
+              style={igSeeAllBtn}
+              title="See all creators"
             >
-              <ChevronLeft size={16} />
+              <span>See All</span>
             </button>
-            <button 
-              type="button"
-              onClick={() => scrollTrack(1)} 
-              style={igArrowBtn}
-              title="Scroll right"
-              aria-label="Scroll right"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
+          )}
+          {visibleCreators.length > 2 && (
+            <div style={{ display: "flex", gap: "4px" }}>
+              <button 
+                type="button"
+                onClick={() => scrollTrack(-1)} 
+                style={igArrowBtn}
+                title="Scroll left"
+                aria-label="Scroll left"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button 
+                type="button"
+                onClick={() => scrollTrack(1)} 
+                style={igArrowBtn}
+                title="Scroll right"
+                aria-label="Scroll right"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -287,18 +295,20 @@ export default function DiscoverCreatorsSection({
               onClick={() => onCreatorClick && onCreatorClick(uname)}
             >
               {/* Dismiss (✕) button */}
-              <button 
-                type="button"
-                style={igDismissBtn} 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDismiss(uname);
-                }}
-                title="Dismiss"
-                aria-label="Dismiss"
-              >
-                <X size={12} />
-              </button>
+              {!hideDismiss && (
+                <button 
+                  type="button"
+                  style={igDismissBtn} 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDismiss(uname);
+                  }}
+                  title="Dismiss"
+                  aria-label="Dismiss"
+                >
+                  <X size={12} />
+                </button>
+              )}
 
               {/* Center Avatar with Story Ring (Big TikTok Suggested Accounts Style) */}
               <div style={igAvatarContainer}>

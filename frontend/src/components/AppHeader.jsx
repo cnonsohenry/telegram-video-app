@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Search, X, MoveLeft, Flame, TrendingUp, Play, Clock, Users } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import StoryAvatar from "./StoryAvatar";
+import DiscoverCreatorsSection from "./DiscoverCreatorsSection";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
@@ -232,13 +233,13 @@ export default function AppHeader({
     }
   };
 
-  const handleCreatorClick = (creator, e) => {
+  const handleCreatorClick = (creatorOrUname, e) => {
     if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
     saveSearchHistory(searchTerm);
     searchScrollPosRef.current = overlayContentRef.current?.scrollTop || 0;
     isSearchOpenRef.current = false;
     setIsSearchOpen(false);
-    const uname = creator.username;
+    const uname = typeof creatorOrUname === 'string' ? creatorOrUname : creatorOrUname?.username;
     if (onCreatorClick) {
       onCreatorClick(uname);
     } else {
@@ -383,97 +384,24 @@ export default function AppHeader({
                   </div>
                 ) : (
                   <>
-                    {/* 🌟 MATCHING CREATORS SECTION */}
+                    {/* 🌟 MATCHING CREATORS SECTION (Consistent TikTok-Style Creator Cards) */}
                     {searchCreators.length > 0 && (
-                      <div style={{ marginBottom: "20px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <Users size={16} color="var(--primary-color, #1d9bf0)" />
-                            <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#e7e9ea" }}>
-                              Creators
-                            </h4>
-                          </div>
-                          <span style={{ fontSize: "12px", color: "var(--primary-color, #1d9bf0)", fontWeight: "600" }}>
-                            {searchCreators.length} matched
-                          </span>
-                        </div>
-
-                        <div style={{
-                          display: "flex",
-                          gap: "10px",
-                          overflowX: "auto",
-                          paddingBottom: "8px",
-                          scrollbarWidth: "none"
-                        }}>
-                          {searchCreators.map(creator => (
-                            <div
-                              key={creator.username}
-                              onClick={(e) => handleCreatorClick(creator, e)}
-                              style={{
-                                minWidth: isDesktop ? "210px" : "175px",
-                                maxWidth: isDesktop ? "230px" : "190px",
-                                flexShrink: 0,
-                                background: "#16181c",
-                                border: "1px solid #2f3336",
-                                borderRadius: "14px",
-                                padding: "12px 10px",
-                                cursor: "pointer",
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                textAlign: "center",
-                                transition: "all 0.15s ease"
-                              }}
-                            >
-                              <div style={{ position: "relative", width: "48px", height: "48px", marginBottom: "8px" }}>
-                                <StoryAvatar
-                                  username={creator.username}
-                                  avatarUrl={creator.avatar_url}
-                                  displayName={creator.display_name}
-                                  size={48}
-                                  borderWidth={2}
-                                />
-                              </div>
-
-                              <div style={{ display: "flex", alignItems: "center", gap: "4px", maxWidth: "100%", justifyContent: "center" }}>
-                                <span style={{ fontWeight: "700", fontSize: "13.5px", color: "#d4d4d8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                  {creator.display_name || creator.username}
-                                </span>
-                                {creator.is_verified && (
-                                  <TwitterVerifiedBadge size={14} style={{ flexShrink: 0 }} />
-                                )}
-                              </div>
-
-                              <span style={{ color: "#71767b", fontSize: "12px", marginBottom: "6px" }}>
-                                @{creator.username}
-                              </span>
-
-                              {creator.creator_category && (
-                                <span style={{
-                                  fontSize: "10px",
-                                  fontWeight: "600",
-                                  color: "#aaa",
-                                  background: "rgba(255,255,255,0.06)",
-                                  padding: "2px 6px",
-                                  borderRadius: "4px",
-                                  marginBottom: "6px"
-                                }}>
-                                  {creator.creator_category}
-                                </span>
-                              )}
-
-                              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "#71767b", marginTop: "auto" }}>
-                                {creator.followers_count > 0 && (
-                                  <span>{creator.followers_count.toLocaleString()} followers</span>
-                                )}
-                                {creator.followers_count > 0 && creator.video_count > 0 && <span>•</span>}
-                                {creator.video_count > 0 && (
-                                  <span>{creator.video_count.toLocaleString()} drops</span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      <div style={{ marginBottom: "16px" }}>
+                        <DiscoverCreatorsSection 
+                          creators={searchCreators}
+                          onCreatorClick={handleCreatorClick}
+                          title={`Creators (${searchCreators.length})`}
+                          isSearch={true}
+                          hideSeeAll={true}
+                          hideDismiss={true}
+                          style={{
+                            background: "transparent",
+                            borderTop: "none",
+                            borderBottom: "none",
+                            padding: "0 0 4px 0",
+                            margin: 0
+                          }}
+                        />
                       </div>
                     )}
 

@@ -23,7 +23,7 @@ import DesktopLeftSidebar from "../components/DesktopLeftSidebar";
 import DesktopRightSidebar from "../components/DesktopRightSidebar";
 import { InstagramSuggestedCreators } from "../components/DiscoverCreatorsSection";
 
-// 🌟 TWITTER/X STYLE CREATOR SEARCH CARD
+// 🌟 UNIFIED CREATOR SEARCH CARD
 const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowing, isLoadingFollow }) => {
   const uname = creator.username;
   return (
@@ -31,12 +31,12 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
       onClick={() => onCreatorClick && onCreatorClick(uname)}
       style={{
         display: "flex",
-        alignItems: "flex-start",
+        alignItems: "center",
         justifyContent: "space-between",
         gap: "12px",
         padding: "14px 16px",
         background: "transparent",
-        borderBottom: "1px solid var(--border-color, #2f3336)",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
         cursor: "pointer",
         transition: "background 0.15s ease",
         boxSizing: "border-box",
@@ -45,14 +45,14 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
       onMouseEnter={(e) => { e.currentTarget.style.background = "var(--hover-bg, rgba(255, 255, 255, 0.03))"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", minWidth: 0, flex: 1 }}>
-        <div style={{ position: "relative", width: "44px", height: "44px", flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "14px", minWidth: 0, flex: 1 }}>
+        <div style={{ position: "relative", width: "58px", height: "58px", flexShrink: 0 }}>
           <StoryAvatar
             username={uname}
             avatarUrl={creator.avatar_url}
             displayName={creator.display_name || uname}
-            size={44}
-            borderWidth={2}
+            size={58}
+            borderWidth={2.5}
             onClick={() => onCreatorClick && onCreatorClick(uname)}
           />
         </div>
@@ -98,7 +98,7 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
             gap: "6px", 
             marginTop: "2px", 
             fontSize: "12.5px", 
-            color: "#71767b",
+            color: "#8e8e93",
             minWidth: 0,
             maxWidth: "100%",
             overflow: "hidden",
@@ -141,38 +141,25 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
         </div>
       </div>
 
-      <div style={{ marginLeft: "12px", flexShrink: 0, alignSelf: "flex-start" }}>
+      <div style={{ marginLeft: "12px", flexShrink: 0, alignSelf: "center" }}>
         <button
           type="button"
           onClick={(e) => onFollowToggle(e, creator)}
           disabled={isLoadingFollow}
           style={{
-            padding: isFollowing ? "6px 14px" : "6px 16px",
-            borderRadius: "20px",
-            fontSize: "13px",
+            height: "32px",
+            minWidth: "82px",
+            padding: "0 16px",
+            borderRadius: "16px",
+            fontSize: "12.5px",
             fontWeight: "700",
             cursor: "pointer",
             transition: "all 0.15s ease",
-            border: isFollowing ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
-            background: isFollowing ? "transparent" : "#e4e4e7",
+            border: isFollowing ? "1px solid rgba(255, 255, 255, 0.12)" : "none",
+            background: isFollowing ? "rgba(255, 255, 255, 0.08)" : "#e4e4e7",
             color: isFollowing ? "#a1a1aa" : "#09090b",
             whiteSpace: "nowrap",
-            minWidth: "82px",
             textAlign: "center"
-          }}
-          onMouseEnter={(e) => {
-            if (isFollowing) {
-              e.currentTarget.style.borderColor = "#f4212e";
-              e.currentTarget.style.color = "#f4212e";
-              e.currentTarget.innerText = "Unfollow";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (isFollowing) {
-              e.currentTarget.style.borderColor = "#536471";
-              e.currentTarget.style.color = "#eff3f4";
-              e.currentTarget.innerText = "Following";
-            }
           }}
         >
           {isLoadingFollow ? "..." : (isFollowing ? "Following" : "Follow")}
@@ -1034,53 +1021,25 @@ export default function Explore({
       return (
         <div>
           {hasCreators && (
-            <div style={{ borderBottom: "1px solid var(--border-color, #2f3336)" }}>
-              <div style={{ 
-                display: "flex", 
-                alignItems: "center", 
-                justifyContent: "space-between", 
-                padding: "14px 16px 10px 16px",
-                borderBottom: "1px solid var(--border-color, #2f3336)",
-                background: "transparent"
-              }}>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: "#d4d4d8" }}>
-                    Creators
-                  </h3>
-                </div>
-                {searchCreators.length > 3 && (
-                  <button
-                    onClick={() => {
-                      setSearchSubTab("creators");
-                      loadSearchFeed(1, false, "creators");
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#d4d4d8",
-                      fontSize: "13px",
-                      fontWeight: "600",
-                      cursor: "pointer",
-                      padding: 0
-                    }}
-                  >
-                    View all ({searchCreators.length})
-                  </button>
-                )}
-              </div>
-
-              <div>
-                {searchCreators.slice(0, 3).map(creator => (
-                  <SearchCreatorCard
-                    key={creator.username}
-                    creator={creator}
-                    onCreatorClick={onCreatorClick}
-                    onFollowToggle={handleSearchCreatorFollow}
-                    isFollowing={searchFollowingMap[creator.username] !== undefined ? searchFollowingMap[creator.username] : creator.is_following}
-                    isLoadingFollow={Boolean(searchFollowingLoading[creator.username])}
-                  />
-                ))}
-              </div>
+            <div style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.08)", marginBottom: "14px" }}>
+              <InstagramSuggestedCreators 
+                creators={searchCreators}
+                onCreatorClick={onCreatorClick}
+                onSeeAll={searchCreators.length > 3 ? () => {
+                  setSearchSubTab("creators");
+                  loadSearchFeed(1, false, "creators");
+                } : null}
+                hideSeeAll={searchCreators.length <= 3}
+                hideDismiss={true}
+                title={`Creators (${searchCreators.length})`}
+                style={{
+                  background: "transparent",
+                  borderTop: "none",
+                  borderBottom: "none",
+                  padding: "8px 8px 10px 8px",
+                  margin: 0
+                }}
+              />
             </div>
           )}
 
