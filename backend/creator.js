@@ -2370,33 +2370,43 @@ router.patch("/:username/highlights/:id", authenticateOwnerOrApiKey, async (req,
     }
 
     const currentHl = hlRes.rows[0];
-    let updatedStoryIds = [...(currentHl.story_ids || [])];
+    let updatedStoryIds = [];
 
-    const toAdd = [];
-    if (story_id && !isNaN(Number(story_id))) {
-      toAdd.push(Number(story_id));
-    }
     if (Array.isArray(story_ids)) {
+      // Caller explicitly provided the story_ids array (re-order, slice, or update)
+      const toAdd = [];
       story_ids.forEach(sid => {
         const n = Number(sid);
         if (!isNaN(n) && n > 0) toAdd.push(n);
       });
-    }
 
-    if (toAdd.length > 0) {
-      const validRes = await pool.query(
-        `SELECT id, thumbnail_url, video_url, duration, sound_title, created_at, expires_at
-         FROM creator_stories
-         WHERE id = ANY($1::INT[]) AND LOWER(username) = LOWER($2)`,
-        [toAdd, username]
-      );
-      const validIds = validRes.rows.map(r => r.id);
-
-      toAdd.forEach(sid => {
-        if (validIds.includes(sid) && !updatedStoryIds.includes(sid)) {
+      if (toAdd.length > 0) {
+        const validRes = await pool.query(
+          `SELECT id FROM creator_stories
+           WHERE id = ANY($1::INT[]) AND LOWER(username) = LOWER($2)`,
+          [toAdd, username]
+        );
+        const validIds = new Set(validRes.rows.map(r => r.id));
+        toAdd.forEach(sid => {
+          if (validIds.has(sid) && !updatedStoryIds.includes(sid)) {
+            updatedStoryIds.push(sid);
+          }
+        });
+      }
+    } else {
+      // Append mode: caller passed a single story_id to push into existing highlight
+      updatedStoryIds = [...(currentHl.story_ids || [])];
+      if (story_id && !isNaN(Number(story_id))) {
+        const sid = Number(story_id);
+        const validRes = await pool.query(
+          `SELECT id FROM creator_stories
+           WHERE id = $1 AND LOWER(username) = LOWER($2)`,
+          [sid, username]
+        );
+        if (validRes.rows.length > 0 && !updatedStoryIds.includes(sid)) {
           updatedStoryIds.push(sid);
         }
-      });
+      }
     }
 
     const newTitle = title !== undefined && String(title).trim() ? String(title).trim().slice(0, 100) : currentHl.title;
