@@ -217,10 +217,10 @@ export default function DiscoverCreatorsSection({
         <div style={igScrollTrack}>
           {[1, 2, 3, 4].map((n) => (
             <div key={n} style={igCardBox}>
-              <div style={{ width: "84px", height: "84px", borderRadius: "50%", background: "rgba(255, 255, 255, 0.08)", animation: "skeleton-loading 1.2s infinite" }} />
-              <div style={{ width: "96px", height: "14px", borderRadius: "4px", background: "rgba(255, 255, 255, 0.08)", marginTop: "12px", animation: "skeleton-loading 1.2s infinite" }} />
-              <div style={{ width: "64px", height: "12px", borderRadius: "4px", background: "rgba(255, 255, 255, 0.05)", marginTop: "6px", animation: "skeleton-loading 1.2s infinite" }} />
-              <div style={{ width: "100%", height: "30px", borderRadius: "8px", background: "rgba(255, 255, 255, 0.08)", marginTop: "12px", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "58px", height: "58px", borderRadius: "50%", background: "rgba(255, 255, 255, 0.08)", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "70px", height: "12px", borderRadius: "4px", background: "rgba(255, 255, 255, 0.08)", marginTop: "8px", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "50px", height: "10px", borderRadius: "4px", background: "rgba(255, 255, 255, 0.05)", marginTop: "4px", animation: "skeleton-loading 1.2s infinite" }} />
+              <div style={{ width: "86%", height: "28px", borderRadius: "14px", background: "rgba(255, 255, 255, 0.08)", marginTop: "8px", animation: "skeleton-loading 1.2s infinite" }} />
             </div>
           ))}
         </div>
@@ -297,28 +297,28 @@ export default function DiscoverCreatorsSection({
                 title="Dismiss"
                 aria-label="Dismiss"
               >
-                <X size={13} />
+                <X size={11} />
               </button>
 
-              {/* Center Avatar with Story Ring (Big Instagram Suggested Accounts Style) */}
+              {/* Center Avatar with Story Ring (Compact TikTok Suggested Accounts Style) */}
               <div style={igAvatarContainer}>
                 <StoryAvatar
                   username={uname}
                   avatarUrl={creator.avatar_url}
                   displayName={creator.display_name || uname}
-                  size={84}
-                  borderWidth={2.8}
+                  size={58}
+                  borderWidth={2}
                   onClick={() => onCreatorClick && onCreatorClick(uname)}
                 />
               </div>
 
               {/* Display Name + Twitter Verified Badge */}
-              <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "2.5px", width: "100%", minWidth: 0, marginTop: "2px" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "2px", width: "100%", minWidth: 0, marginTop: "2px" }}>
                 <span style={igDisplayName} title={creator.display_name || uname}>
                   {creator.display_name || uname}
                 </span>
                 {creator.is_verified && (
-                  <TwitterVerifiedBadge size={13.5} style={{ flexShrink: 0 }} />
+                  <TwitterVerifiedBadge size={12} style={{ flexShrink: 0 }} />
                 )}
               </div>
 
@@ -327,7 +327,7 @@ export default function DiscoverCreatorsSection({
                 @{uname}
               </span>
 
-              {/* Follow Button (Instagram Style) */}
+              {/* Follow Button (Fatter & Shorter TikTok Style) */}
               <button
                 type="button"
                 style={isFollowing ? igFollowingBtn : igFollowBtn}
@@ -335,7 +335,7 @@ export default function DiscoverCreatorsSection({
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <Loader2 size={13} className="animate-spin" />
+                  <Loader2 size={12} className="animate-spin" />
                 ) : isFollowing ? (
                   "Following"
                 ) : (
@@ -356,8 +356,8 @@ export { DiscoverCreatorsSection as InstagramSuggestedCreators };
 // 🌟 Instagram-Style Suggested Creators Styles (Exact match with Explore.jsx)
 const igSuggestedWrapper = {
   width: "100%",
-  padding: "16px 12px 16px 12px",
-  margin: "12px 0 16px 0",
+  padding: "8px 8px 8px 8px",
+  margin: "4px 0 6px 0",
   background: "linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)",
   borderTop: "1px solid rgba(255, 255, 255, 0.08)",
   borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
@@ -369,12 +369,12 @@ const igSuggestedHeader = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginBottom: "14px",
+  marginBottom: "8px",
   padding: "0 4px"
 };
 
 const igSuggestedTitle = {
-  fontSize: "14px",
+  fontSize: "13.5px",
   fontWeight: "700",
   letterSpacing: "0.2px",
   color: "#d4d4d8"
@@ -384,19 +384,19 @@ const igSeeAllBtn = {
   background: "transparent",
   border: "none",
   color: "#0095f6",
-  fontSize: "12.5px",
+  fontSize: "12px",
   fontWeight: "600",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
-  padding: "4px 8px",
+  padding: "3px 6px",
   borderRadius: "6px",
   transition: "background 0.2s ease, opacity 0.2s ease"
 };
 
 const igArrowBtn = {
-  width: "24px",
-  height: "24px",
+  width: "22px",
+  height: "22px",
   borderRadius: "50%",
   background: "rgba(255, 255, 255, 0.08)",
   border: "none",
@@ -411,9 +411,9 @@ const igArrowBtn = {
 
 const igScrollTrack = {
   display: "flex",
-  gap: "12px",
+  gap: "8px",
   overflowX: "auto",
-  paddingBottom: "6px",
+  paddingBottom: "4px",
   scrollbarWidth: "none",
   msOverflowStyle: "none",
   scrollSnapType: "x mandatory",
@@ -422,14 +422,14 @@ const igScrollTrack = {
 
 const igCardBox = {
   position: "relative",
-  flex: "0 0 174px",
-  width: "174px",
-  minWidth: "174px",
-  maxWidth: "174px",
+  flex: "0 0 116px",
+  width: "116px",
+  minWidth: "116px",
+  maxWidth: "116px",
   background: "var(--bg-color, #09090b)",
   border: "1px solid rgba(255, 255, 255, 0.10)",
-  borderRadius: "14px",
-  padding: "16px 10px 14px 10px",
+  borderRadius: "12px",
+  padding: "10px 6px 10px 6px",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
@@ -441,10 +441,10 @@ const igCardBox = {
 
 const igDismissBtn = {
   position: "absolute",
-  top: "8px",
-  right: "8px",
-  width: "20px",
-  height: "20px",
+  top: "4px",
+  right: "4px",
+  width: "18px",
+  height: "18px",
   borderRadius: "50%",
   background: "transparent",
   border: "none",
@@ -460,28 +460,28 @@ const igDismissBtn = {
 
 const igAvatarContainer = {
   position: "relative",
-  width: "90px",
-  height: "90px",
-  marginBottom: "6px",
+  width: "62px",
+  height: "62px",
+  marginBottom: "4px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center"
 };
 
 const igDisplayName = {
-  fontSize: "14px",
+  fontSize: "12.5px",
   fontWeight: "700",
-  color: "#d4d4d8",
+  color: "#f4f4f5",
   textAlign: "center",
-  maxWidth: "calc(100% - 18px)",
+  maxWidth: "calc(100% - 14px)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
-  lineHeight: "1.25"
+  lineHeight: "1.2"
 };
 
 const igHandleName = {
-  fontSize: "12px",
+  fontSize: "11px",
   color: "#8e8e93",
   textAlign: "center",
   width: "100%",
@@ -492,11 +492,12 @@ const igHandleName = {
 };
 
 const igFollowBtn = {
-  width: "100%",
-  marginTop: "12px",
-  padding: "7px 0",
-  borderRadius: "8px",
-  fontSize: "13px",
+  width: "86%",
+  minWidth: "70px",
+  marginTop: "8px",
+  height: "28px",
+  borderRadius: "14px",
+  fontSize: "12px",
   fontWeight: "700",
   color: "#09090b",
   backgroundColor: "#e4e4e7",
@@ -509,11 +510,12 @@ const igFollowBtn = {
 };
 
 const igFollowingBtn = {
-  width: "100%",
-  marginTop: "12px",
-  padding: "6px 0",
-  borderRadius: "8px",
-  fontSize: "13px",
+  width: "86%",
+  minWidth: "70px",
+  marginTop: "8px",
+  height: "28px",
+  borderRadius: "14px",
+  fontSize: "12px",
   fontWeight: "700",
   color: "#a1a1aa",
   backgroundColor: "rgba(255, 255, 255, 0.08)",

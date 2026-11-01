@@ -729,8 +729,8 @@ export default function CreatorProfileModal({
                   <p style={{
                     fontSize: "13.5px",
                     color: "#d4d4d8",
-                    lineHeight: "1.45",
-                    margin: "8px 0 10px 0",
+                    lineHeight: "1.4",
+                    margin: "6px 0 6px 0",
                     wordBreak: "break-word"
                   }}>
                     {creatorData.creator_bio}
@@ -950,7 +950,7 @@ export default function CreatorProfileModal({
             <div style={{
               width: "100%",
               maxWidth: isDesktop ? "935px" : "100%",
-              margin: isDesktop ? "0 auto 8px auto" : "0 0 4px 0",
+              margin: isDesktop ? "0 auto 4px auto" : "0 0 2px 0",
               boxSizing: "border-box",
               display: showDiscoverCreators ? "block" : "none"
             }}>
@@ -969,7 +969,7 @@ export default function CreatorProfileModal({
                   background: "transparent",
                   borderTop: "1px solid rgba(255, 255, 255, 0.08)",
                   borderBottom: "none",
-                  padding: isDesktop ? "16px 24px" : "14px 12px"
+                  padding: isDesktop ? "8px 24px" : "4px 10px"
                 }}
               />
             </div>
@@ -986,7 +986,7 @@ export default function CreatorProfileModal({
                 setHighlights((prev) => prev.filter(h => h.id !== deletedId));
               }}
               style={{
-                padding: isDesktop ? "0 24px 20px 24px" : "4px 16px 14px 16px"
+                padding: isDesktop ? "0 24px 8px 24px" : "2px 16px 4px 16px"
               }}
             />
 
@@ -1612,7 +1612,8 @@ const websiteLinkStyle = {
 const mobileActionButtonsRow = {
   display: "flex",
   gap: "8px",
-  marginTop: "14px"
+  marginTop: "8px",
+  marginBottom: "4px"
 };
 
 const mobileFollowBtn = {
@@ -1737,10 +1738,10 @@ const tabBtnStyle = {
   flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
-  gap: "6px",
+  gap: "4px",
   background: "none",
   border: "none",
-  padding: "14px 0",
+  padding: "9px 0",
   cursor: "pointer",
   flex: 1,
   transition: "all 0.15s ease"

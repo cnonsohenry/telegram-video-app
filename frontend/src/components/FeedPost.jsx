@@ -13,20 +13,20 @@ import StoryAvatar from "./StoryAvatar";
 import { loadedThumbnailsCache } from "./VideoCard";
 
 export const postStyle = { 
-  padding: "16px", 
+  padding: "10px 14px 8px 14px", 
   borderBottom: "1px solid var(--border-color, #262626)", 
   display: "flex", 
   flexDirection: "row", 
   animation: "fadeIn 0.3s ease-out" 
 };
 
-export const avatarColumnStyle = { marginRight: "12px", flexShrink: 0 };
+export const avatarColumnStyle = { marginRight: "10px", flexShrink: 0 };
 export const contentColumnStyle = { flex: 1, display: "flex", flexDirection: "column", minWidth: 0 };
-const postHeaderStyle = { display: "flex", alignItems: "center", gap: "4px", marginBottom: "2px", lineHeight: "20px" };
+const postHeaderStyle = { display: "flex", alignItems: "center", gap: "4px", marginBottom: "1px", lineHeight: "18px" };
 const avatarStyle = { width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover", backgroundColor: "#18181b" };
-const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#d4d4d8", lineHeight: "20px" };
-const timeStyle = { fontSize: "15px", color: "#71767b", lineHeight: "20px", textTransform: "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
-const captionStyle = { fontSize: "15px", lineHeight: "20px", letterSpacing: "-0.01em", color: "#c4c4c8", margin: "0 0 8px 0", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-line" };
+const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#d4d4d8", lineHeight: "18px" };
+const timeStyle = { fontSize: "14px", color: "#71767b", lineHeight: "18px", textTransform: "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const captionStyle = { fontSize: "14.5px", lineHeight: "19px", letterSpacing: "-0.01em", color: "#c4c4c8", margin: "0 0 5px 0", wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-line" };
 
 const videoContainerStyle = { 
   position: "relative", 
@@ -78,7 +78,7 @@ const groupBadgeStyle = {
   zIndex: 11 
 };
 
-const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "12px", maxWidth: "425px" };
+const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "8px", maxWidth: "425px" };
 const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", color: "#71767b", fontSize: "13px", cursor: "pointer", transition: "color 0.2s ease" };
 
 const vipLockedOverlayStyle = {

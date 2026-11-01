@@ -2597,23 +2597,23 @@ const desktopFooterCopy = {
 };
 
 const feedWrapper = { maxWidth: "600px", margin: "0 auto", width: "100%", borderLeft: window.innerWidth > 600 ? "1px solid var(--border-color)" : "none", borderRight: window.innerWidth > 600 ? "1px solid var(--border-color)" : "none", minHeight: "100vh" };
-const postStyle = { padding: "16px", borderBottom: "1px solid var(--border-color)", display: "flex", flexDirection: "row", animation: "fadeIn 0.3s ease-out" };
-const avatarColumnStyle = { marginRight: "12px", flexShrink: 0 };
+const postStyle = { padding: "10px 14px 8px 14px", borderBottom: "1px solid var(--border-color)", display: "flex", flexDirection: "row", animation: "fadeIn 0.3s ease-out" };
+const avatarColumnStyle = { marginRight: "10px", flexShrink: 0 };
 const contentColumnStyle = { flex: 1, display: "flex", flexDirection: "column", minWidth: 0 };
-const postHeaderStyle = { display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" };
+const postHeaderStyle = { display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" };
 const avatarStyle = { width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover", backgroundColor: "#222" };
 const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#d4d4d8" };
 const timeStyle = { fontSize: "13px", color: "#71767b", textTransform: "capitalize", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
-const captionStyle = { fontSize: "15px", lineHeight: "1.5", color: "#e7e9ea", margin: "0 0 12px 0", wordWrap: "break-word" };
+const captionStyle = { fontSize: "14.5px", lineHeight: "1.4", color: "#e7e9ea", margin: "0 0 6px 0", wordWrap: "break-word" };
 
 // 🟢 FIX: Removed hardcoded width (now handled inline by state). Removed aspectRatio.
-const videoContainerStyle = { position: "relative", borderRadius: "16px", overflow: "hidden", background: "#111", border: "1px solid #333", cursor: "pointer", maxHeight: "600px" };
+const videoContainerStyle = { position: "relative", borderRadius: "14px", overflow: "hidden", background: "#111", border: "1px solid #333", cursor: "pointer", maxHeight: "600px" };
 
 // 🟢 FIX: Let media scale naturally up to 600px tall
 const thumbnailImgStyle = { width: "100%", height: "100%", maxHeight: "560px", objectFit: "cover", display: "block" };
 const playOverlayStyle = { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "48px", height: "48px", borderRadius: "50%", background: "rgba(0, 0, 0, 0.6)", color: "#d4d4d8", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(0,0,0,0.5)", border: "1.5px solid rgba(255,255,255,0.25)", backdropFilter: "blur(4px)" };
 const groupBadgeStyle = { position: "absolute", top: "12px", right: "12px", background: "rgba(0,0,0,0.6)", color: "#d4d4d8", fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.15)", zIndex: 11 };
-const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "12px", maxWidth: "425px" };
+const actionBarStyle = { display: "flex", justifyContent: "space-between", marginTop: "8px", maxWidth: "425px" };
 const actionItemStyle = { display: "flex", alignItems: "center", gap: "6px", color: "#71767b", fontSize: "13px", cursor: "pointer", transition: "color 0.2s ease" };
 const skeletonAvatar = { width: "40px", height: "40px", borderRadius: "50%", animation: "skeleton-loading 1.5s infinite" };
 const skeletonTextBase = { width: "150px", height: "20px", borderRadius: "4px", marginTop: "4px", animation: "skeleton-loading 1.5s infinite" };

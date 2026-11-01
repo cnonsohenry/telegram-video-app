@@ -888,8 +888,8 @@ export default function Profile({
                 <p style={{
                   fontSize: "13.5px",
                   color: "#d4d4d8",
-                  lineHeight: "1.45",
-                  margin: "8px 0 10px 0",
+                  lineHeight: "1.4",
+                  margin: "6px 0 6px 0",
                   wordBreak: "break-word"
                 }}>
                   {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
@@ -1121,7 +1121,7 @@ export default function Profile({
         <div style={{ 
           width: "100%", 
           maxWidth: isDesktop ? "935px" : "100%",
-          margin: isDesktop ? "0 auto 8px auto" : "0 0 4px 0",
+          margin: isDesktop ? "0 auto 4px auto" : "0 0 2px 0",
           boxSizing: "border-box",
           display: showDiscoverCreators ? "block" : "none"
         }}>
@@ -1142,7 +1142,7 @@ export default function Profile({
               background: "transparent",
               borderTop: "1px solid rgba(255, 255, 255, 0.08)",
               borderBottom: "none",
-              padding: isDesktop ? "16px 0" : "14px 12px"
+              padding: isDesktop ? "8px 0" : "4px 10px"
             }}
           />
         </div>
@@ -1159,7 +1159,7 @@ export default function Profile({
             setHighlights((prev) => prev.filter(h => h.id !== deletedId));
           }}
           style={{
-            padding: isDesktop ? "0 0 18px 0" : "4px 12px 14px 12px"
+            padding: isDesktop ? "0 0 8px 0" : "2px 12px 4px 12px"
           }}
         />
 
@@ -1729,7 +1729,7 @@ const TabButton = ({ active, onClick, icon, label, isDesktop }) => (
     gap: isDesktop ? "8px" : "6px",
     background: "none", 
     border: "none", 
-    padding: isDesktop ? "16px 0" : "12px 0",
+    padding: isDesktop ? "12px 0" : "8px 0",
     borderTop: (isDesktop && active) ? "1px solid #e4e4e7" : "none",
     borderBottom: (!isDesktop && active) ? "2px solid #e4e4e7" : "none",
     opacity: active ? 1 : 0.45, 
@@ -2004,8 +2004,8 @@ const professionalIconStyle = {
 const mobileActionButtonsRow = {
   display: "flex",
   gap: "8px",
-  marginTop: "12px",
-  marginBottom: "8px"
+  marginTop: "8px",
+  marginBottom: "4px"
 };
 
 const mobileActionButton = {

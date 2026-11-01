@@ -95,11 +95,11 @@ export default function StoryHighlightsTray({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "18px",
+        gap: "12px",
         overflowX: "auto",
         scrollbarWidth: "none",
         msOverflowStyle: "none",
-        padding: "4px 16px 14px 16px",
+        padding: "2px 16px 6px 16px",
         boxSizing: "border-box",
         ...style
       }}
@@ -112,7 +112,7 @@ export default function StoryHighlightsTray({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: "6px",
+            gap: "4px",
             cursor: "pointer",
             flexShrink: 0
           }}
@@ -120,8 +120,8 @@ export default function StoryHighlightsTray({
         >
           <div
             style={{
-              width: "64px",
-              height: "64px",
+              width: "56px",
+              height: "56px",
               borderRadius: "50%",
               backgroundColor: "#18181b",
               border: "1.5px solid rgba(255, 255, 255, 0.18)",
@@ -141,14 +141,14 @@ export default function StoryHighlightsTray({
               e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.18)";
             }}
           >
-            <Plus size={26} strokeWidth={2.2} />
+            <Plus size={22} strokeWidth={2} />
           </div>
           <span
             style={{
-              fontSize: "12px",
+              fontSize: "11px",
               fontWeight: "600",
               color: "#d4d4d8",
-              maxWidth: "68px",
+              maxWidth: "62px",
               textAlign: "center",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -172,7 +172,7 @@ export default function StoryHighlightsTray({
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: "6px",
+              gap: "4px",
               cursor: "pointer",
               flexShrink: 0,
               position: "relative"
@@ -182,10 +182,10 @@ export default function StoryHighlightsTray({
             {/* Highlight Circular Cover */}
             <div
               style={{
-                width: "64px",
-                height: "64px",
+                width: "56px",
+                height: "56px",
                 borderRadius: "50%",
-                padding: "2.5px",
+                padding: "2px",
                 border: "1.5px solid rgba(255, 255, 255, 0.22)",
                 boxSizing: "border-box",
                 transition: "transform 0.15s ease, border-color 0.15s ease"
@@ -220,10 +220,10 @@ export default function StoryHighlightsTray({
             {/* Title */}
             <span
               style={{
-                fontSize: "12px",
+                fontSize: "11px",
                 fontWeight: "600",
                 color: "#e4e4e7",
-                maxWidth: "70px",
+                maxWidth: "62px",
                 textAlign: "center",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
