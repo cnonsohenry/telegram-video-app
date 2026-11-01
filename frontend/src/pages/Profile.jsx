@@ -728,17 +728,17 @@ export default function Profile({
           {/* MOBILE HEADER LAYOUT */}
           {!isDesktop ? (
             <div>
-              {/* Top Row: Details on left; Avatar on right (TikTok style) */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", marginBottom: "14px" }}>
+              {/* Top Row: Details on left (Display Name, @username, 3-column stats); Avatar on right */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "14px", marginBottom: "12px" }}>
                 
-                {/* Display Name, Bio */}
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
+                {/* Display Name, @username, and 3-column stats */}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
                   {/* Line 1: Display Name */}
-                  <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
                     <h1 style={{
                       margin: 0,
                       fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-                      fontSize: "24px",
+                      fontSize: "22px",
                       fontWeight: "800",
                       letterSpacing: "-0.4px",
                       color: "#f4f4f5",
@@ -746,20 +746,65 @@ export default function Profile({
                     }}>
                       {user?.display_name || user?.username || "Member"}
                     </h1>
+                    {(user?.is_creator || user?.is_verified) && (
+                      <TwitterVerifiedBadge size={16} style={{ flexShrink: 0 }} />
+                    )}
                   </div>
 
-                  {/* Line 2: Bio directly under display name */}
-                  {(user?.creator_bio || user?.bio || user?.is_creator) && (
-                    <p style={{
-                      fontSize: "13.5px",
-                      color: "#c8c8c8",
-                      lineHeight: "1.4",
-                      margin: "2px 0 0 0",
-                      wordBreak: "break-word"
-                    }}>
-                      {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
-                    </p>
-                  )}
+                  {/* Line 2: Username below Display Name */}
+                  <span style={{
+                    fontSize: "13.5px",
+                    color: "#a1a1aa",
+                    fontWeight: "500",
+                    marginTop: "2px",
+                    marginBottom: "10px"
+                  }}>
+                    @{user?.username || APP_CONFIG.defaultUploader}
+                  </span>
+
+                  {/* Line 3: 3-Column Stats (Stops around half upload button, does NOT go below Avatar) */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    maxWidth: "230px",
+                    paddingRight: "8px"
+                  }}>
+                    <div
+                      onClick={() => handleOpenFollowList("followers")}
+                      style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", cursor: "pointer" }}
+                      title="View followers"
+                    >
+                      <span style={{ fontSize: "17px", fontWeight: "800", color: "#f4f4f5", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+                        {formatStat(followersCount)}
+                      </span>
+                      <span style={{ fontSize: "12px", color: "#a1a1aa", fontWeight: "500", marginTop: "2px" }}>
+                        Followers
+                      </span>
+                    </div>
+
+                    <div
+                      onClick={() => handleOpenFollowList("following")}
+                      style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", cursor: "pointer" }}
+                      title="View following"
+                    >
+                      <span style={{ fontSize: "17px", fontWeight: "800", color: "#f4f4f5", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+                        {formatStat(followingCount)}
+                      </span>
+                      <span style={{ fontSize: "12px", color: "#a1a1aa", fontWeight: "500", marginTop: "2px" }}>
+                        Following
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                      <span style={{ fontSize: "17px", fontWeight: "800", color: "#f4f4f5", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+                        {formatStat(likesCount)}
+                      </span>
+                      <span style={{ fontSize: "12px", color: "#a1a1aa", fontWeight: "500", marginTop: "2px" }}>
+                        Likes
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Avatar on Right (Bigger TikTok style) + Camera Edit Badge */}
@@ -783,53 +828,6 @@ export default function Profile({
                   </button>
                 </div>
 
-              </div>
-
-              {/* TikTok-Style Stats Row: Followers, Following, Likes with numbers on top & labels below */}
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-around",
-                padding: "10px 0 6px 0",
-                marginTop: "2px",
-                marginBottom: "4px"
-              }}>
-                <div
-                  onClick={() => handleOpenFollowList("followers")}
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer", flex: 1 }}
-                  title="View followers"
-                >
-                  <span style={{ fontSize: "18px", fontWeight: "800", color: "#f4f4f5", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
-                    {formatStat(followersCount)}
-                  </span>
-                  <span style={{ fontSize: "12.5px", color: "#a1a1aa", fontWeight: "500", marginTop: "3px" }}>
-                    Followers
-                  </span>
-                </div>
-
-                <div
-                  onClick={() => handleOpenFollowList("following")}
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer", flex: 1 }}
-                  title="View following"
-                >
-                  <span style={{ fontSize: "18px", fontWeight: "800", color: "#f4f4f5", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
-                    {formatStat(followingCount)}
-                  </span>
-                  <span style={{ fontSize: "12.5px", color: "#a1a1aa", fontWeight: "500", marginTop: "3px" }}>
-                    Following
-                  </span>
-                </div>
-
-                <div
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}
-                >
-                  <span style={{ fontSize: "18px", fontWeight: "800", color: "#f4f4f5", lineHeight: "1.2", fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', -apple-system, sans-serif" }}>
-                    {formatStat(likesCount)}
-                  </span>
-                  <span style={{ fontSize: "12.5px", color: "#a1a1aa", fontWeight: "500", marginTop: "3px" }}>
-                    Likes
-                  </span>
-                </div>
               </div>
 
               {/* Action Buttons Row */}
@@ -885,6 +883,19 @@ export default function Profile({
                 </button>
               </div>
 
+              {/* Bio text brought BELOW the Action Buttons */}
+              {(user?.creator_bio || user?.bio || user?.is_creator) && (
+                <p style={{
+                  fontSize: "13.5px",
+                  color: "#d4d4d8",
+                  lineHeight: "1.45",
+                  margin: "8px 0 10px 0",
+                  wordBreak: "break-word"
+                }}>
+                  {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
+                </p>
+              )}
+
               {/* Website Link & Location */}
               {(user?.website || user?.location) && (
                 <div style={metaRowStyle}>
@@ -916,7 +927,7 @@ export default function Profile({
               <div style={{ flex: 1, minWidth: 0 }}>
                 
                 {/* Line 1: Display Name */}
-                <div style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                   <h1 style={{
                     fontFamily: "'TikTok Sans', 'Plus Jakarta Sans', 'Proxima Nova', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                     fontSize: "34px",
@@ -928,28 +939,28 @@ export default function Profile({
                   }}>
                     {user?.display_name || user?.username || "Member"}
                   </h1>
+                  {(user?.is_creator || user?.is_verified) && (
+                    <TwitterVerifiedBadge size={18} style={{ flexShrink: 0 }} />
+                  )}
                 </div>
 
-                {/* Line 2: Bio directly under display name */}
-                {(user?.creator_bio || user?.bio || user?.is_creator) && (
-                  <p style={{
-                    fontSize: "14.5px",
-                    color: "#c8c8c8",
-                    lineHeight: "1.45",
-                    margin: "4px 0 8px 0",
-                    maxWidth: "600px",
-                    wordBreak: "break-word"
-                  }}>
-                    {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
-                  </p>
-                )}
+                {/* Line 2: Username below Display Name */}
+                <span style={{
+                  fontSize: "15px",
+                  color: "#a1a1aa",
+                  fontWeight: "500",
+                  display: "block",
+                  marginBottom: "14px"
+                }}>
+                  @{user?.username || APP_CONFIG.defaultUploader}
+                </span>
 
                 {/* Line 3: Followers, following, likes count (TikTok style with labels below) */}
                 <div style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "36px",
-                  marginTop: "12px",
+                  marginTop: "4px",
                   marginBottom: "20px"
                 }}>
                   <div
@@ -989,7 +1000,7 @@ export default function Profile({
                 </div>
 
                 {/* Action Buttons */}
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
                   <button 
                     onClick={() => setShowEditModal(true)} 
                     style={{
@@ -1043,6 +1054,20 @@ export default function Profile({
                     <Settings size={18} color="#d4d4d8" />
                   </button>
                 </div>
+
+                {/* Bio directly BELOW Action Buttons */}
+                {(user?.creator_bio || user?.bio || user?.is_creator) && (
+                  <p style={{
+                    fontSize: "14.5px",
+                    color: "#c8c8c8",
+                    lineHeight: "1.45",
+                    margin: "0 0 14px 0",
+                    maxWidth: "600px",
+                    wordBreak: "break-word"
+                  }}>
+                    {user?.creator_bio || user?.bio || APP_CONFIG.profileBioSubtitle}
+                  </p>
+                )}
 
                 {/* Links & Meta */}
                 {(user?.website || user?.location) && (
@@ -1538,13 +1563,7 @@ export default function Profile({
                 </button>
               )}
             </div>
-            <div style={centerTitleContainer}>
-              <h2 style={usernameStyle}>{user?.username || APP_CONFIG.defaultUploader}</h2>
-              {(user?.is_creator || user?.is_verified) && (
-                <TwitterVerifiedBadge size={15} style={{ marginLeft: "4px" }} />
-              )}
-              <ChevronDown size={14} color="#a8a8a8" style={{ marginLeft: "2px" }} />
-            </div>
+            <div style={{ minHeight: "24px" }} />
             <div style={{ display: "flex", gap: "14px", justifyContent: "flex-end", flex: 1, alignItems: "center" }}>
               <button onClick={handleOpenSettings} style={headerIconButton} title="Settings">
                 <Settings size={21} color="#d4d4d8" />
