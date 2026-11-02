@@ -25,7 +25,9 @@ export default function StoryAvatar({
   // Normalize avatar URL to /avatar.jpg or fallback to dynamic Telegram/TikTok initial avatar
   const safeAvatarUrl = React.useMemo(() => {
     let url = avatarUrl;
-    if (url && typeof url === "string" && (url.includes("/api/avatar") || url.includes("/avatar"))) {
+    if (!url && cleanUsername) {
+      url = `/avatar.jpg?username=${encodeURIComponent(cleanUsername)}`;
+    } else if (url && typeof url === "string" && (url.includes("/api/avatar") || url.includes("/avatar"))) {
       url = url
         .replace(/\/api\/avatar(?:\.jpg)?/, "/avatar.jpg")
         .replace(/\/avatar(?!\.jpg)/, "/avatar.jpg");
@@ -87,6 +89,7 @@ export default function StoryAvatar({
       title={active ? (viewed ? `Viewed Story by @${cleanUsername}` : `New Story by @${cleanUsername}`) : displayName || cleanUsername}
     >
       <img
+        key={safeAvatarUrl}
         src={safeAvatarUrl}
         alt={displayName || cleanUsername}
         loading="lazy"

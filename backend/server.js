@@ -3050,7 +3050,7 @@ const handleAvatarRequest = async (req, res) => {
       return res.send(fallbackSvg);
     }
 
-    let cleanStr = String(rawId).trim();
+    let cleanStr = String(rawId).trim().replace(/^@/, "");
 
     // Map obsolete 1881815190 directly to the active Naija Homemade Telegram channel
     if (cleanStr === '1881815190' || cleanStr.toLowerCase() === 'naijahomemade') {
@@ -3087,8 +3087,8 @@ const handleAvatarRequest = async (req, res) => {
         `SELECT id, username, telegram_user_id, source_channel, avatar_url, creator_bio, display_name 
          FROM app_users 
          WHERE ${numericId !== null 
-           ? "((id = $1::BIGINT OR telegram_user_id = $1::BIGINT) OR (username IS NOT NULL AND LOWER(username) = LOWER($2)))" 
-           : "(username IS NOT NULL AND LOWER(username) = LOWER($1))"} 
+           ? "((id = $1::BIGINT OR telegram_user_id = $1::BIGINT OR source_channel = $2) OR (username IS NOT NULL AND LOWER(username) = LOWER($2)))" 
+           : "((username IS NOT NULL AND LOWER(username) = LOWER($1)) OR source_channel = $1)"} 
          LIMIT 1`,
         numericId !== null ? [numericId, cleanStr] : [cleanStr]
       );
@@ -3154,6 +3154,22 @@ const handleAvatarRequest = async (req, res) => {
     }
 
     if (!fileId) {
+      // Check R2 for cached creator avatar
+      const safeKey = String(userRow?.source_channel || userRow?.telegram_user_id || userRow?.username || cleanStr).replace(/[^a-zA-Z0-9_-]/g, "_");
+      const r2Key = `avatars/creator_${safeKey}.jpg`;
+      try {
+        const headRes = await r2.send(new HeadObjectCommand({ Bucket: process.env.R2_BUCKET_NAME || "videos-bucket", Key: r2Key }));
+        if (headRes) {
+          const publicDomain = process.env.R2_PUBLIC_DOMAIN || "https://bucket.naijahomemade.com";
+          const r2Url = `${publicDomain}/${r2Key}`;
+          avatarUrlCache.set(cacheKey, { targetUrl: r2Url, expiresAt: Date.now() + 86400000 });
+          res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" });
+          return res.redirect(r2Url);
+        }
+      } catch (r2Err) {
+        // Not in R2, proceed to dynamic SVG fallback
+      }
+
       const displayNameOrUname = userRow?.display_name || userRow?.username || cleanStr;
       const targetId = userRow?.id || cleanStr;
       const dynamicSvg = generateBackendAvatarSvg(displayNameOrUname, targetId);

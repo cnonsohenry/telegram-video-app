@@ -112,7 +112,7 @@ export function getDynamicAvatar(nameOrUser, identifier) {
   const gradient = getAvatarGradient(targetId);
   const cleanId = String(targetId).replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
   const svg = generateAvatarSvg(initial, gradient, cleanId);
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 /**
@@ -124,6 +124,7 @@ export function isCustomAvatar(url) {
   if (trimmed === "" || trimmed === "null" || trimmed === "undefined") return false;
   if (trimmed.includes("default-avatar")) return false;
   if (trimmed.includes("ui-avatars.com")) return false;
+  if (trimmed.startsWith("data:image/svg+xml")) return false;
   return true;
 }
 
@@ -145,6 +146,9 @@ export function resolveAvatar(avatarUrl, nameOrUser, identifier) {
 export function handleAvatarError(e, nameOrUser, identifier) {
   if (e && e.currentTarget) {
     e.currentTarget.onerror = null;
-    e.currentTarget.src = getDynamicAvatar(nameOrUser, identifier);
+    const current = String(e.currentTarget.src || "");
+    if (!current.startsWith("data:image/svg+xml")) {
+      e.currentTarget.src = getDynamicAvatar(nameOrUser, identifier);
+    }
   }
 }

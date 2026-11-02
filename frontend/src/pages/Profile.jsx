@@ -812,7 +812,7 @@ export default function Profile({
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   <StoryAvatar
                     username={user?.username}
-                    avatarUrl={user?.avatar_url}
+                    avatarUrl={user?.avatar_url || (user?.id ? `/avatar.jpg?user_id=${user.id}` : (user?.username ? `/avatar.jpg?username=${encodeURIComponent(user.username)}` : ""))}
                     displayName={user?.display_name || user?.username}
                     size={98}
                     borderWidth={3}
@@ -1098,7 +1098,7 @@ export default function Profile({
               <div style={{ flexShrink: 0, position: "relative" }}>
                 <StoryAvatar
                   username={user?.username}
-                  avatarUrl={user?.avatar_url}
+                  avatarUrl={user?.avatar_url || (user?.id ? `/avatar.jpg?user_id=${user.id}` : (user?.username ? `/avatar.jpg?username=${encodeURIComponent(user.username)}` : ""))}
                   displayName={user?.display_name || user?.username}
                   size={150}
                   borderWidth={4}
