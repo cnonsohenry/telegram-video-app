@@ -534,6 +534,7 @@ export default function CreatorProfileModal({
   const cleanUname = String(creatorData?.username || creatorUsername || "").toLowerCase().replace(/^@/, "").trim();
   const avatar = resolveAvatar(creatorData?.avatar_url, creatorData?.display_name || cleanUname, creatorData?.id || cleanUname);
   const price = Number(creatorData?.subscription_price || 0);
+  const isMonetizedCreator = Boolean(creatorData?.is_creator) || price > 0;
   const isOwner = Boolean(
     creatorData?.is_owner || 
     (currentUser && (
