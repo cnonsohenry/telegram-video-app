@@ -659,9 +659,9 @@ export default function Profile({
             user={user}
             onClose={() => setShowEditModal(false)}
             onOpenCreatorSetup={() => setShowSetupModal(true)}
-            onUpdateSuccess={(updatedUser) => {
+            onUpdateSuccess={(updatedUser, shouldClose = true) => {
               handleUpdateSuccess(updatedUser);
-              setShowEditModal(false);
+              if (shouldClose) setShowEditModal(false);
             }}
           />
         )}
@@ -1620,9 +1620,9 @@ export default function Profile({
           user={user}
           onClose={() => setShowEditModal(false)}
           onOpenCreatorSetup={() => setShowSetupModal(true)}
-          onUpdateSuccess={(updatedUser) => {
+          onUpdateSuccess={(updatedUser, shouldClose = true) => {
             handleUpdateSuccess(updatedUser);
-            setShowEditModal(false);
+            if (shouldClose) setShowEditModal(false);
           }}
         />
       )}

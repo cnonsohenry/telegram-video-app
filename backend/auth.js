@@ -249,7 +249,13 @@ async function processGoogleIdToken(token) {
     `INSERT INTO app_users (email, username, display_name, avatar_url, google_id, email_verified) 
      VALUES ($1, $2, $3, $4, $5, TRUE) 
      ON CONFLICT (email) DO UPDATE 
-     SET avatar_url = COALESCE(EXCLUDED.avatar_url, app_users.avatar_url), 
+     SET avatar_url = CASE 
+           WHEN app_users.avatar_url IS NOT NULL 
+            AND app_users.avatar_url != '' 
+            AND app_users.avatar_url NOT LIKE '%default-avatar%'
+           THEN app_users.avatar_url
+           ELSE COALESCE(EXCLUDED.avatar_url, app_users.avatar_url)
+         END, 
          google_id = COALESCE(app_users.google_id, EXCLUDED.google_id),
          email_verified = TRUE
      RETURNING id, email, username, avatar_url, role, settings, is_premium,

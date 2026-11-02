@@ -161,10 +161,29 @@ router.post("/upload-image", authenticateToken, upload.single("image"), async (r
     const r2Res = await uploadImageToR2(imageFile.path, folder, imageFile.originalname);
     if (fs.existsSync(imageFile.path)) fs.unlinkSync(imageFile.path);
 
+    // 🟢 AUTO-PERSIST AVATAR: Immediately persist profile photo to app_users.avatar_url
+    let updatedUser = null;
+    if (folder === "avatars") {
+      const uRes = await pool.query(
+        `UPDATE app_users 
+         SET avatar_url = $1 
+         WHERE id = $2 
+         RETURNING id, email, username, avatar_url, role, settings, is_premium,
+                   is_creator, display_name, creator_bio, banner_url, creator_category, 
+                   subscription_price, social_links, is_verified, location, website,
+                   email_verified, kyc_status, kyc_verified_at`,
+        [r2Res.url, req.user.id]
+      );
+      if (uRes.rows.length > 0) {
+        updatedUser = uRes.rows[0];
+      }
+    }
+
     return res.json({
       success: true,
       url: r2Res.url,
-      r2Key: r2Res.r2Key
+      r2Key: r2Res.r2Key,
+      user: updatedUser
     });
   } catch (err) {
     console.error("[IMAGE UPLOAD ERROR]", err);

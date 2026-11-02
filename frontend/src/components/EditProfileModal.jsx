@@ -3,6 +3,7 @@ import { MoveLeft, Camera, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import useModalHistory from "../hooks/useModalHistory";
 import { resolveAvatar, handleAvatarError } from "../utils/avatar";
+import { showToast } from "../utils/toast";
 
 const BANNER_PRESETS = [
   { label: "Luxury Noir", url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80" },
@@ -57,6 +58,10 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess, onOpe
 
       if (field === "avatar") {
         setAvatarUrl(data.url);
+        if (data.user && onUpdateSuccess) {
+          onUpdateSuccess(data.user, false);
+        }
+        showToast("Profile photo updated!", "success");
       } else if (field === "banner") {
         setBannerUrl(data.url);
         setCustomBanner(data.url);
