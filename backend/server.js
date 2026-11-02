@@ -28,6 +28,7 @@ import { generateDownloadUrl } from "./r2.js";
 import adminRoutes, { syncTelegramCreators, migrateLegacyVipToCreator } from "./admin.js";
 import authRoutes, { authenticateToken, requireEmailVerified, JWT_SECRET } from "./auth.js";
 import creatorRoutes from "./creator.js";
+import { avatarUrlCache, avatarBufferCache, purgeAvatarCache } from "./avatarCache.js";
 import pool from "./db.js";
 import { fetchTelegramChat } from "./telegramCreatorSync.js";
 import { isAiRefusal } from "./sanitizer.js";
@@ -1776,6 +1777,13 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     uploaderHandle = uploaderHandle || uploaderName || "creator";
   }
 
+  const rawAvatarUrl = v.avatar_url && typeof v.avatar_url === "string" ? v.avatar_url.trim() : "";
+  const cleanAvatarUrl = rawAvatarUrl && !rawAvatarUrl.includes("default-avatar")
+    ? (rawAvatarUrl.includes("bucket.naijahomemade.com/avatars/")
+        ? rawAvatarUrl.replace("https://bucket.naijahomemade.com/avatars/", `${(apiBaseUrl || "https://naijahomemade.com").replace(/\/+$/, "")}/avatars/`)
+        : rawAvatarUrl)
+    : null;
+
   return {
     id: v.id,
     chat_id: v.chat_id,
@@ -1790,6 +1798,7 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     uploader_id: v.uploader_id,
     uploader_name: uploaderName,
     uploader_handle: uploaderHandle,
+    avatar_url: cleanAvatarUrl,
     created_at: v.created_at,
     thumbnail_url: thumbnailUrl,
     media_group_id: v.media_group_id || null,
@@ -1926,6 +1935,7 @@ app.get("/api/videos", async (req, res) => {
           p.group_count,
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.avatar_url, '') as avatar_url,
           COALESCE(au.is_verified, true) as is_verified,
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedIds p
@@ -1956,6 +1966,7 @@ app.get("/api/videos", async (req, res) => {
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.avatar_url, '') as avatar_url,
           COALESCE(au.is_verified, true) as is_verified,
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedVideos v 
@@ -1987,6 +1998,7 @@ app.get("/api/videos", async (req, res) => {
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.avatar_url, '') as avatar_url,
           COALESCE(au.is_verified, true) as is_verified,
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM PagedVideos v 
@@ -2044,6 +2056,7 @@ app.get("/api/videos", async (req, res) => {
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.avatar_url, '') as avatar_url,
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM RandomVideos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id 
@@ -2171,6 +2184,7 @@ app.get("/api/group", async (req, res) => {
       SELECT v.*, 
         COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
         COALESCE(au.username, u.username, 'creator') as uploader_handle,
+        COALESCE(au.avatar_url, '') as avatar_url,
         COALESCE(au.subscription_price, 0) as subscription_price
       FROM videos v 
       LEFT JOIN users u ON v.uploader_id = u.user_id 
@@ -2361,6 +2375,7 @@ app.get("/api/search", async (req, res) => {
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
           COALESCE(au.username, u.username, 'creator') as uploader_handle,
+          COALESCE(au.avatar_url, '') as avatar_url,
           COALESCE(au.subscription_price, 0) as subscription_price
         FROM videos v 
         LEFT JOIN users u ON v.uploader_id = u.user_id 
@@ -2500,7 +2515,8 @@ app.get("/api/interactions/liked", authenticateToken, async (req, res) => {
     const query = `
       SELECT v.*, 
         COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
-        COALESCE(au.username, u.username, 'creator') as uploader_handle
+        COALESCE(au.username, u.username, 'creator') as uploader_handle,
+        COALESCE(au.avatar_url, '') as avatar_url
       FROM likes l
       JOIN videos v ON l.message_id = v.message_id
       LEFT JOIN users u ON v.uploader_id = u.user_id
@@ -2539,6 +2555,7 @@ app.get("/api/interactions/saved", authenticateToken, async (req, res) => {
       SELECT v.*, 
         COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
         COALESCE(au.username, u.username, 'creator') as uploader_handle,
+        COALESCE(au.avatar_url, '') as avatar_url,
         COALESCE(au.subscription_price, 0) as subscription_price
       FROM saves s
       JOIN videos v ON s.message_id = v.message_id
@@ -2854,8 +2871,6 @@ const FALLBACK_THUMB_SVG = Buffer.from(
 
 // 🟢 In-memory caches to eliminate redundant network & DB roundtrips under high concurrency
 const existingR2Thumbs = new Set();
-const avatarUrlCache = new Map(); // identifier -> { targetUrl, expiresAt }
-const avatarBufferCache = new Map(); // identifier -> { buffer, expiresAt }
 
 const handleThumbnailRequest = async (req, res) => {
   const { chat_id, message_id } = req.query;
@@ -3098,8 +3113,41 @@ const handleAvatarRequest = async (req, res) => {
             !userRow.avatar_url.includes('/api/avatar') && 
             !userRow.avatar_url.includes('/avatar?') &&
             !userRow.avatar_url.includes('default-avatar')) {
-          avatarUrlCache.set(cacheKey, { targetUrl: userRow.avatar_url, expiresAt: Date.now() + 3600000 });
-          res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" });
+
+          // 🟢 1a. If avatar is stored in R2, stream image buffer directly to eliminate Cloudflare WAF Hotlink blocks
+          if (userRow.avatar_url.includes('/avatars/')) {
+            const avatarFilename = userRow.avatar_url.split('/avatars/').pop().split('?')[0];
+            const r2Key = `avatars/${avatarFilename}`;
+            try {
+              const getObj = await r2.send(new GetObjectCommand({
+                Bucket: process.env.R2_BUCKET_NAME || "videos-bucket",
+                Key: r2Key
+              }));
+              const chunks = [];
+              for await (const chunk of getObj.Body) chunks.push(chunk);
+              const imgBuf = Buffer.concat(chunks);
+              const contentType = getObj.ContentType || "image/jpeg";
+              
+              const entry = { buffer: imgBuf, contentType, expiresAt: Date.now() + 86400000 };
+              avatarBufferCache.set(cacheKey, entry);
+              avatarBufferCache.set(cleanStr.toLowerCase(), entry);
+              if (numericId !== null) avatarBufferCache.set(String(numericId), entry);
+
+              res.set({
+                "Content-Type": contentType,
+                "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
+                "Access-Control-Allow-Origin": "*"
+              });
+              return res.send(imgBuf);
+            } catch (r2Err) {
+              console.warn(`[AVATAR R2 FETCH FAIL] ${r2Key}:`, r2Err.message);
+            }
+          }
+
+          // 🟢 1b. For external URLs (Google OAuth), redirect with short edge TTL unless explicitly versioned
+          const edgeTtl = versionParam ? 604800 : 300;
+          avatarUrlCache.set(cacheKey, { targetUrl: userRow.avatar_url, expiresAt: Date.now() + 300000 });
+          res.set({ "Cache-Control": `public, max-age=60, s-maxage=${edgeTtl}, stale-while-revalidate=600` });
           return res.redirect(userRow.avatar_url);
         }
       }
@@ -3158,13 +3206,21 @@ const handleAvatarRequest = async (req, res) => {
       const safeKey = String(userRow?.source_channel || userRow?.telegram_user_id || userRow?.username || cleanStr).replace(/[^a-zA-Z0-9_-]/g, "_");
       const r2Key = `avatars/creator_${safeKey}.jpg`;
       try {
-        const headRes = await r2.send(new HeadObjectCommand({ Bucket: process.env.R2_BUCKET_NAME || "videos-bucket", Key: r2Key }));
-        if (headRes) {
-          const publicDomain = process.env.R2_PUBLIC_DOMAIN || "https://bucket.naijahomemade.com";
-          const r2Url = `${publicDomain}/${r2Key}`;
-          avatarUrlCache.set(cacheKey, { targetUrl: r2Url, expiresAt: Date.now() + 86400000 });
-          res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" });
-          return res.redirect(r2Url);
+        const getObj = await r2.send(new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME || "videos-bucket", Key: r2Key }));
+        if (getObj && getObj.Body) {
+          const chunks = [];
+          for await (const chunk of getObj.Body) chunks.push(chunk);
+          const imgBuf = Buffer.concat(chunks);
+          const contentType = getObj.ContentType || "image/jpeg";
+          const entry = { buffer: imgBuf, contentType, expiresAt: Date.now() + 86400000 };
+          avatarBufferCache.set(cacheKey, entry);
+          avatarBufferCache.set(cleanStr.toLowerCase(), entry);
+          res.set({
+            "Content-Type": contentType,
+            "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
+            "Access-Control-Allow-Origin": "*"
+          });
+          return res.send(imgBuf);
         }
       } catch (r2Err) {
         // Not in R2, proceed to dynamic SVG fallback
@@ -3216,6 +3272,55 @@ app.get("/avatar", handleAvatarRequest);
 app.get("/avatar.jpg", handleAvatarRequest);
 app.get("/api/avatar", handleAvatarRequest);
 app.get("/api/avatar.jpg", handleAvatarRequest);
+
+/* =======================================================
+   DIRECT AVATAR STREAMING FROM R2
+   GET /avatars/:filename
+   Direct origin delivery bypassing Cloudflare WAF Hotlink Protection
+======================================================= */
+app.get("/avatars/:filename", async (req, res) => {
+  const filename = String(req.params.filename || "").replace(/[^a-zA-Z0-9_.-]/g, "");
+  if (!filename) return res.status(404).send("Not found");
+
+  const cacheKey = `avatars/${filename}`.toLowerCase();
+  const cached = avatarBufferCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    res.set({
+      "Content-Type": cached.contentType || "image/jpeg",
+      "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
+      "Access-Control-Allow-Origin": "*"
+    });
+    return res.send(cached.buffer);
+  }
+
+  try {
+    const getObj = await r2.send(new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME || "videos-bucket",
+      Key: `avatars/${filename}`
+    }));
+    const chunks = [];
+    for await (const chunk of getObj.Body) chunks.push(chunk);
+    const buf = Buffer.concat(chunks);
+    const contentType = getObj.ContentType || "image/jpeg";
+
+    avatarBufferCache.set(cacheKey, { buffer: buf, contentType, expiresAt: Date.now() + 86400000 });
+
+    res.set({
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable",
+      "Access-Control-Allow-Origin": "*"
+    });
+    return res.send(buf);
+  } catch (err) {
+    const fallbackSvg = generateBackendAvatarSvg(filename.slice(0, 4), filename);
+    res.set({
+      "Content-Type": "image/svg+xml",
+      "Cache-Control": "public, max-age=300",
+      "Access-Control-Allow-Origin": "*"
+    });
+    return res.send(fallbackSvg);
+  }
+});
 
 /* =====================
    ROBOTS.TXT

@@ -81,10 +81,13 @@ export async function uploadImageToR2(filePath, folder = "profiles", originalNam
     ContentType: mimeType,
   }));
 
+  const apiBaseUrl = (process.env.API_BASE_URL || "https://naijahomemade.com").replace(/\/+$/, "");
+  const directUrl = safeFolder === "avatars" ? `${apiBaseUrl}/${r2Key}` : `${R2_PUBLIC_DOMAIN}/${r2Key}`;
+
   return {
     r2Key,
-    staticUrl: `${R2_PUBLIC_DOMAIN}/${r2Key}`,
-    url: `${R2_PUBLIC_DOMAIN}/${r2Key}`
+    staticUrl: directUrl,
+    url: directUrl
   };
 }
 

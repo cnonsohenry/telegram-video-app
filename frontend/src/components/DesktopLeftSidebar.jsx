@@ -329,6 +329,8 @@ export default function DesktopLeftSidebar({
               alt="User Avatar"
               loading="lazy"
               decoding="async"
+              crossOrigin="anonymous"
+              referrerPolicy="no-referrer-when-downgrade"
               onError={(e) => handleAvatarError(e, user?.display_name || user?.username, user?.id || user?.username)}
               style={desktopUserPillAvatar}
             />

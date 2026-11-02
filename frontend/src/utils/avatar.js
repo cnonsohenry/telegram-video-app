@@ -116,11 +116,25 @@ export function getDynamicAvatar(nameOrUser, identifier) {
 }
 
 /**
+ * Normalizes avatar URLs to same-origin proxies where necessary
+ * (e.g. converting bucket.naijahomemade.com/avatars/ to /avatars/).
+ */
+export function normalizeAvatarUrl(url) {
+  if (!url || typeof url !== "string") return "";
+  let clean = url.trim();
+  if (clean.includes("bucket.naijahomemade.com/avatars/")) {
+    clean = clean.replace("https://bucket.naijahomemade.com/avatars/", "https://naijahomemade.com/avatars/");
+  }
+  return clean;
+}
+
+/**
  * Checks if an avatar URL is an authentic custom user photo.
  */
 export function isCustomAvatar(url) {
   if (!url || typeof url !== "string") return false;
-  const trimmed = url.trim().toLowerCase();
+  const clean = normalizeAvatarUrl(url);
+  const trimmed = clean.trim().toLowerCase();
   if (trimmed === "" || trimmed === "null" || trimmed === "undefined") return false;
   if (trimmed.includes("default-avatar")) return false;
   if (trimmed.includes("ui-avatars.com")) return false;
@@ -133,8 +147,9 @@ export function isCustomAvatar(url) {
  * or gracefully returns the Telegram/TikTok style dynamic initial SVG Data URI.
  */
 export function resolveAvatar(avatarUrl, nameOrUser, identifier) {
-  if (isCustomAvatar(avatarUrl)) {
-    return avatarUrl;
+  const cleanUrl = normalizeAvatarUrl(avatarUrl);
+  if (isCustomAvatar(cleanUrl)) {
+    return cleanUrl;
   }
   return getDynamicAvatar(nameOrUser, identifier);
 }

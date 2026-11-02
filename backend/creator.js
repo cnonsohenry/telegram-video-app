@@ -27,6 +27,7 @@ import {
 import { syncTelegramCreatorProfile } from "./telegramCreatorSync.js";
 import { purgeVideoAndInteractions } from "./admin.js";
 import { isAiRefusal } from "./sanitizer.js";
+import { purgeAvatarCache } from "./avatarCache.js";
 
 const router = express.Router();
 
@@ -177,6 +178,7 @@ router.post("/upload-image", authenticateToken, upload.single("image"), async (r
       if (uRes.rows.length > 0) {
         updatedUser = uRes.rows[0];
       }
+      purgeAvatarCache([req.user.id, updatedUser?.username, updatedUser?.source_channel, updatedUser?.telegram_user_id]);
     }
 
     return res.json({
@@ -606,6 +608,10 @@ const handleUpdateProfile = async (req, res) => {
       cleanWebsite,
       userId
     ]);
+
+    if (cleanAvatar) {
+      purgeAvatarCache([userId, existing.username, existing.source_channel, existing.telegram_user_id]);
+    }
 
     res.json({ success: true, user: result.rows[0] });
   } catch (err) {
@@ -1507,6 +1513,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       uploader_name: creator.display_name || v.uploader_name || creator.username,
       display_name: creator.display_name || v.uploader_name || creator.username,
       uploader_handle: creator.username || username,
+      avatar_url: creator.avatar_url || null,
       subscription_price: creatorSubPrice,
       is_premium: String(v.category || "").toLowerCase().trim() === "premium",
       category: v.category,
@@ -2516,7 +2523,7 @@ router.get("/:username/videos", async (req, res) => {
 
   try {
     const appUserRes = await pool.query(
-      `SELECT id, username, display_name, telegram_user_id, subscription_price 
+      `SELECT id, username, display_name, telegram_user_id, subscription_price, avatar_url 
        FROM app_users 
        WHERE LOWER(username) = LOWER($1) 
           OR LOWER(COALESCE(display_name, '')) = LOWER($1)
@@ -2624,6 +2631,7 @@ router.get("/:username/videos", async (req, res) => {
       uploader_name: creatorDisplayName || v.uploader_name || username,
       display_name: creatorDisplayName || v.uploader_name || username,
       uploader_handle: creatorUsername,
+      avatar_url: appUserRes.rows[0]?.avatar_url || null,
       subscription_price: creatorSubPrice,
       is_premium: String(v.category || "").toLowerCase().trim() === "premium",
       category: v.category,

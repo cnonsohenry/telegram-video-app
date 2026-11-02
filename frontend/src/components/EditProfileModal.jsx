@@ -178,6 +178,8 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess, onOpe
                   <img
                     src={resolveAvatar(avatarUrl || user?.avatar_url, displayName || user?.username, user?.id || user?.username)}
                     alt="Avatar preview"
+                    crossOrigin="anonymous"
+                    referrerPolicy="no-referrer-when-downgrade"
                     style={{
                       width: "84px",
                       height: "84px",

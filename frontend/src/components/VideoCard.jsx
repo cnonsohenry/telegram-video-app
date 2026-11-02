@@ -5,6 +5,7 @@ import { APP_CONFIG } from "../config";
 import { renderClickableCaption } from "./ClickableCaption";
 import { formatTwitterDate, getPostDisplayName } from "../utils/date";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 // Global loaded image cache to guarantee 0ms instant display without blink on re-mounts/scroll
 export const loadedThumbnailsCache = new Set();
@@ -295,11 +296,11 @@ function VideoCard({ video, onOpen, showDetails = true, priority = false, onCrea
           >
             <div style={avatarWrapperStyle}>
                <img 
-                 src={`${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${video.uploader_id}`}
+                 src={resolveAvatar(video.avatar_url || (video.uploader_id ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${video.uploader_id}` : ""), getPostDisplayName(video), video.uploader_id || video.uploader_handle)}
                  alt={getPostDisplayName(video)}
                  loading="lazy"
                  decoding="async"
-                 onError={(e) => { e.target.style.display = 'none'; }}
+                 onError={(e) => handleAvatarError(e, getPostDisplayName(video), video.uploader_id || video.uploader_handle)}
                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
                />
             </div>

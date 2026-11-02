@@ -418,6 +418,8 @@ export default function CommentSectionModal({ video, onClose }) {
                     <img 
                       src={resolveAvatar(p.avatar_url, p.display_name || p.username, p.user_id || p.username)} 
                       alt="avatar" 
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer-when-downgrade"
                       style={commentAvatarStyle}
                       onError={(e) => handleAvatarError(e, p.display_name || p.username, p.user_id || p.username)}
                       onClick={() => {
@@ -500,6 +502,8 @@ export default function CommentSectionModal({ video, onClose }) {
                                   <img 
                                     src={resolveAvatar(reply.avatar_url, reply.display_name || reply.username, reply.user_id || reply.username)} 
                                     alt="avatar" 
+                                    crossOrigin="anonymous"
+                                    referrerPolicy="no-referrer-when-downgrade"
                                     style={replyAvatarStyle}
                                     onError={(e) => handleAvatarError(e, reply.display_name || reply.username, reply.user_id || reply.username)}
                                     onClick={() => {

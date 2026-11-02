@@ -538,6 +538,8 @@ export default function AppHeader({
                 <img 
                   src={resolveAvatar(user?.avatar_url, user?.display_name || user?.username, user?.id || user?.username)} 
                   alt="Profile" 
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer-when-downgrade"
                   style={avatarStyle(isDesktop)} 
                   onError={(e) => handleAvatarError(e, user?.display_name || user?.username, user?.id || user?.username)}
                 />
@@ -564,6 +566,8 @@ export default function AppHeader({
                 <img 
                   src={resolveAvatar(user?.avatar_url, user?.display_name || user?.username, user?.id || user?.username)} 
                   alt="P" 
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer-when-downgrade"
                   style={avatarStyle(false)} 
                   onError={(e) => handleAvatarError(e, user?.display_name || user?.username, user?.id || user?.username)}
                 />

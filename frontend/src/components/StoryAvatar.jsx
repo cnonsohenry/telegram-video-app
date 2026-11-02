@@ -1,7 +1,7 @@
 import React from "react";
 import { useActiveStories } from "../context/StoryContext";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
-import { resolveAvatar, handleAvatarError } from "../utils/avatar";
+import { resolveAvatar, handleAvatarError, normalizeAvatarUrl } from "../utils/avatar";
 
 export default function StoryAvatar({
   username,
@@ -24,7 +24,7 @@ export default function StoryAvatar({
 
   // Normalize avatar URL to /avatar.jpg or fallback to dynamic Telegram/TikTok initial avatar
   const safeAvatarUrl = React.useMemo(() => {
-    let url = avatarUrl;
+    let url = normalizeAvatarUrl(avatarUrl);
     if (!url && cleanUsername) {
       url = `/avatar.jpg?username=${encodeURIComponent(cleanUsername)}`;
     } else if (url && typeof url === "string" && (url.includes("/api/avatar") || url.includes("/avatar"))) {
@@ -94,6 +94,8 @@ export default function StoryAvatar({
         alt={displayName || cleanUsername}
         loading="lazy"
         decoding="async"
+        crossOrigin="anonymous"
+        referrerPolicy="no-referrer-when-downgrade"
         onError={(e) => handleAvatarError(e, displayName || cleanUsername, cleanUsername)}
         style={finalImgStyle}
       />

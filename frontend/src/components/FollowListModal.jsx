@@ -370,6 +370,8 @@ export default function FollowListModal({
                 <img
                   src={avatarSrc}
                   alt={u.username}
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer-when-downgrade"
                   style={styles.avatar}
                   onError={(e) => handleAvatarError(e, u.display_name || u.username, u.id || u.username)}
                 />
