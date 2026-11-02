@@ -12,6 +12,7 @@ import useModalHistory from "../hooks/useModalHistory";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 export default function SettingsView({ 
   user,
@@ -187,10 +188,10 @@ export default function SettingsView({
           <div style={userRowStyle} onClick={onOpenEditProfile}>
             <div style={avatarCircle}>
               <img 
-                src={user?.avatar_url || "/assets/default-avatar.png"} 
+                src={resolveAvatar(user?.avatar_url, user?.display_name || user?.username, user?.id || user?.username)} 
                 alt=""
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                onError={(e) => handleAvatarError(e, user?.display_name || user?.username, user?.id || user?.username)}
               />
             </div>
             <div style={{ flex: 1, minWidth: 0, marginLeft: "14px" }}>
@@ -568,7 +569,7 @@ export default function SettingsView({
                         loading="lazy"
                         decoding="async"
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                        onError={(e) => handleAvatarError(e, sub.creator_display_name || sub.creator_username, sub.creator_id)}
                       />
                     </div>
                     <div>

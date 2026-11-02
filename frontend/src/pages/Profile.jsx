@@ -28,6 +28,7 @@ import { useVideos } from "../hooks/useVideos";
 import { APP_CONFIG } from "../config";
 import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subscription";
 import { showToast, promptLogin } from "../utils/toast";
+import { handleAvatarError } from "../utils/avatar";
 
 export default function Profile({ 
   user, 
@@ -1273,7 +1274,7 @@ export default function Profile({
                         }}>
                           <img 
                             src={`/avatar.jpg?user_id=${sub.creator_id}`}
-                            onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                            onError={(e) => handleAvatarError(e, sub.creator_name || sub.creator_username, sub.creator_id)}
                             alt=""
                             loading="lazy"
                             decoding="async"

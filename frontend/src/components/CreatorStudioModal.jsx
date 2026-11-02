@@ -10,6 +10,7 @@ import { APP_CONFIG } from "../config";
 import CreatorUploadModal from "./CreatorUploadModal";
 import { showToast } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser }) {
   const handleSafeClose = useModalHistory(isOpen, onClose, "creatorStudio");
@@ -357,10 +358,10 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                             <div key={t.id} style={tipRowStyle}>
                               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                 <img 
-                                  src={t.sender_avatar || "/assets/default-avatar.png"} 
+                                  src={resolveAvatar(t.sender_avatar, t.sender_username, t.sender_user_id || t.sender_username)} 
                                   alt="" 
                                   style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
-                                  onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                  onError={(e) => handleAvatarError(e, t.sender_username, t.sender_user_id || t.sender_username)}
                                 />
                                 <div>
                                   <div style={{ fontSize: "13px", fontWeight: "700", color: "#d4d4d8" }}>
@@ -408,10 +409,10 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                             <div key={s.id} style={tipRowStyle}>
                               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                 <img 
-                                  src={s.subscriber_avatar || "/assets/default-avatar.png"} 
+                                  src={resolveAvatar(s.subscriber_avatar, s.subscriber_username, s.subscriber_user_id || s.subscriber_username)} 
                                   alt="" 
                                   style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
-                                  onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                  onError={(e) => handleAvatarError(e, s.subscriber_username, s.subscriber_user_id || s.subscriber_username)}
                                 />
                                 <div>
                                   <div style={{ fontSize: "13px", fontWeight: "700", color: "#d4d4d8" }}>
@@ -471,10 +472,10 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                               <td style={tdStyle}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                   <img 
-                                    src={sub.subscriber_avatar || "/assets/default-avatar.png"} 
+                                    src={resolveAvatar(sub.subscriber_avatar, sub.subscriber_display_name || sub.subscriber_username, sub.subscriber_user_id || sub.subscriber_username)} 
                                     alt="" 
                                     style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
-                                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                    onError={(e) => handleAvatarError(e, sub.subscriber_display_name || sub.subscriber_username, sub.subscriber_user_id || sub.subscriber_username)}
                                   />
                                   <div>
                                     <div style={{ fontWeight: "700", color: "#d4d4d8", fontSize: "13px" }}>
@@ -531,10 +532,10 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                               <img 
-                                src={t.sender_avatar || "/assets/default-avatar.png"} 
+                                src={resolveAvatar(t.sender_avatar, t.sender_username, t.sender_user_id || t.sender_username)} 
                                 alt="" 
                                 style={{ width: "38px", height: "38px", borderRadius: "50%", objectFit: "cover" }}
-                                onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                                onError={(e) => handleAvatarError(e, t.sender_username, t.sender_user_id || t.sender_username)}
                               />
                               <div>
                                 <span style={{ fontWeight: "700", color: "#d4d4d8", fontSize: "14px" }}>

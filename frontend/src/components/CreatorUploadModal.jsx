@@ -7,6 +7,7 @@ import {
 import { APP_CONFIG } from "../config";
 import { showToast } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 export default function CreatorUploadModal({ 
   isOpen, 
@@ -529,10 +530,10 @@ export default function CreatorUploadModal({
               <div style={avatarColumnStyle}>
                 <div style={avatarCircleStyle}>
                   <img 
-                    src={user?.avatar_url || "/assets/default-avatar.png"} 
+                    src={resolveAvatar(user?.avatar_url, user?.display_name || user?.username, user?.id || user?.username)} 
                     alt=""
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                    onError={(e) => handleAvatarError(e, user?.display_name || user?.username, user?.id || user?.username)}
                   />
                 </div>
               </div>

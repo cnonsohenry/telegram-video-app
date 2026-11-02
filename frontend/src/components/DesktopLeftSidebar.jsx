@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 /**
  * Reusable Desktop Left Sidebar (Twitter/X style navigation rail)
@@ -324,11 +325,11 @@ export default function DesktopLeftSidebar({
             title={`Logged in as ${user.display_name || user.username || "Creator"}`}
           >
             <img 
-              src={user.avatar_url || (user.id ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${user.id}` : "/assets/default-avatar.png")} 
+              src={resolveAvatar(user?.avatar_url, user?.display_name || user?.username, user?.id || user?.username)} 
               alt="User Avatar"
               loading="lazy"
               decoding="async"
-              onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+              onError={(e) => handleAvatarError(e, user?.display_name || user?.username, user?.id || user?.username)}
               style={desktopUserPillAvatar}
             />
             <div style={{ flex: 1, minWidth: 0 }}>

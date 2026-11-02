@@ -1,10 +1,11 @@
 import React from "react";
 import { useActiveStories } from "../context/StoryContext";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 export default function StoryAvatar({
   username,
-  avatarUrl = "/assets/default-avatar.png",
+  avatarUrl = "",
   displayName = "",
   size = 40,
   borderWidth = 2.5,
@@ -21,19 +22,16 @@ export default function StoryAvatar({
   const active = hasActiveStory(cleanUsername);
   const viewed = isStoryViewed(cleanUsername);
 
-  // Normalize avatar URL to /avatar.jpg for global Cloudflare Edge HIT caching
+  // Normalize avatar URL to /avatar.jpg or fallback to dynamic Telegram/TikTok initial avatar
   const safeAvatarUrl = React.useMemo(() => {
-    if (!avatarUrl || avatarUrl === "null" || avatarUrl === "undefined") {
-      return "/assets/default-avatar.png";
-    }
-    if (avatarUrl.includes("/api/avatar") || avatarUrl.includes("/avatar")) {
-      let normalized = avatarUrl
+    let url = avatarUrl;
+    if (url && typeof url === "string" && (url.includes("/api/avatar") || url.includes("/avatar"))) {
+      url = url
         .replace(/\/api\/avatar(?:\.jpg)?/, "/avatar.jpg")
         .replace(/\/avatar(?!\.jpg)/, "/avatar.jpg");
-      return normalized;
     }
-    return avatarUrl;
-  }, [avatarUrl]);
+    return resolveAvatar(url, displayName || cleanUsername, cleanUsername);
+  }, [avatarUrl, displayName, cleanUsername]);
 
   const handleClick = (e) => {
     if (active) {
@@ -93,7 +91,7 @@ export default function StoryAvatar({
         alt={displayName || cleanUsername}
         loading="lazy"
         decoding="async"
-        onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+        onError={(e) => handleAvatarError(e, displayName || cleanUsername, cleanUsername)}
         style={finalImgStyle}
       />
       {showVerifiedBadge && (

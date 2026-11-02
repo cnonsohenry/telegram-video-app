@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import useModalHistory from "../hooks/useModalHistory";
 import { APP_CONFIG } from "../config";
 import { promptLogin, promptEmailVerification } from "../utils/toast";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 function formatStoryTimeAgo(story) {
   if (!story) return "";
@@ -477,8 +478,11 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     currentStory.display_name ||
     creator?.username ||
     currentStory.username;
-  const avatarUrl =
-    creator?.avatar_url || currentStory.avatar_url || "/assets/default-avatar.png";
+  const avatarUrl = resolveAvatar(
+    creator?.avatar_url || currentStory.avatar_url,
+    displayName,
+    creator?.id || currentStory.creator_id || currentStory.username
+  );
   const soundTitle = currentStory.sound_title || "Trending Afrobeat Track";
   const storyTimeAgo = formatStoryTimeAgo(currentStory);
 
@@ -793,6 +797,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                 <img
                   src={avatarUrl}
                   alt={displayName}
+                  onError={(e) => handleAvatarError(e, displayName, creator?.id || currentStory.creator_id || currentStory.username)}
                   style={{
                     width: "36px",
                     height: "36px",

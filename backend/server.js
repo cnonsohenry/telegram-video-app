@@ -2957,8 +2957,79 @@ app.get("/api/thumb", handleThumbnailRequest);
 app.get("/thumb", handleThumbnailRequest);
 
 /* =======================================================
-   🟢 BULLETPROOF AVATAR ROUTE (Cached & Timeout-Protected)
+   🟢 BULLETPROOF AVATAR ROUTE (Cached & Dynamic Telegram/TikTok SVG Generator)
 ======================================================= */
+const AVATAR_GRADIENTS = [
+  { name: "Sunset Coral",   start: "#FF5E62", end: "#FF9966" },
+  { name: "Neon Violet",    start: "#8A2387", end: "#E94057" },
+  { name: "Electric Blue",  start: "#2563EB", end: "#60A5FA" },
+  { name: "Emerald Mint",   start: "#059669", end: "#34D399" },
+  { name: "Vibrant Amber",  start: "#D97706", end: "#FBBF24" },
+  { name: "Royal Violet",   start: "#7C3AED", end: "#A78BFA" },
+  { name: "Aqua Cyan",      start: "#0891B2", end: "#22D3EE" },
+  { name: "Rose Crimson",   start: "#E11D48", end: "#FB7185" },
+  { name: "Indigo Dusk",    start: "#4F46E5", end: "#818CF8" },
+  { name: "Warm Tangerine", start: "#EA580C", end: "#FB923C" },
+];
+
+function getBackendAvatarInitial(nameOrUser) {
+  if (!nameOrUser) return "";
+  let raw = "";
+  if (typeof nameOrUser === "object") {
+    raw = nameOrUser.display_name || nameOrUser.displayName || nameOrUser.username || "";
+  } else {
+    raw = String(nameOrUser);
+  }
+  const clean = raw.replace(/^[@#\s"'`]+/, "").trim();
+  if (!clean) return "";
+  const match = clean.match(/[\p{L}\p{N}]/u);
+  if (match) return match[0].toUpperCase();
+  const graphemes = Array.from(clean);
+  return graphemes.length > 0 ? graphemes[0] : "";
+}
+
+function getBackendAvatarGradient(identifier) {
+  if (identifier === null || identifier === undefined) return AVATAR_GRADIENTS[0];
+  let index = 0;
+  if (typeof identifier === "number" && !isNaN(identifier)) {
+    index = Math.abs(identifier) % AVATAR_GRADIENTS.length;
+  } else {
+    const str = String(identifier).trim().toLowerCase();
+    if (/^-?\d+$/.test(str)) {
+      index = Math.abs(parseInt(str, 10)) % AVATAR_GRADIENTS.length;
+    } else {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+      }
+      index = Math.abs(hash) % AVATAR_GRADIENTS.length;
+    }
+  }
+  return AVATAR_GRADIENTS[index] || AVATAR_GRADIENTS[0];
+}
+
+function generateBackendAvatarSvg(nameOrUser, identifier) {
+  const initial = getBackendAvatarInitial(nameOrUser);
+  const targetId = identifier || (typeof nameOrUser === "object" ? (nameOrUser.id || nameOrUser.username) : nameOrUser) || "user";
+  const gradient = getBackendAvatarGradient(targetId);
+  const gradId = `avg_${(gradient.name || "g").replace(/\s+/g, "_")}_${String(targetId).replace(/[^a-zA-Z0-9]/g, "").slice(0, 8)}`;
+  const isSilhouette = !initial || initial === "?";
+  const content = isSilhouette
+    ? `<path d="M50 48a14 14 0 1 0 0-28 14 14 0 0 0 0 28zm0 7c-13.3 0-26 7.4-26 19v4h52v-4c0-11.6-12.7-19-26-19z" fill="#ffffff" fill-opacity="0.95"/>`
+    : `<text x="50%" y="53%" font-family="-apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Roboto, sans-serif" font-size="44" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="central">${initial}</text>`;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${gradient.start}"/>
+      <stop offset="100%" stop-color="${gradient.end}"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="50" fill="url(#${gradId})"/>
+  ${content}
+</svg>`;
+}
+
 const handleAvatarRequest = async (req, res) => {
   res.set({
     "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
@@ -2970,8 +3041,13 @@ const handleAvatarRequest = async (req, res) => {
     
     // Prevent bad requests from breaking the image
     if (!rawId || rawId === 'undefined' || rawId === 'null') {
-      res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable" });
-      return res.redirect('/assets/default-avatar.png');
+      const fallbackSvg = generateBackendAvatarSvg("", "unknown");
+      res.set({
+        "Content-Type": "image/svg+xml",
+        "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable",
+        "Access-Control-Allow-Origin": "*"
+      });
+      return res.send(fallbackSvg);
     }
 
     let cleanStr = String(rawId).trim();
@@ -3078,9 +3154,15 @@ const handleAvatarRequest = async (req, res) => {
     }
 
     if (!fileId) {
-      avatarUrlCache.set(cleanStr, { targetUrl: '/assets/default-avatar.png', expiresAt: Date.now() + 300000 });
-      res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable" });
-      return res.redirect('/assets/default-avatar.png');
+      const displayNameOrUname = userRow?.display_name || userRow?.username || cleanStr;
+      const targetId = userRow?.id || cleanStr;
+      const dynamicSvg = generateBackendAvatarSvg(displayNameOrUname, targetId);
+      res.set({
+        "Content-Type": "image/svg+xml",
+        "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable",
+        "Access-Control-Allow-Origin": "*"
+      });
+      return res.send(dynamicSvg);
     }
 
     const fileRes = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: fileId }, timeout: 5000 });
@@ -3104,8 +3186,13 @@ const handleAvatarRequest = async (req, res) => {
     return res.send(imageBuffer);
   } catch (err) {
     // Ultimate Failsafe: Never show a broken image icon
-    res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable" });
-    return res.redirect('/assets/default-avatar.png');
+    const fallbackSvg = generateBackendAvatarSvg(cleanStr || "user", cleanStr || "user");
+    res.set({
+      "Content-Type": "image/svg+xml",
+      "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable",
+      "Access-Control-Allow-Origin": "*"
+    });
+    return res.send(fallbackSvg);
   }
 };
 

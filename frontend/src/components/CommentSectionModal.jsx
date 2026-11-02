@@ -3,6 +3,7 @@ import { X, Send, Loader2, Heart, Search, ChevronDown, ChevronUp } from "lucide-
 import { APP_CONFIG } from "../config";
 import { promptEmailVerification } from "../utils/toast";
 import { renderClickableCaption } from "./ClickableCaption";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 export function generateSearchPhrase(video) {
   if (video?.search_phrase && typeof video.search_phrase === "string" && video.search_phrase.trim()) {
@@ -415,9 +416,10 @@ export default function CommentSectionModal({ video, onClose }) {
                   {/* Top-Level Parent Comment */}
                   <div style={commentItemStyle}>
                     <img 
-                      src={p.avatar_url || '/assets/default-avatar.png'} 
+                      src={resolveAvatar(p.avatar_url, p.display_name || p.username, p.user_id || p.username)} 
                       alt="avatar" 
                       style={commentAvatarStyle}
+                      onError={(e) => handleAvatarError(e, p.display_name || p.username, p.user_id || p.username)}
                       onClick={() => {
                         if (p.username) {
                           window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: p.username }));
@@ -496,9 +498,10 @@ export default function CommentSectionModal({ video, onClose }) {
                               {p.replies.map(reply => (
                                 <div key={reply.id} style={replyItemStyle}>
                                   <img 
-                                    src={reply.avatar_url || '/assets/default-avatar.png'} 
+                                    src={resolveAvatar(reply.avatar_url, reply.display_name || reply.username, reply.user_id || reply.username)} 
                                     alt="avatar" 
                                     style={replyAvatarStyle}
+                                    onError={(e) => handleAvatarError(e, reply.display_name || reply.username, reply.user_id || reply.username)}
                                     onClick={() => {
                                       if (reply.username) {
                                         window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: reply.username }));

@@ -15,6 +15,7 @@ import { isUserSubscribedToCreator, getVideoCreatorHandle } from "../utils/subsc
 import { renderClickableCaption } from "../components/ClickableCaption";
 import { promptLogin, showToast } from "../utils/toast";
 import { formatTwitterDate, getPostDisplayName } from "../utils/date";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 import FeedPost from "../components/FeedPost";
 import TwitterVerifiedBadge from "../components/TwitterVerifiedBadge";
@@ -1337,9 +1338,10 @@ export default function Explore({
                 >
                   {user?.id || user?.email ? (
                     <img 
-                      src={user.avatar_url || "/assets/default-avatar.png"} 
+                      src={resolveAvatar(user.avatar_url, user.display_name || user.username, user.id || user.username)} 
                       alt="P" 
                       style={{ width: "30px", height: "30px", borderRadius: "50%", border: "2px solid rgba(255, 255, 255, 0.2)", objectFit: "cover" }} 
+                      onError={(e) => handleAvatarError(e, user.display_name || user.username, user.id || user.username)}
                     />
                   ) : (
                     <div style={{ background: "#c4c4c8", color: "#09090b", padding: "5px 10px", borderRadius: "18px", fontSize: "11px", fontWeight: "800" }}>

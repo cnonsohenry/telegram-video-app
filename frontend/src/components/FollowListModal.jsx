@@ -10,6 +10,7 @@ import DesktopLeftSidebar from "./DesktopLeftSidebar";
 import DesktopRightSidebar from "./DesktopRightSidebar";
 import { APP_CONFIG } from "../config";
 import { promptLogin, promptEmailVerification } from "../utils/toast";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 const API_BASE_URL = APP_CONFIG.apiUrl || "";
 const getAuthHeaders = (json = false) => {
@@ -357,7 +358,7 @@ export default function FollowListModal({
         ) : (
           users.map((u) => {
             const isMe = currentUser && Number(currentUser.id) === Number(u.id);
-            const avatarSrc = resolveAssetUrl(u.avatar_url) || "/assets/default-avatar.png";
+            const avatarSrc = resolveAvatar(u.avatar_url, u.display_name || u.username, u.id || u.username);
 
             return (
               <div
@@ -370,10 +371,7 @@ export default function FollowListModal({
                   src={avatarSrc}
                   alt={u.username}
                   style={styles.avatar}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.display_name || u.username || "U")}&background=27272a&color=f4f4f5&bold=true`;
-                  }}
+                  onError={(e) => handleAvatarError(e, u.display_name || u.username, u.id || u.username)}
                 />
 
                 <div style={styles.userMainCol}>

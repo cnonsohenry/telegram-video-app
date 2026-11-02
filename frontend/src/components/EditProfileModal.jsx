@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { MoveLeft, Camera, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import useModalHistory from "../hooks/useModalHistory";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 const BANNER_PRESETS = [
   { label: "Luxury Noir", url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&q=80" },
@@ -170,7 +171,7 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess, onOpe
                   }}
                 >
                   <img
-                    src={avatarUrl || user?.avatar_url || "/assets/default-avatar.png"}
+                    src={resolveAvatar(avatarUrl || user?.avatar_url, displayName || user?.username, user?.id || user?.username)}
                     alt="Avatar preview"
                     style={{
                       width: "84px",
@@ -181,7 +182,7 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess, onOpe
                       display: "block"
                     }}
                     onError={(e) => {
-                      e.target.src = "/assets/default-avatar.png";
+                      handleAvatarError(e, displayName || user?.username, user?.id || user?.username);
                     }}
                   />
                 </div>

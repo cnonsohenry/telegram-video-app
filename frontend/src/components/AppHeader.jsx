@@ -8,6 +8,7 @@ import DiscoverCreatorsSection from "./DiscoverCreatorsSection";
 // 🟢 IMPORT YOUR CENTRAL CONFIG
 import { APP_CONFIG } from "../config";
 import { getPostDisplayName } from "../utils/date";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 export default function AppHeader({ 
   isDesktop, searchTerm, setSearchTerm, 
@@ -534,7 +535,12 @@ export default function AppHeader({
             
             <button onClick={onProfileClick} style={profileBtnStyle}>
               {isLoggedIn ? (
-                <img src={user.avatar_url || "/assets/default-avatar.png"} alt="Profile" style={avatarStyle(isDesktop)} />
+                <img 
+                  src={resolveAvatar(user?.avatar_url, user?.display_name || user?.username, user?.id || user?.username)} 
+                  alt="Profile" 
+                  style={avatarStyle(isDesktop)} 
+                  onError={(e) => handleAvatarError(e, user?.display_name || user?.username, user?.id || user?.username)}
+                />
               ) : (
                 <div style={loginBadgeStyle}>LOGIN</div>
               )}
@@ -555,7 +561,12 @@ export default function AppHeader({
             <Search size={22} color="#d4d4d8" onClick={handleOpenSearch} />
             <button onClick={onProfileClick} style={profileBtnStyle}>
               {isLoggedIn ? (
-                <img src={user.avatar_url || "/assets/default-avatar.png"} alt="P" style={avatarStyle(false)} />
+                <img 
+                  src={resolveAvatar(user?.avatar_url, user?.display_name || user?.username, user?.id || user?.username)} 
+                  alt="P" 
+                  style={avatarStyle(false)} 
+                  onError={(e) => handleAvatarError(e, user?.display_name || user?.username, user?.id || user?.username)}
+                />
               ) : (
                 <div style={loginBadgeStyle}>LOGIN</div>
               )}

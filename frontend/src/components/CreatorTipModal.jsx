@@ -8,6 +8,7 @@ import { APP_CONFIG } from "../config";
 import { promptLogin, promptEmailVerification } from "../utils/toast";
 import useModalHistory from "../hooks/useModalHistory";
 import { getNetworkBadge, getWalletDeepLink, getQrData, formatCountdown } from "../utils/cryptoHelpers";
+import { resolveAvatar, handleAvatarError } from "../utils/avatar";
 
 const TIP_PRESETS = [
   { amountUsd: 3, label: "$3" },
@@ -213,12 +214,12 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
               </p>
               <div style={successCreatorCardStyle}>
                 <img 
-                  src={creator?.avatar_url || "/assets/default-avatar.png"} 
+                  src={resolveAvatar(creator?.avatar_url, creator?.display_name || creator?.username, creator?.id || creator?.username)} 
                   alt={creator?.display_name} 
                   loading="eager"
                   decoding="async"
                   style={{ width: "48px", height: "48px", borderRadius: "50%", objectFit: "cover", backgroundColor: "#27272a" }}
-                  onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                  onError={(e) => handleAvatarError(e, creator?.display_name || creator?.username, creator?.id || creator?.username)}
                 />
                 <div>
                   <div style={{ fontWeight: "800", color: "#d4d4d8", fontSize: "14px" }}>
@@ -242,12 +243,12 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
               <div style={invoiceHeaderCard}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <img 
-                    src={creator?.avatar_url || "/assets/default-avatar.png"} 
+                    src={resolveAvatar(creator?.avatar_url, creator?.display_name || creator?.username, creator?.id || creator?.username)} 
                     alt={creator?.display_name}
                     loading="eager"
                     decoding="async"
                     style={creatorSmallAvatarStyle}
-                    onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                    onError={(e) => handleAvatarError(e, creator?.display_name || creator?.username, creator?.id || creator?.username)}
                   />
                   <div>
                     <div style={{ fontSize: "11px", color: "#8e8e93", textTransform: "uppercase", letterSpacing: "0.5px" }}>
@@ -397,12 +398,12 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
               {/* Creator Card */}
               <div style={creatorBannerCardStyle}>
                 <img 
-                  src={creator?.avatar_url || "/assets/default-avatar.png"} 
+                  src={resolveAvatar(creator?.avatar_url, creator?.display_name || creator?.username, creator?.id || creator?.username)} 
                   alt={creator?.display_name} 
                   loading="eager"
                   decoding="async"
                   style={creatorProfileAvatarStyle}
-                  onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                  onError={(e) => handleAvatarError(e, creator?.display_name || creator?.username, creator?.id || creator?.username)}
                 />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>

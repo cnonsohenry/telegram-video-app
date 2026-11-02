@@ -19,6 +19,7 @@ import FollowListModal from "./FollowListModal";
 import DesktopLeftSidebar from "./DesktopLeftSidebar";
 import DesktopRightSidebar from "./DesktopRightSidebar";
 import { promptLogin, showToast, promptEmailVerification } from "../utils/toast";
+import { resolveAvatar } from "../utils/avatar";
 
 export default function CreatorProfileModal({ 
   creatorUsername, 
@@ -530,10 +531,9 @@ export default function CreatorProfileModal({
     return Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
   };
 
-  const avatar = creatorData?.avatar_url || "/assets/default-avatar.png";
-  const price = Number(creatorData?.subscription_price || 0);
-  const isMonetizedCreator = Boolean(creatorData?.is_creator) || price > 0;
   const cleanUname = String(creatorData?.username || creatorUsername || "").toLowerCase().replace(/^@/, "").trim();
+  const avatar = resolveAvatar(creatorData?.avatar_url, creatorData?.display_name || cleanUname, creatorData?.id || cleanUname);
+  const price = Number(creatorData?.subscription_price || 0);
   const isOwner = Boolean(
     creatorData?.is_owner || 
     (currentUser && (
