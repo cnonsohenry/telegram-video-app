@@ -1394,8 +1394,51 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 onTouchStart={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
               >
-                
-                {/* 1. 🟢 Top: End-to-End Progress Bar (Stretches full width from edge to edge) */}
+                {/* 1. 🟢 Creator Info (Above Progress Bar): Avatar, Display Name, Follow button (extreme right), and Caption */}
+                <div style={postInfoStyle}>
+                    <StoryAvatar
+                      username={creatorHandle}
+                      avatarUrl={video.avatar_url || (video.uploader_id ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${video.uploader_id}&v=2` : (creatorHandle ? `${APP_CONFIG.apiUrl}/avatar.jpg?username=${encodeURIComponent(creatorHandle)}&v=2` : ""))}
+                      displayName={getPostDisplayName(video)}
+                      size={42}
+                      borderWidth={2}
+                      onClick={handleCreatorClick}
+                    />
+                   <div style={textDetailsStyle}>
+                      <div style={usernameRowStyle}>
+                        <div 
+                          style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+                          onClick={handleCreatorClick}
+                        >
+                          {getPostDisplayName(video)}
+                        </div>
+
+                        {!isOwner && (
+                          <button
+                            onClick={handleFollowClick}
+                            disabled={isFollowLoading}
+                            style={isFollowing ? followingBtnStyle : followBtnStyle}
+                            title={isFollowing ? `Unfollow @${creatorHandle}` : `Follow @${creatorHandle}`}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = isFollowing ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.2)";
+                              e.currentTarget.style.transform = "scale(1.05)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = "transparent";
+                              e.currentTarget.style.transform = "scale(1)";
+                            }}
+                          >
+                            <span>{isFollowLoading ? "..." : isFollowing ? "Following" : "+ Follow"}</span>
+                          </button>
+                        )}
+                      </div>
+                      <div style={captionStyle}>
+                        {renderClickableCaption(video.caption || APP_CONFIG.defaultCaption, (handle) => handleCreatorClick(null, handle))}
+                      </div>
+                   </div>
+                </div>
+
+                {/* 2. 🟢 End-to-End Progress Bar (Stretches full width from edge to edge) */}
                 <div 
                   ref={progressBarRef}
                   style={progressContainerStyle}
@@ -1427,7 +1470,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                   />
                 </div>
 
-                {/* 2. 🟢 Controls Row (Below Progress Bar, Above Display Name): Play/Pause & Duration at extreme left; Volume, Download, Rotate, Zoom at extreme right */}
+                {/* 3. 🟢 Controls Row (Below Progress Bar): Play/Pause & Duration at extreme left; Volume, Download, Rotate, Zoom at extreme right */}
                 <div style={playerControlsRowStyle}>
                   {/* Extreme Left: Play/Pause and Time Count */}
                   <div style={controlsLeftStyle}>
@@ -1501,50 +1544,6 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                       {isZoomed ? <Minimize size={19} color="#f4f4f5" /> : <Maximize size={19} color="#f4f4f5" />}
                     </button>
                   </div>
-                </div>
-
-                {/* 3. 🟢 Creator Info: Avatar, Display Name, Follow button (extreme right), and Caption */}
-                <div style={postInfoStyle}>
-                    <StoryAvatar
-                      username={creatorHandle}
-                      avatarUrl={video.avatar_url || (video.uploader_id ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${video.uploader_id}&v=2` : (creatorHandle ? `${APP_CONFIG.apiUrl}/avatar.jpg?username=${encodeURIComponent(creatorHandle)}&v=2` : ""))}
-                      displayName={getPostDisplayName(video)}
-                      size={42}
-                      borderWidth={2}
-                      onClick={handleCreatorClick}
-                    />
-                   <div style={textDetailsStyle}>
-                      <div style={usernameRowStyle}>
-                        <div 
-                          style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
-                          onClick={handleCreatorClick}
-                        >
-                          {getPostDisplayName(video)}
-                        </div>
-
-                        {!isOwner && (
-                          <button
-                            onClick={handleFollowClick}
-                            disabled={isFollowLoading}
-                            style={isFollowing ? followingBtnStyle : followBtnStyle}
-                            title={isFollowing ? `Unfollow @${creatorHandle}` : `Follow @${creatorHandle}`}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = isFollowing ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.2)";
-                              e.currentTarget.style.transform = "scale(1.05)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = "transparent";
-                              e.currentTarget.style.transform = "scale(1)";
-                            }}
-                          >
-                            <span>{isFollowLoading ? "..." : isFollowing ? "Following" : "+ Follow"}</span>
-                          </button>
-                        )}
-                      </div>
-                      <div style={captionStyle}>
-                        {renderClickableCaption(video.caption || APP_CONFIG.defaultCaption, (handle) => handleCreatorClick(null, handle))}
-                      </div>
-                   </div>
                 </div>
 
                 {/* 4. 🟢 Action Bar (Views, Like, Comment, Save, Share) */}
@@ -1848,7 +1847,7 @@ const postInfoStyle = {
   display: "flex", 
   alignItems: "flex-start", 
   gap: "10px", 
-  marginBottom: "10px", 
+  marginBottom: "6px", 
   padding: "0 14px", 
   width: "100%", 
   boxSizing: "border-box" 

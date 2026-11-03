@@ -546,17 +546,22 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
 
 ---
 
-## 29. FullscreenPlayer End-to-End Progress Bar, Reorganized Media Controls & Right-Pinned Follow Button
-- **End-to-End Progress Bar (`FullscreenPlayer.jsx`)**:
-  - Unshackled the video scrubber from the control button group, allowing it to stretch 100% full width from display edge to display edge (`left: 0, right: 0, padding: 0` on `bottomUIWrapper`, `width: 100%` on `progressContainerStyle`).
-  - Sleek 3.5px visual track (`rgba(255, 255, 255, 0.28)`) with crisp Zinc 100 played fill (`#f4f4f5`) and interactive scrubbing thumb with touch-friendly 20px hit-box.
-- **Dedicated Media Controls Row (Below Scrubber, Above Creator Bio)**:
-  - Positioned directly beneath the end-to-end progress bar and directly above the creator display name/bio area:
-    - **Extreme Left**: Play/Pause button (`Play` / `Pause` size 22) and tabular duration countdown (`currentTime / duration`).
-    - **Extreme Right**: Media utility tools group: Volume (`Volume2` / `VolumeX`), Direct Download (`Download`, hidden on premium), Rotate (`RotateCw`), and Zoom/Aspect ratio (`Maximize` / `Minimize`).
-- **Right-Pinned Follow Button (`usernameRowStyle`)**:
-  - Reorganized creator header with `justifyContent: "space-between", width: "100%"`.
-  - The creator's display name sits on the left (with ellipsis truncation guards for long names), while the `+ Follow` / `Following` button is pinned to the extreme right of that line, creating a balanced, professional profile banner above the caption.
+## 29. FullscreenPlayer Bottom UI Hierarchy: Creator Info Above End-to-End Progress Bar, Media Controls & Right-Pinned Follow Button
+- **Vertical Stack Order in `bottomUIWrapper`**:
+  1. **Creator Info Block (`postInfoStyle`)**: Positioned at the top of the bottom UI overlay, directly above the progress bar with `padding: 0 14px` and compact `marginBottom: 6px`. Features:
+     - Avatar (`StoryAvatar` with size 42)
+     - Display name on the left with text truncation guards
+     - Follow button (`+ Follow` / `Following`) pinned to the **extreme right** of the display name (`usernameRowStyle` with `justifyContent: "space-between", width: "100%"`)
+     - Clickable hashtag/handle caption (`captionStyle`)
+  2. **End-to-End Progress Bar (`progressContainerStyle`)**:
+     - Full-bleed edge-to-edge scrubbing track stretching 100% across the viewport width (`left: 0, right: 0, width: "100%", padding: 0`).
+     - Sleek 3.5px visual track (`rgba(255, 255, 255, 0.28)`) with crisp Zinc 100 played fill (`#f4f4f5`) and interactive scrubbing thumb (`scrubberThumbStyle`) with touch-friendly 20px hit-box.
+  3. **Dedicated Media Controls Row (`playerControlsRowStyle`)**:
+     - Positioned directly below the end-to-end progress bar with `padding: 2px 14px 8px 14px`:
+       - **Extreme Left**: Play/Pause button (`Play` / `Pause` size 22) and tabular duration countdown (`currentTime / duration`).
+       - **Extreme Right**: Media utility tools group: Volume (`Volume2` / `VolumeX`), Direct Download (`Download`, hidden on premium), Rotate (`RotateCw`), and Zoom/Aspect ratio (`Maximize` / `Minimize`).
+  4. **Engagement Bar (`engagementBarStyle`)**:
+     - Bottom row with hairline top border (`1px solid rgba(255,255,255,0.12)`) and actions: Views count, Like (`Heart`), Reply (`MessageCircle`), Save (`Bookmark`), and Share (`Share2`).
 
 
 
