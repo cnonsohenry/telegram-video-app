@@ -296,7 +296,7 @@ function VideoCard({ video, onOpen, showDetails = true, priority = false, onCrea
           >
             <div style={avatarWrapperStyle}>
                <img 
-                 src={resolveAvatar(video.avatar_url || (video.uploader_id ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${video.uploader_id}` : ""), getPostDisplayName(video), video.uploader_id || video.uploader_handle)}
+                 src={resolveAvatar(video.avatar_url || (video.uploader_id ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${video.uploader_id}&v=2` : (video.uploader_handle ? `${APP_CONFIG.apiUrl}/avatar.jpg?username=${encodeURIComponent(video.uploader_handle)}&v=2` : "")), getPostDisplayName(video), video.uploader_id || video.uploader_handle)}
                  alt={getPostDisplayName(video)}
                  loading="lazy"
                  decoding="async"

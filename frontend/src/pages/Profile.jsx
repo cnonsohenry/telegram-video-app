@@ -357,6 +357,19 @@ export default function Profile({
     }
   }, [user?.username, fetchCreatorPosts]);
 
+  // 🟢 Live Avatar Sync: Immediately update creator's cached tab videos when avatar is updated
+  useEffect(() => {
+    const handleAvatarUpdate = (e) => {
+      const newUrl = e.detail?.avatarUrl;
+      if (newUrl) {
+        setCreatorPosts(prev => prev.map(v => ({ ...v, avatar_url: newUrl })));
+        setCreatorPremiumPosts(prev => prev.map(v => ({ ...v, avatar_url: newUrl })));
+      }
+    };
+    window.addEventListener("userAvatarUpdated", handleAvatarUpdate);
+    return () => window.removeEventListener("userAvatarUpdated", handleAvatarUpdate);
+  }, []);
+
   useEffect(() => {
     if (user?.is_creator && user?.username && activeTab === "premium" && !hasLoadedPremiumOnce && !creatorPremiumLoading) {
       setCreatorPremiumPage(1);
@@ -812,7 +825,7 @@ export default function Profile({
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   <StoryAvatar
                     username={user?.username}
-                    avatarUrl={user?.avatar_url || (user?.id ? `/avatar.jpg?user_id=${user.id}` : (user?.username ? `/avatar.jpg?username=${encodeURIComponent(user.username)}` : ""))}
+                    avatarUrl={user?.avatar_url || (user?.id ? `/avatar.jpg?user_id=${user.id}&v=2` : (user?.username ? `/avatar.jpg?username=${encodeURIComponent(user.username)}&v=2` : ""))}
                     displayName={user?.display_name || user?.username}
                     size={98}
                     borderWidth={3}
@@ -1098,7 +1111,7 @@ export default function Profile({
               <div style={{ flexShrink: 0, position: "relative" }}>
                 <StoryAvatar
                   username={user?.username}
-                  avatarUrl={user?.avatar_url || (user?.id ? `/avatar.jpg?user_id=${user.id}` : (user?.username ? `/avatar.jpg?username=${encodeURIComponent(user.username)}` : ""))}
+                  avatarUrl={user?.avatar_url || (user?.id ? `/avatar.jpg?user_id=${user.id}&v=2` : (user?.username ? `/avatar.jpg?username=${encodeURIComponent(user.username)}&v=2` : ""))}
                   displayName={user?.display_name || user?.username}
                   size={150}
                   borderWidth={4}

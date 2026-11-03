@@ -652,7 +652,18 @@ function FeedPost({
   };
 
   const uploaderId = video.uploader_id || video.user_id || video.creator_id || (video.creator && video.creator.id);
-  const avatarUrl = video.avatar_url || video.creator?.avatar_url || (uploaderId ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${uploaderId}` : '/assets/default-avatar.png');
+
+  // 🟢 Reactive User Avatar: If current logged-in user owns this post, prefer their live avatar state
+  const isPostByCurrentUser = user && (
+    (uploaderId && String(user.id) === String(uploaderId)) ||
+    (user.username && creatorHandle && user.username.toLowerCase().replace(/^@/, '').trim() === creatorHandle.toLowerCase().replace(/^@/, '').trim())
+  );
+
+  const rawAvatar = (isPostByCurrentUser && user?.avatar_url)
+    ? user.avatar_url
+    : (video.avatar_url || video.creator?.avatar_url);
+
+  const avatarUrl = rawAvatar || (uploaderId ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${uploaderId}&v=2` : (creatorHandle ? `${APP_CONFIG.apiUrl}/avatar.jpg?username=${encodeURIComponent(creatorHandle)}&v=2` : '/assets/default-avatar.png'));
   const displayName = getPostDisplayName(video);
   const formattedDate = formatTwitterDate(video.created_at);
 

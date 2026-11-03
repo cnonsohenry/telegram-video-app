@@ -61,6 +61,13 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess, onOpe
         if (data.user && onUpdateSuccess) {
           onUpdateSuccess(data.user, false);
         }
+        window.dispatchEvent(new CustomEvent("userAvatarUpdated", {
+          detail: {
+            userId: data.user?.id || user?.id,
+            username: data.user?.username || user?.username,
+            avatarUrl: data.url
+          }
+        }));
         showToast("Profile photo updated!", "success");
       } else if (field === "banner") {
         setBannerUrl(data.url);
@@ -132,6 +139,13 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess, onOpe
       if (onUpdateSuccess) {
         onUpdateSuccess({ ...data.user, settings: updatedSettings });
       }
+      window.dispatchEvent(new CustomEvent("userAvatarUpdated", {
+        detail: {
+          userId: data.user?.id || user?.id,
+          username: data.user?.username || user?.username,
+          avatarUrl: data.user?.avatar_url || avatarUrl
+        }
+      }));
       handleSafeClose();
     } catch (err) {
       setError(err.message);

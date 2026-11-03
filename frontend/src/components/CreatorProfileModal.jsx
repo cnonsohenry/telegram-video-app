@@ -532,10 +532,6 @@ export default function CreatorProfileModal({
   };
 
   const cleanUname = String(creatorData?.username || creatorUsername || "").toLowerCase().replace(/^@/, "").trim();
-  const rawAvatarUrl = creatorData?.avatar_url || (cleanUname ? `/avatar.jpg?username=${encodeURIComponent(cleanUname)}` : "");
-  const avatar = resolveAvatar(rawAvatarUrl, creatorData?.display_name || cleanUname, creatorData?.id || cleanUname);
-  const price = Number(creatorData?.subscription_price || 0);
-  const isMonetizedCreator = Boolean(creatorData?.is_creator) || price > 0;
   const isOwner = Boolean(
     creatorData?.is_owner || 
     (currentUser && (
@@ -543,6 +539,12 @@ export default function CreatorProfileModal({
       (currentUser.id && creatorData?.id && String(currentUser.id) === String(creatorData.id))
     ))
   );
+  const rawAvatarUrl = (isOwner && currentUser?.avatar_url)
+    ? currentUser.avatar_url
+    : (creatorData?.avatar_url || (cleanUname ? `/avatar.jpg?username=${encodeURIComponent(cleanUname)}&v=2` : ""));
+  const avatar = resolveAvatar(rawAvatarUrl, creatorData?.display_name || cleanUname, creatorData?.id || cleanUname);
+  const price = Number(creatorData?.subscription_price || 0);
+  const isMonetizedCreator = Boolean(creatorData?.is_creator) || price > 0;
   const hasUniversalAccess = currentUser?.role === "admin" || (currentUser?.is_premium && cleanUname === "naijahomemade");
   const hasAccess = price <= 0 || isSubscribed || isOwner || hasUniversalAccess;
 

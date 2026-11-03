@@ -474,6 +474,22 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
   - `normalizeAvatarUrl` in `frontend/src/utils/avatar.js` automatically maps any legacy `bucket.naijahomemade.com/avatars/` URLs to `https://naijahomemade.com/avatars/`.
   - `StoryAvatar.jsx`, `EditProfileModal.jsx`, `VideoCard.jsx`, `AppHeader.jsx`, `DesktopLeftSidebar.jsx`, `FollowListModal.jsx`, and `CommentSectionModal.jsx` declare `crossOrigin="anonymous"` and `referrerPolicy="no-referrer-when-downgrade"` on avatar images.
 
+---
+
+## 26. StoryAvatar Storage Path Integrity, Reactive Cross-Component Invalidation & Zero-Edge-Redirect Caching
+- **StoryAvatar Storage Path Integrity (`StoryAvatar.jsx`)**:
+  - Resolved a critical path corruption bug where `url.replace(/\/avatar(?!\.jpg)/, "/avatar.jpg")` matched against valid R2 storage paths (`https://naijahomemade.com/avatars/...`), mutating them into invalid `/avatar.jpgs/...` URLs. This caused 404 image errors and triggered `handleAvatarError`, resetting bio avatars to SVG initials.
+  - Guarded URL normalization so storage paths containing `/avatars/` are never mutated, and legacy endpoint rewrites strictly match query-delimited endpoints `/(?:\/api)?\/avatar(?:\.jpg)?(?=\?|$)/`.
+- **Reactive Current-User Avatar Resolution (`FeedPost.jsx` & `CreatorProfileModal.jsx`)**:
+  - `FeedPost.jsx` checks if the post's uploader matches the currently logged-in user (`isPostByCurrentUser`). If matched, it immediately prioritizes `user.avatar_url` from state over stale video-level records.
+  - `CreatorProfileModal.jsx` prioritizes `currentUser.avatar_url` when the viewer is the profile owner (`isOwner`), rendering new uploads immediately across modal views.
+- **Global `userAvatarUpdated` Event Bus**:
+  - Upon successful upload (`handleImageUpload`) or profile save (`handleSubmit`) in `EditProfileModal.jsx`, a `userAvatarUpdated` CustomEvent is dispatched containing `{ userId, username, avatarUrl }`.
+  - `Profile.jsx` listens to `userAvatarUpdated` and updates in-memory `creatorPosts` and `creatorPremiumPosts` arrays in real-time, eliminating stale avatars in profile feeds without requiring re-fetching or page reloads.
+- **Stale Edge 302 Redirect Prevention (`backend/server.js`)**:
+  - Removed persistent edge caching (`s-maxage=604800`) on unversioned 302 redirects in `/avatar.jpg`. When `versionParam` is absent, Express sets `Cache-Control: no-cache, no-store, must-revalidate` so Cloudflare edge never caches external Google OAuth redirects past the point of custom user photo uploads.
+  - All frontend avatar fallback endpoints (`/avatar.jpg?user_id=...` and `/avatar.jpg?username=...`) append `&v=2` cache-busting version stamps, ensuring instantaneous Edge MISS delivery and direct origin buffer streaming.
+
 
 
 

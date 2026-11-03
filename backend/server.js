@@ -3089,7 +3089,7 @@ const handleAvatarRequest = async (req, res) => {
     // 🟢 1. Fast-Path: In-memory redirect cache hit (1 hour TTL)
     const cached = avatarUrlCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      res.set({ "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" });
+      res.set({ "Cache-Control": versionParam ? "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" : "no-cache, no-store, must-revalidate" });
       return res.redirect(cached.targetUrl);
     }
 
@@ -3145,9 +3145,9 @@ const handleAvatarRequest = async (req, res) => {
           }
 
           // 🟢 1b. For external URLs (Google OAuth), redirect with short edge TTL unless explicitly versioned
-          const edgeTtl = versionParam ? 604800 : 300;
+          const edgeTtl = versionParam ? 604800 : 0;
           avatarUrlCache.set(cacheKey, { targetUrl: userRow.avatar_url, expiresAt: Date.now() + 300000 });
-          res.set({ "Cache-Control": `public, max-age=60, s-maxage=${edgeTtl}, stale-while-revalidate=600` });
+          res.set({ "Cache-Control": versionParam ? `public, max-age=86400, s-maxage=${edgeTtl}` : "no-cache, no-store, must-revalidate" });
           return res.redirect(userRow.avatar_url);
         }
       }

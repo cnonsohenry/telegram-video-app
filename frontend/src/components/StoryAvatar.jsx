@@ -26,11 +26,12 @@ export default function StoryAvatar({
   const safeAvatarUrl = React.useMemo(() => {
     let url = normalizeAvatarUrl(avatarUrl);
     if (!url && cleanUsername) {
-      url = `/avatar.jpg?username=${encodeURIComponent(cleanUsername)}`;
-    } else if (url && typeof url === "string" && (url.includes("/api/avatar") || url.includes("/avatar"))) {
-      url = url
-        .replace(/\/api\/avatar(?:\.jpg)?/, "/avatar.jpg")
-        .replace(/\/avatar(?!\.jpg)/, "/avatar.jpg");
+      url = `/avatar.jpg?username=${encodeURIComponent(cleanUsername)}&v=2`;
+    } else if (url && typeof url === "string") {
+      // 🟢 Fix: Only rewrite legacy endpoint paths like /api/avatar or /avatar? - NEVER touch /avatars/ storage paths!
+      if (!url.includes("/avatars/")) {
+        url = url.replace(/(?:\/api)?\/avatar(?:\.jpg)?(?=\?|$)/, "/avatar.jpg");
+      }
     }
     return resolveAvatar(url, displayName || cleanUsername, cleanUsername);
   }, [avatarUrl, displayName, cleanUsername]);
