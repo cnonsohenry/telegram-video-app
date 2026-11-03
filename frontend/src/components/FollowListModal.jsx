@@ -5,7 +5,7 @@
 ============================================================================ */
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, MoveLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import DesktopLeftSidebar from "./DesktopLeftSidebar";
 import DesktopRightSidebar from "./DesktopRightSidebar";
 import { APP_CONFIG } from "../config";

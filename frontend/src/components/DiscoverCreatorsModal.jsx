@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
-  X, MoveLeft, Search, 
+  X, ArrowLeft, Search, 
   Users, Play 
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
@@ -289,11 +289,11 @@ export default function DiscoverCreatorsModal({
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <button 
               onClick={handleSafeClose} 
-              style={iconBtnStyle} 
+              style={navBackBtnStyle} 
               title="Back"
               aria-label="Back"
             >
-              <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+              <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
             </button>
             <div style={{ display: "flex", alignItems: "center" }}>
               <h2 style={titleStyle}>Discover Creators</h2>
@@ -615,6 +615,25 @@ const titleStyle = {
   color: "#d4d4d8",
   margin: 0,
   letterSpacing: "0.2px"
+};
+
+const navBackBtnStyle = {
+  background: "transparent",
+  border: "none",
+  color: "#f4f4f5",
+  cursor: "pointer",
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px",
+  height: "48px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+  margin: "0 0 0 -10px",
+  outline: "none",
+  touchAction: "manipulation",
+  WebkitTapHighlightColor: "transparent"
 };
 
 const iconBtnStyle = {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Heart, MessageCircle, Share2, Eye, Play, Loader2, Bookmark, 
   Sparkles, Lock, ChevronLeft, ChevronRight, X, ArrowRight, Users, Film, Plus,
-  Home, Compass, Flame, TrendingUp, User, Search, MoreHorizontal, MoreVertical, Grid3X3, MoveLeft, RefreshCw, Flag
+  Home, Compass, Flame, TrendingUp, User, Search, MoreHorizontal, MoreVertical, Grid3X3, ArrowLeft, RefreshCw, Flag
 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import PullToRefresh from "../components/PullToRefresh";
@@ -1270,14 +1270,20 @@ export default function Explore({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    padding: "6px",
+                    minWidth: "48px",
+                    minHeight: "48px",
+                    width: "48px",
+                    height: "48px",
+                    padding: 0,
+                    margin: "0 0 0 -8px",
                     borderRadius: "50%",
-                    flexShrink: 0
+                    flexShrink: 0,
+                    WebkitTapHighlightColor: "transparent"
                   }}
                   title="Back to Explore"
                   aria-label="Back to Explore"
                 >
-                  <MoveLeft size={24} strokeWidth={2.3} color="#f4f4f5" />
+                  <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
                 </button>
 
                 <div

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { ArrowUp, MoveLeft, ChevronsDown } from "lucide-react";
+import { ArrowUp, ArrowLeft, ChevronsDown } from "lucide-react";
 import AppHeader from "../components/AppHeader";
 import DesktopRightSidebar from "../components/DesktopRightSidebar";
 import VideoCard from "../components/VideoCard";
@@ -916,7 +916,7 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
                  {activeGroup && (
                    <div style={groupHeaderStyle}>
                      <button onClick={handleCloseGroup} style={backButtonStyle}>
-                       <MoveLeft size={22} strokeWidth={2.3} color="#f4f4f5" />
+                       <ArrowLeft size={24} strokeWidth={2.6} color="#f4f4f5" />
                        <span>Back to {currentCategory.toUpperCase()}</span>
                      </button>
                      <span style={groupTitleStyle}>{activeGroup.videos.length} clips in collection</span>
@@ -1132,7 +1132,7 @@ const showMoreButtonStyle = {
 };
 const scrollTopButtonStyle = { position: "fixed", bottom: "30px", right: "10px", width: "50px", height: "50px", borderRadius: "50%", background: "var(--primary-color)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "pointer" };
 const groupHeaderStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 0 15px 0", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)" };
-const backButtonStyle = { display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", color: "#d4d4d8", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "0" };
+const backButtonStyle = { display: "inline-flex", alignItems: "center", gap: "8px", background: "none", border: "none", color: "#d4d4d8", fontSize: "15px", fontWeight: "600", cursor: "pointer", padding: "8px 12px 8px 4px", minHeight: "44px", borderRadius: "8px", WebkitTapHighlightColor: "transparent" };
 const groupTitleStyle = { fontSize: "13px", color: "#8e8e8e", fontWeight: "500" };
 const seoFooterStyle = { padding: "20px 25px", fontSize: "12px", color: "#666", textAlign: "center", lineHeight: "1.6", maxWidth: "800px", margin: "20px auto 0", borderTop: "1px solid rgba(255,255,255,0.05)" };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { 
-  ArrowLeft, X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, MoveLeft, 
+  ArrowLeft, X, CheckCircle2, CreditCard, Bitcoin, Lock, Loader2, 
   Copy, QrCode, ShieldCheck, Wallet, UserX, AlertTriangle, ExternalLink 
 } from "lucide-react";
 

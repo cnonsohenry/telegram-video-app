@@ -499,10 +499,29 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
   - "+ New" highlight creation button matched to identical dimensions (72px mobile / 82px desktop) with scaled `Plus` icon (`size={26}` mobile / `size={30}` desktop).
   - Title text expanded to `maxWidth: 78px` (mobile) / `88px` (desktop) and `fontSize: 12px` / `13px` to prevent premature word truncation.
   - Tray horizontal spacing increased to `gap: 15px-18px` with `-webkit-overflow-scrolling: touch` for fluid native mobile momentum scrolling.
-- **Prominent Arrow Cap & 48px Invisible Touch Target Architecture**:
-  - Replaced thin, shallow-cap `MoveLeft` icons with prominent, wide-headed `ArrowLeft` icons (`strokeWidth={2.6 - 2.7}`, `size={28}` mobile / `size={24}` desktop).
-  - Implemented Apple HIG / Google Material Design minimum touch target standards (`48px × 48px` minimum bounding box on touch screens).
-  - Incorporated negative margin offsets (`margin: 0 0 0 -10px`) into navigation bar back buttons (`CreatorProfileModal.jsx`, `SettingsView.jsx`, `EditProfileModal.jsx`, `FollowListModal.jsx`, `CreatorStudioModal.jsx`, `CreatorSetupModal.jsx`, `PaywallModal.jsx`, and `Profile.jsx`), extending the invisible tap hit-box all the way to the screen's left edge for effortless thumb tapping without visual misalignment.
+- **Prominent Arrow Cap & 48px Invisible Touch Target Architecture (App-Wide Standard)**:
+  - Replaced thin, shallow-cap `MoveLeft` icons with prominent, wide-headed `ArrowLeft` icons (`strokeWidth={2.6 - 2.7}`, `size={28}` mobile / `size={22 - 24}` desktop) with zero remaining `MoveLeft` occurrences codebase-wide.
+  - Implemented Apple HIG / Google Material Design minimum touch target standards (`48px × 48px` minimum bounding box on touch screens, `minWidth: 48px, minHeight: 48px, width: 48px, height: 48px, padding: 0`).
+  - Incorporated negative margin offsets (`margin: 0 0 0 -10px` or `-8px`) into navigation bar back buttons, extending the invisible tap hit-box all the way to the screen's left edge for effortless thumb tapping without visual misalignment.
+  - Exhaustively implemented across all modals, sheets, and pages:
+    1. `AppHeader.jsx`: Search modal back button (`size={28}`, `strokeWidth={2.7}`, 48px × 48px tap target with `margin: 0 0 0 -8px`).
+    2. `FullscreenPlayer.jsx`: Mobile floating back button on fullscreen video (`size={28}`, `strokeWidth={2.7}`, 48px × 48px tap target at `top: 14px, left: 14px`) and Edit Info overlay header (`editNavBackBtnStyle`).
+    3. `CreatorProfileModal.jsx`: Mobile top nav back button (48px × 48px, `margin: 0 0 0 -10px`) and desktop floating back button (42px × 42px).
+    4. `SettingsView.jsx`: Top navigation back button (48px × 48px, `margin: 0 0 0 -10px`).
+    5. `EditProfileModal.jsx`: Top navigation back button (48px × 48px, `margin: 0 0 0 -10px`).
+    6. `FollowListModal.jsx`: Mobile back button (48px × 48px) and desktop back button (42px × 42px).
+    7. `CreatorStudioModal.jsx`: Top navigation back button (48px × 48px, `margin: 0 0 0 -10px`).
+    8. `CreatorSetupModal.jsx`: Top navigation back button (48px × 48px, `margin: 0 0 0 -10px`).
+    9. `PaywallModal.jsx`: VIP checkout top navigation back button (48px × 48px, `margin: 0 0 0 -10px`).
+    10. `CreatorSubscribeModal.jsx`: VIP subscription top navigation back button (48px × 48px, `margin: 0 0 0 -10px`).
+    11. `CreatorTipModal.jsx`: Tip creator top navigation back button (48px × 48px, `margin: 0 0 0 -10px`).
+    12. `DiscoverCreatorsModal.jsx`: Search/discovery top navigation back button (48px × 48px, `margin: 0 0 0 -10px`).
+    13. `StoryArchiveModal.jsx`: Story selection step 2 back button (48px × 48px, `margin: 0 0 0 -10px`).
+    14. `AdminUpload.jsx`: Admin upload top navigation back button (48px × 48px, `margin: 0 0 0 -10px`).
+    15. `Profile.jsx`: Mobile header back button (48px × 48px) and group collection back button (44px min-height).
+    16. `Home.jsx`: Group collection back button (`backButtonStyle` with 44px min-height and `ArrowLeft` size 24).
+    17. `Explore.jsx`: Search view exit back button (48px × 48px with `margin: 0 0 0 -8px`).
+    18. `LegalPages.jsx`: Mobile header back button (48px × 48px) and desktop return button (`ArrowLeft` size 22).
 
 
 

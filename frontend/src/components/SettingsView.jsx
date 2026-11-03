@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { 
-  ArrowLeft, MoveLeft, User, Lock, Bell, LogOut, ChevronRight,
+  ArrowLeft, User, Lock, Bell, LogOut, ChevronRight,
   TrendingUp, Eye, Share2, CheckCircle, DollarSign,
   ShieldCheck, Volume2, Trash2, HelpCircle, ExternalLink,
   Copy, Plus, CreditCard, X, Edit3, Film, Info, Smartphone

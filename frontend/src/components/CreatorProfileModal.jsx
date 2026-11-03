@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
-  ArrowLeft, MoveLeft, Share2, Heart, Lock, Grid3X3, 
+  ArrowLeft, Share2, Heart, Lock, Grid3X3, 
   MapPin, Globe, Sparkles, Send, Play, Loader2, MessageCircle,
   Film, Link2, ChevronDown, Plus, UserPlus
 } from "lucide-react";

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowLeft, MoveLeft, Camera, Loader2, Lock, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import useModalHistory from "../hooks/useModalHistory";
 import { resolveAvatar, handleAvatarError } from "../utils/avatar";

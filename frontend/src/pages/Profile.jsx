@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { 
-  ArrowLeft, Settings, Grid3X3, Heart, Lock, Share2, MoveLeft,
+  ArrowLeft, Settings, Grid3X3, Heart, Lock, Share2,
   Camera, Sparkles, Edit3, MapPin, Globe, Award, ExternalLink, ShieldCheck, Eye,
   Film, Play, Plus, ChevronRight, TrendingUp, Link2, ChevronDown, Bookmark, Copy, MessageCircle, UserPlus
 } from "lucide-react"; 

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { 
-  X, MoveLeft, Play, Pause, Loader2, Maximize, Minimize, 
+  X, ArrowLeft, Play, Pause, Loader2, Maximize, Minimize, 
   Share2, Download, Check, Heart, MessageCircle, Bookmark, 
   Volume2, VolumeX, MoreVertical, Edit2, Trash2, RotateCw,
   UserPlus, SkipForward, ExternalLink, Eye, Flag, Link2
@@ -943,11 +943,12 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
             pointerEvents: (showControls || adState === "playing") ? "auto" : "none", 
             zIndex: 10010 
           }}
+          title="Back"
           aria-label="Back"
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)"}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
         >
-          <MoveLeft size={28} strokeWidth={2.4} color="#f4f4f5" />
+          <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
         </button>
       ) : (
         <button 
@@ -1603,9 +1604,10 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
               type="button" 
               onClick={handleCloseEditMode}
               style={editNavBackBtnStyle}
+              title="Back"
               aria-label="Back"
             >
-              <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+              <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
             </button>
             <span style={editTopNavTitleStyle}>Edit Info</span>
             <button 
@@ -1705,7 +1707,7 @@ const centerHeartBurstStyle = {
 const topGradientStyle = { position: "absolute", top: 0, left: 0, right: 0, height: "130px", background: "linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0) 100%)", zIndex: 10005, transition: "opacity 0.3s ease" };
 const bottomGradientStyle = { position: "absolute", bottom: 0, left: 0, right: 0, height: "320px", background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0) 100%)", zIndex: 10001, transition: "opacity 0.3s ease", pointerEvents: "none" };
 
-const mobileBackButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", left: "20px", background: "transparent", color: "#d4d4d8", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.7))", cursor: "pointer", transition: "all 0.2s ease" };
+const mobileBackButtonStyle = { position: "absolute", top: "max(16px, env(safe-area-inset-top))", left: "14px", background: "transparent", color: "#f4f4f5", border: "none", borderRadius: "50%", minWidth: "48px", minHeight: "48px", width: "48px", height: "48px", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.7))", cursor: "pointer", transition: "all 0.2s ease", outline: "none", touchAction: "manipulation", WebkitTapHighlightColor: "transparent" };
 const desktopCloseButtonStyle = { position: "absolute", top: "30px", right: "30px", background: "transparent", color: "#d4d4d8", border: "none", borderRadius: "50%", width: "48px", height: "48px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.7))", transition: "all 0.2s ease" };
 
 const menuButtonStyle = { position: "absolute", top: "max(20px, env(safe-area-inset-top))", background: "transparent", color: "#d4d4d8", border: "none", borderRadius: "50%", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.7))", transition: "all 0.2s ease", cursor: "pointer" };
@@ -1826,11 +1828,20 @@ const editTopNavStyle = {
 const editNavBackBtnStyle = {
   background: "none",
   border: "none",
-  color: "#d4d4d8",
+  color: "#f4f4f5",
   cursor: "pointer",
-  padding: "6px",
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px",
+  height: "48px",
   display: "flex",
-  alignItems: "center"
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+  margin: "0 0 0 -10px",
+  outline: "none",
+  touchAction: "manipulation",
+  WebkitTapHighlightColor: "transparent"
 };
 
 const editTopNavTitleStyle = {

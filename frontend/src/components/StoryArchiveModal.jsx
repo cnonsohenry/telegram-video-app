@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, MoveLeft, Check, Film, Loader2 } from "lucide-react";
+import { X, ArrowLeft, Check, Film, Loader2 } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { showToast } from "../utils/toast";
 
@@ -185,10 +185,18 @@ export default function StoryArchiveModal({
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  padding: 0
+                  justifyContent: "center",
+                  minWidth: "48px",
+                  minHeight: "48px",
+                  width: "48px",
+                  height: "48px",
+                  margin: "0 0 0 -10px",
+                  padding: 0,
+                  WebkitTapHighlightColor: "transparent"
                 }}
+                aria-label="Back"
               >
-                <MoveLeft size={24} strokeWidth={2.3} color="#f4f4f5" />
+                <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
               </button>
             ) : (
               <button
@@ -200,10 +208,18 @@ export default function StoryArchiveModal({
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  padding: 0
+                  justifyContent: "center",
+                  minWidth: "44px",
+                  minHeight: "44px",
+                  width: "44px",
+                  height: "44px",
+                  margin: "0 0 0 -8px",
+                  padding: 0,
+                  WebkitTapHighlightColor: "transparent"
                 }}
+                aria-label="Close"
               >
-                <X size={22} />
+                <X size={24} />
               </button>
             )}
             <h2

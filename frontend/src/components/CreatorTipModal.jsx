@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   X, Heart, CheckCircle2, Copy, QrCode, 
-  Loader2, Sparkles, MoveLeft, ShieldCheck, DollarSign, AlertTriangle, ExternalLink
+  Loader2, Sparkles, ArrowLeft, ShieldCheck, DollarSign, AlertTriangle, ExternalLink
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
@@ -185,9 +185,10 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
             }
           }} 
           style={navBackBtnStyle}
+          title="Back"
           aria-label="Back"
         >
-          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+          <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
         </button>
 
         <div style={{ textAlign: "center", flex: 1 }}>
@@ -541,11 +542,20 @@ const topNavStyle = {
 const navBackBtnStyle = {
   background: "none",
   border: "none",
-  color: "#d4d4d8",
+  color: "#f4f4f5",
   cursor: "pointer",
-  padding: "6px",
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px",
+  height: "48px",
   display: "flex",
-  alignItems: "center"
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+  margin: "0 0 0 -10px",
+  outline: "none",
+  touchAction: "manipulation",
+  WebkitTapHighlightColor: "transparent"
 };
 
 const topNavTitleStyle = {

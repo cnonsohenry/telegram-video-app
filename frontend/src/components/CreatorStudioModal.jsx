@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { 
-  ArrowLeft, MoveLeft, X, Sparkles, Users, DollarSign, Heart, Eye, ThumbsUp, 
+  ArrowLeft, X, Sparkles, Users, DollarSign, Heart, Eye, ThumbsUp, 
   MessageCircle, Settings, Calendar, Lock, 
   CheckCircle2, Clock, TrendingUp, Edit3, Save, ExternalLink, 
   Loader2, AlertCircle, ShieldCheck, Plus, UploadCloud, Trash2

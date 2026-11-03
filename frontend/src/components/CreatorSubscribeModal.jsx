@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   X, CheckCircle2, ShieldCheck, Copy, QrCode, 
-  Loader2, Sparkles, MoveLeft, Lock, Star, MessageCircle, AlertTriangle, ExternalLink
+  Loader2, Sparkles, ArrowLeft, Lock, Star, MessageCircle, AlertTriangle, ExternalLink
 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
@@ -163,7 +163,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
           style={navBackBtnStyle}
           aria-label="Back"
         >
-          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+          <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
         </button>
 
         <div style={{ textAlign: "center", flex: 1 }}>
@@ -172,7 +172,7 @@ export default function CreatorSubscribeModal({ creator, onClose, onSubscribeSuc
           </span>
         </div>
 
-        <div style={{ width: "36px" }} />
+        <div style={{ width: "48px" }} />
       </div>
 
       <div style={scrollAreaStyle}>
@@ -492,9 +492,16 @@ const navBackBtnStyle = {
   border: "none",
   color: "#d4d4d8",
   cursor: "pointer",
-  padding: "6px",
+  padding: 0,
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px",
+  height: "48px",
   display: "flex",
-  alignItems: "center"
+  alignItems: "center",
+  justifyContent: "center",
+  margin: "0 0 0 -10px",
+  WebkitTapHighlightColor: "transparent"
 };
 
 const topNavTitleStyle = {

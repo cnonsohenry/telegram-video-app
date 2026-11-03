@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
-  MoveLeft, Upload, CheckCircle, AlertCircle, Loader2, Video, 
+  ArrowLeft, Upload, CheckCircle, AlertCircle, Loader2, Video, 
   FileVideo, Twitter, Link, X, Send, Instagram, Scissors, Play, Pause, Clock,
   ChevronDown, Check, Plus, Search, Sparkles, Bot, Zap, HardDrive, Droplets
 } from "lucide-react";
@@ -1140,14 +1140,14 @@ export default function AdminUpload({ onClose }) {
       {/* Instagram-style Top Navigation Bar */}
       <div style={topNavStyle}>
         <button onClick={onClose} style={navBackBtnStyle} aria-label="Back">
-          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+          <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
         </button>
 
         <span style={topNavTitleStyle}>
           Admin Upload
         </span>
 
-        <div style={{ width: "36px" }} />
+        <div style={{ width: "48px" }} />
       </div>
 
       <div style={scrollAreaStyle}>
@@ -1905,9 +1905,16 @@ const navBackBtnStyle = {
   border: "none",
   color: "#d4d4d8",
   cursor: "pointer",
-  padding: "6px",
+  padding: 0,
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px",
+  height: "48px",
   display: "flex",
-  alignItems: "center"
+  alignItems: "center",
+  justifyContent: "center",
+  margin: "0 0 0 -10px",
+  WebkitTapHighlightColor: "transparent"
 };
 
 const topNavTitleStyle = {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Search, X, MoveLeft, Flame, TrendingUp, Play, Clock, Users } from "lucide-react";
+import { Search, X, ArrowLeft, Flame, TrendingUp, Play, Clock, Users } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import StoryAvatar from "./StoryAvatar";
 import DiscoverCreatorsSection from "./DiscoverCreatorsSection";
@@ -260,8 +260,8 @@ export default function AppHeader({
       {isSearchOpen && createPortal(
         <div style={searchOverlayStyle}>
           <div style={overlayHeaderStyle}>
-            <button onClick={handleCloseSearch} style={iconBtnStyle}>
-              <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+            <button onClick={handleCloseSearch} style={searchBackBtnStyle} title="Back" aria-label="Back">
+              <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
             </button>
             <div style={activeSearchBarStyle}>
               <Search size={16} color="#8e8e8e" />
@@ -593,7 +593,8 @@ const loginBadgeStyle = { background: "var(--primary-color)", color: "#d4d4d8", 
 const mobileHeaderStyle = { zIndex: 100, padding: "12px 15px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#09090b", borderBottom: "1px solid rgba(255, 255, 255, 0.08)" };
 
 const searchOverlayStyle = { position: "fixed", inset: 0, zIndex: 1000100, background: "var(--bg-color)", display: "flex", flexDirection: "column", animation: "fadeIn 0.2s ease-out" };
-const overlayHeaderStyle = { display: "flex", alignItems: "center", gap: "12px", padding: "15px", borderBottom: "1px solid #222" };
+const overlayHeaderStyle = { display: "flex", alignItems: "center", gap: "8px", padding: "10px 15px", borderBottom: "1px solid #222" };
+const searchBackBtnStyle = { background: "none", border: "none", cursor: "pointer", minWidth: "48px", minHeight: "48px", width: "48px", height: "48px", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, margin: "0 0 0 -8px", outline: "none", touchAction: "manipulation", WebkitTapHighlightColor: "transparent" };
 const iconBtnStyle = { background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex" };
 const activeSearchBarStyle = { display: "flex", alignItems: "center", background: "var(--bg-color, #09090b)", borderRadius: "8px", padding: "0 12px", flex: 1, height: "42px", border: "1px solid rgba(255, 255, 255, 0.12)" };
 const searchActionBtnStyle = { background: "none", border: "none", color: "var(--primary-color)", fontWeight: "700", fontSize: "14px", cursor: "pointer" };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
-  MoveLeft, 
+  ArrowLeft, 
   Shield, 
   FileText, 
   Lock, 
@@ -202,7 +202,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
               aria-label="Back" 
               style={mobileBackBtnStyle}
             >
-              <MoveLeft size={24} strokeWidth={2.3} color="#f4f4f5" />
+              <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
             </button>
             <div>
               <div style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "0.08em", color: "var(--primary-color)", textTransform: "uppercase" }}>
@@ -280,7 +280,7 @@ export default function LegalPages({ onBack, initialPage = "terms" }) {
                 e.currentTarget.style.transform = "translateX(0)";
               }}
             >
-              <MoveLeft size={20} strokeWidth={2.3} color="#f4f4f5" />
+              <ArrowLeft size={22} strokeWidth={2.6} color="#f4f4f5" />
               <span>Back to Website</span>
             </button>
 
@@ -691,9 +691,12 @@ const mobileBackBtnStyle = {
   display: "flex", 
   alignItems: "center", 
   justifyContent: "center", 
-  width: "34px", 
-  height: "34px", 
-  padding: 0 
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px", 
+  height: "48px", 
+  padding: 0,
+  WebkitTapHighlightColor: "transparent"
 };
 
 const headerActionBtnStyle = {
