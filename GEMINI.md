@@ -546,22 +546,26 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
 
 ---
 
-## 29. FullscreenPlayer Bottom UI Hierarchy: Creator Info Above End-to-End Progress Bar, Media Controls & Right-Pinned Follow Button
+## 29. FullscreenPlayer Bottom UI Hierarchy: Creator Info, Verified Username, Engagement Bar & Media Controls
 - **Vertical Stack Order in `bottomUIWrapper`**:
-  1. **Creator Info Block (`postInfoStyle`)**: Positioned at the top of the bottom UI overlay, directly above the progress bar with `padding: 0 14px` and compact `marginBottom: 6px`. Features:
-     - Avatar (`StoryAvatar` with size 42)
-     - Display name on the left with text truncation guards
-     - Follow button (`+ Follow` / `Following`) pinned to the **extreme right** of the display name (`usernameRowStyle` with `justifyContent: "space-between", width: "100%"`)
-     - Clickable hashtag/handle caption (`captionStyle`)
-  2. **End-to-End Progress Bar (`progressContainerStyle`)**:
-     - Full-bleed edge-to-edge scrubbing track stretching 100% across the viewport width (`left: 0, right: 0, width: "100%", padding: 0`).
+  1. **Creator Info Block (`postInfoStyle`)**:
+     - **Creator Header Row (`creatorHeaderRowStyle`)**:
+       - Left: Avatar (`StoryAvatar`, size 40)
+       - Creator Names Column (`creatorNamesColStyle`):
+         - Bold Zinc 100 display name (`displayNameStyle`, 14.5px) on top with text truncation guards.
+         - Dimmer white username (`@handle` at 12.5px, `rgba(244, 244, 245, 0.65)`) with official Twitter/X-style verification rosette (`TwitterVerifiedBadge`, size 13) rendered alongside when `is_verified` is true.
+       - Right: Follow button (`+ Follow` / `Following`) pinned to the extreme right of the header row (`!isOwner`).
+     - **Full-Width Caption (`captionStyle`)**: Starts directly below the Avatar (not indented), spanning the full container width with clickable hashtag and handle parsing (`renderClickableCaption`).
+  2. **Engagement Action Bar (`engagementBarStyle`)**:
+     - Positioned directly below Creator Info and directly **above** the end-to-end progress bar with borderless presentation (`padding: 4px 14px 6px 14px`).
+     - Interactive actions: Views count (`Eye`), Like (`Heart`), Reply (`MessageCircle`), Save (`Bookmark`), and Share (`Share2`).
+  3. **End-to-End Progress Bar (`progressContainerStyle`)**:
+     - Full-bleed edge-to-edge scrubbing track stretching 100% across the viewport width (`left: 0, right: 0, width: "100%", padding: 0`), serving as the visual divider between social engagement and media playback.
      - Sleek 3.5px visual track (`rgba(255, 255, 255, 0.28)`) with crisp Zinc 100 played fill (`#f4f4f5`) and interactive scrubbing thumb (`scrubberThumbStyle`) with touch-friendly 20px hit-box.
-  3. **Dedicated Media Controls Row (`playerControlsRowStyle`)**:
-     - Positioned directly below the end-to-end progress bar with `padding: 2px 14px 8px 14px`:
+  4. **Dedicated Media Controls Row (`playerControlsRowStyle`)**:
+     - Positioned at the bottom beneath the progress bar with `padding: 2px 14px 6px 14px`:
        - **Extreme Left**: Play/Pause button (`Play` / `Pause` size 22) and tabular duration countdown (`currentTime / duration`).
        - **Extreme Right**: Media utility tools group: Volume (`Volume2` / `VolumeX`), Direct Download (`Download`, hidden on premium), Rotate (`RotateCw`), and Zoom/Aspect ratio (`Maximize` / `Minimize`).
-  4. **Engagement Bar (`engagementBarStyle`)**:
-     - Bottom row with hairline top border (`1px solid rgba(255,255,255,0.12)`) and actions: Views count, Like (`Heart`), Reply (`MessageCircle`), Save (`Bookmark`), and Share (`Share2`).
 
 
 

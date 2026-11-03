@@ -17,6 +17,7 @@ import { getPostDisplayName } from "../utils/date";
 import ReportModal from "./ReportModal";
 import useModalHistory from "../hooks/useModalHistory";
 import StoryAvatar from "./StoryAvatar";
+import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 
 export default function FullscreenPlayer({ video, currentUser, onClose, isDesktop, onCommentClick, onCreatorClick }) {
   const videoRef = useRef(null);
@@ -174,6 +175,13 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
   // Creator & Follow States
   const creatorHandle = getVideoCreatorHandle(video);
   const uploaderId = video.uploader_id ? String(video.uploader_id) : null;
+  const isCreatorVerified = Boolean(
+    video?.is_verified === true || 
+    video?.creator_verified === true || 
+    video?.creator?.is_verified === true ||
+    video?.uploader?.is_verified === true ||
+    creatorHandle.toLowerCase() === "naijahomemade"
+  );
 
   const isOwner = Boolean(currentUser && (
     (currentUser.username && currentUser.username.toLowerCase().replace(/^@/, "").trim() === creatorHandle.toLowerCase()) ||
@@ -1394,51 +1402,110 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 onTouchStart={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
               >
-                {/* 1. 🟢 Creator Info (Above Progress Bar): Avatar, Display Name, Follow button (extreme right), and Caption */}
+                {/* 1. 🟢 Creator Info: Avatar + Names + Follow button row, followed by Caption starting directly below Avatar */}
                 <div style={postInfoStyle}>
-                    <StoryAvatar
-                      username={creatorHandle}
-                      avatarUrl={video.avatar_url || (video.uploader_id ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${video.uploader_id}&v=2` : (creatorHandle ? `${APP_CONFIG.apiUrl}/avatar.jpg?username=${encodeURIComponent(creatorHandle)}&v=2` : ""))}
-                      displayName={getPostDisplayName(video)}
-                      size={42}
-                      borderWidth={2}
-                      onClick={handleCreatorClick}
-                    />
-                   <div style={textDetailsStyle}>
-                      <div style={usernameRowStyle}>
-                        <div 
-                          style={{ ...usernameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+                   <div style={creatorHeaderRowStyle}>
+                      <div style={creatorLeftGroupStyle}>
+                        <StoryAvatar
+                          username={creatorHandle}
+                          avatarUrl={video.avatar_url || (video.uploader_id ? `${APP_CONFIG.apiUrl}/avatar.jpg?user_id=${video.uploader_id}&v=2` : (creatorHandle ? `${APP_CONFIG.apiUrl}/avatar.jpg?username=${encodeURIComponent(creatorHandle)}&v=2` : ""))}
+                          displayName={getPostDisplayName(video)}
+                          size={40}
+                          borderWidth={2}
                           onClick={handleCreatorClick}
-                        >
-                          {getPostDisplayName(video)}
-                        </div>
-
-                        {!isOwner && (
-                          <button
-                            onClick={handleFollowClick}
-                            disabled={isFollowLoading}
-                            style={isFollowing ? followingBtnStyle : followBtnStyle}
-                            title={isFollowing ? `Unfollow @${creatorHandle}` : `Follow @${creatorHandle}`}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = isFollowing ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.2)";
-                              e.currentTarget.style.transform = "scale(1.05)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = "transparent";
-                              e.currentTarget.style.transform = "scale(1)";
-                            }}
+                        />
+                        <div style={creatorNamesColStyle}>
+                          <div 
+                            style={{ ...displayNameStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+                            onClick={handleCreatorClick}
+                            title={getPostDisplayName(video)}
                           >
-                            <span>{isFollowLoading ? "..." : isFollowing ? "Following" : "+ Follow"}</span>
-                          </button>
-                        )}
+                            {getPostDisplayName(video)}
+                          </div>
+                          <div 
+                            style={{ ...handleRowStyle, cursor: onCreatorClick ? "pointer" : "default" }}
+                            onClick={handleCreatorClick}
+                            title={`@${creatorHandle}`}
+                          >
+                            <span style={handleSubtextStyle}>@{creatorHandle}</span>
+                            {isCreatorVerified && <TwitterVerifiedBadge size={13} style={{ flexShrink: 0 }} />}
+                          </div>
+                        </div>
                       </div>
-                      <div style={captionStyle}>
-                        {renderClickableCaption(video.caption || APP_CONFIG.defaultCaption, (handle) => handleCreatorClick(null, handle))}
-                      </div>
+
+                      {!isOwner && (
+                        <button
+                          onClick={handleFollowClick}
+                          disabled={isFollowLoading}
+                          style={isFollowing ? followingBtnStyle : followBtnStyle}
+                          title={isFollowing ? `Unfollow @${creatorHandle}` : `Follow @${creatorHandle}`}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isFollowing ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.2)";
+                            e.currentTarget.style.transform = "scale(1.05)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                            e.currentTarget.style.transform = "scale(1)";
+                          }}
+                        >
+                          <span>{isFollowLoading ? "..." : isFollowing ? "Following" : "+ Follow"}</span>
+                        </button>
+                      )}
+                   </div>
+
+                   {/* Caption: Starts directly below the Avatar */}
+                   <div style={captionStyle}>
+                     {renderClickableCaption(video.caption || APP_CONFIG.defaultCaption, (handle) => handleCreatorClick(null, handle))}
                    </div>
                 </div>
 
-                {/* 2. 🟢 End-to-End Progress Bar (Stretches full width from edge to edge) */}
+                {/* 2. 🟢 Engagement Bar (Above Progress Bar, Below Creator Info: Views, Like, Comment, Save, Share) */}
+                <div style={engagementBarStyle}>
+                   <div style={{ ...engagementBtnStyle, cursor: "default" }}>
+                      <Eye size={20} color="#d4d4d8" />
+                      <span>{Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}</span>
+                   </div>
+                   <button 
+                     style={engagementBtnStyle} 
+                     onClick={handleLike}
+                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
+                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                   >
+                      <Heart size={21} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#d4d4d8"} />
+                      <span>{likesCount > 0 ? likesCount : 'Like'}</span>
+                   </button>
+                   <button 
+                     style={engagementBtnStyle} 
+                     onClick={handleCommentClick}
+                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
+                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                   >
+                      <MessageCircle size={21} color="#d4d4d8" />
+                      <span>{commentsCount > 0 ? commentsCount : 'Reply'}</span>
+                   </button>
+                   <button 
+                     style={engagementBtnStyle} 
+                     onClick={handleSaveToProfile}
+                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
+                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                   >
+                      <Bookmark size={21} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#d4d4d8"} />
+                      <span>{savesCount > 0 ? savesCount : 'Save'}</span>
+                   </button>
+                    {!isPremium && (
+                      <button 
+                        style={engagementBtnStyle} 
+                        onClick={handleShare}
+                        onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
+                        onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                      >
+                         {copied ? <Check size={21} color="#f4f4f5" /> : <Share2 size={21} color="#d4d4d8" />}
+                         <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
+                      </button>
+                    )}
+                </div>
+
+                {/* 3. 🟢 End-to-End Progress Bar (Stretches full width from edge to edge) */}
                 <div 
                   ref={progressBarRef}
                   style={progressContainerStyle}
@@ -1470,7 +1537,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                   />
                 </div>
 
-                {/* 3. 🟢 Controls Row (Below Progress Bar): Play/Pause & Duration at extreme left; Volume, Download, Rotate, Zoom at extreme right */}
+                {/* 4. 🟢 Controls Row (Below Progress Bar): Play/Pause & Duration at extreme left; Volume, Download, Rotate, Zoom at extreme right */}
                 <div style={playerControlsRowStyle}>
                   {/* Extreme Left: Play/Pause and Time Count */}
                   <div style={controlsLeftStyle}>
@@ -1544,52 +1611,6 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                       {isZoomed ? <Minimize size={19} color="#f4f4f5" /> : <Maximize size={19} color="#f4f4f5" />}
                     </button>
                   </div>
-                </div>
-
-                {/* 4. 🟢 Action Bar (Views, Like, Comment, Save, Share) */}
-                <div style={engagementBarStyle}>
-                   <div style={{ ...engagementBtnStyle, cursor: "default" }}>
-                      <Eye size={20} color="#d4d4d8" />
-                      <span>{Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(video.views || 0))}</span>
-                   </div>
-                   <button 
-                     style={engagementBtnStyle} 
-                     onClick={handleLike}
-                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
-                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                   >
-                      <Heart size={21} fill={isLiked ? "#f91880" : "none"} color={isLiked ? "#f91880" : "#d4d4d8"} />
-                      <span>{likesCount > 0 ? likesCount : 'Like'}</span>
-                   </button>
-                   <button 
-                     style={engagementBtnStyle} 
-                     onClick={handleCommentClick}
-                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
-                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                   >
-                      <MessageCircle size={21} color="#d4d4d8" />
-                      <span>{commentsCount > 0 ? commentsCount : 'Reply'}</span>
-                   </button>
-                   <button 
-                     style={engagementBtnStyle} 
-                     onClick={handleSaveToProfile}
-                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
-                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                   >
-                      <Bookmark size={21} fill={isSaved ? "var(--primary-color)" : "none"} color={isSaved ? "var(--primary-color)" : "#d4d4d8"} />
-                      <span>{savesCount > 0 ? savesCount : 'Save'}</span>
-                   </button>
-                    {!isPremium && (
-                      <button 
-                        style={engagementBtnStyle} 
-                        onClick={handleShare}
-                        onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
-                        onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                      >
-                         {copied ? <Check size={21} color="#f4f4f5" /> : <Share2 size={21} color="#d4d4d8" />}
-                         <span>{sharesCount > 0 ? sharesCount : 'Share'}</span>
-                      </button>
-                    )}
                 </div>
 
               </div>
@@ -1777,7 +1798,7 @@ const playerControlsRowStyle = {
   alignItems: "center", 
   justifyContent: "space-between", 
   width: "100%", 
-  padding: "2px 14px 8px 14px", 
+  padding: "2px 14px 6px 14px", 
   boxSizing: "border-box" 
 };
 
@@ -1845,50 +1866,68 @@ const timeDisplayStyle = {
 
 const postInfoStyle = { 
   display: "flex", 
-  alignItems: "flex-start", 
-  gap: "10px", 
-  marginBottom: "6px", 
+  flexDirection: "column", 
+  gap: "6px", 
+  marginBottom: "4px", 
   padding: "0 14px", 
   width: "100%", 
   boxSizing: "border-box" 
 };
 
-const avatarStyle = { 
-  width: "42px", 
-  height: "42px", 
-  borderRadius: "50%", 
-  objectFit: "cover", 
-  border: "1.5px solid rgba(255,255,255,0.3)", 
-  flexShrink: 0 
-};
-
-const textDetailsStyle = { 
-  display: "flex", 
-  flexDirection: "column", 
-  gap: "4px", 
-  overflow: "hidden", 
-  flex: 1, 
-  minWidth: 0 
-};
-
-const usernameRowStyle = { 
+const creatorHeaderRowStyle = { 
   display: "flex", 
   alignItems: "center", 
   justifyContent: "space-between", 
   width: "100%", 
-  gap: "12px" 
+  gap: "10px" 
 };
 
-const usernameStyle = { 
-  fontSize: "15px", 
+const creatorLeftGroupStyle = { 
+  display: "flex", 
+  alignItems: "center", 
+  gap: "10px", 
+  minWidth: 0, 
+  flex: 1 
+};
+
+const creatorNamesColStyle = { 
+  display: "flex", 
+  flexDirection: "column", 
+  justifyContent: "center", 
+  gap: "1px", 
+  minWidth: 0, 
+  flex: 1 
+};
+
+const displayNameStyle = { 
+  fontSize: "14.5px", 
   fontWeight: "700", 
   color: "#f4f4f5", 
   textShadow: "0px 1px 3px rgba(0,0,0,0.8)", 
   overflow: "hidden", 
   textOverflow: "ellipsis", 
   whiteSpace: "nowrap", 
+  lineHeight: "1.25" 
+};
+
+const handleRowStyle = { 
+  display: "inline-flex", 
+  alignItems: "center", 
+  gap: "4.5px", 
+  overflow: "hidden", 
   minWidth: 0,
-  flex: 1
+  maxWidth: "100%"
+};
+
+const handleSubtextStyle = { 
+  fontSize: "12.5px", 
+  fontWeight: "500", 
+  color: "rgba(244, 244, 245, 0.65)",
+  textShadow: "0px 1px 3px rgba(0,0,0,0.8)", 
+  overflow: "hidden", 
+  textOverflow: "ellipsis", 
+  whiteSpace: "nowrap", 
+  lineHeight: "1.2" 
 };
 
 const followBtnStyle = {
@@ -1938,10 +1977,9 @@ const engagementBarStyle = {
   display: "flex", 
   justifyContent: "space-between", 
   alignItems: "center", 
-  padding: "10px 14px 2px 14px", 
-  borderTop: "1px solid rgba(255,255,255,0.12)",
-  width: "100%",
-  boxSizing: "border-box"
+  padding: "4px 14px 6px 14px", 
+  width: "100%", 
+  boxSizing: "border-box" 
 };
 
 const engagementBtnStyle = { 
