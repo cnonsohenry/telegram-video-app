@@ -1455,7 +1455,7 @@ export default function CreatorProfileModal({
 const containerStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 1000025,
+  zIndex: 1000070,
   backgroundColor: "#09090b",
   display: "flex",
   flexDirection: "column",

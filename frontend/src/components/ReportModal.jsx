@@ -374,7 +374,7 @@ const modalBackdrop = {
   WebkitBackdropFilter: "blur(12px)",
   display: "flex",
   justifyContent: "center",
-  zIndex: 1000060,
+  zIndex: 1000095,
   padding: 0
 };
 

@@ -593,7 +593,7 @@ const fullscreenContainerStyle = {
   width: "100%",
   height: "100%",
   backgroundColor: "#09090b",
-  zIndex: 1000040,
+  zIndex: 1000090,
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",

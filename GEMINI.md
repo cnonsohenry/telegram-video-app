@@ -523,6 +523,27 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
     17. `Explore.jsx`: Search view exit back button (48px × 48px with `margin: 0 0 0 -8px`).
     18. `LegalPages.jsx`: Mobile header back button (48px × 48px) and desktop return button (`ArrowLeft` size 22).
 
+---
+
+## 28. TikTok-Sized Comment Likes/Dislikes, Spotlight Comment Typography & Creator Modal Z-Index Elevation
+- **TikTok-Sized Like & Dislike Action Buttons (`CommentSectionModal.jsx`)**:
+  - Implemented TikTok-style **Dislike** button (`ThumbsDown`) alongside the **Like** button (`Heart`) on parent comments and nested replies.
+  - Generous touch hit-box dimensions: `minWidth: 40px, minHeight: 38px, padding: 4px 8px` with `display: inline-flex, alignItems: center, justifyContent: center`, smooth spring active scale (`.comment-action-btn:active { transform: scale(0.84); opacity: 0.8; }`), and prominent icon scale (`Heart size={20}` mobile / `ThumbsDown size={19}` mobile; `18px / 17px` on replies).
+  - Mutual Exclusivity & Privacy: Liking cancels dislike, disliking cancels like and decrements likes count. In accordance with TikTok's standard, dislike counts are private and only reflected in the active toggled icon state for the user who cast it.
+- **Backend Persistent Dislike Architecture (`backend/server.js`)**:
+  - PostgreSQL table `comment_dislikes (user_id INTEGER REFERENCES app_users(id), comment_id INTEGER REFERENCES comments(id), created_at TIMESTAMP DEFAULT NOW(), UNIQUE(user_id, comment_id))` with index on `comment_id`.
+  - Endpoint `POST /api/comments/:comment_id/dislike`: Toggles dislike on/off, clears any prior like from `comment_likes`, and decrements `likes_count`.
+  - Endpoint `POST /api/comments/:comment_id/like`: Toggles like on/off and automatically deletes any prior dislike from `comment_dislikes`.
+  - Endpoint `GET /api/comments/:message_id`: Probes and returns both `user_liked` and `user_disliked` boolean flags for authenticated users.
+- **Dimmer Display Name & Spotlight Comment Typography**:
+  - Commenter display names (`commentDisplayNameStyle`) softened to calm, muted Zinc 400 (`#8e8e93`, `fontSize: 13px`, `fontWeight: 600`), positioning username metadata as secondary context.
+  - Comment text (`commentText`) elevated to bright, crisp Zinc 100 white (`#f4f4f5`, `fontSize: 14px`, `lineHeight: 1.42`), giving comments the center stage and visual spotlight.
+- **CreatorProfileModal Elevation Over CommentSectionModal (`zIndex: 1000070`)**:
+  - Fixed an issue where tapping a user's avatar or display name in `CommentSectionModal` caused `CreatorProfileModal` to render *behind* the comment sheet (`zIndex: 1000025` vs `zIndex: 1000050`).
+  - Elevated `CreatorProfileModal` container to `zIndex: 1000070`, ensuring it smoothly slides up directly in front of `CommentSectionModal` (`zIndex: 1000050`) and `FullscreenPlayer` (`zIndex: 1000030`).
+  - Adjusted child and sibling modal overlays accordingly: `CreatorTipModal` (`zIndex: 1000085`), `CreatorSubscribeModal` (`zIndex: 1000085`), `PostOptionsModal` (`zIndex: 1000075`), and `PaywallModal` (`zIndex: 1000090`).
+  - History preservation: Tapping Back from `CreatorProfileModal` cleanly dismisses the profile and restores the caller's view (bringing the user right back to the active comment sheet).
+
 
 
 

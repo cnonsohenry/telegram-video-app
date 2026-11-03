@@ -517,7 +517,7 @@ export default function CreatorTipModal({ creator, onClose, onTipSuccess }) {
 const fullscreenContainerStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 1000035,
+  zIndex: 1000085,
   backgroundColor: "#09090b",
   display: "flex",
   flexDirection: "column",

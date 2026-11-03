@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { X, Send, Loader2, Heart, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Send, Loader2, Heart, ThumbsDown, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import { promptEmailVerification } from "../utils/toast";
 import { renderClickableCaption } from "./ClickableCaption";
@@ -272,6 +272,7 @@ export default function CommentSectionModal({ video, onClose }) {
           return {
             ...c,
             user_liked: !wasLiked,
+            user_disliked: false, // liking removes any dislike
             likes_count: wasLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1
           };
         }
@@ -313,12 +314,81 @@ export default function CommentSectionModal({ video, onClose }) {
         const data = await res.json();
         if (typeof data.likes_count !== "undefined") {
           setComments(prevComments =>
-            prevComments.map(c => c.id === commentId ? { ...c, likes_count: data.likes_count, user_liked: data.user_liked } : c)
+            prevComments.map(c => c.id === commentId ? { 
+              ...c, 
+              likes_count: data.likes_count, 
+              user_liked: Boolean(data.user_liked),
+              user_disliked: Boolean(data.user_disliked)
+            } : c)
           );
         }
       }
     } catch (err) {
       console.error("Failed to toggle comment like:", err);
+    }
+  };
+
+  const handleDislikeComment = async (commentId) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.dispatchEvent(new CustomEvent("promptLogin", { detail: { action: "dislike" } }));
+      return;
+    }
+
+    const userStr = localStorage.getItem("user");
+    let currentUser = null;
+    try { currentUser = userStr ? JSON.parse(userStr) : null; } catch (_) {}
+    if (currentUser && !currentUser.email_verified && currentUser.role !== "admin") {
+      promptEmailVerification({ reason: "dislike", email: currentUser.email || "" });
+      return;
+    }
+
+    // Optimistic UI update
+    setComments(prevComments =>
+      prevComments.map(c => {
+        if (c.id === commentId) {
+          const wasDisliked = Boolean(c.user_disliked);
+          const wasLiked = Boolean(c.user_liked);
+          const currentLikes = Number(c.likes_count || 0);
+          return {
+            ...c,
+            user_disliked: !wasDisliked,
+            user_liked: false, // disliking removes any like
+            likes_count: wasLiked ? Math.max(0, currentLikes - 1) : currentLikes
+          };
+        }
+        return c;
+      })
+    );
+
+    try {
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/comments/${commentId}/dislike`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (res.status === 403) {
+        const errData = await res.json();
+        if (errData.requires_email_verification) {
+          promptEmailVerification({ reason: "dislike", email: errData.email || currentUser?.email || "" });
+          return;
+        }
+      }
+      if (res.ok) {
+        const data = await res.json();
+        setComments(prevComments =>
+          prevComments.map(c => c.id === commentId ? {
+            ...c,
+            user_disliked: Boolean(data.user_disliked),
+            user_liked: Boolean(data.user_liked),
+            likes_count: typeof data.likes_count !== "undefined" ? data.likes_count : c.likes_count
+          } : c)
+        );
+      }
+    } catch (err) {
+      console.error("Failed to toggle comment dislike:", err);
     }
   };
 
@@ -442,7 +512,7 @@ export default function CommentSectionModal({ video, onClose }) {
                       </span>
                       <p style={commentText}>{renderClickableCaption(p.content)}</p>
 
-                      {/* Parent Action Row: Date & Reply at extreme left, Like at extreme right */}
+                      {/* Parent Action Row: Date & Reply at extreme left, Like & Dislike at extreme right */}
                       <div style={commentActionRowStyle}>
                         <div style={commentActionLeftStyle}>
                           <span style={commentDateStyle}>{formatCommentDate(p.created_at)}</span>
@@ -455,23 +525,42 @@ export default function CommentSectionModal({ video, onClose }) {
                           </button>
                         </div>
 
-                        <button 
-                          type="button" 
-                          onClick={() => handleLikeComment(p.id)} 
-                          style={commentLikeBtnStyle}
-                          aria-label="Like comment"
-                        >
-                          <Heart 
-                            size={14} 
-                            color={p.user_liked ? "#f43f5e" : "#8e8e93"} 
-                            fill={p.user_liked ? "#f43f5e" : "none"} 
-                          />
-                          {Number(p.likes_count || 0) > 0 && (
-                            <span style={{ fontSize: "11.5px", color: p.user_liked ? "#f43f5e" : "#8e8e93", fontWeight: 600 }}>
-                              {p.likes_count}
-                            </span>
-                          )}
-                        </button>
+                        <div style={commentActionRightStyle}>
+                          <button 
+                            type="button" 
+                            onClick={() => handleLikeComment(p.id)} 
+                            style={commentLikeBtnStyle}
+                            className="comment-action-btn"
+                            aria-label="Like comment"
+                          >
+                            <Heart 
+                              size={20} 
+                              strokeWidth={2}
+                              color={p.user_liked ? "#e11d48" : "#71767b"} 
+                              fill={p.user_liked ? "#e11d48" : "none"} 
+                            />
+                            {Number(p.likes_count || 0) > 0 && (
+                              <span style={{ fontSize: "12px", color: p.user_liked ? "#e11d48" : "#8e8e93", fontWeight: 600 }}>
+                                {p.likes_count}
+                              </span>
+                            )}
+                          </button>
+
+                          <button 
+                            type="button" 
+                            onClick={() => handleDislikeComment(p.id)} 
+                            style={commentDislikeBtnStyle}
+                            className="comment-action-btn"
+                            aria-label="Dislike comment"
+                          >
+                            <ThumbsDown 
+                              size={19} 
+                              strokeWidth={2}
+                              color={p.user_disliked ? "#e11d48" : "#71767b"} 
+                              fill={p.user_disliked ? "#e11d48" : "none"} 
+                            />
+                          </button>
+                        </div>
                       </div>
 
                       {/* 🟢 TIKTOK STACKED REPLIES & HIDE FEATURE */}
@@ -528,7 +617,7 @@ export default function CommentSectionModal({ video, onClose }) {
                                       {renderClickableCaption(stripParentMention(reply.content, p.username))}
                                     </p>
 
-                                    {/* Reply Action Row */}
+                                    {/* Reply Action Row: Date & Reply at left, Like & Dislike at right */}
                                     <div style={commentActionRowStyle}>
                                       <div style={commentActionLeftStyle}>
                                         <span style={commentDateStyle}>{formatCommentDate(reply.created_at)}</span>
@@ -541,23 +630,42 @@ export default function CommentSectionModal({ video, onClose }) {
                                         </button>
                                       </div>
 
-                                      <button 
-                                        type="button" 
-                                        onClick={() => handleLikeComment(reply.id)} 
-                                        style={commentLikeBtnStyle}
-                                        aria-label="Like reply"
-                                      >
-                                        <Heart 
-                                          size={13} 
-                                          color={reply.user_liked ? "#f43f5e" : "#8e8e93"} 
-                                          fill={reply.user_liked ? "#f43f5e" : "none"} 
-                                        />
-                                        {Number(reply.likes_count || 0) > 0 && (
-                                          <span style={{ fontSize: "11px", color: reply.user_liked ? "#f43f5e" : "#8e8e93", fontWeight: 600 }}>
-                                            {reply.likes_count}
-                                          </span>
-                                        )}
-                                      </button>
+                                      <div style={commentActionRightStyle}>
+                                        <button 
+                                          type="button" 
+                                          onClick={() => handleLikeComment(reply.id)} 
+                                          style={replyLikeBtnStyle}
+                                          className="comment-action-btn"
+                                          aria-label="Like reply"
+                                        >
+                                          <Heart 
+                                            size={18} 
+                                            strokeWidth={2}
+                                            color={reply.user_liked ? "#e11d48" : "#71767b"} 
+                                            fill={reply.user_liked ? "#e11d48" : "none"} 
+                                          />
+                                          {Number(reply.likes_count || 0) > 0 && (
+                                            <span style={{ fontSize: "11px", color: reply.user_liked ? "#e11d48" : "#8e8e93", fontWeight: 600 }}>
+                                              {reply.likes_count}
+                                            </span>
+                                          )}
+                                        </button>
+
+                                        <button 
+                                          type="button" 
+                                          onClick={() => handleDislikeComment(reply.id)} 
+                                          style={replyDislikeBtnStyle}
+                                          className="comment-action-btn"
+                                          aria-label="Dislike reply"
+                                        >
+                                          <ThumbsDown 
+                                            size={17} 
+                                            strokeWidth={2}
+                                            color={reply.user_disliked ? "#e11d48" : "#71767b"} 
+                                            fill={reply.user_disliked ? "#e11d48" : "none"} 
+                                          />
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -639,6 +747,8 @@ export default function CommentSectionModal({ video, onClose }) {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
         .animate-spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+        .comment-action-btn { transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.15s ease; }
+        .comment-action-btn:active { transform: scale(0.84); opacity: 0.8; }
       `}</style>
     </>
   );
@@ -726,16 +836,19 @@ const commentAvatarStyle = {
 const commentContentWrapper = { display: "flex", flexDirection: "column", flex: 1, minWidth: 0 };
 
 const commentDisplayNameStyle = { 
-  fontSize: "13.5px", 
-  fontWeight: "700", 
-  color: "#d4d4d8", 
-  letterSpacing: "-0.2px" 
+  fontSize: "13px", 
+  fontWeight: "600", 
+  color: "#8e8e93", // Dimmer, muted gray so comments have the spotlight
+  letterSpacing: "-0.1px" 
 };
 const commentUsernameStyle = commentDisplayNameStyle;
 
 const commentText = {
-  fontSize: "14px", color: "#c4c4c8",
-  margin: "4px 0 0 0", lineHeight: "1.4", wordBreak: "break-word"
+  fontSize: "14px", 
+  color: "#f4f4f5", // Crisp, bright Zinc 100 white so comments command the show
+  margin: "3px 0 0 0", 
+  lineHeight: "1.42", 
+  wordBreak: "break-word"
 };
 
 const commentActionRowStyle = {
@@ -750,6 +863,12 @@ const commentActionLeftStyle = {
   display: "flex",
   alignItems: "center",
   gap: "14px"
+};
+
+const commentActionRightStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "4px"
 };
 
 const commentDateStyle = { 
@@ -772,13 +891,46 @@ const commentReplyBtnStyle = {
 const commentLikeBtnStyle = {
   background: "none",
   border: "none",
-  padding: "4px",
-  display: "flex",
+  minWidth: "40px",
+  minHeight: "38px",
+  padding: "4px 8px",
+  display: "inline-flex",
   alignItems: "center",
+  justifyContent: "center",
   gap: "5px",
   cursor: "pointer",
-  color: "#8e8e93",
-  transition: "transform 0.15s ease"
+  color: "#71767b",
+  borderRadius: "18px",
+  WebkitTapHighlightColor: "transparent"
+};
+
+const commentDislikeBtnStyle = {
+  background: "none",
+  border: "none",
+  minWidth: "38px",
+  minHeight: "38px",
+  padding: "4px 8px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  color: "#71767b",
+  borderRadius: "18px",
+  WebkitTapHighlightColor: "transparent"
+};
+
+const replyLikeBtnStyle = {
+  ...commentLikeBtnStyle,
+  minWidth: "36px",
+  minHeight: "34px",
+  padding: "3px 6px"
+};
+
+const replyDislikeBtnStyle = {
+  ...commentDislikeBtnStyle,
+  minWidth: "34px",
+  minHeight: "34px",
+  padding: "3px 6px"
 };
 
 // 🟢 COMPOSER (Permanently docked at the bottom of the modal)

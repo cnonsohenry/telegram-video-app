@@ -348,7 +348,7 @@ export default function PostOptionsModal({
 const overlayStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 1000020,
+  zIndex: 1000075,
   backgroundColor: "rgba(0, 0, 0, 0.65)",
   backdropFilter: "blur(12px)",
   WebkitBackdropFilter: "blur(12px)",

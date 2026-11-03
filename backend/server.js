@@ -434,6 +434,16 @@ async function initDatabase() {
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_comment_likes_comment_id ON comment_likes (comment_id)`);
       await pool.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0`);
 
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS comment_dislikes (
+          user_id INTEGER REFERENCES app_users(id) ON DELETE CASCADE,
+          comment_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(user_id, comment_id)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_comment_dislikes_comment_id ON comment_dislikes (comment_id)`);
+
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS likes_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS comments_count BIGINT DEFAULT 0`);
       await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS shares_count BIGINT DEFAULT 0`);
@@ -2703,7 +2713,8 @@ app.get("/api/comments/:message_id", async (req, res) => {
         u.username, 
         COALESCE(u.display_name, u.username) AS display_name,
         u.avatar_url,
-        ${userId ? `EXISTS(SELECT 1 FROM comment_likes cl WHERE cl.comment_id = c.id AND cl.user_id = $2) AS user_liked` : `false AS user_liked`}
+        ${userId ? `EXISTS(SELECT 1 FROM comment_likes cl WHERE cl.comment_id = c.id AND cl.user_id = $2) AS user_liked,` : `false AS user_liked,`}
+        ${userId ? `EXISTS(SELECT 1 FROM comment_dislikes cd WHERE cd.comment_id = c.id AND cd.user_id = $2) AS user_disliked` : `false AS user_disliked`}
       FROM comments c
       LEFT JOIN app_users u ON c.user_id = u.id
       WHERE c.message_id = $1
@@ -2746,6 +2757,11 @@ app.post("/api/comments/:comment_id/like", authenticateToken, requireEmailVerifi
         "UPDATE comments SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = $1",
         [comment_id]
       );
+      // Liking removes any existing dislike
+      await pool.query(
+        "DELETE FROM comment_dislikes WHERE user_id = $1 AND comment_id = $2",
+        [user_id, comment_id]
+      );
       user_liked = true;
     }
 
@@ -2753,10 +2769,70 @@ app.post("/api/comments/:comment_id/like", authenticateToken, requireEmailVerifi
       "SELECT COALESCE(likes_count, 0) as likes_count FROM comments WHERE id = $1",
       [comment_id]
     );
-    res.json({ success: true, user_liked, likes_count: Number(updated.rows[0]?.likes_count || 0) });
+    res.json({ 
+      success: true, 
+      user_liked, 
+      user_disliked: false, 
+      likes_count: Number(updated.rows[0]?.likes_count || 0) 
+    });
   } catch (err) {
     console.error("Failed to like comment:", err);
     res.status(500).json({ error: "Failed to toggle comment like" });
+  }
+});
+
+app.post("/api/comments/:comment_id/dislike", authenticateToken, requireEmailVerified, async (req, res) => {
+  try {
+    const { comment_id } = req.params;
+    const user_id = req.user.id;
+
+    const existingDislike = await pool.query(
+      "SELECT 1 FROM comment_dislikes WHERE user_id = $1 AND comment_id = $2",
+      [user_id, comment_id]
+    );
+
+    let user_disliked = false;
+    if (existingDislike.rows.length > 0) {
+      // Toggle dislike off
+      await pool.query(
+        "DELETE FROM comment_dislikes WHERE user_id = $1 AND comment_id = $2",
+        [user_id, comment_id]
+      );
+      user_disliked = false;
+    } else {
+      // Toggle dislike on
+      await pool.query(
+        "INSERT INTO comment_dislikes (user_id, comment_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [user_id, comment_id]
+      );
+      user_disliked = true;
+
+      // Disliking removes any existing like and decrements likes_count
+      const existingLike = await pool.query(
+        "DELETE FROM comment_likes WHERE user_id = $1 AND comment_id = $2 RETURNING 1",
+        [user_id, comment_id]
+      );
+      if (existingLike.rows.length > 0) {
+        await pool.query(
+          "UPDATE comments SET likes_count = GREATEST(0, COALESCE(likes_count, 1) - 1) WHERE id = $1",
+          [comment_id]
+        );
+      }
+    }
+
+    const updated = await pool.query(
+      "SELECT COALESCE(likes_count, 0) as likes_count FROM comments WHERE id = $1",
+      [comment_id]
+    );
+    res.json({ 
+      success: true, 
+      user_disliked, 
+      user_liked: false, 
+      likes_count: Number(updated.rows[0]?.likes_count || 0) 
+    });
+  } catch (err) {
+    console.error("Failed to dislike comment:", err);
+    res.status(500).json({ error: "Failed to toggle comment dislike" });
   }
 });
 

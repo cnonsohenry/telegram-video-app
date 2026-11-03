@@ -942,6 +942,8 @@ export default function App() {
       }
 
       // Clear completely first
+      activeCommentVideoRef.current = null;
+      setActiveCommentVideo(null);
       setActiveVideo(null);
       // 🟢 Pause any existing feed videos to release HTTP range-request socket locks
       try {
