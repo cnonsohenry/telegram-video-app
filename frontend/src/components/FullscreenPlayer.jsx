@@ -1395,53 +1395,115 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                 onPointerDown={(e) => e.stopPropagation()}
               >
                 
-                {/* Top Row: Floating Controls (Transparent) */}
-                <div style={floatingControlsRow}>
-                    {/* Rotate Button */}
+                {/* 1. 🟢 Top: End-to-End Progress Bar (Stretches full width from edge to edge) */}
+                <div 
+                  ref={progressBarRef}
+                  style={progressContainerStyle}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerUp}
+                  onClick={(e) => e.stopPropagation()}
+                  role="slider"
+                  tabIndex={0}
+                  aria-label="Video progress slider"
+                  aria-valuemin={0}
+                  aria-valuemax={duration || 100}
+                  aria-valuenow={currentTime || 0}
+                >
+                  {/* Visual Background Track (end-to-end sleek bar) */}
+                  <div style={visualTrackStyle}>
+                    {/* Played Progress Fill */}
+                    <div style={{ ...progressFillStyle, width: `${progressPercent}%` }} />
+                  </div>
+
+                  {/* Interactive Scrubbing Thumb */}
+                  <div 
+                    style={{
+                      ...scrubberThumbStyle,
+                      left: `${progressPercent}%`,
+                      transform: `translate(-50%, -50%) scale(${isDragging ? 1.35 : 1})`
+                    }} 
+                  />
+                </div>
+
+                {/* 2. 🟢 Controls Row (Below Progress Bar, Above Display Name): Play/Pause & Duration at extreme left; Volume, Download, Rotate, Zoom at extreme right */}
+                <div style={playerControlsRowStyle}>
+                  {/* Extreme Left: Play/Pause and Time Count */}
+                  <div style={controlsLeftStyle}>
                     <button 
-                      onClick={(e) => { e.stopPropagation(); setIsRotated(!isRotated); }} 
-                      style={floatingBtnStyle} 
-                      title="Rotate video"
+                      onClick={handleTogglePlay} 
+                      style={playPauseBtnStyle}
+                      aria-label={isPlaying ? "Pause video" : "Play video"}
+                      title={isPlaying ? "Pause" : "Play"}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.12)"}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                    >
+                      {isPlaying ? (
+                        <Pause size={22} fill="#f4f4f5" color="#f4f4f5" />
+                      ) : (
+                        <Play size={22} fill="#f4f4f5" color="#f4f4f5" style={{ marginLeft: "2px" }} />
+                      )}
+                    </button>
+
+                    <div style={timeDisplayStyle}>
+                      <span>{formatTime(currentTime)}</span>
+                      <span style={{ opacity: 0.5, margin: "0 3px" }}>/</span>
+                      <span>{formatTime(duration)}</span>
+                    </div>
+                  </div>
+
+                  {/* Extreme Right: Volume, Download, Rotate, Zoom */}
+                  <div style={controlsRightStyle}>
+                    {/* Volume Mute Toggle */}
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} 
+                      style={mediaControlBtnStyle} 
+                      title={isMuted ? "Unmute" : "Mute"}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)"}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                     >
-                      <RotateCw size={19} />
+                      {isMuted ? <VolumeX size={19} color="#f4f4f5" /> : <Volume2 size={19} color="#f4f4f5" />}
                     </button>
 
                     {/* Direct Download Button (Hidden for premium videos) */}
                     {!isPremium && (
                       <button 
                         onClick={handleDownload} 
-                        style={floatingBtnStyle} 
+                        style={mediaControlBtnStyle} 
                         title="Download video"
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)"}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                       >
-                        {isDownloading ? <Loader2 size={19} className="spin-animation" /> : <Download size={19} />}
+                        {isDownloading ? <Loader2 size={19} className="spin-animation" color="#f4f4f5" /> : <Download size={19} color="#f4f4f5" />}
                       </button>
                     )}
 
+                    {/* Rotate Button */}
                     <button 
-                      onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} 
-                      style={floatingBtnStyle} 
-                      title={isMuted ? "Unmute" : "Mute"}
+                      onClick={(e) => { e.stopPropagation(); setIsRotated(!isRotated); }} 
+                      style={mediaControlBtnStyle} 
+                      title="Rotate video"
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)"}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                     >
-                      {isMuted ? <VolumeX size={19} /> : <Volume2 size={19} />}
+                      <RotateCw size={19} color="#f4f4f5" />
                     </button>
+
+                    {/* Zoom / Aspect Ratio Toggle */}
                     <button 
                       onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }} 
-                      style={floatingBtnStyle} 
+                      style={mediaControlBtnStyle} 
                       title={isZoomed ? "Fit to screen" : "Zoom to fill"}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)"}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                     >
-                      {isZoomed ? <Minimize size={19} /> : <Maximize size={19} />}
+                      {isZoomed ? <Minimize size={19} color="#f4f4f5" /> : <Maximize size={19} color="#f4f4f5" />}
                     </button>
+                  </div>
                 </div>
 
-                {/* Middle Row: Avatar, Name, Follow button (transparent, bigger, free, next to username!), and Caption */}
+                {/* 3. 🟢 Creator Info: Avatar, Display Name, Follow button (extreme right), and Caption */}
                 <div style={postInfoStyle}>
                     <StoryAvatar
                       username={creatorHandle}
@@ -1485,66 +1547,7 @@ export default function FullscreenPlayer({ video, currentUser, onClose, isDeskto
                    </div>
                 </div>
 
-                {/* Bottom Row: Play/Pause firmly docked next to Progress Bar in single sleek row */}
-                <div 
-                  style={controlBarContainer}
-                  onClick={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                   <button 
-                     onClick={handleTogglePlay} 
-                     style={playPauseBtnStyle}
-                     aria-label={isPlaying ? "Pause video" : "Play video"}
-                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.12)"}
-                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                   >
-                     {isPlaying ? (
-                       <Pause size={22} fill="#d4d4d8" color="#d4d4d8" />
-                     ) : (
-                       <Play size={22} fill="#d4d4d8" color="#d4d4d8" style={{ marginLeft: "2px" }} />
-                     )}
-                   </button>
-
-                   <div 
-                     ref={progressBarRef}
-                     style={progressContainerStyle}
-                     onPointerDown={handlePointerDown}
-                     onPointerMove={handlePointerMove}
-                     onPointerUp={handlePointerUp}
-                     onPointerCancel={handlePointerUp}
-                     onClick={(e) => e.stopPropagation()}
-                     role="slider"
-                     tabIndex={0}
-                     aria-label="Video progress slider"
-                     aria-valuemin={0}
-                     aria-valuemax={duration || 100}
-                     aria-valuenow={currentTime || 0}
-                   >
-                     {/* Visual Background Track (4px sleek bar) */}
-                     <div style={visualTrackStyle}>
-                       {/* Played Progress Fill */}
-                       <div style={{ ...progressFillStyle, width: `${progressPercent}%` }} />
-                     </div>
-
-                     {/* Interactive Scrubbing Thumb */}
-                     <div 
-                       style={{
-                         ...scrubberThumbStyle,
-                         left: `${progressPercent}%`,
-                         transform: `translate(-50%, -50%) scale(${isDragging ? 1.35 : 1})`
-                       }} 
-                     />
-                   </div>
-
-                   <div style={timeDisplayStyle}>
-                     <span>{formatTime(currentTime)}</span>
-                     <span style={{ opacity: 0.5, margin: "0 3px" }}>/</span>
-                     <span>{formatTime(duration)}</span>
-                   </div>
-                </div>
-
-                {/* 🟢 RESTORED: Action Bar (Views, Like, Comment, Save, Share) */}
+                {/* 4. 🟢 Action Bar (Views, Like, Comment, Save, Share) */}
                 <div style={engagementBarStyle}>
                    <div style={{ ...engagementBtnStyle, cursor: "default" }}>
                       <Eye size={20} color="#d4d4d8" />
@@ -1715,15 +1718,180 @@ const dropdownMenuStyle = { position: "absolute", top: "max(75px, calc(env(safe-
 const dropdownItemStyle = { background: "transparent", border: "none", color: "#d4d4d8", padding: "12px 14px", display: "flex", alignItems: "center", gap: "12px", fontSize: "14px", fontWeight: "500", cursor: "pointer", borderRadius: "8px", width: "100%", textAlign: "left", transition: "background 0.2s" };
 const dropdownDividerStyle = { height: "1px", background: "rgba(255,255,255,0.08)", margin: "4px 0" };
 
-const bottomUIWrapper = { position: "absolute", bottom: "max(15px, env(safe-area-inset-bottom))", left: 0, right: 0, padding: "0 15px", zIndex: 10002, display: "flex", flexDirection: "column", transition: "opacity 0.2s ease" };
-const floatingControlsRow = { display: "flex", justifyContent: "flex-end", gap: "12px", marginBottom: "8px" };
-const floatingBtnStyle = { background: "transparent", border: "none", color: "#d4d4d8", width: "40px", height: "40px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.7))", cursor: "pointer", transition: "all 0.2s ease" };
+const bottomUIWrapper = { 
+  position: "absolute", 
+  bottom: "max(10px, env(safe-area-inset-bottom))", 
+  left: 0, 
+  right: 0, 
+  padding: 0, 
+  zIndex: 10002, 
+  display: "flex", 
+  flexDirection: "column", 
+  transition: "opacity 0.2s ease" 
+};
 
-const postInfoStyle = { display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "12px", width: "100%" };
-const avatarStyle = { width: "42px", height: "42px", borderRadius: "50%", objectFit: "cover", border: "1.5px solid rgba(255,255,255,0.3)", flexShrink: 0 };
-const textDetailsStyle = { display: "flex", flexDirection: "column", gap: "4px", overflow: "hidden", flex: 1, minWidth: 0 };
-const usernameRowStyle = { display: "flex", alignItems: "center", justifyContent: "flex-start", width: "auto", gap: "10px" };
-const usernameStyle = { fontSize: "15px", fontWeight: "700", color: "#d4d4d8", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+const progressContainerStyle = {
+  position: "relative",
+  display: "flex",
+  alignItems: "center",
+  width: "100%",
+  height: "20px",
+  cursor: "pointer",
+  touchAction: "none",
+  userSelect: "none",
+  WebkitUserSelect: "none",
+  margin: 0,
+  padding: 0
+};
+
+const visualTrackStyle = {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  height: "3.5px",
+  backgroundColor: "rgba(255, 255, 255, 0.28)",
+  pointerEvents: "none",
+  overflow: "hidden"
+};
+
+const progressFillStyle = {
+  height: "100%",
+  backgroundColor: "#f4f4f5",
+  pointerEvents: "none"
+};
+
+const scrubberThumbStyle = {
+  position: "absolute",
+  top: "50%",
+  width: "13px",
+  height: "13px",
+  borderRadius: "50%",
+  backgroundColor: "#ffffff",
+  boxShadow: "0 1px 6px rgba(0, 0, 0, 0.9)",
+  pointerEvents: "none",
+  transition: "transform 0.15s ease",
+  cursor: "grab"
+};
+
+const playerControlsRowStyle = { 
+  display: "flex", 
+  alignItems: "center", 
+  justifyContent: "space-between", 
+  width: "100%", 
+  padding: "2px 14px 8px 14px", 
+  boxSizing: "border-box" 
+};
+
+const controlsLeftStyle = { 
+  display: "flex", 
+  alignItems: "center", 
+  gap: "10px" 
+};
+
+const controlsRightStyle = { 
+  display: "flex", 
+  alignItems: "center", 
+  gap: "6px" 
+};
+
+const playPauseBtnStyle = { 
+  background: "transparent", 
+  border: "none", 
+  cursor: "pointer", 
+  padding: 0, 
+  minWidth: "36px", 
+  minHeight: "36px", 
+  width: "36px", 
+  height: "36px", 
+  borderRadius: "50%", 
+  display: "flex", 
+  alignItems: "center", 
+  justifyContent: "center", 
+  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.8))", 
+  transition: "transform 0.15s ease", 
+  color: "#f4f4f5",
+  WebkitTapHighlightColor: "transparent"
+};
+
+const mediaControlBtnStyle = { 
+  background: "transparent", 
+  border: "none", 
+  color: "#f4f4f5", 
+  minWidth: "36px", 
+  minHeight: "36px", 
+  width: "36px", 
+  height: "36px", 
+  borderRadius: "50%", 
+  display: "flex", 
+  alignItems: "center", 
+  justifyContent: "center", 
+  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.8))", 
+  cursor: "pointer", 
+  transition: "all 0.18s ease",
+  padding: 0,
+  WebkitTapHighlightColor: "transparent"
+};
+
+const timeDisplayStyle = { 
+  display: "flex", 
+  alignItems: "center", 
+  fontSize: "12.5px", 
+  fontWeight: "600", 
+  fontVariantNumeric: "tabular-nums", 
+  color: "#f4f4f5", 
+  whiteSpace: "nowrap", 
+  textShadow: "0px 1px 3px rgba(0,0,0,0.8)", 
+  flexShrink: 0 
+};
+
+const postInfoStyle = { 
+  display: "flex", 
+  alignItems: "flex-start", 
+  gap: "10px", 
+  marginBottom: "10px", 
+  padding: "0 14px", 
+  width: "100%", 
+  boxSizing: "border-box" 
+};
+
+const avatarStyle = { 
+  width: "42px", 
+  height: "42px", 
+  borderRadius: "50%", 
+  objectFit: "cover", 
+  border: "1.5px solid rgba(255,255,255,0.3)", 
+  flexShrink: 0 
+};
+
+const textDetailsStyle = { 
+  display: "flex", 
+  flexDirection: "column", 
+  gap: "4px", 
+  overflow: "hidden", 
+  flex: 1, 
+  minWidth: 0 
+};
+
+const usernameRowStyle = { 
+  display: "flex", 
+  alignItems: "center", 
+  justifyContent: "space-between", 
+  width: "100%", 
+  gap: "12px" 
+};
+
+const usernameStyle = { 
+  fontSize: "15px", 
+  fontWeight: "700", 
+  color: "#f4f4f5", 
+  textShadow: "0px 1px 3px rgba(0,0,0,0.8)", 
+  overflow: "hidden", 
+  textOverflow: "ellipsis", 
+  whiteSpace: "nowrap", 
+  minWidth: 0,
+  flex: 1
+};
+
 const followBtnStyle = {
   background: "transparent",
   color: "#f4f4f5",
@@ -1738,8 +1906,10 @@ const followBtnStyle = {
   justifyContent: "center",
   flexShrink: 0,
   filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.6))",
-  transition: "all 0.2s ease"
+  transition: "all 0.2s ease",
+  WebkitTapHighlightColor: "transparent"
 };
+
 const followingBtnStyle = {
   background: "transparent",
   color: "rgba(255, 255, 255, 0.85)",
@@ -1753,56 +1923,43 @@ const followingBtnStyle = {
   alignItems: "center",
   justifyContent: "center",
   flexShrink: 0,
-  transition: "all 0.2s ease"
+  transition: "all 0.2s ease",
+  WebkitTapHighlightColor: "transparent"
 };
-const captionStyle = { fontSize: "14px", color: "#e7e9ea", lineHeight: "1.4", wordWrap: "break-word", textShadow: "0px 1px 3px rgba(0,0,0,0.8)" };
 
-const controlBarContainer = { display: "flex", alignItems: "center", gap: "12px", width: "100%", marginBottom: "14px", padding: "0 4px" };
-const playPauseBtnStyle = { background: "transparent", border: "none", cursor: "pointer", padding: "4px", width: "36px", height: "36px", minWidth: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.7))", transition: "transform 0.15s ease" };
-const progressContainerStyle = {
-  position: "relative",
-  display: "flex",
-  alignItems: "center",
-  flex: 1,
-  height: "36px",
-  cursor: "pointer",
-  touchAction: "none",
-  userSelect: "none",
-  WebkitUserSelect: "none"
+const captionStyle = { 
+  fontSize: "14px", 
+  color: "#e7e9ea", 
+  lineHeight: "1.4", 
+  wordWrap: "break-word", 
+  textShadow: "0px 1px 3px rgba(0,0,0,0.8)" 
 };
-const visualTrackStyle = {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  height: "4px",
-  borderRadius: "9999px",
-  backgroundColor: "rgba(255, 255, 255, 0.28)",
-  pointerEvents: "none",
-  overflow: "hidden"
-};
-const progressFillStyle = {
-  height: "100%",
-  backgroundColor: "#d4d4d8",
-  borderRadius: "9999px",
-  pointerEvents: "none"
-};
-const scrubberThumbStyle = {
-  position: "absolute",
-  top: "50%",
-  width: "14px",
-  height: "14px",
-  borderRadius: "50%",
-  backgroundColor: "#d4d4d8",
-  boxShadow: "0 1px 6px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.2)",
-  pointerEvents: "none",
-  transition: "transform 0.15s ease",
-  cursor: "grab"
-};
-const timeDisplayStyle = { display: "flex", alignItems: "center", fontSize: "12px", fontWeight: "600", fontVariantNumeric: "tabular-nums", color: "#d4d4d8", whiteSpace: "nowrap", textShadow: "0px 1px 3px rgba(0,0,0,0.8)", flexShrink: 0 };
 
-// 🟢 RESTORED: Engagement Bar Styles
-const engagementBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 10px 4px 10px", borderTop: "1px solid rgba(255,255,255,0.12)" };
-const engagementBtnStyle = { background: "transparent", border: "none", display: "flex", alignItems: "center", gap: "6px", color: "#f3f4f6", fontSize: "13px", fontWeight: "600", cursor: "pointer", filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.8))", transition: "transform 0.15s ease", padding: "4px" };
+const engagementBarStyle = { 
+  display: "flex", 
+  justifyContent: "space-between", 
+  alignItems: "center", 
+  padding: "10px 14px 2px 14px", 
+  borderTop: "1px solid rgba(255,255,255,0.12)",
+  width: "100%",
+  boxSizing: "border-box"
+};
+
+const engagementBtnStyle = { 
+  background: "transparent", 
+  border: "none", 
+  display: "flex", 
+  alignItems: "center", 
+  gap: "6px", 
+  color: "#f3f4f6", 
+  fontSize: "13px", 
+  fontWeight: "600", 
+  cursor: "pointer", 
+  filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.8))", 
+  transition: "transform 0.15s ease", 
+  padding: "4px",
+  WebkitTapHighlightColor: "transparent"
+};
 
 const editFullscreenStyle = {
   position: "fixed",
