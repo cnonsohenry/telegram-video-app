@@ -3127,6 +3127,7 @@ const handleAvatarRequest = async (req, res) => {
     "Access-Control-Allow-Origin": "*"
   });
 
+  let cleanStr = "";
   try {
     const rawId = req.query.user_id || req.query.username || req.query.channel;
     
@@ -3141,7 +3142,7 @@ const handleAvatarRequest = async (req, res) => {
       return res.send(fallbackSvg);
     }
 
-    let cleanStr = String(rawId).trim().replace(/^@/, "");
+    cleanStr = String(rawId).trim().replace(/^@/, "");
 
     // Map obsolete 1881815190 directly to the active Naija Homemade Telegram channel
     if (cleanStr === '1881815190' || cleanStr.toLowerCase() === 'naijahomemade') {
