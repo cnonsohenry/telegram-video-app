@@ -890,19 +890,24 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                 style={{
                   background: "transparent",
                   border: "none",
-                  width: "36px",
-                  height: "36px",
+                  minWidth: "44px",
+                  minHeight: "44px",
+                  width: "44px",
+                  height: "44px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   cursor: "pointer",
-                  color: "#d4d4d8",
+                  color: "#f4f4f5",
                   padding: 0,
-                  filter: "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))"
+                  margin: "0 -6px 0 0",
+                  filter: "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))",
+                  touchAction: "manipulation",
+                  WebkitTapHighlightColor: "transparent"
                 }}
                 title="Close Story"
               >
-                <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.6" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>

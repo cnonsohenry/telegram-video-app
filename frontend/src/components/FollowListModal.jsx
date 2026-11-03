@@ -5,7 +5,7 @@
 ============================================================================ */
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { MoveLeft } from "lucide-react";
+import { ArrowLeft, MoveLeft } from "lucide-react";
 import DesktopLeftSidebar from "./DesktopLeftSidebar";
 import DesktopRightSidebar from "./DesktopRightSidebar";
 import { APP_CONFIG } from "../config";
@@ -500,7 +500,7 @@ export default function FollowListModal({
                     title="Back"
                     aria-label="Back"
                   >
-                    <MoveLeft size={22} strokeWidth={2.3} color="#f4f4f5" />
+                    <ArrowLeft size={24} strokeWidth={2.6} color="#f4f4f5" />
                   </button>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -561,7 +561,7 @@ export default function FollowListModal({
           {/* Top Navbar matching CreatorProfileModal & SettingsView */}
           <div style={styles.topNav}>
             <button onClick={onClose} style={styles.backBtn} title="Back" aria-label="Back">
-              <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+              <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
             </button>
             <div style={styles.headerTitle}>
               @{cleanUname}
@@ -671,8 +671,10 @@ const styles = {
     background: "rgba(255, 255, 255, 0.06)",
     border: "1px solid rgba(255, 255, 255, 0.1)",
     borderRadius: "50%",
-    width: "36px",
-    height: "36px",
+    minWidth: "42px",
+    minHeight: "42px",
+    width: "42px",
+    height: "42px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -696,10 +698,18 @@ const styles = {
     background: "none",
     border: "none",
     cursor: "pointer",
-    padding: "6px",
+    minWidth: "48px",
+    minHeight: "48px",
+    width: "48px",
+    height: "48px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    padding: "0",
+    margin: "0 0 0 -10px",
+    outline: "none",
+    touchAction: "manipulation",
+    WebkitTapHighlightColor: "transparent",
     color: "#f4f4f5"
   },
   headerTitle: {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { 
-  Settings, Grid3X3, Heart, Lock, Share2, MoveLeft,
+  ArrowLeft, Settings, Grid3X3, Heart, Lock, Share2, MoveLeft,
   Camera, Sparkles, Edit3, MapPin, Globe, Award, ExternalLink, ShieldCheck, Eye,
   Film, Play, Plus, ChevronRight, TrendingUp, Link2, ChevronDown, Bookmark, Copy, MessageCircle, UserPlus
 } from "lucide-react"; 
@@ -1238,7 +1238,7 @@ export default function Profile({
           {activeGroup && (
             <div style={groupHeaderStyle}>
               <button onClick={handleCloseGroup} style={backButtonStyle}>
-                <MoveLeft size={22} strokeWidth={2.3} color="#f4f4f5" />
+                <ArrowLeft size={24} strokeWidth={2.6} color="#f4f4f5" />
                 <span>Back to profile</span>
               </button>
               <span 
@@ -1572,8 +1572,8 @@ export default function Profile({
           }}>
             <div style={{ width: "36px" }}>
               {activeGroup && (
-                <button onClick={handleCloseGroup} style={headerIconButton}>
-                  <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+                <button onClick={handleCloseGroup} style={headerIconButton} aria-label="Back">
+                  <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
                 </button>
               )}
             </div>
@@ -1859,7 +1859,20 @@ const groupTitleStyle = {
   whiteSpace: "nowrap"
 };
 
-const headerIconButton = { background: "none", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: "4px" };
+const headerIconButton = { 
+  background: "none", 
+  border: "none", 
+  display: "flex", 
+  alignItems: "center", 
+  justifyContent: "center", 
+  cursor: "pointer", 
+  minWidth: "44px",
+  minHeight: "44px",
+  padding: "4px",
+  outline: "none",
+  touchAction: "manipulation",
+  WebkitTapHighlightColor: "transparent"
+};
 const desktopIconBtnStyle = { background: "#27272a", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "22px", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s ease" };
 
 // TikTok / Creator Avatars (Clean, no story blue outline)

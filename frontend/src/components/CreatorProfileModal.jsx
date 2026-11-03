@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
-  MoveLeft, Share2, Heart, Lock, Grid3X3, 
+  ArrowLeft, MoveLeft, Share2, Heart, Lock, Grid3X3, 
   MapPin, Globe, Sparkles, Send, Play, Loader2, MessageCircle,
   Film, Link2, ChevronDown, Plus, UserPlus
 } from "lucide-react";
@@ -1227,8 +1227,9 @@ export default function CreatorProfileModal({
                     onClick={onClose} 
                     style={desktopBackBtnStyle} 
                     title="Back"
+                    aria-label="Back"
                   >
-                    <MoveLeft size={22} strokeWidth={2.3} color="#f4f4f5" />
+                    <ArrowLeft size={24} strokeWidth={2.6} color="#f4f4f5" />
                   </button>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -1311,8 +1312,8 @@ export default function CreatorProfileModal({
         <>
           {/* Top Navbar */}
           <div style={topNavStyle}>
-            <button onClick={onClose} style={navBtnStyle} title="Back">
-              <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+            <button onClick={onClose} style={navBackBtnTapArea} title="Back" aria-label="Back">
+              <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               {!creatorData?.is_owner && isMonetizedCreator && creatorData?.allow_tips !== false && (
@@ -1463,7 +1464,7 @@ const containerStyle = {
 };
 
 const topNavStyle = {
-  height: "44px",
+  height: "48px",
   padding: "0 16px",
   display: "flex",
   alignItems: "center",
@@ -1474,7 +1475,38 @@ const topNavStyle = {
   flexShrink: 0
 };
 
-const navBtnStyle = { background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center" };
+// 🟢 Invisible Tap Area for Mobile Back Arrow (>= 48px touch target with negative margin extension)
+const navBackBtnTapArea = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px",
+  height: "48px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0",
+  margin: "0 0 0 -10px",
+  outline: "none",
+  touchAction: "manipulation",
+  WebkitTapHighlightColor: "transparent"
+};
+
+const navBtnStyle = { 
+  background: "none", 
+  border: "none", 
+  cursor: "pointer", 
+  minWidth: "40px",
+  minHeight: "40px",
+  padding: "6px", 
+  display: "flex", 
+  alignItems: "center",
+  justifyContent: "center",
+  outline: "none",
+  touchAction: "manipulation"
+};
 const topNavNameStyle = { fontWeight: "700", fontSize: "16px", color: "#d4d4d8" };
 const scrollContentStyle = { flex: 1, overflowY: "auto", paddingBottom: "60px" };
 
@@ -1884,8 +1916,10 @@ const desktopBackBtnStyle = {
   background: "rgba(255, 255, 255, 0.06)",
   border: "1px solid rgba(255, 255, 255, 0.1)",
   borderRadius: "50%",
-  width: "36px",
-  height: "36px",
+  minWidth: "42px",
+  minHeight: "42px",
+  width: "42px",
+  height: "42px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",

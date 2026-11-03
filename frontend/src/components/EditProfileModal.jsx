@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MoveLeft, Camera, Loader2, Lock, ShieldCheck } from "lucide-react";
+import { ArrowLeft, MoveLeft, Camera, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { APP_CONFIG } from "../config";
 import useModalHistory from "../hooks/useModalHistory";
 import { resolveAvatar, handleAvatarError } from "../utils/avatar";
@@ -159,7 +159,7 @@ export default function EditProfileModal({ user, onClose, onUpdateSuccess, onOpe
       {/* Top Navigation Bar */}
       <div style={topNavStyle}>
         <button onClick={handleSafeClose} style={navBackBtnStyle} aria-label="Back">
-          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+          <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
         </button>
 
         <span style={topNavTitleStyle}>Edit Profile</span>
@@ -486,9 +486,18 @@ const navBackBtnStyle = {
   border: "none",
   color: "#f4f4f5",
   cursor: "pointer",
-  padding: "6px",
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px",
+  height: "48px",
   display: "flex",
-  alignItems: "center"
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0",
+  margin: "0 0 0 -10px",
+  outline: "none",
+  touchAction: "manipulation",
+  WebkitTapHighlightColor: "transparent"
 };
 
 const topNavTitleStyle = {

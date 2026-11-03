@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
+  ArrowLeft,
   MoveLeft,
   Sparkles,
   CheckCircle,
@@ -370,7 +371,7 @@ export default function CreatorSetupModal({ user, onClose, onSetupSuccess }) {
       {/* Top Navigation Bar */}
       <div style={topNavStyle}>
         <button onClick={handleSafeClose} style={navBackBtnStyle} aria-label="Back">
-          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+          <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
         </button>
 
         <span style={topNavTitleStyle}>Creator Verification & Monetization</span>
@@ -976,9 +977,18 @@ const navBackBtnStyle = {
   border: "none",
   color: "#f4f4f5",
   cursor: "pointer",
-  padding: "6px",
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px",
+  height: "48px",
   display: "flex",
-  alignItems: "center"
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0",
+  margin: "0 0 0 -10px",
+  outline: "none",
+  touchAction: "manipulation",
+  WebkitTapHighlightColor: "transparent"
 };
 
 const topNavTitleStyle = {

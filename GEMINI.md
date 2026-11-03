@@ -490,6 +490,20 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
   - Removed persistent edge caching (`s-maxage=604800`) on unversioned 302 redirects in `/avatar.jpg`. When `versionParam` is absent, Express sets `Cache-Control: no-cache, no-store, must-revalidate` so Cloudflare edge never caches external Google OAuth redirects past the point of custom user photo uploads.
   - All frontend avatar fallback endpoints (`/avatar.jpg?user_id=...` and `/avatar.jpg?username=...`) append `&v=2` cache-busting version stamps, ensuring instantaneous Edge MISS delivery and direct origin buffer streaming.
 
+---
+
+## 27. Instagram-Sized Highlights & 48px Invisible Touch Target Navigation Architecture
+- **Instagram-Proportioned Profile Highlights (`StoryHighlightsTray.jsx`)**:
+  - Scaled highlights from cramped 56px to authentic Instagram dimensions: **72px** outer diameter on mobile devices and **82px** outer diameter on desktop/tablet displays.
+  - Double-ring spacing: outer hairline border (`border: 1.5px solid rgba(255, 255, 255, 0.28)`) with `padding: 3px`, and inner image border (`border: 2px solid #09090b`), reproducing Instagram's signature double-ring gap around highlight thumbnails.
+  - "+ New" highlight creation button matched to identical dimensions (72px mobile / 82px desktop) with scaled `Plus` icon (`size={26}` mobile / `size={30}` desktop).
+  - Title text expanded to `maxWidth: 78px` (mobile) / `88px` (desktop) and `fontSize: 12px` / `13px` to prevent premature word truncation.
+  - Tray horizontal spacing increased to `gap: 15px-18px` with `-webkit-overflow-scrolling: touch` for fluid native mobile momentum scrolling.
+- **Prominent Arrow Cap & 48px Invisible Touch Target Architecture**:
+  - Replaced thin, shallow-cap `MoveLeft` icons with prominent, wide-headed `ArrowLeft` icons (`strokeWidth={2.6 - 2.7}`, `size={28}` mobile / `size={24}` desktop).
+  - Implemented Apple HIG / Google Material Design minimum touch target standards (`48px × 48px` minimum bounding box on touch screens).
+  - Incorporated negative margin offsets (`margin: 0 0 0 -10px`) into navigation bar back buttons (`CreatorProfileModal.jsx`, `SettingsView.jsx`, `EditProfileModal.jsx`, `FollowListModal.jsx`, `CreatorStudioModal.jsx`, `CreatorSetupModal.jsx`, `PaywallModal.jsx`, and `Profile.jsx`), extending the invisible tap hit-box all the way to the screen's left edge for effortless thumb tapping without visual misalignment.
+
 
 
 

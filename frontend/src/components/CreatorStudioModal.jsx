@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { 
-  MoveLeft, X, Sparkles, Users, DollarSign, Heart, Eye, ThumbsUp, 
+  ArrowLeft, MoveLeft, X, Sparkles, Users, DollarSign, Heart, Eye, ThumbsUp, 
   MessageCircle, Settings, Calendar, Lock, 
   CheckCircle2, Clock, TrendingUp, Edit3, Save, ExternalLink, 
   Loader2, AlertCircle, ShieldCheck, Plus, UploadCloud, Trash2
@@ -163,7 +163,7 @@ export default function CreatorStudioModal({ isOpen, onClose, user, onUpdateUser
       <div style={topNavStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <button onClick={handleSafeClose} style={navBackBtnStyle} aria-label="Back">
-            <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+            <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
           </button>
           <div style={studioLogoBadgeStyle}>
             <Sparkles size={18} color="#FFD700" />
@@ -837,11 +837,20 @@ const fullscreenContainerStyle = {
 const navBackBtnStyle = {
   background: "none",
   border: "none",
-  color: "#d4d4d8",
+  color: "#f4f4f5",
   cursor: "pointer",
-  padding: "6px",
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px",
+  height: "48px",
   display: "flex",
-  alignItems: "center"
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0",
+  margin: "0 0 0 -10px",
+  outline: "none",
+  touchAction: "manipulation",
+  WebkitTapHighlightColor: "transparent"
 };
 
 const topNavStyle = {

@@ -16,6 +16,22 @@ export default function StoryHighlightsTray({
   const { openCustomStories } = useActiveStories() || {};
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== "undefined" ? window.innerWidth > 768 : false
+  );
+
+  React.useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth > 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Instagram-proportioned dimensions
+  const circleSize = isDesktop ? 82 : 72;
+  const plusSize = isDesktop ? 30 : 26;
+  const titleMaxWidth = isDesktop ? 88 : 78;
+  const titleFontSize = isDesktop ? "13px" : "12px";
+  const trayGap = isDesktop ? "18px" : "15px";
 
   // If there are no highlights and the user is not the owner, do not show empty tray
   if (!isOwner && (!highlights || highlights.length === 0)) {
@@ -95,11 +111,12 @@ export default function StoryHighlightsTray({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "12px",
+        gap: trayGap,
         overflowX: "auto",
         scrollbarWidth: "none",
         msOverflowStyle: "none",
-        padding: "2px 16px 6px 16px",
+        WebkitOverflowScrolling: "touch",
+        padding: "4px 16px 8px 16px",
         boxSizing: "border-box",
         ...style
       }}
@@ -112,7 +129,7 @@ export default function StoryHighlightsTray({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: "4px",
+            gap: "6px",
             cursor: "pointer",
             flexShrink: 0
           }}
@@ -120,15 +137,15 @@ export default function StoryHighlightsTray({
         >
           <div
             style={{
-              width: "56px",
-              height: "56px",
+              width: `${circleSize}px`,
+              height: `${circleSize}px`,
               borderRadius: "50%",
               backgroundColor: "#18181b",
-              border: "1.5px solid rgba(255, 255, 255, 0.18)",
+              border: "1.5px solid rgba(255, 255, 255, 0.25)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#d4d4d8",
+              color: "#e4e4e7",
               transition: "transform 0.15s ease, border-color 0.15s ease",
               boxSizing: "border-box"
             }}
@@ -138,21 +155,22 @@ export default function StoryHighlightsTray({
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "scale(1)";
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.18)";
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.25)";
             }}
           >
-            <Plus size={22} strokeWidth={2} />
+            <Plus size={plusSize} strokeWidth={2} />
           </div>
           <span
             style={{
-              fontSize: "11px",
+              fontSize: titleFontSize,
               fontWeight: "600",
-              color: "#d4d4d8",
-              maxWidth: "62px",
+              color: "#e4e4e7",
+              maxWidth: `${titleMaxWidth}px`,
               textAlign: "center",
               overflow: "hidden",
               textOverflow: "ellipsis",
-              whiteSpace: "nowrap"
+              whiteSpace: "nowrap",
+              lineHeight: "1.2"
             }}
           >
             New
@@ -172,31 +190,31 @@ export default function StoryHighlightsTray({
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: "4px",
+              gap: "6px",
               cursor: "pointer",
               flexShrink: 0,
               position: "relative"
             }}
             title={h.title || "Highlights"}
           >
-            {/* Highlight Circular Cover */}
+            {/* Highlight Circular Cover - Instagram Sized with Double-Ring Spacing */}
             <div
               style={{
-                width: "56px",
-                height: "56px",
+                width: `${circleSize}px`,
+                height: `${circleSize}px`,
                 borderRadius: "50%",
-                padding: "2px",
-                border: "1.5px solid rgba(255, 255, 255, 0.22)",
+                padding: "3px",
+                border: "1.5px solid rgba(255, 255, 255, 0.28)",
                 boxSizing: "border-box",
                 transition: "transform 0.15s ease, border-color 0.15s ease"
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "scale(1.04)";
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.6)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.75)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.22)";
+                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.28)";
               }}
             >
               <img
@@ -212,7 +230,7 @@ export default function StoryHighlightsTray({
                   objectFit: "cover",
                   display: "block",
                   backgroundColor: "#18181b",
-                  border: "1.5px solid #000"
+                  border: "2px solid #09090b"
                 }}
               />
             </div>
@@ -220,14 +238,15 @@ export default function StoryHighlightsTray({
             {/* Title */}
             <span
               style={{
-                fontSize: "11px",
-                fontWeight: "600",
+                fontSize: titleFontSize,
+                fontWeight: "500",
                 color: "#e4e4e7",
-                maxWidth: "62px",
+                maxWidth: `${titleMaxWidth}px`,
                 textAlign: "center",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
-                whiteSpace: "nowrap"
+                whiteSpace: "nowrap",
+                lineHeight: "1.2"
               }}
             >
               {h.title || "Highlights"}

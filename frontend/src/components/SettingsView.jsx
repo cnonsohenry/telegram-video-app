@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { 
-  MoveLeft, User, Lock, Bell, LogOut, ChevronRight,
+  ArrowLeft, MoveLeft, User, Lock, Bell, LogOut, ChevronRight,
   TrendingUp, Eye, Share2, CheckCircle, DollarSign,
   ShieldCheck, Volume2, Trash2, HelpCircle, ExternalLink,
   Copy, Plus, CreditCard, X, Edit3, Film, Info, Smartphone
@@ -175,7 +175,7 @@ export default function SettingsView({
       {/* Top Navigation */}
       <div style={navBarStyle}>
         <button onClick={onBack} style={navBackBtnStyle} aria-label="Back">
-          <MoveLeft size={26} strokeWidth={2.3} color="#f4f4f5" />
+          <ArrowLeft size={28} strokeWidth={2.7} color="#f4f4f5" />
         </button>
         <h2 style={headerTitleStyle}>Settings</h2>
         <div style={{ width: "36px" }} />
@@ -764,11 +764,20 @@ const navBarStyle = {
 const navBackBtnStyle = {
   background: "none",
   border: "none",
-  color: "#d4d4d8",
+  color: "#f4f4f5",
   cursor: "pointer",
-  padding: "6px",
+  minWidth: "48px",
+  minHeight: "48px",
+  width: "48px",
+  height: "48px",
   display: "flex",
-  alignItems: "center"
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0",
+  margin: "0 0 0 -10px",
+  outline: "none",
+  touchAction: "manipulation",
+  WebkitTapHighlightColor: "transparent"
 };
 
 const headerTitleStyle = {
