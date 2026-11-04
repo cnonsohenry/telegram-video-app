@@ -3698,6 +3698,11 @@ app.get(['/privacy', '/privacy-policy', '/terms', '/terms-of-service', '/tos', '
   }
 });
 
+// 🟢 301 Permanent Redirect for crawler/bot .php requests (e.g. /venor.php) to preserve Google Search SEO
+app.get(/\.php$/i, (req, res) => {
+  return res.redirect(301, '/');
+});
+
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
 });

@@ -567,6 +567,24 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
        - **Extreme Left**: Play/Pause button (`Play` / `Pause` size 22) and tabular duration countdown (`currentTime / duration`).
        - **Extreme Right**: Media utility tools group: Volume (`Volume2` / `VolumeX`), Direct Download (`Download`, hidden on premium), Rotate (`RotateCw`), and Zoom/Aspect ratio (`Maximize` / `Minimize`).
 
+---
+
+## 30. Google Search Console /venor.php Resolution & 301 Permanent Redirect
+- **Context & Root Cause**:
+  - Google Search Console listed `https://naijahomemade.com/venor.php` among the top-growing pages (+297 clicks), causing confusion because the platform is entirely built on Node.js / React (Vite) with no PHP runtime installed.
+  - The path `/venor.php` originates from third-party ad network scripts (specifically ExoClick / PopMagic in `index.html`), which probe `s.pemsrv.com/venor.php` to verify browser environment and ad-block presence.
+  - During crawler indexing or before ad configuration evaluation, Googlebot detected the `/venor.php` string. Because the single-page application (SPA) server previously utilized an unqualified wildcard catch-all route `app.get('*')`, requests for `/venor.php` returned HTTP 200 with the full HTML of `index.html`.
+  - Consequently, Google indexed `/venor.php` as an alternate URL for the homepage, ranking it in search results and delivering user traffic to it.
+- **Permanent SEO Remediation**:
+  - Implemented an explicit HTTP 301 Permanent Redirect in `backend/server.js`:
+    ```javascript
+    app.get(/\.php$/i, (req, res) => {
+      return res.redirect(301, '/');
+    });
+    ```
+  - Any request to `/venor.php` (or legacy/crawler `.php` probes) immediately returns `301 Moved Permanently` to `/`.
+  - Google Search Console automatically transfers all accumulated impressions, clicks, and ranking authority directly to the canonical homepage (`https://naijahomemade.com/`) and purges `/venor.php` from search indexing.
+
 
 
 
