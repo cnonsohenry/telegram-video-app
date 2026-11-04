@@ -18,6 +18,7 @@ import DiscoverCreatorsSection from "./DiscoverCreatorsSection";
 import FollowListModal from "./FollowListModal";
 import DesktopLeftSidebar from "./DesktopLeftSidebar";
 import DesktopRightSidebar from "./DesktopRightSidebar";
+import PullToRefresh from "./PullToRefresh";
 import { promptLogin, showToast, promptEmailVerification } from "../utils/toast";
 import { resolveAvatar } from "../utils/avatar";
 
@@ -67,6 +68,9 @@ export default function CreatorProfileModal({
   const [showDiscoverCreators, setShowDiscoverCreators] = useState(false);
   const [optionsVideo, setOptionsVideo] = useState(null);
   const [reportedVideo, setReportedVideo] = useState(null);
+  const mobileScrollRef = useRef(null);
+  const desktopScrollRef = useRef(null);
+  const loaderSentinelRef = useRef(null);
   const [highlights, setHighlights] = useState([]);
   const isAnyModalOpen = Boolean(showTipModal || showSubscribeModal || optionsVideo || reportedVideo || followListTab);
   const [tabVideos, setTabVideos] = useState({
@@ -369,13 +373,67 @@ export default function CreatorProfileModal({
     }
   }, []);
 
-  const handleLoadMoreVideos = () => {
+  const handleLoadMoreVideos = useCallback(() => {
     const curLoading = tabLoading[activeTab];
     const curHasMore = tabHasMore[activeTab];
     if (curLoading || !curHasMore) return;
     const nextPage = (tabPages[activeTab] || 1) + 1;
     fetchTabVideos(activeTab, nextPage, true);
-  };
+  }, [tabLoading, tabHasMore, tabPages, activeTab, fetchTabVideos]);
+
+  // 🟢 Pull to Refresh handler
+  const handleRefresh = useCallback(async () => {
+    try {
+      const cleanUsername = String(creatorUsername || "").replace(/^@/, "").trim();
+      const token = localStorage.getItem("token");
+      const headers = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      // 1. Refresh creator profile data
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUsername)}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.creator) {
+          setCreatorData(data.creator);
+          setIsSubscribed(Boolean(data.creator.is_subscribed));
+          setIsFollowing(Boolean(data.creator.is_following));
+          setSubscribersCount(Number(data.creator.stats?.subscribers || 0));
+          setFollowersCount(Number(data.creator.stats?.followers || 0));
+          setFollowingCount(Number(data.creator.stats?.following || 0));
+          setHighlights(data.creator.highlights || []);
+        }
+      }
+
+      // 2. Refresh active tab videos from page 1
+      await fetchTabVideos(activeTab, 1, false);
+      setTabPages(prev => ({ ...prev, [activeTab]: 1 }));
+    } catch (err) {
+      console.error("Failed to refresh creator profile:", err);
+    }
+  }, [creatorUsername, activeTab, fetchTabVideos]);
+
+  // 🟢 Infinite Scroll IntersectionObserver
+  useEffect(() => {
+    const curHasMore = tabHasMore[activeTab];
+    const curLoading = tabLoading[activeTab];
+    if (!curHasMore || curLoading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !tabLoading[activeTab] && tabHasMore[activeTab]) {
+          handleLoadMoreVideos();
+        }
+      },
+      { root: null, rootMargin: "350px", threshold: 0.1 }
+    );
+
+    const el = loaderSentinelRef.current;
+    if (el) observer.observe(el);
+    return () => {
+      if (el) observer.unobserve(el);
+      observer.disconnect();
+    };
+  }, [activeTab, tabHasMore, tabLoading, handleLoadMoreVideos]);
 
   const handleFollowToggle = async () => {
     const token = localStorage.getItem("token");
@@ -1153,27 +1211,8 @@ export default function CreatorProfileModal({
                   )}
 
                   {hasMoreVideos && (
-                    <div style={{ display: "flex", justifyContent: "center", marginTop: "24px", marginBottom: "20px" }}>
-                      <button
-                        onClick={handleLoadMoreVideos}
-                        disabled={loadingMoreVideos}
-                        style={{
-                          background: "#262626",
-                          border: "1px solid #363636",
-                          borderRadius: "8px",
-                          padding: "8px 20px",
-                          color: "#d4d4d8",
-                          fontSize: "13px",
-                          fontWeight: "600",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "8px"
-                        }}
-                      >
-                        {loadingMoreVideos && <Loader2 size={16} className="animate-spin" />}
-                        <span>{loadingMoreVideos ? "Loading more..." : (activeTab === "premium" ? "Load More VIP Drops" : "Load More Posts")}</span>
-                      </button>
+                    <div ref={loaderSentinelRef} style={{ display: "flex", justifyContent: "center", padding: "24px 0", color: "#d4d4d8", width: "100%" }}>
+                      <Loader2 size={24} className="animate-spin" color="var(--primary-color, #e11d48)" />
                     </div>
                   )}
                 </div>
@@ -1218,6 +1257,7 @@ export default function CreatorProfileModal({
 
             {/* 2. MIDDLE CREATOR PROFILE COLUMN */}
             <div
+              ref={desktopScrollRef}
               className="custom-scrollbar"
               style={desktopCenterProfileRailStyle}
             >
@@ -1276,9 +1316,11 @@ export default function CreatorProfileModal({
                   <button onClick={onClose} style={errorBackBtnStyle}>Back to Feed</button>
                 </div>
               ) : (
-                <div style={{ paddingBottom: "60px" }}>
-                  {renderProfileBody()}
-                </div>
+                <PullToRefresh scrollRef={desktopScrollRef} onRefresh={handleRefresh}>
+                  <div style={{ paddingBottom: "60px" }}>
+                    {renderProfileBody()}
+                  </div>
+                </PullToRefresh>
               )}
             </div>
 
@@ -1344,10 +1386,12 @@ export default function CreatorProfileModal({
               <button onClick={onClose} style={errorBackBtnStyle}>Back to Feed</button>
             </div>
           ) : (
-            <div style={scrollContentStyle}>
-              <div style={profileInnerContainer}>
-                {renderProfileBody()}
-              </div>
+            <div ref={mobileScrollRef} style={scrollContentStyle}>
+              <PullToRefresh scrollRef={mobileScrollRef} onRefresh={handleRefresh}>
+                <div style={profileInnerContainer}>
+                  {renderProfileBody()}
+                </div>
+              </PullToRefresh>
             </div>
           )}
         </>

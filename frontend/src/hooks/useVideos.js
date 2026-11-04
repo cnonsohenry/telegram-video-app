@@ -108,6 +108,10 @@ export function useVideos(currentCategory, limit = 12) {
     hasMore,
     loadMore: () => {
         if (!loading && hasMore) fetchData(page, false);
+    },
+    refresh: async () => {
+        isFetching.current = false;
+        await fetchData(1, true);
     }
   };
 }

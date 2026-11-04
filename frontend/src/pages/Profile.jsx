@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { 
   ArrowLeft, Settings, Grid3X3, Heart, Lock, Share2,
   Camera, Sparkles, Edit3, MapPin, Globe, Award, ExternalLink, ShieldCheck, Eye,
-  Film, Play, Plus, ChevronRight, TrendingUp, Link2, ChevronDown, Bookmark, Copy, MessageCircle, UserPlus
+  Film, Play, Plus, ChevronRight, TrendingUp, Link2, ChevronDown, Bookmark, Copy, MessageCircle, UserPlus, Loader2
 } from "lucide-react"; 
 import TwitterVerifiedBadge from "../components/TwitterVerifiedBadge"; 
 import VideoCard from "../components/VideoCard"; 
@@ -22,6 +22,7 @@ import ReportModal from "../components/ReportModal";
 import FollowListModal from "../components/FollowListModal";
 import DesktopLeftSidebar from "../components/DesktopLeftSidebar";
 import DesktopRightSidebar from "../components/DesktopRightSidebar";
+import PullToRefresh from "../components/PullToRefresh";
 import { useVideos } from "../hooks/useVideos";
 
 // 🟢 IMPORT YOUR CENTRAL CONFIG
@@ -287,8 +288,8 @@ export default function Profile({
 
   const fetchLimit = isDesktop ? 15 : 12;
 
-  const { videos: liked, loading: likedLoading, loadMore: loadMoreLiked } = useVideos("likes", fetchLimit);
-  const { videos: saved, loading: savedLoading, loadMore: loadMoreSaved } = useVideos("saved", fetchLimit);
+  const { videos: liked, loading: likedLoading, hasMore: hasMoreLiked, loadMore: loadMoreLiked, refresh: refreshLiked } = useVideos("likes", fetchLimit);
+  const { videos: saved, loading: savedLoading, hasMore: hasMoreSaved, loadMore: loadMoreSaved, refresh: refreshSaved } = useVideos("saved", fetchLimit);
 
   // User/Creator's own posts state
   const [creatorPosts, setCreatorPosts] = useState([]);
@@ -392,11 +393,13 @@ export default function Profile({
 
   let rawVideosToDisplay = [];
   let loading = false;
+  let hasMore = false;
   let loadMore = () => {};
 
   if (activeTab === "videos" || activeTab === "reels") {
     rawVideosToDisplay = creatorPosts;
     loading = creatorPostsLoading;
+    hasMore = hasMoreCreatorPosts;
     loadMore = () => {
       if (!creatorPostsLoading && hasMoreCreatorPosts) {
         fetchCreatorPosts(creatorPostsPage, false);
@@ -405,6 +408,7 @@ export default function Profile({
   } else if (activeTab === "premium" && user?.is_creator) {
     rawVideosToDisplay = creatorPremiumPosts;
     loading = creatorPremiumLoading;
+    hasMore = hasMoreCreatorPremiumPosts;
     loadMore = () => {
       if (!creatorPremiumLoading && hasMoreCreatorPremiumPosts) {
         fetchCreatorPremiumPosts(creatorPremiumPage, false);
@@ -413,12 +417,64 @@ export default function Profile({
   } else if (activeTab === "likes") {
     rawVideosToDisplay = liked || [];
     loading = likedLoading;
+    hasMore = hasMoreLiked;
     loadMore = loadMoreLiked;
   } else if (activeTab === "saved") {
     rawVideosToDisplay = saved || [];
     loading = savedLoading;
+    hasMore = hasMoreSaved;
     loadMore = loadMoreSaved;
   }
+
+  // 🟢 Pull to Refresh handler
+  const handleRefresh = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      // 1. Refresh creator stats and highlights
+      if (user?.username) {
+        fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(user.username)}`, { headers })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data?.creator?.stats) {
+              setCreatorStats(data.creator.stats);
+              setFollowersCount(Number(data.creator.stats.followers || 0));
+              setFollowingCount(Number(data.creator.stats.following || 0));
+            }
+            if (data?.creator?.highlights) {
+              setHighlights(data.creator.highlights);
+            }
+          })
+          .catch(() => {});
+      }
+
+      // 2. Refresh auth profile state
+      if (token && onUpdateUser) {
+        fetch(`${APP_CONFIG.apiUrl}/api/auth/me`, { headers })
+          .then(res => res.ok ? res.json() : null)
+          .then(freshUser => {
+            if (freshUser) onUpdateUser(freshUser);
+          })
+          .catch(() => {});
+      }
+
+      // 3. Refresh active tab videos from page 1
+      if (activeTab === "videos" || activeTab === "reels") {
+        setCreatorPostsPage(1);
+        await fetchCreatorPosts(1, true);
+      } else if (activeTab === "premium" && user?.is_creator) {
+        setCreatorPremiumPage(1);
+        await fetchCreatorPremiumPosts(1, true);
+      } else if (activeTab === "likes") {
+        if (refreshLiked) await refreshLiked();
+      } else if (activeTab === "saved") {
+        if (refreshSaved) await refreshSaved();
+      }
+    } catch (err) {
+      console.error("Profile pull-to-refresh error:", err);
+    }
+  }, [user?.username, user?.is_creator, activeTab, fetchCreatorPosts, fetchCreatorPremiumPosts, refreshLiked, refreshSaved, onUpdateUser]);
 
   useEffect(() => {
     const handleVideoDeleted = (event) => {
@@ -486,19 +542,25 @@ export default function Profile({
   }, [activeGroup, filteredRawVideos]);
 
   useEffect(() => {
+    if (!hasMore || loading || activeGroup) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         const target = entries[0];
-        if (target.isIntersecting && !loading && !activeGroup) {
+        if (target.isIntersecting && !loading && !activeGroup && hasMore) {
           loadMore();
         }
       },
-      { root: null, rootMargin: "200px", threshold: 0.1 }
+      { root: null, rootMargin: "350px", threshold: 0.1 }
     );
 
-    if (loaderRef.current) observer.observe(loaderRef.current);
-    return () => observer.disconnect();
-  }, [loading, loadMore, activeGroup]);
+    const el = loaderRef.current;
+    if (el) observer.observe(el);
+    return () => {
+      if (el) observer.unobserve(el);
+      observer.disconnect();
+    };
+  }, [loading, loadMore, activeGroup, hasMore]);
 
   // 🟢 Scroll Listener
   useEffect(() => {
@@ -1475,8 +1537,10 @@ export default function Profile({
                 </div>
               )}
 
-              {!loading && !activeGroup && filteredRawVideos.length > 0 && (
-                <div ref={loaderRef} style={{ height: "10px", width: "100%" }} />
+              {!activeGroup && hasMore && filteredRawVideos.length > 0 && (
+                <div ref={loaderRef} style={{ display: "flex", justifyContent: "center", padding: "24px 0", color: "#d4d4d8", width: "100%" }}>
+                  <Loader2 className="animate-spin" size={24} color="var(--primary-color, #e11d48)" />
+                </div>
               )}
             </>
           )}
@@ -1533,8 +1597,10 @@ export default function Profile({
                 </button>
               </div>
 
-              {/* Profile Body */}
-              {renderProfileBody()}
+              {/* Profile Body with Pull to Refresh */}
+              <PullToRefresh scrollRef={scrollContainerRef} onRefresh={handleRefresh}>
+                {renderProfileBody()}
+              </PullToRefresh>
             </div>
 
             {/* 3. RIGHT SIDEBAR: Highlights & Trends */}
@@ -1585,8 +1651,10 @@ export default function Profile({
             </div>
           </div>
 
-          {/* Profile Body */}
-          {renderProfileBody()}
+          {/* Profile Body with Pull to Refresh */}
+          <PullToRefresh scrollRef={scrollContainerRef} onRefresh={handleRefresh}>
+            {renderProfileBody()}
+          </PullToRefresh>
         </div>
       )}
 

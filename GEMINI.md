@@ -611,6 +611,28 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
   - In `handlePopState`, sequential evaluation without blocking early returns ensures the top-most modal of the restored history entry (e.g. `state.discoverCreators: true`) is bumped to the front with `getNextZIndex()` and remains strictly above any underlying background state (`state.creatorProfile`).
   - Eliminates duplicate `popstate` listeners and duplicate `pushState` calls inside modal children (`DiscoverCreatorsModal`), delegating history state management to `App.jsx` as the single authoritative source of truth.
 
+---
+
+## 33. Infinite Scroll & Pull-to-Refresh on Creator and User Profiles
+- **Infinite Scroll Architecture (`IntersectionObserver`)**:
+  - Replaces rigid manual "Load More" buttons in both Creator Profile (`CreatorProfileModal.jsx`) and User Profile (`Profile.jsx`) with dynamic infinite scrolling.
+  - An intersection sentinel element (`loaderSentinelRef` / `loaderRef`) is mounted at the bottom of the video grid whenever `hasMore` is `true`.
+  - Configured with `root: null`, `rootMargin: "350px"`, and `threshold: 0.1` to trigger early page fetches before the user reaches the bottom, ensuring zero perceptible latency.
+  - Renders a branded animated Rose-Crimson spinner (`Loader2` with `color: "var(--primary-color, #e11d48)"`) during active pagination requests.
+  - Guards against race conditions and redundant fetches by inspecting `loading` state, tab switching, and `hasMore` before firing `loadMore()`.
+- **Pull-to-Refresh Integration (`PullToRefresh.jsx`)**:
+  - Implemented on both Mobile and Desktop profile containers via `<PullToRefresh scrollRef={...} onRefresh={handleRefresh}>`.
+  - Pass the explicit scroll container ref (`mobileScrollRef`, `desktopScrollRef`, or `scrollContainerRef`) to reliably inspect `scrollTop <= 1` and prevent accidental trigger during downward scrolling.
+  - Ignores micro-movements (<25px deadzone) and horizontal swipes to preserve tab switching and card swipe gestures.
+  - Dynamic visual indicator with rotating refresh icon (`RefreshCcw`) and scale/color feedback when pulling beyond the 75px threshold.
+  - **Comprehensive Refresh Logic**:
+    - Re-fetches fresh creator stats (followers, following, subscribers, highlights) via `/api/creator/:username`.
+    - Refreshes auth profile details via `/api/auth/me`.
+    - Resets active tab pagination back to page 1 (`page = 1`) and fetches the newest drops cleanly with array replacement (`isAppend = false`).
+  - **Shared Video Hook Enhancement (`useVideos.js`)**:
+    - Exposes a dedicated `refresh: async () => { isFetching.current = false; await fetchData(1, true); }` method, enabling `likes` and `saved` video tabs on User Profile to refresh smoothly without stale lockouts.
+
+
 
 
 
