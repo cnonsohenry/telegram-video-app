@@ -10,7 +10,7 @@ import { showToast, promptLogin, promptEmailVerification } from "../utils/toast"
 import useModalHistory from "../hooks/useModalHistory";
 import { getNetworkBadge, getWalletDeepLink, getQrData, formatCountdown } from "../utils/cryptoHelpers";
 
-export default function PaywallModal({ onClose, user }) {
+export default function PaywallModal({ onClose, user, zIndex }) {
   const handleSafeClose = useModalHistory(true, onClose, "paywall");
   const [selectedMethod, setSelectedMethod] = useState(null); 
   const [selectedPackage, setSelectedPackage] = useState(null);
@@ -227,7 +227,7 @@ export default function PaywallModal({ onClose, user }) {
   const qrData = cryptoPaymentDetails ? getQrData(cryptoPaymentDetails.pay_currency, cryptoPaymentDetails.pay_address, cryptoPaymentDetails.pay_amount) : "";
 
   return (
-    <div style={fullscreenContainerStyle}>
+    <div style={{ ...fullscreenContainerStyle, zIndex: zIndex || 1000070 }}>
       {/* Instagram-style Top Navigation Bar */}
       <div style={topNavStyle}>
         <button 

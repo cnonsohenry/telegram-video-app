@@ -83,7 +83,18 @@ export default function App() {
     return null;
   });
   const [creatorAutoSubscribe, setCreatorAutoSubscribe] = useState(false);
-  const [isCreatorOverVideo, setIsCreatorOverVideo] = useState(false);
+  // 🟢 Dynamic Window Manager: Auto-incrementing Z-Index stacking
+  const topZIndexRef = useRef(1000030);
+  const getNextZIndex = useCallback(() => {
+    topZIndexRef.current += 2;
+    return topZIndexRef.current;
+  }, []);
+
+  const [videoZIndex, setVideoZIndex] = useState(1000030);
+  const [creatorZIndex, setCreatorZIndex] = useState(1000040);
+  const [commentZIndex, setCommentZIndex] = useState(1000050);
+  const [discoverZIndex, setDiscoverZIndex] = useState(1000060);
+  const [paywallZIndex, setPaywallZIndex] = useState(1000070);
   const [loginPromptAction, setLoginPromptAction] = useState(null);
   const [emailVerificationState, setEmailVerificationState] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -350,6 +361,12 @@ export default function App() {
         setShowPaywall(false);
         return;
       }
+      if (state.paywall && !showPaywallRef.current) {
+        setPaywallZIndex(getNextZIndex());
+        showPaywallRef.current = true;
+        setShowPaywall(true);
+        return;
+      }
 
       // 4. If legal page was open and state no longer has legal, close legal page
       if (activeLegalPageRef.current && !state.legal) {
@@ -365,13 +382,13 @@ export default function App() {
 
       // 5. If creator profile was open and state no longer has creatorProfile, close creator modal
       if (viewingCreatorRef.current && !state.creatorProfile) {
-        setIsCreatorOverVideo(false);
         viewingCreatorRef.current = null;
         setViewingCreator(null);
         setCreatorAutoSubscribe(false);
         return;
       }
       if (state.creatorProfile && state.creatorProfile !== viewingCreatorRef.current) {
+        setCreatorZIndex(getNextZIndex());
         viewingCreatorRef.current = state.creatorProfile;
         setViewingCreator(state.creatorProfile);
         setCreatorAutoSubscribe(false);
@@ -388,6 +405,7 @@ export default function App() {
         return;
       }
       if (state.discoverCreators && !showDiscoverCreatorsRef.current) {
+        setDiscoverZIndex(getNextZIndex());
         showDiscoverCreatorsRef.current = true;
         setShowDiscoverCreators(true);
         return;
@@ -456,6 +474,7 @@ export default function App() {
 
   // 🟢 Seamless Discover Creators navigation
   const handleOpenDiscoverCreators = useCallback(() => {
+    setDiscoverZIndex(getNextZIndex());
     setShowDiscoverCreators(true);
     showDiscoverCreatorsRef.current = true;
     const currentState = window.history.state || {};
@@ -473,7 +492,7 @@ export default function App() {
         window.location.search ? `${window.location.search}&discover=creators` : `/?discover=creators`
       );
     }
-  }, []);
+  }, [getNextZIndex]);
 
   const handleCloseDiscoverCreators = useCallback(() => {
     showDiscoverCreatorsRef.current = false;
@@ -497,9 +516,7 @@ export default function App() {
     const username = String(rawUsername).replace(/^@/, '').trim();
     if (!username) return;
 
-    if (activeVideoRef.current) {
-      setIsCreatorOverVideo(true);
-    }
+    setCreatorZIndex(getNextZIndex());
 
     const autoSub = Boolean(options.autoSubscribe || target.autoSubscribe);
     setCreatorAutoSubscribe(autoSub);
@@ -518,14 +535,13 @@ export default function App() {
       document.title,
       `/?creator=${encodeURIComponent(username)}`
     );
-  }, []);
+  }, [getNextZIndex]);
 
   const handleCloseCreator = useCallback(() => {
     if (window.history.state?.creatorPushed) {
       window.history.back();
       return;
     }
-    setIsCreatorOverVideo(false);
     viewingCreatorRef.current = null;
     setViewingCreator(null);
     setCreatorAutoSubscribe(false);
@@ -579,6 +595,7 @@ export default function App() {
 
     window.addEventListener("openCreatorProfile", handleOpenCreatorEvent);
     window.addEventListener("openDiscoverCreators", handleOpenDiscoverCreators);
+    window.addEventListener("openDiscoverCreatorsModal", handleOpenDiscoverCreators);
     window.addEventListener("refreshUser", refreshUser);
     window.addEventListener("openLoginPrompt", handleOpenLoginPrompt);
     window.addEventListener("promptLogin", handleOpenLoginPrompt);
@@ -587,6 +604,7 @@ export default function App() {
     return () => {
       window.removeEventListener("openCreatorProfile", handleOpenCreatorEvent);
       window.removeEventListener("openDiscoverCreators", handleOpenDiscoverCreators);
+      window.removeEventListener("openDiscoverCreatorsModal", handleOpenDiscoverCreators);
       window.removeEventListener("refreshUser", refreshUser);
       window.removeEventListener("openLoginPrompt", handleOpenLoginPrompt);
       window.removeEventListener("promptLogin", handleOpenLoginPrompt);
@@ -609,6 +627,13 @@ export default function App() {
     }
   }, []);
 
+  const handleOpenComments = useCallback((video) => {
+    if (!video) return;
+    setCommentZIndex(getNextZIndex());
+    activeCommentVideoRef.current = video;
+    setActiveCommentVideo(video);
+  }, [getNextZIndex]);
+
   const handleCloseComments = useCallback((isTransitioning = false) => {
     activeCommentVideoRef.current = null;
     setActiveCommentVideo(null);
@@ -616,6 +641,15 @@ export default function App() {
       window.history.back();
     }
   }, []);
+
+  const handleSetShowPaywall = useCallback((show) => {
+    const shouldShow = Boolean(show);
+    if (shouldShow) {
+      setPaywallZIndex(getNextZIndex());
+    }
+    showPaywallRef.current = shouldShow;
+    setShowPaywall(shouldShow);
+  }, [getNextZIndex]);
 
   const handleClosePaywall = useCallback(() => {
     showPaywallRef.current = false;
@@ -771,12 +805,12 @@ export default function App() {
   useEffect(() => {
     const handleCustomCommentModal = (e) => {
       if (e.detail?.video) {
-        setActiveCommentVideo(e.detail.video);
+        handleOpenComments(e.detail.video);
       }
     };
     window.addEventListener("openCommentModal", handleCustomCommentModal);
     return () => window.removeEventListener("openCommentModal", handleCustomCommentModal);
-  }, []);
+  }, [handleOpenComments]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -919,8 +953,15 @@ export default function App() {
   // 🟢 FIX: Only hide the footer when logged out if we are currently on the profile tab (showing AuthForm)
   const shouldShowFooter = isFooterVisible && !activeVideo && !showPaywall && activeTab !== "admin" && !activeCommentVideo && (activeTab !== "profile" || isLoggedIn);
 
+  const handleSetActiveVideo = useCallback((val) => {
+    if (val) {
+      setVideoZIndex(getNextZIndex());
+    }
+    setActiveVideo(val);
+  }, [getNextZIndex]);
+
   const handleOpenVideo = async (video) => {
-    setIsCreatorOverVideo(false);
+    setVideoZIndex(getNextZIndex());
     try {
       if (video.category === "premium" || video.is_premium) {
         const creatorPrice = video.subscription_price !== undefined ? Number(video.subscription_price) : null;
@@ -1010,8 +1051,8 @@ export default function App() {
             user={user} 
             onProfileClick={() => handleTabSwitch("profile")}
             setHideFooter={handleHomeHideFooter} // 🟢 UPDATED
-            setActiveVideo={setActiveVideo}
-            setShowPaywall={setShowPaywall} 
+            setActiveVideo={handleSetActiveVideo}
+            setShowPaywall={handleSetShowPaywall} 
             onCreatorClick={handleOpenCreator}
           />
         </div>
@@ -1028,7 +1069,7 @@ export default function App() {
             onNavigateTab={handleTabSwitch}
             setHideFooter={handleExploreHideFooter} 
             onVideoClick={handleOpenVideo}
-            onCommentClick={setActiveCommentVideo}
+            onCommentClick={handleOpenComments}
             onCreatorClick={handleOpenCreator}
             onOpenDiscoverCreators={handleOpenDiscoverCreators}
             isAnyModalOpen={!!activeVideo || !!activeCommentVideo || showPaywall || !!activeLegalPage || !!viewingCreator || showDiscoverCreators || activeTab !== "explore"} 
@@ -1045,13 +1086,13 @@ export default function App() {
             <Profile 
               user={user} 
               onLogout={onLogout} 
-              setActiveVideo={setActiveVideo} 
+              setActiveVideo={handleSetActiveVideo} 
               setHideFooter={handleProfileHideFooter} 
-              setShowPaywall={setShowPaywall} 
+              setShowPaywall={handleSetShowPaywall} 
               onUpdateUser={(updated) => setUser(prev => ({ ...prev, ...updated }))}
               onCreatorClick={handleOpenCreator}
               onOpenDiscoverCreators={handleOpenDiscoverCreators}
-              onCommentClick={setActiveCommentVideo}
+              onCommentClick={handleOpenComments}
             />
           ) : (
             (activeTab === "profile" && !showAuthModal) ? (
@@ -1119,7 +1160,7 @@ export default function App() {
       )}
 
       {showPaywall && isLoggedIn && (
-        <PaywallModal user={user} onClose={handleClosePaywall} />
+        <PaywallModal user={user} onClose={handleClosePaywall} zIndex={paywallZIndex} />
       )}
 
       {activeLegalPage && (
@@ -1130,13 +1171,13 @@ export default function App() {
       )}
 
       {activeVideo && (
-        <div style={{ position: "fixed", inset: 0, zIndex: isCreatorOverVideo ? 999990 : 1000030, background: "var(--bg-color)" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: videoZIndex, background: "var(--bg-color)" }}>
           <FullscreenPlayer 
             video={activeVideo}
             currentUser={user} 
             onClose={handleCloseVideo} 
             isDesktop={window.innerWidth > 1024} 
-            onCommentClick={setActiveCommentVideo}
+            onCommentClick={handleOpenComments}
             onCreatorClick={handleOpenCreator}
           />
         </div>
@@ -1147,6 +1188,7 @@ export default function App() {
         <CommentSectionModal 
           video={activeCommentVideo} 
           onClose={handleCloseComments} 
+          zIndex={commentZIndex}
         />
       )}
 
@@ -1160,6 +1202,7 @@ export default function App() {
             handleOpenCreator(uname, options);
           }}
           onVideoClick={handleOpenVideo}
+          zIndex={discoverZIndex}
         />
       )}
 
@@ -1171,9 +1214,10 @@ export default function App() {
           autoOpenSubscribe={creatorAutoSubscribe}
           onClose={handleCloseCreator} 
           onVideoClick={handleOpenVideo} 
-          setShowPaywall={setShowPaywall} 
+          setShowPaywall={handleSetShowPaywall} 
           onSubscriptionUpdated={refreshUser}
-          onCommentClick={setActiveCommentVideo}
+          onCommentClick={handleOpenComments}
+          zIndex={creatorZIndex}
         />
       )}
 

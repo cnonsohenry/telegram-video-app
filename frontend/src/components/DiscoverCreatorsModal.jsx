@@ -16,7 +16,8 @@ export default function DiscoverCreatorsModal({
   onClose, 
   currentUser, 
   onCreatorClick,
-  onVideoClick
+  onVideoClick,
+  zIndex
 }) {
   const [creators, setCreators] = useState(() => {
     if (memoryCachedCreators && memoryCachedCreators.length > 0) {
@@ -279,7 +280,7 @@ export default function DiscoverCreatorsModal({
   if (!isOpen) return null;
 
   return (
-    <div style={backdropStyle} onClick={handleSafeClose}>
+    <div style={{ ...backdropStyle, zIndex: zIndex || 1000060 }} onClick={handleSafeClose}>
       <div 
         style={isDesktop ? desktopModalStyle : mobileModalStyle} 
         onClick={(e) => e.stopPropagation()}

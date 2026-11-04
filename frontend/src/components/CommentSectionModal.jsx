@@ -80,7 +80,7 @@ export function stripParentMention(content, parentUsername) {
   return text.replace(/^@\w+\s*/, '');
 }
 
-export default function CommentSectionModal({ video, onClose }) {
+export default function CommentSectionModal({ video, onClose, zIndex }) {
   const [comments, setComments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
@@ -419,7 +419,7 @@ export default function CommentSectionModal({ video, onClose }) {
 
   return (
     <>
-      <div style={commentBackdropStyle} onClick={onClose}>
+      <div style={{ ...commentBackdropStyle, zIndex: zIndex || 1000050 }} onClick={onClose}>
         
         {/* 🟢 THE MODAL: Native flex column with borderless dark gray sheet */}
         <div style={commentBottomSheetStyle} onClick={e => e.stopPropagation()}>

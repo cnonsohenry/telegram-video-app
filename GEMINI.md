@@ -585,6 +585,19 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
   - Any request to `/venor.php` (or legacy/crawler `.php` probes) immediately returns `301 Moved Permanently` to `/`.
   - Google Search Console automatically transfers all accumulated impressions, clicks, and ranking authority directly to the canonical homepage (`https://naijahomemade.com/`) and purges `/venor.php` from search indexing.
 
+---
+
+## 31. Dynamic Window Manager Z-Index Stacking Architecture
+- **Problem**: In single-page architectures with bidirectional overlay navigation (e.g., Creator Profile -> Video, Video -> Creator Profile, Comments -> Creator Profile, Creator Profile -> Comments, Creator Profile -> Discover Creators), static z-index assignments inevitably cause modal clipping or trapped underneath layers (e.g. Creator Profile at static z-index 1000070 rendering in front of a Video Player at 1000030, Comment Modal at 1000050, or Discover Creators at 1000010).
+- **Dynamic Window Manager**:
+  - `App.jsx` implements an auto-incrementing window manager (`topZIndexRef` initialized to `1000030`, with `getNextZIndex()` incrementing by `+2`).
+  - Active overlays (`videoZIndex`, `creatorZIndex`, `commentZIndex`, `discoverZIndex`, `paywallZIndex`) dynamically receive `getNextZIndex()` upon being opened or focused.
+  - Component signatures for `CreatorProfileModal`, `CommentSectionModal`, `DiscoverCreatorsModal`, and `PaywallModal` accept `zIndex` props and apply them to their respective container backdrops.
+  - Ensures any newly invoked overlay (whether a video tapped from inside a creator profile, a comment modal tapped on a creator's post, a profile tapped from inside the comment modal, or "See All" suggested creators) strictly renders on top of the caller.
+  - When the top overlay is dismissed, the underlying view is immediately active with its state preserved without unmounting or reloading.
+- **Event Synchronization**:
+  - `App.jsx` listens to both `"openDiscoverCreators"` and `"openDiscoverCreatorsModal"` events to handle invocations across `CreatorProfileModal.jsx` and discover grids.
+
 
 
 

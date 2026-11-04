@@ -29,7 +29,8 @@ export default function CreatorProfileModal({
   autoOpenSubscribe = false,
   setShowPaywall,
   onSubscriptionUpdated,
-  onCommentClick
+  onCommentClick,
+  zIndex
 }) {
   const normalizedTarget = String(creatorUsername || "").toLowerCase().replace(/^@/, "").trim();
   const [creatorData, setCreatorData] = useState(null);
@@ -1183,7 +1184,7 @@ export default function CreatorProfileModal({
   );
 
   return (
-    <div style={containerStyle}>
+    <div style={{ ...containerStyle, zIndex: zIndex || 1000040 }}>
       {isDesktop ? (
         <div style={desktopContainerStyle}>
           <div style={desktopInnerWrapperStyle}>
@@ -1455,7 +1456,7 @@ export default function CreatorProfileModal({
 const containerStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 1000070,
+  zIndex: 1000040,
   backgroundColor: "#09090b",
   display: "flex",
   flexDirection: "column",
