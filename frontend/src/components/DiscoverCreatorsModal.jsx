@@ -50,7 +50,6 @@ export default function DiscoverCreatorsModal({
   const [followingMap, setFollowingMap] = useState({});
   const [loadingFollowMap, setLoadingFollowMap] = useState({});
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 768);
-  const historyPushedRef = useRef(false);
   const isFirstSearchRef = useRef(true);
 
   // Resize listener
@@ -60,38 +59,8 @@ export default function DiscoverCreatorsModal({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Browser back button (popstate) integration
-  useEffect(() => {
-    if (!isOpen) return;
-
-    if (!window.history.state?.discoverCreators) {
-      window.history.pushState(
-        { ...(window.history.state || {}), discoverCreators: true },
-        document.title
-      );
-      historyPushedRef.current = true;
-    }
-
-    const handlePopState = (e) => {
-      if (!e.state?.discoverCreators) {
-        historyPushedRef.current = false;
-        onClose();
-      }
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
-  }, [isOpen, onClose]);
-
   const handleSafeClose = useCallback(() => {
-    if (historyPushedRef.current && window.history.state?.discoverCreators) {
-      historyPushedRef.current = false;
-      window.history.back();
-    } else {
-      onClose();
-    }
+    if (onClose) onClose();
   }, [onClose]);
 
   // Fetch creators list

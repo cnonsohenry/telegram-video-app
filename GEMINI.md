@@ -598,6 +598,19 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
 - **Event Synchronization**:
   - `App.jsx` listens to both `"openDiscoverCreators"` and `"openDiscoverCreatorsModal"` events to handle invocations across `CreatorProfileModal.jsx` and discover grids.
 
+---
+
+## 32. Deterministic Bottom Tab Navigation & Multi-Tier Modal Popstate Hierarchy
+- **Explicit Tab Navigation vs History Popping**:
+  - Tapping on-screen footer buttons (e.g. Home, Explore, Profile) must **never** invoke `window.history.back()`. Popping history on explicit tab clicks causes spurious navigations if the user previously traversed nested overlays, queries, or subtabs (e.g. popping to an old Explore state instead of Home).
+  - When returning to Home from a secondary tab, `handleTabSwitch("home")` replaces the active history entry with `{ tab: "home" }` via `replaceState`, instantly and reliably loading Home without history pollution or reverse jumps.
+  - Secondary tabs pushed from Home retain `fromHome: true`, allowing the device/browser physical Back button to return to Home naturally.
+  - Overlays (`activeVideo`, `viewingCreator`, `showDiscoverCreators`, `activeCommentVideo`, `showPaywall`) are proactively reset during bottom tab switches to guarantee a clean viewport.
+- **Multi-Tier Modal Popstate Synchronization**:
+  - When a child overlay (such as `CreatorProfileModal`) is opened from within another overlay (such as `DiscoverCreatorsModal`), closing the child pops history back to the parent modal.
+  - In `handlePopState`, sequential evaluation without blocking early returns ensures the top-most modal of the restored history entry (e.g. `state.discoverCreators: true`) is bumped to the front with `getNextZIndex()` and remains strictly above any underlying background state (`state.creatorProfile`).
+  - Eliminates duplicate `popstate` listeners and duplicate `pushState` calls inside modal children (`DiscoverCreatorsModal`), delegating history state management to `App.jsx` as the single authoritative source of truth.
+
 
 
 

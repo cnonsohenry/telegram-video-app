@@ -153,6 +153,30 @@ export default function App() {
     activeTabRef.current = tabName;
     setActiveTab(tabName);
 
+    // 🟢 Close any active overlays when switching footer tabs
+    if (activeVideoRef.current) {
+      activeVideoRef.current = null;
+      setActiveVideo(null);
+      setIsSharedVideoView(false);
+    }
+    if (viewingCreatorRef.current) {
+      viewingCreatorRef.current = null;
+      setViewingCreator(null);
+      setCreatorAutoSubscribe(false);
+    }
+    if (showDiscoverCreatorsRef.current) {
+      showDiscoverCreatorsRef.current = false;
+      setShowDiscoverCreators(false);
+    }
+    if (activeCommentVideoRef.current) {
+      activeCommentVideoRef.current = null;
+      setActiveCommentVideo(null);
+    }
+    if (showPaywallRef.current) {
+      showPaywallRef.current = false;
+      setShowPaywall(false);
+    }
+
     if (!fromHistory) {
       let targetUrl = "/";
       const currentState = window.history.state || {};
@@ -166,6 +190,7 @@ export default function App() {
       delete stateData.searchOpen;
       delete stateData.albumOpen;
       delete stateData.creatorProfile;
+      delete stateData.creatorPushed;
       delete stateData.discoverCreators;
       delete stateData.authModal;
       delete stateData.loginPrompt;
@@ -181,23 +206,19 @@ export default function App() {
         targetUrl = `/?tab=${encodeURIComponent(tabName)}`;
       }
 
-      // 🟢 Industry-Standard App Tab Navigation:
+      // 🟢 Deterministic Tab Navigation Architecture:
       // 1. Moving from Home to any secondary tab (Explore, Profile, Admin):
-      //    Always PUSH so that pressing the phone Back button returns cleanly to Home!
+      //    Push state so pressing the device/browser Back button returns cleanly to Home!
       // 2. Returning to Home from a secondary tab:
-      //    If the user arrived from Home, pop history to return to the Home root!
+      //    Always replace state with Home root. Never use window.history.back() on explicit tab clicks!
       // 3. Switching between secondary tabs (e.g. Explore <-> Profile):
-      //    REPLACE state so secondary tabs do not build an infinite stack.
-      if (prevTab === "home") {
+      //    Replace state so secondary tabs do not build an infinite stack.
+      if (tabName === "home") {
+        delete stateData.fromHome;
+        window.history.replaceState(stateData, document.title, targetUrl);
+      } else if (prevTab === "home") {
         stateData.fromHome = true;
         window.history.pushState(stateData, document.title, targetUrl);
-      } else if (tabName === "home") {
-        if (currentState.fromHome && window.history.length > 1) {
-          window.history.back();
-        } else {
-          delete stateData.fromHome;
-          window.history.replaceState(stateData, document.title, targetUrl);
-        }
       } else {
         stateData.fromHome = Boolean(currentState.fromHome);
         window.history.replaceState(stateData, document.title, targetUrl);
@@ -337,14 +358,15 @@ export default function App() {
       if (showAuthModalRef.current && !state.authModal) {
         showAuthModalRef.current = false;
         setShowAuthModal(false);
-        return;
+      } else if (state.authModal && !showAuthModalRef.current) {
+        showAuthModalRef.current = true;
+        setShowAuthModal(true);
       }
 
       // 1. If comments modal was open and state no longer has commentModal, close comments
       if (activeCommentVideoRef.current && !state.commentModal) {
         activeCommentVideoRef.current = null;
         setActiveCommentVideo(null);
-        return;
       }
 
       // 2. If video player was open and state no longer has videoPlayer, close video
@@ -352,63 +374,52 @@ export default function App() {
         activeVideoRef.current = null;
         setActiveVideo(null);
         setIsSharedVideoView(false);
-        return;
       }
 
       // 3. If paywall was open and state no longer has paywall, close paywall
       if (showPaywallRef.current && !state.paywall) {
         showPaywallRef.current = false;
         setShowPaywall(false);
-        return;
-      }
-      if (state.paywall && !showPaywallRef.current) {
+      } else if (state.paywall && !showPaywallRef.current) {
         setPaywallZIndex(getNextZIndex());
         showPaywallRef.current = true;
         setShowPaywall(true);
-        return;
       }
 
       // 4. If legal page was open and state no longer has legal, close legal page
       if (activeLegalPageRef.current && !state.legal) {
         activeLegalPageRef.current = null;
         setActiveLegalPage(null);
-        return;
-      }
-      if (state.legal && state.legal !== activeLegalPageRef.current) {
+      } else if (state.legal && state.legal !== activeLegalPageRef.current) {
         activeLegalPageRef.current = state.legal;
         setActiveLegalPage(state.legal);
-        return;
       }
 
-      // 5. If creator profile was open and state no longer has creatorProfile, close creator modal
+      // 5. Creator Profile popstate sync
       if (viewingCreatorRef.current && !state.creatorProfile) {
         viewingCreatorRef.current = null;
         setViewingCreator(null);
         setCreatorAutoSubscribe(false);
-        return;
-      }
-      if (state.creatorProfile && state.creatorProfile !== viewingCreatorRef.current) {
-        setCreatorZIndex(getNextZIndex());
-        viewingCreatorRef.current = state.creatorProfile;
-        setViewingCreator(state.creatorProfile);
-        setCreatorAutoSubscribe(false);
-        return;
-      }
-      if (viewingCreatorRef.current && state.creatorProfile === viewingCreatorRef.current) {
-        return;
+      } else if (state.creatorProfile) {
+        if (state.creatorProfile !== viewingCreatorRef.current) {
+          viewingCreatorRef.current = state.creatorProfile;
+          setViewingCreator(state.creatorProfile);
+          setCreatorAutoSubscribe(false);
+        }
+        if (!state.discoverCreators) {
+          setCreatorZIndex(getNextZIndex());
+        }
       }
 
-      // 5.5 If discover creators modal was open and state no longer has discoverCreators, close it
+      // 5.5 Discover Creators popstate sync
       if (showDiscoverCreatorsRef.current && !state.discoverCreators) {
         showDiscoverCreatorsRef.current = false;
         setShowDiscoverCreators(false);
-        return;
-      }
-      if (state.discoverCreators && !showDiscoverCreatorsRef.current) {
-        setDiscoverZIndex(getNextZIndex());
+      } else if (state.discoverCreators) {
         showDiscoverCreatorsRef.current = true;
         setShowDiscoverCreators(true);
-        return;
+        // Discover Creators must strictly sit on top of any underlying creator profile in this state
+        setDiscoverZIndex(getNextZIndex());
       }
 
       // 6. If search overlay or profile follow list was open, their popstate listeners handle it
@@ -432,7 +443,7 @@ export default function App() {
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+  }, [getNextZIndex]);
 
   // 🟢 Seamless in-app legal page navigation
   const handleOpenLegal = useCallback((pageId) => {
