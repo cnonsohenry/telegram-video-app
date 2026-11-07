@@ -166,7 +166,13 @@ export default function PullToRefresh({ onRefresh, children, scrollRef }) {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchCancel}
-      style={{ position: 'relative', overflow: 'hidden' }}
+      style={{
+        position: 'relative',
+        width: '100%',
+        flex: '1 0 auto',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
     >
       {/* 🟢 THE REFRESH INDICATOR */}
       <div style={{
@@ -180,7 +186,7 @@ export default function PullToRefresh({ onRefresh, children, scrollRef }) {
         borderRadius: '50%',
         boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
         border: isOverThreshold ? '1.5px solid var(--primary-color, #ff3b30)' : '1px solid rgba(255,255,255,0.1)',
-        display: 'flex',
+        display: (pullDistance > 0 || isRefreshing) ? 'flex' : 'none',
         alignItems: 'center',
         justifyContent: 'center',
         transition: isRefreshing ? 'border 0.2s ease, transform 0.2s ease' : 'top 0.15s ease-out, transform 0.2s ease, opacity 0.2s ease',

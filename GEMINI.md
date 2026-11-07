@@ -632,6 +632,20 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
   - **Shared Video Hook Enhancement (`useVideos.js`)**:
     - Exposes a dedicated `refresh: async () => { isFetching.current = false; await fetchData(1, true); }` method, enabling `likes` and `saved` video tabs on User Profile to refresh smoothly without stale lockouts.
 
+---
+
+## 34. Desktop Profile Scroll & Feed Layout Optimization
+- **Flex Child Scroll Unfreezing (`PullToRefresh.jsx`)**:
+  - Replaced `overflow: hidden` on the `PullToRefresh` wrapper with `flex: 1 0 auto; width: 100%; display: flex; flexDirection: column;`.
+  - In CSS flexbox, any flex child inside a flex column with constrained height (`height: 100vh`) having `overflow: hidden` forces `min-height: 0` and `flex-shrink: 1`, collapsing `scrollHeight` to equal `clientHeight` and freezing desktop scrolling.
+  - Refresh indicator is conditionally hidden via `display: (pullDistance > 0 || isRefreshing) ? 'flex' : 'none'`, completely eliminating overflow clipping while preserving touch pull-to-refresh.
+- **Feed Alignment & Duplicate Border Elimination (`CreatorProfileModal.jsx` & `Profile.jsx`)**:
+  - Removed internal duplicate `borderLeft` and `borderRight` styles from feed wrappers inside `Profile.jsx`, delegating edge boundaries solely to the outer rail (`desktopCenterProfileRailStyle`).
+  - Removed `maxWidth: "600px"` and `margin: "0 auto"` from the feed container in both Creator and User profiles, allowing feed posts to stretch 100% across the rail and align flush from the left edge with profile headers and tabs.
+- **Creator Top Bar Simplification (`CreatorProfileModal.jsx`)**:
+  - Removed display name, username, verified badge, and `{postsCount} drops` from the desktop sticky header, presenting a clean top bar with only the back navigation chevron on the left and action buttons on the right.
+
+
 
 
 

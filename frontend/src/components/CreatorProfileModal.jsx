@@ -1150,14 +1150,12 @@ export default function CreatorProfileModal({
                 </div>
               ) : (
                 <div style={{ 
-                  padding: activeTab === "posts" ? (isDesktop ? "16px 0 30px 0" : "0 0 24px 0") : (isDesktop ? "16px 12px 30px 12px" : "14px 4px 24px 4px"),
+                  padding: activeTab === "posts" ? "0 0 30px 0" : (isDesktop ? "16px 12px 30px 12px" : "14px 4px 24px 4px"),
                   width: "100%",
                   boxSizing: "border-box"
                 }}>
                   {activeTab === "posts" ? (
                     <div style={{
-                      maxWidth: "600px",
-                      margin: "0 auto",
                       width: "100%",
                       animation: "fadeIn 0.3s ease-out"
                     }}>
@@ -1272,19 +1270,6 @@ export default function CreatorProfileModal({
                   >
                     <ArrowLeft size={24} strokeWidth={2.6} color="#f4f4f5" />
                   </button>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span style={desktopProfileHeaderTitleStyle}>
-                        {creatorData?.display_name || creatorUsername}
-                      </span>
-                      {creatorData?.is_verified && <TwitterVerifiedBadge size={16} />}
-                    </div>
-                    {postsCount > 0 && (
-                      <span style={{ fontSize: "12px", color: "#8e8e93" }}>
-                        {postsCount} drops
-                      </span>
-                    )}
-                  </div>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

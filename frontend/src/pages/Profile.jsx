@@ -1291,7 +1291,7 @@ export default function Profile({
 
         {/* 🌟 VIDEO FEED GRID / SUBSCRIPTIONS */}
         <div style={{ 
-          paddingTop: isDesktop ? "20px" : "14px",
+          paddingTop: activeTab === "videos" ? "0" : (isDesktop ? "20px" : "14px"),
           paddingBottom: "30px",
           width: "100%",
           boxSizing: "border-box"
@@ -1400,11 +1400,7 @@ export default function Profile({
             <>
               {activeTab === "videos" && !activeGroup ? (
                 <div style={{ 
-                  maxWidth: "600px", 
-                  margin: "0 auto", 
                   width: "100%",
-                  borderLeft: isDesktop ? "1px solid var(--border-color, #262626)" : "none",
-                  borderRight: isDesktop ? "1px solid var(--border-color, #262626)" : "none",
                   animation: "fadeIn 0.3s ease-out"
                 }}>
                   {videosToDisplay.map((v, idx) => (
