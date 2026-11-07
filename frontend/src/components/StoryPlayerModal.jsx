@@ -4,6 +4,7 @@ import useModalHistory from "../hooks/useModalHistory";
 import { APP_CONFIG } from "../config";
 import { promptLogin, promptEmailVerification } from "../utils/toast";
 import { resolveAvatar, handleAvatarError } from "../utils/avatar";
+import { isUserAdExempt } from "../utils/subscription";
 
 function formatStoryTimeAgo(story) {
   if (!story) return "";
@@ -39,6 +40,20 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const [isAdShowing, setIsAdShowing] = useState(false);
+
+  const zoneId = APP_CONFIG.ads?.storyInterstitialZoneId || "5968872";
+
+  // Check if current user is exempt from ads (VIP subscriber, creator, admin)
+  const isAdExempt = useMemo(() => {
+    try {
+      const userStr = localStorage.getItem("user");
+      const u = userStr ? JSON.parse(userStr) : null;
+      return isUserAdExempt(u);
+    } catch (_) {
+      return false;
+    }
+  }, []);
 
   const pauseTimeoutRef = useRef(null);
   const pointerStartRef = useRef({ time: 0, x: 0, y: 0, isHolding: false });
@@ -99,6 +114,129 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       window.dispatchEvent(new CustomEvent("resumeMainVideo"));
     };
   }, [isOpen]);
+
+  // 🟢 Mobile Fullpage Interstitial Ad (ExoClick Zone 5968872) for Non-Exempt Users
+  useEffect(() => {
+    if (!isOpen || isAdExempt) return;
+
+    // 1. Ensure ad-provider script exists in document
+    if (!document.querySelector('script[src*="ad-provider.js"]')) {
+      const s = document.createElement("script");
+      s.async = true;
+      s.type = "application/javascript";
+      s.src = "https://a.pemsrv.com/ad-provider.js";
+      document.head.appendChild(s);
+    }
+
+    // 2. Request ad serving via AdProvider queue
+    try {
+      (window.AdProvider = window.AdProvider || []).push({ serve: {} });
+    } catch (err) {
+      console.warn("[EXOCLICK STORY AD] Push error:", err);
+    }
+
+    // 3. Monitor ad appearance / visibility
+    const checkAdVisibility = () => {
+      const adEl = document.getElementById(`ad_${zoneId}`) || document.querySelector(".ex-over-top");
+      if (!adEl) return false;
+      try {
+        const style = window.getComputedStyle(adEl);
+        return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+      } catch (_) {
+        return adEl.style.display !== "none";
+      }
+    };
+
+    const handleAdOpened = () => {
+      setIsAdShowing(true);
+      const activeVid = getActiveVideo();
+      if (activeVid && !activeVid.paused) {
+        try { activeVid.pause(); } catch (_) {}
+      }
+      localStorage.setItem("last_ad_timestamp", Date.now().toString());
+    };
+
+    const handleAdClosed = () => {
+      setIsAdShowing(false);
+      const activeVid = getActiveVideo();
+      if (activeVid) {
+        activeVid.play().catch(() => {});
+      }
+    };
+
+    // MutationObserver to detect when ad element is created, becomes visible, or removed
+    let lastKnownVisible = false;
+    const observer = new MutationObserver(() => {
+      const isVisible = checkAdVisibility();
+      if (isVisible && !lastKnownVisible) {
+        lastKnownVisible = true;
+        handleAdOpened();
+      } else if (!isVisible && lastKnownVisible) {
+        lastKnownVisible = false;
+        handleAdClosed();
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style", "class"]
+    });
+
+    // Custom event listeners dispatched by ExoClick ad-provider
+    const onCreativeDisplayed = (e) => {
+      if (!e?.detail?.id || e.detail.id === `ad_${zoneId}`) {
+        if (!lastKnownVisible) {
+          lastKnownVisible = true;
+          handleAdOpened();
+        }
+      }
+    };
+
+    window.addEventListener(`creativeDisplayed-${zoneId}`, onCreativeDisplayed);
+    window.addEventListener("creativeDisplayed", onCreativeDisplayed);
+
+    // Capture clicks on the close button for zero-delay playback resume
+    const onDocClick = (e) => {
+      if (e.target && e.target.closest && (e.target.closest(".ex-over-btn") || e.target.closest(".ex-over-btn-container"))) {
+        setTimeout(() => {
+          if (lastKnownVisible) {
+            lastKnownVisible = false;
+            handleAdClosed();
+          }
+        }, 60);
+      }
+    };
+    document.addEventListener("click", onDocClick, true);
+
+    // Initial check in case ad loaded synchronously
+    if (checkAdVisibility()) {
+      lastKnownVisible = true;
+      handleAdOpened();
+    }
+
+    // Cleanup on unmount or story close
+    return () => {
+      observer.disconnect();
+      window.removeEventListener(`creativeDisplayed-${zoneId}`, onCreativeDisplayed);
+      window.removeEventListener("creativeDisplayed", onCreativeDisplayed);
+      document.removeEventListener("click", onDocClick, true);
+
+      // Clean up any open ad overlays
+      const adEl = document.getElementById(`ad_${zoneId}`);
+      if (adEl) {
+        try { adEl.remove(); } catch (_) {}
+      }
+      document.querySelectorAll(".ex-over-top").forEach((el) => {
+        try { el.remove(); } catch (_) {}
+      });
+      // Restore body styles in case ExoClick modified them
+      if (document.body && document.body.style && document.body.style.overflow === "hidden") {
+        document.body.style.overflow = "";
+      }
+    };
+  }, [isOpen, isAdExempt, zoneId, getActiveVideo]);
 
   // Initialize Dual-Player on open: Slot 0 plays current, Slot 1 pre-buffers next
   useEffect(() => {
@@ -196,6 +334,13 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
 
   // Video time tracking (filtered strictly to the active slot)
   const handleTimeUpdate = (e, slotId) => {
+    if (isAdShowing) {
+      const v = e.currentTarget;
+      if (v && !v.paused) {
+        try { v.pause(); } catch (_) {}
+      }
+      return;
+    }
     if (slotId !== activeSlot) return;
     const v = e.currentTarget;
     const duration = v.duration || (currentStory?.duration ? parseFloat(currentStory.duration) : 15);
@@ -207,6 +352,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
   // Jump directly to an arbitrary story segment
   const jumpToStory = useCallback(
     (targetIdx) => {
+      if (isAdShowing) return;
       if (targetIdx === currentIndex) {
         const activeVid = getActiveVideo();
         if (activeVid) {
@@ -376,11 +522,13 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
   const goToPrev = useCallback(() => navigateWithDebounce("prev"), [navigateWithDebounce]);
 
   const handleVideoEnded = () => {
+    if (isAdShowing) return;
     goToNext();
   };
 
   // Pointer Down / Up tap & hold handling (unified across touch and mouse)
   const handlePointerDown = (e) => {
+    if (isAdShowing) return;
     if (e.button && e.button !== 0) return;
     pointerStartRef.current = {
       time: Date.now(),
@@ -401,6 +549,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
   };
 
   const handlePointerUp = (e) => {
+    if (isAdShowing) return;
     if (pauseTimeoutRef.current) {
       clearTimeout(pauseTimeoutRef.current);
       pauseTimeoutRef.current = null;
@@ -434,6 +583,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
+      if (isAdShowing) return;
       if (e.key === "Escape") {
         handleSafeClose();
       } else if (e.key === "ArrowLeft") {
@@ -458,7 +608,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, handleSafeClose, goToPrev, goToNext, getActiveVideo]);
+  }, [isOpen, handleSafeClose, goToPrev, goToNext, getActiveVideo, isAdShowing]);
 
   // Volume / Mute Toggle (applies to both players simultaneously)
   const toggleMute = (e) => {
@@ -501,6 +651,28 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
         overflow: "hidden"
       }}
     >
+      {/* 🟢 ExoClick Mobile Fullpage Interstitial Ad (Zone 5968872) */}
+      {!isAdExempt && (
+        <div
+          id="story-interstitial-zone"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: 0,
+            overflow: "visible",
+            zIndex: 999999
+          }}
+        >
+          <ins
+            className="eas6a97888e33"
+            data-zoneid={zoneId}
+            style={{ display: "block", width: "100%" }}
+          />
+        </div>
+      )}
+
       {/* Desktop Prev Button (Outside Frame) */}
       {storyList.length > 1 && (
         <button
@@ -508,7 +680,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            goToPrev();
+            if (!isAdShowing) goToPrev();
           }}
           style={{
             position: "absolute",
@@ -526,7 +698,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             alignItems: "center",
             justifyContent: "center",
             color: "#d4d4d8",
-            cursor: "pointer",
+            cursor: isAdShowing ? "default" : "pointer",
             zIndex: 100,
             transition: "all 0.2s"
           }}
@@ -545,7 +717,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            goToNext();
+            if (!isAdShowing) goToNext();
           }}
           style={{
             position: "absolute",
@@ -563,7 +735,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             alignItems: "center",
             justifyContent: "center",
             color: "#d4d4d8",
-            cursor: "pointer",
+            cursor: isAdShowing ? "default" : "pointer",
             zIndex: 100,
             transition: "all 0.2s"
           }}
@@ -753,7 +925,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                   key={item.id || idx}
                   onClick={(e) => {
                     e.stopPropagation();
-                    jumpToStory(idx);
+                    if (!isAdShowing) jumpToStory(idx);
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
                   style={{
@@ -762,7 +934,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                     backgroundColor: "rgba(255, 255, 255, 0.35)",
                     borderRadius: "2px",
                     overflow: "hidden",
-                    cursor: "pointer"
+                    cursor: isAdShowing ? "default" : "pointer"
                   }}
                 >
                   <div
@@ -770,7 +942,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                       height: "100%",
                       width: `${fill}%`,
                       backgroundColor: "#d4d4d8",
-                      transition: idx === currentIndex && !isPaused ? "width 0.1s linear" : "none"
+                      transition: idx === currentIndex && !isPaused && !isAdShowing ? "width 0.1s linear" : "none"
                     }}
                   />
                 </div>
@@ -916,7 +1088,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
         </div>
 
         {/* Center Pause Indicator */}
-        {isPaused && (
+        {isPaused && !isAdShowing && (
           <div
             style={{
               position: "absolute",
@@ -944,7 +1116,9 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={toggleMute}
+          onClick={(e) => {
+            if (!isAdShowing) toggleMute(e);
+          }}
           style={{
             position: "absolute",
             bottom: "18px",

@@ -50,7 +50,8 @@ export const APP_CONFIG = {
     vastSkipSeconds: 5, // Skip ad countdown duration
     minMinutesBetweenAds: 4, // Minimum 6 minutes cooldown between any full-page ads/smartlinks
     initialFreeVideos: 2, // First 2 videos are 100% ad-free
-    exoClickPopZoneId: "5883574"
+    exoClickPopZoneId: "5883574",
+    storyInterstitialZoneId: "5968872"
   },
   supportTelegramLink: "",
   bankDetails: {
