@@ -364,7 +364,6 @@ export default function DiscoverCreatorsSection({
                   displayName={creator.display_name || uname}
                   size={78}
                   borderWidth={2.5}
-                  onClick={() => onCreatorClick && onCreatorClick(uname)}
                 />
               </div>
 

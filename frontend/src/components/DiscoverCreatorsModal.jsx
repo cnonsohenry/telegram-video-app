@@ -410,7 +410,6 @@ export default function DiscoverCreatorsModal({
                             displayName={creator.display_name || uname}
                             size={54}
                             borderWidth={2.5}
-                            onClick={() => handleCreatorClick(uname)}
                           />
                         </div>
 

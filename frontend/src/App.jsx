@@ -273,6 +273,8 @@ export default function App() {
   const showPaywallRef = useRef(false);
   const activeLegalPageRef = useRef(null);
   const viewingCreatorRef = useRef(null);
+  const lastOpenCreatorTargetRef = useRef(null);
+  const lastOpenCreatorTimeRef = useRef(0);
 
   useEffect(() => {
     activeVideoRef.current = activeVideo;
@@ -403,11 +405,14 @@ export default function App() {
       // 5. Creator Profile popstate sync
       if (viewingCreatorRef.current && !state.creatorProfile) {
         viewingCreatorRef.current = null;
+        lastOpenCreatorTargetRef.current = null;
         setViewingCreator(null);
         setCreatorAutoSubscribe(false);
       } else if (state.creatorProfile) {
         if (state.creatorProfile !== viewingCreatorRef.current) {
           viewingCreatorRef.current = state.creatorProfile;
+          lastOpenCreatorTargetRef.current = state.creatorProfile ? state.creatorProfile.toLowerCase() : null;
+          lastOpenCreatorTimeRef.current = Date.now();
           setViewingCreator(state.creatorProfile);
           setCreatorAutoSubscribe(false);
         }
@@ -532,6 +537,25 @@ export default function App() {
     const username = String(rawUsername).replace(/^@/, '').trim();
     if (!username) return;
 
+    const normalizedUname = username.toLowerCase();
+    const now = Date.now();
+
+    // 🛑 Prevent rapid duplicate dispatches (e.g. avatar click bubbling to card click)
+    if (
+      lastOpenCreatorTargetRef.current === normalizedUname &&
+      now - lastOpenCreatorTimeRef.current < 450
+    ) {
+      return;
+    }
+
+    // 🛑 If already viewing this exact creator, do not push another history entry
+    if (viewingCreatorRef.current && viewingCreatorRef.current.toLowerCase() === normalizedUname) {
+      return;
+    }
+
+    lastOpenCreatorTargetRef.current = normalizedUname;
+    lastOpenCreatorTimeRef.current = now;
+
     setCreatorZIndex(getNextZIndex());
 
     const autoSub = Boolean(options.autoSubscribe || target.autoSubscribe);
@@ -546,11 +570,21 @@ export default function App() {
     delete nextState.profileFollowList;
     delete nextState.creatorFollowList;
     delete nextState.creatorFollowListUser;
-    window.history.pushState(
-      nextState,
-      document.title,
-      `/?creator=${encodeURIComponent(username)}`
-    );
+
+    // If top of history state is already for this creator, replace instead of pushing
+    if (currentState.creatorProfile && currentState.creatorProfile.toLowerCase() === normalizedUname) {
+      window.history.replaceState(
+        nextState,
+        document.title,
+        `/?creator=${encodeURIComponent(username)}`
+      );
+    } else {
+      window.history.pushState(
+        nextState,
+        document.title,
+        `/?creator=${encodeURIComponent(username)}`
+      );
+    }
   }, [getNextZIndex]);
 
   const handleCloseCreator = useCallback(() => {
@@ -559,6 +593,7 @@ export default function App() {
       return;
     }
     viewingCreatorRef.current = null;
+    lastOpenCreatorTargetRef.current = null;
     setViewingCreator(null);
     setCreatorAutoSubscribe(false);
     const currentState = { ...(window.history.state || {}) };

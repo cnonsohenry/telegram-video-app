@@ -45,6 +45,7 @@ export default function StoryAvatar({
         avatar_url: safeAvatarUrl
       });
     } else if (onClick) {
+      e.stopPropagation();
       onClick(e);
     }
   };

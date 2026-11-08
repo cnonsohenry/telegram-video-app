@@ -1525,7 +1525,6 @@ export default function CreatorProfileModal({
                     showDiscoverCreators,
                     activeTab
                   });
-                  onClose();
                   window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
                 }
               }}
