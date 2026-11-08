@@ -21,6 +21,15 @@ import DesktopRightSidebar from "./DesktopRightSidebar";
 import PullToRefresh from "./PullToRefresh";
 import { promptLogin, showToast, promptEmailVerification } from "../utils/toast";
 import { resolveAvatar } from "../utils/avatar";
+import { 
+  getCachedCreator, 
+  setCachedCreator, 
+  updateCachedCreator, 
+  saveCreatorScroll, 
+  getCreatorScroll, 
+  getGlobalFollow, 
+  setGlobalFollow 
+} from "../utils/creatorProfileCache";
 
 export default function CreatorProfileModal({ 
   creatorUsername, 
@@ -34,14 +43,16 @@ export default function CreatorProfileModal({
   zIndex
 }) {
   const normalizedTarget = String(creatorUsername || "").toLowerCase().replace(/^@/, "").trim();
-  const [creatorData, setCreatorData] = useState(null);
-  const [videos, setVideos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialCache = getCachedCreator(normalizedTarget);
+
+  const [creatorData, setCreatorData] = useState(() => initialCache?.creatorData || null);
+  const [videos, setVideos] = useState(() => initialCache?.videos || []);
+  const [loading, setLoading] = useState(() => !initialCache || !initialCache.creatorData);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("posts");
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followersCount, setFollowersCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
+  const [activeTab, setActiveTab] = useState(() => initialCache?.activeTab || "posts");
+  const [isFollowing, setIsFollowing] = useState(() => initialCache ? getGlobalFollow(normalizedTarget, Boolean(initialCache.isFollowing)) : false);
+  const [followersCount, setFollowersCount] = useState(() => initialCache?.followersCount || 0);
+  const [followingCount, setFollowingCount] = useState(() => initialCache?.followingCount || 0);
   const [followListTab, setFollowListTab] = useState(() => {
     const st = window.history.state || {};
     return (st.creatorFollowList && st.creatorFollowListUser === normalizedTarget) ? st.creatorFollowList : null;
@@ -52,8 +63,8 @@ export default function CreatorProfileModal({
   }, [followListTab]);
 
   const [isFollowLoading, setIsFollowLoading] = useState(false);
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [subscribersCount, setSubscribersCount] = useState(0);
+  const [isSubscribed, setIsSubscribed] = useState(() => initialCache ? Boolean(initialCache.isSubscribed) : false);
+  const [subscribersCount, setSubscribersCount] = useState(() => initialCache?.subscribersCount || 0);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
@@ -65,26 +76,26 @@ export default function CreatorProfileModal({
     }
     setShowTipModal(true);
   };
-  const [showDiscoverCreators, setShowDiscoverCreators] = useState(false);
+  const [showDiscoverCreators, setShowDiscoverCreators] = useState(() => Boolean(initialCache?.showDiscoverCreators));
   const [optionsVideo, setOptionsVideo] = useState(null);
   const [reportedVideo, setReportedVideo] = useState(null);
   const mobileScrollRef = useRef(null);
   const desktopScrollRef = useRef(null);
   const loaderSentinelRef = useRef(null);
-  const [highlights, setHighlights] = useState([]);
+  const [highlights, setHighlights] = useState(() => initialCache?.highlights || []);
   const isAnyModalOpen = Boolean(showTipModal || showSubscribeModal || optionsVideo || reportedVideo || followListTab);
-  const [tabVideos, setTabVideos] = useState({
-    posts: [],
+  const [tabVideos, setTabVideos] = useState(() => initialCache?.tabVideos || {
+    posts: initialCache?.videos || [],
     reels: [],
     premium: []
   });
-  const [tabPages, setTabPages] = useState({
+  const [tabPages, setTabPages] = useState(() => initialCache?.tabPages || {
     posts: 1,
     reels: 1,
     premium: 1
   });
-  const [tabHasMore, setTabHasMore] = useState({
-    posts: false,
+  const [tabHasMore, setTabHasMore] = useState(() => initialCache?.tabHasMore || {
+    posts: Boolean(initialCache?.videos?.length >= 12),
     reels: false,
     premium: false
   });
@@ -93,7 +104,7 @@ export default function CreatorProfileModal({
     reels: false,
     premium: false
   });
-  const [loadedTabs, setLoadedTabs] = useState({
+  const [loadedTabs, setLoadedTabs] = useState(() => initialCache?.loadedTabs || {
     posts: true,
     reels: false,
     premium: false
@@ -205,95 +216,258 @@ export default function CreatorProfileModal({
           const map = new Map();
           prevList.forEach(v => map.set(`${v.chat_id}:${v.message_id}`, v));
           data.videos.forEach(v => map.set(`${v.chat_id}:${v.message_id}`, v));
-          return {
+          const updated = {
             ...prev,
             [targetTab]: Array.from(map.values())
           };
+          updateCachedCreator(normalizedTarget, { tabVideos: updated });
+          return updated;
         });
-        setTabPages(prev => ({ ...prev, [targetTab]: targetPage }));
-        setTabHasMore(prev => ({ ...prev, [targetTab]: Boolean(data.hasMore) }));
-        setLoadedTabs(prev => ({ ...prev, [targetTab]: true }));
+        setTabPages(prev => {
+          const updated = { ...prev, [targetTab]: targetPage };
+          updateCachedCreator(normalizedTarget, { tabPages: updated });
+          return updated;
+        });
+        setTabHasMore(prev => {
+          const updated = { ...prev, [targetTab]: Boolean(data.hasMore) };
+          updateCachedCreator(normalizedTarget, { tabHasMore: updated });
+          return updated;
+        });
+        setLoadedTabs(prev => {
+          const updated = { ...prev, [targetTab]: true };
+          updateCachedCreator(normalizedTarget, { loadedTabs: updated });
+          return updated;
+        });
       }
     } catch (err) {
       console.error(`Failed to load ${targetTab} videos`, err);
     } finally {
       setTabLoading(prev => ({ ...prev, [targetTab]: false }));
     }
-  }, [creatorUsername]);
+  }, [creatorUsername, normalizedTarget]);
 
-  useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
-    setError("");
-
-    const fetchCreator = async () => {
-      try {
-        const cleanUsername = String(creatorUsername || "").replace(/^@/, "").trim();
-        const token = localStorage.getItem("token");
-        const headers = {};
-        if (token) headers.Authorization = `Bearer ${token}`;
-
-        const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUsername)}`, { headers });
-        if (!res.ok) throw new Error("Creator not found");
-
-        const data = await res.json();
-        if (isMounted) {
-          setCreatorData(data.creator);
-
-          const initialVideos = data.videos || [];
-          setVideos(initialVideos);
-          setTabVideos(prev => ({
-            ...prev,
-            posts: initialVideos
-          }));
-          const isSub = Boolean(data.creator.is_subscribed);
-          const isFoll = Boolean(data.creator.is_following);
-          setIsSubscribed(isSub);
-          setIsFollowing(isFoll);
-          setSubscribersCount(Number(data.creator.stats?.subscribers || 0));
-          setFollowersCount(Number(data.creator.stats?.followers || 0));
-          setFollowingCount(Number(data.creator.stats?.following || 0));
-          const st = window.history.state || {};
-          const restoredTab = (st.creatorFollowList && st.creatorFollowListUser === normalizedTarget) ? st.creatorFollowList : null;
-          followListTabRef.current = restoredTab;
-          setFollowListTab(restoredTab);
-          setHighlights(data.creator.highlights || []);
-          setTabHasMore(prev => ({
-            ...prev,
-            posts: Boolean(initialVideos.length >= 12)
-          }));
-          setTabPages(prev => ({
-            ...prev,
-            posts: 1
-          }));
-          setLoadedTabs({
-            posts: true,
-            reels: false,
-            premium: false
-          });
-
-          if (autoOpenSubscribe && !isSub && !data.creator.is_owner) {
-            const token = localStorage.getItem("token");
-            if (!token) {
-              promptLogin("subscribe");
-            } else {
-              setShowSubscribeModal(true);
-            }
-          }
+  // Scroll restoration helper
+  const restoreScroll = useCallback((scrollY) => {
+    if (typeof scrollY !== "number" || scrollY <= 0) return;
+    requestAnimationFrame(() => {
+      if (mobileScrollRef.current) mobileScrollRef.current.scrollTop = scrollY;
+      if (desktopScrollRef.current) desktopScrollRef.current.scrollTop = scrollY;
+      setTimeout(() => {
+        if (mobileScrollRef.current && Math.abs(mobileScrollRef.current.scrollTop - scrollY) > 5) {
+          mobileScrollRef.current.scrollTop = scrollY;
         }
-      } catch (err) {
-        if (isMounted) setError(err.message);
-      } finally {
-        if (isMounted) setLoading(false);
+        if (desktopScrollRef.current && Math.abs(desktopScrollRef.current.scrollTop - scrollY) > 5) {
+          desktopScrollRef.current.scrollTop = scrollY;
+        }
+      }, 50);
+    });
+  }, []);
+
+  // Passive scroll position tracker for instant back restoration
+  const handleProfileScroll = useCallback(() => {
+    const el = isDesktop ? desktopScrollRef.current : mobileScrollRef.current;
+    if (el) {
+      saveCreatorScroll(normalizedTarget, el.scrollTop);
+    }
+  }, [isDesktop, normalizedTarget]);
+
+  // Instant Suggested Creators toggle with cache persistence
+  const handleToggleDiscoverCreators = useCallback(() => {
+    setShowDiscoverCreators(prev => {
+      const next = !prev;
+      updateCachedCreator(normalizedTarget, { showDiscoverCreators: next });
+      return next;
+    });
+  }, [normalizedTarget]);
+
+  // Tab change handler with cache persistence
+  const handleTabChange = useCallback((targetTab) => {
+    setActiveTab(targetTab);
+    updateCachedCreator(normalizedTarget, { activeTab: targetTab });
+  }, [normalizedTarget]);
+
+  // Track previous creator to save their state right before navigation
+  const prevTargetRef = useRef(normalizedTarget);
+  useEffect(() => {
+    if (prevTargetRef.current && prevTargetRef.current !== normalizedTarget) {
+      const prevKey = prevTargetRef.current;
+      const prevScroll = isDesktop
+        ? (desktopScrollRef.current?.scrollTop || 0)
+        : (mobileScrollRef.current?.scrollTop || 0);
+      saveCreatorScroll(prevKey, prevScroll);
+      updateCachedCreator(prevKey, {
+        showDiscoverCreators,
+        activeTab
+      });
+    }
+    prevTargetRef.current = normalizedTarget;
+  }, [normalizedTarget, isDesktop, showDiscoverCreators, activeTab]);
+
+  // Save state on unmount
+  useEffect(() => {
+    return () => {
+      if (normalizedTarget) {
+        const curScroll = isDesktop
+          ? (desktopScrollRef.current?.scrollTop || 0)
+          : (mobileScrollRef.current?.scrollTop || 0);
+        saveCreatorScroll(normalizedTarget, curScroll);
+        updateCachedCreator(normalizedTarget, {
+          showDiscoverCreators,
+          activeTab
+        });
       }
     };
+  }, [normalizedTarget, isDesktop, showDiscoverCreators, activeTab]);
 
-    fetchCreator();
+  // Synchronize follow changes across the application
+  useEffect(() => {
+    const handleFollowChange = (e) => {
+      const { username, isFollowing: nextFoll } = e.detail || {};
+      if (username && username.toLowerCase() === normalizedTarget) {
+        setIsFollowing(Boolean(nextFoll));
+        if (nextFoll) {
+          setFollowersCount(c => c + 1);
+        } else {
+          setFollowersCount(c => Math.max(0, c - 1));
+        }
+      }
+    };
+    window.addEventListener("creatorFollowChanged", handleFollowChange);
+    return () => window.removeEventListener("creatorFollowChanged", handleFollowChange);
+  }, [normalizedTarget]);
+
+  const fetchCreator = useCallback(async (targetKey, isSilent = false) => {
+    try {
+      const cleanUsername = String(targetKey || "").replace(/^@/, "").trim();
+      const token = localStorage.getItem("token");
+      const headers = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(cleanUsername)}`, { headers });
+      if (!res.ok) {
+        if (!isSilent) throw new Error("Creator not found");
+        return;
+      }
+
+      const data = await res.json();
+      if (!data?.creator) return;
+
+      const isSub = Boolean(data.creator.is_subscribed);
+      const isFoll = getGlobalFollow(targetKey, Boolean(data.creator.is_following));
+      const subsCount = Number(data.creator.stats?.subscribers || 0);
+      const follsCount = Number(data.creator.stats?.followers || 0);
+      const follingCount = Number(data.creator.stats?.following || 0);
+      const initialVideos = data.videos || [];
+      const hls = data.creator.highlights || [];
+
+      setCreatorData(data.creator);
+      setIsSubscribed(isSub);
+      setIsFollowing(isFoll);
+      setSubscribersCount(subsCount);
+      setFollowersCount(follsCount);
+      setFollowingCount(follingCount);
+      setHighlights(hls);
+
+      setVideos(initialVideos);
+      setTabVideos(prev => ({
+        ...prev,
+        posts: initialVideos
+      }));
+
+      // Cache the complete snapshot
+      setCachedCreator(targetKey, {
+        creatorData: data.creator,
+        videos: initialVideos,
+        highlights: hls,
+        isSubscribed: isSub,
+        isFollowing: isFoll,
+        subscribersCount: subsCount,
+        followersCount: follsCount,
+        followingCount: follingCount
+      });
+
+      if (!isSilent) {
+        setTabHasMore(prev => ({
+          ...prev,
+          posts: Boolean(initialVideos.length >= 12)
+        }));
+        setTabPages(prev => ({
+          ...prev,
+          posts: 1
+        }));
+        setLoadedTabs({
+          posts: true,
+          reels: false,
+          premium: false
+        });
+      }
+
+      const st = window.history.state || {};
+      const restoredTab = (st.creatorFollowList && st.creatorFollowListUser === targetKey) ? st.creatorFollowList : null;
+      followListTabRef.current = restoredTab;
+      setFollowListTab(restoredTab);
+
+      if (autoOpenSubscribe && !isSub && !data.creator.is_owner) {
+        if (!token) {
+          promptLogin("subscribe");
+        } else {
+          setShowSubscribeModal(true);
+        }
+      }
+    } catch (err) {
+      if (!isSilent) {
+        setError(err.message);
+      }
+    } finally {
+      if (!isSilent) {
+        setLoading(false);
+      }
+    }
+  }, [autoOpenSubscribe]);
+
+  // Main creator hydration & fetch effect
+  useEffect(() => {
+    let isMounted = true;
+    const targetKey = normalizedTarget;
+    if (!targetKey) return;
+
+    // Check if target is already cached in memory
+    const cached = getCachedCreator(targetKey);
+    if (cached && cached.creatorData) {
+      // 🌟 INSTANT (0MS) CACHE RESTORATION
+      setCreatorData(cached.creatorData);
+      setVideos(cached.videos || []);
+      setTabVideos(cached.tabVideos || { posts: [], reels: [], premium: [] });
+      setTabPages(cached.tabPages || { posts: 1, reels: 1, premium: 1 });
+      setTabHasMore(cached.tabHasMore || { posts: false, reels: false, premium: false });
+      setLoadedTabs(cached.loadedTabs || { posts: true, reels: false, premium: false });
+      setActiveTab(cached.activeTab || "posts");
+      setHighlights(cached.highlights || []);
+      setIsSubscribed(Boolean(cached.isSubscribed));
+      setIsFollowing(getGlobalFollow(targetKey, Boolean(cached.isFollowing)));
+      setSubscribersCount(Number(cached.subscribersCount || 0));
+      setFollowersCount(Number(cached.followersCount || 0));
+      setFollowingCount(Number(cached.followingCount || 0));
+      setShowDiscoverCreators(Boolean(cached.showDiscoverCreators));
+      setLoading(false);
+      setError("");
+
+      const savedScroll = cached.scrollPosition || getCreatorScroll(targetKey);
+      restoreScroll(savedScroll);
+
+      // Silent background refresh (stale-while-revalidate)
+      fetchCreator(targetKey, true);
+    } else {
+      // First visit: show clean loading state
+      setLoading(true);
+      setError("");
+      fetchCreator(targetKey, false);
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [creatorUsername, normalizedTarget]);
+  }, [creatorUsername, normalizedTarget, fetchCreator, restoreScroll]);
 
   useEffect(() => {
     if (!creatorData) return;
@@ -473,6 +647,11 @@ export default function CreatorProfileModal({
       if (typeof data.followers_count === "number") {
         setFollowersCount(data.followers_count);
       }
+      setGlobalFollow(normalizedTarget, Boolean(data.following));
+      updateCachedCreator(normalizedTarget, {
+        isFollowing: Boolean(data.following),
+        followersCount: data.followers_count
+      });
       showToast(data.following ? `Following @${creatorUsername}` : `Unfollowed @${creatorUsername}`, data.following ? "success" : "error");
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (e) {
@@ -525,6 +704,10 @@ export default function CreatorProfileModal({
         }
         setIsSubscribed(false);
         setSubscribersCount(data.subscribers_count);
+        updateCachedCreator(normalizedTarget, {
+          isSubscribed: false,
+          subscribersCount: data.subscribers_count
+        });
         showToast("VIP subscription cancelled", "info");
         if (onSubscriptionUpdated) onSubscriptionUpdated();
         window.dispatchEvent(new CustomEvent("refreshUser"));
@@ -562,6 +745,10 @@ export default function CreatorProfileModal({
       }
       setIsSubscribed(data.subscribed);
       setSubscribersCount(data.subscribers_count);
+      updateCachedCreator(normalizedTarget, {
+        isSubscribed: Boolean(data.subscribed),
+        subscribersCount: data.subscribers_count
+      });
       showToast("Subscribed to VIP tier!", "success");
       if (onSubscriptionUpdated) onSubscriptionUpdated();
       window.dispatchEvent(new CustomEvent("refreshUser"));
@@ -627,6 +814,15 @@ export default function CreatorProfileModal({
       setShowSubscribeModal(true);
       return;
     }
+
+    const currentScroll = isDesktop 
+      ? (desktopScrollRef.current?.scrollTop || 0)
+      : (mobileScrollRef.current?.scrollTop || 0);
+    saveCreatorScroll(normalizedTarget, currentScroll);
+    updateCachedCreator(normalizedTarget, {
+      showDiscoverCreators,
+      activeTab
+    });
 
     if (onVideoClick) {
       onVideoClick({
@@ -765,7 +961,7 @@ export default function CreatorProfileModal({
                   {/* User icon passport with plus sign positioned besides Subscribe button */}
                   <button
                     type="button"
-                    onClick={() => setShowDiscoverCreators(prev => !prev)}
+                    onClick={handleToggleDiscoverCreators}
                     style={{
                       height: "44px",
                       width: "44px",
@@ -935,7 +1131,7 @@ export default function CreatorProfileModal({
                     {/* User icon passport with plus sign positioned besides Subscribe button */}
                     <button
                       type="button"
-                      onClick={() => setShowDiscoverCreators(prev => !prev)}
+                      onClick={handleToggleDiscoverCreators}
                       style={{
                         height: "44px",
                         width: "44px",
@@ -1021,6 +1217,14 @@ export default function CreatorProfileModal({
                 user={currentUser}
                 excludeUsername={creatorData?.username || creatorUsername}
                 onCreatorClick={(uname) => {
+                  const currentScroll = isDesktop 
+                    ? (desktopScrollRef.current?.scrollTop || 0)
+                    : (mobileScrollRef.current?.scrollTop || 0);
+                  saveCreatorScroll(normalizedTarget, currentScroll);
+                  updateCachedCreator(normalizedTarget, {
+                    showDiscoverCreators: true,
+                    activeTab
+                  });
                   window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
                 }}
                 onSeeAll={() => {
@@ -1063,7 +1267,7 @@ export default function CreatorProfileModal({
               zIndex: 90
             }}>
               <button 
-                onClick={() => setActiveTab("posts")} 
+                onClick={() => handleTabChange("posts")} 
                 style={{ 
                   ...tabBtnStyle, 
                   borderTop: (isDesktop && activeTab === "posts") ? "1px solid #ffffff" : "none",
@@ -1076,7 +1280,7 @@ export default function CreatorProfileModal({
                 {isDesktop && <span style={{ fontSize: "12px", fontWeight: "700", letterSpacing: "1px" }}>POSTS</span>}
               </button>
               <button 
-                onClick={() => setActiveTab("reels")} 
+                onClick={() => handleTabChange("reels")} 
                 style={{ 
                   ...tabBtnStyle, 
                   borderTop: (isDesktop && activeTab === "reels") ? "1px solid #ffffff" : "none",
@@ -1090,7 +1294,7 @@ export default function CreatorProfileModal({
               </button>
               {isMonetizedCreator && (
                 <button 
-                  onClick={() => setActiveTab("premium")} 
+                  onClick={() => handleTabChange("premium")} 
                   style={{ 
                     ...tabBtnStyle, 
                     borderTop: (isDesktop && activeTab === "premium") ? "1px solid #ffffff" : "none",
@@ -1258,6 +1462,7 @@ export default function CreatorProfileModal({
               ref={desktopScrollRef}
               className="custom-scrollbar"
               style={desktopCenterProfileRailStyle}
+              onScroll={handleProfileScroll}
             >
               {/* Desktop Sticky Header with Back Button */}
               <div style={desktopProfileStickyHeaderStyle}>
@@ -1314,11 +1519,25 @@ export default function CreatorProfileModal({
               user={currentUser}
               onCreatorClick={(uname) => {
                 if (uname.toLowerCase() !== normalizedTarget) {
+                  const currentScroll = desktopScrollRef.current?.scrollTop || 0;
+                  saveCreatorScroll(normalizedTarget, currentScroll);
+                  updateCachedCreator(normalizedTarget, {
+                    showDiscoverCreators,
+                    activeTab
+                  });
                   onClose();
                   window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: uname }));
                 }
               }}
               onVideoClick={(v) => {
+                const currentScroll = isDesktop 
+                  ? (desktopScrollRef.current?.scrollTop || 0)
+                  : (mobileScrollRef.current?.scrollTop || 0);
+                saveCreatorScroll(normalizedTarget, currentScroll);
+                updateCachedCreator(normalizedTarget, {
+                  showDiscoverCreators,
+                  activeTab
+                });
                 if (onVideoClick) onVideoClick(v);
               }}
               onOpenDiscover={() => {
@@ -1371,7 +1590,7 @@ export default function CreatorProfileModal({
               <button onClick={onClose} style={errorBackBtnStyle}>Back to Feed</button>
             </div>
           ) : (
-            <div ref={mobileScrollRef} style={scrollContentStyle}>
+            <div ref={mobileScrollRef} style={scrollContentStyle} onScroll={handleProfileScroll}>
               <PullToRefresh scrollRef={mobileScrollRef} onRefresh={handleRefresh}>
                 <div style={profileInnerContainer}>
                   {renderProfileBody()}

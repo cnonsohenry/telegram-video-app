@@ -23,6 +23,7 @@ import StoryAvatar from "../components/StoryAvatar";
 import DesktopLeftSidebar from "../components/DesktopLeftSidebar";
 import DesktopRightSidebar from "../components/DesktopRightSidebar";
 import { InstagramSuggestedCreators } from "../components/DiscoverCreatorsSection";
+import { getGlobalFollow, setGlobalFollow } from "../utils/creatorProfileCache";
 
 // 🌟 UNIFIED CREATOR SEARCH CARD
 const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowing, isLoadingFollow }) => {
@@ -777,6 +778,18 @@ export default function Explore({
     return () => window.removeEventListener("popstate", handleExplorePopState);
   }, [searchQuery, loadSearchFeed]);
 
+  // Synchronize follow changes across the application
+  useEffect(() => {
+    const handleFollowChange = (e) => {
+      const { username: changedUname, isFollowing } = e.detail || {};
+      if (changedUname) {
+        setSearchFollowingMap(prev => ({ ...prev, [changedUname]: isFollowing }));
+      }
+    };
+    window.addEventListener("creatorFollowChanged", handleFollowChange);
+    return () => window.removeEventListener("creatorFollowChanged", handleFollowChange);
+  }, []);
+
   const handleSearchCreatorFollow = async (e, creator) => {
     e.stopPropagation();
     const uname = creator.username;
@@ -786,11 +799,12 @@ export default function Explore({
 
     const isCurrentlyFollowing = searchFollowingMap[uname] !== undefined
       ? searchFollowingMap[uname]
-      : Boolean(creator.is_following);
+      : getGlobalFollow(uname, Boolean(creator.is_following));
     const nextFollowing = !isCurrentlyFollowing;
 
     setSearchFollowingMap(prev => ({ ...prev, [uname]: nextFollowing }));
     setSearchFollowingLoading(prev => ({ ...prev, [uname]: true }));
+    setGlobalFollow(uname, nextFollowing);
 
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(uname)}/follow`, {
@@ -800,10 +814,12 @@ export default function Explore({
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Failed to update follow");
       setSearchFollowingMap(prev => ({ ...prev, [uname]: Boolean(data.following) }));
+      setGlobalFollow(uname, Boolean(data.following));
       showToast(data.following ? `Following @${uname}` : `Unfollowed @${uname}`, data.following ? "success" : "error");
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (err) {
       setSearchFollowingMap(prev => ({ ...prev, [uname]: isCurrentlyFollowing }));
+      setGlobalFollow(uname, isCurrentlyFollowing);
       showToast(err.message || "Failed to update follow", "error");
     } finally {
       setSearchFollowingLoading(prev => ({ ...prev, [uname]: false }));

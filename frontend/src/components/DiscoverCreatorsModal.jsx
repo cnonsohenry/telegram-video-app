@@ -7,6 +7,7 @@ import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import { showToast, promptLogin } from "../utils/toast";
 import StoryAvatar from "./StoryAvatar";
+import { getGlobalFollow, setGlobalFollow } from "../utils/creatorProfileCache";
 
 // 🟢 Fast in-memory cache for instant Discover modal display
 let memoryCachedCreators = null;
@@ -110,10 +111,30 @@ export default function DiscoverCreatorsModal({
     }
   }, []);
 
+  const listRef = useRef(null);
+  const lastModalScrollRef = useRef(0);
+
+  // Synchronize follow changes across the application
+  useEffect(() => {
+    const handleFollowChange = (e) => {
+      const { username, isFollowing } = e.detail || {};
+      if (username) {
+        setFollowingMap(prev => ({ ...prev, [username]: isFollowing }));
+      }
+    };
+    window.addEventListener("creatorFollowChanged", handleFollowChange);
+    return () => window.removeEventListener("creatorFollowChanged", handleFollowChange);
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       const hasCached = Boolean(memoryCachedCreators && memoryCachedCreators.length > 0);
       fetchCreators("", hasCached);
+      if (listRef.current && lastModalScrollRef.current > 0) {
+        requestAnimationFrame(() => {
+          if (listRef.current) listRef.current.scrollTop = lastModalScrollRef.current;
+        });
+      }
     }
   }, [isOpen, fetchCreators]);
 
@@ -144,12 +165,13 @@ export default function DiscoverCreatorsModal({
 
     const isCurrentlyFollowing = followingMap[uname] !== undefined 
       ? followingMap[uname] 
-      : Boolean(creator.is_following);
+      : getGlobalFollow(uname, Boolean(creator.is_following));
     const nextFollowing = !isCurrentlyFollowing;
 
-    // Optimistic UI update
+    // Optimistic UI update across local state and global cache
     setFollowingMap(prev => ({ ...prev, [uname]: nextFollowing }));
     setLoadingFollowMap(prev => ({ ...prev, [uname]: true }));
+    setGlobalFollow(uname, nextFollowing);
 
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(uname)}/follow`, {
@@ -164,13 +186,28 @@ export default function DiscoverCreatorsModal({
         throw new Error(data.error || "Failed to update follow");
       }
       setFollowingMap(prev => ({ ...prev, [uname]: Boolean(data.following) }));
+      setGlobalFollow(uname, Boolean(data.following));
       showToast(data.following ? `Following @${uname}` : `Unfollowed @${uname}`, data.following ? "success" : "error");
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (err) {
       setFollowingMap(prev => ({ ...prev, [uname]: isCurrentlyFollowing }));
+      setGlobalFollow(uname, isCurrentlyFollowing);
       showToast(err.message || "Failed to update follow", "error");
     } finally {
       setLoadingFollowMap(prev => ({ ...prev, [uname]: false }));
+    }
+  };
+
+  const handleCreatorClick = (uname, options) => {
+    if (listRef.current) {
+      lastModalScrollRef.current = listRef.current.scrollTop;
+    }
+    if (onCreatorClick) {
+      onCreatorClick(uname, options);
+    } else {
+      window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
+        detail: { username: uname, ...(options || {}) } 
+      }));
     }
   };
 
@@ -182,13 +219,7 @@ export default function DiscoverCreatorsModal({
       promptLogin("subscribe");
       return;
     }
-    if (onCreatorClick) {
-      onCreatorClick(creator.username, { autoSubscribe: true });
-    } else {
-      window.dispatchEvent(new CustomEvent("openCreatorProfile", { 
-        detail: { username: creator.username, autoSubscribe: true } 
-      }));
-    }
+    handleCreatorClick(creator.username, { autoSubscribe: true });
   };
 
   // Thumbnail click handler
@@ -281,7 +312,7 @@ export default function DiscoverCreatorsModal({
         </div>
 
         {/* Scrollable Container: holds search bar and creator cards */}
-        <div style={listContainerStyle}>
+        <div ref={listRef} style={listContainerStyle}>
           {/* Search Input Bar (Scrolls with content) */}
           <div style={searchBarWrapper}>
             <div style={searchBoxStyle}>
@@ -351,7 +382,7 @@ export default function DiscoverCreatorsModal({
                   const uname = creator.username;
                   const isFollowing = followingMap[uname] !== undefined 
                     ? followingMap[uname] 
-                    : Boolean(creator.is_following);
+                    : getGlobalFollow(uname, Boolean(creator.is_following));
                   const isUpdating = Boolean(loadingFollowMap[uname]);
 
                   const isSubscribed = Boolean(
@@ -368,11 +399,7 @@ export default function DiscoverCreatorsModal({
                     <div 
                       key={uname} 
                       style={creatorCardStyle}
-                      onClick={() => {
-                        if (onCreatorClick) {
-                          onCreatorClick(uname);
-                        }
-                      }}
+                      onClick={() => handleCreatorClick(uname)}
                     >
                       {/* Top Row: Avatar on left; Name, bio, follow count closer together without exceeding avatar pic */}
                       <div style={topRowStyle}>
@@ -383,7 +410,7 @@ export default function DiscoverCreatorsModal({
                             displayName={creator.display_name || uname}
                             size={54}
                             borderWidth={2.5}
-                            onClick={() => onCreatorClick && onCreatorClick(uname)}
+                            onClick={() => handleCreatorClick(uname)}
                           />
                         </div>
 

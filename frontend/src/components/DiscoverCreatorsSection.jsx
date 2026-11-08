@@ -1,12 +1,14 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { ChevronLeft, ChevronRight, X, Loader2 } from "lucide-react";
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge";
 import { APP_CONFIG } from "../config";
 import { showToast, promptLogin } from "../utils/toast";
 import StoryAvatar from "./StoryAvatar";
+import { getGlobalFollow, setGlobalFollow, saveSuggestedScroll, getSuggestedScroll } from "../utils/creatorProfileCache";
 
 // 🌟 IN-MEMORY & LOCAL STORAGE CACHE (INSTANT 0MS APPEARANCE)
 let memoryFeaturedCreators = null;
+let lastPrefetchTime = 0;
 try {
   const cached = localStorage.getItem("cached_featured_creators");
   if (cached) {
@@ -17,8 +19,12 @@ try {
   }
 } catch (e) {}
 
-// Eager background pre-fetch function
-export const prefetchFeaturedCreators = async () => {
+// Eager background pre-fetch function with 5-minute memory caching
+export const prefetchFeaturedCreators = async (force = false) => {
+  const now = Date.now();
+  if (!force && memoryFeaturedCreators && memoryFeaturedCreators.length > 0 && (now - lastPrefetchTime < 5 * 60 * 1000)) {
+    return memoryFeaturedCreators;
+  }
   try {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -26,6 +32,7 @@ export const prefetchFeaturedCreators = async () => {
     if (res.ok) {
       const data = await res.json();
       if (data?.creators && data.creators.length > 0) {
+        lastPrefetchTime = Date.now();
         memoryFeaturedCreators = data.creators;
         try {
           localStorage.setItem("cached_featured_creators", JSON.stringify(data.creators));
@@ -114,6 +121,18 @@ export default function DiscoverCreatorsSection({
     return () => window.removeEventListener("storyViewed", handleStoryViewed);
   }, []);
 
+  // Real-time listener for follow/unfollow events across the app
+  useEffect(() => {
+    const handleFollowChange = (e) => {
+      const { username, isFollowing } = e.detail || {};
+      if (username) {
+        setFollowingMap(prev => ({ ...prev, [username]: isFollowing }));
+      }
+    };
+    window.addEventListener("creatorFollowChanged", handleFollowChange);
+    return () => window.removeEventListener("creatorFollowChanged", handleFollowChange);
+  }, []);
+
   // If initialCreators prop changes or was provided
   useEffect(() => {
     if (isControlled) {
@@ -122,13 +141,18 @@ export default function DiscoverCreatorsSection({
     }
   }, [initialCreators, isControlled]);
 
-  // Background fetch / refresh
+  // Background fetch / refresh with deduplication
   useEffect(() => {
     let isMounted = true;
     if (!isControlled) {
       prefetchFeaturedCreators().then((data) => {
         if (isMounted && data && data.length > 0) {
-          setCreators(data);
+          setCreators(prev => {
+            if (prev && prev.length === data.length && prev[0]?.username === data[0]?.username) {
+              return prev;
+            }
+            return data;
+          });
           setIsLoadingFeatured(false);
         }
       });
@@ -157,12 +181,13 @@ export default function DiscoverCreatorsSection({
 
     const isCurrentlyFollowing = followingMap[uname] !== undefined 
       ? followingMap[uname] 
-      : Boolean(creator.is_following);
+      : getGlobalFollow(uname, Boolean(creator.is_following));
     const nextFollowing = !isCurrentlyFollowing;
 
-    // Optimistic UI update
+    // Optimistic UI update across both local state and global cache
     setFollowingMap((prev) => ({ ...prev, [uname]: nextFollowing }));
     setLoadingMap((prev) => ({ ...prev, [uname]: true }));
+    setGlobalFollow(uname, nextFollowing);
 
     try {
       const res = await fetch(`${APP_CONFIG.apiUrl}/api/creator/${encodeURIComponent(uname)}/follow`, {
@@ -177,11 +202,13 @@ export default function DiscoverCreatorsSection({
         throw new Error(data.error || "Failed to update follow");
       }
       setFollowingMap((prev) => ({ ...prev, [uname]: Boolean(data.following) }));
+      setGlobalFollow(uname, Boolean(data.following));
       showToast(data.following ? `Following @${uname}` : `Unfollowed @${uname}`, data.following ? "success" : "error");
       window.dispatchEvent(new CustomEvent("refreshUser"));
     } catch (err) {
       // Revert optimistic state on failure
       setFollowingMap((prev) => ({ ...prev, [uname]: isCurrentlyFollowing }));
+      setGlobalFollow(uname, isCurrentlyFollowing);
       showToast(err.message || "Failed to update follow", "error");
     } finally {
       setLoadingMap((prev) => ({ ...prev, [uname]: false }));
@@ -190,15 +217,34 @@ export default function DiscoverCreatorsSection({
 
   const normExclude = String(excludeUsername || "").toLowerCase().replace(/^@/, "").trim();
   const normUser = String(user?.username || "").toLowerCase().replace(/^@/, "").trim();
+  const scrollKey = normExclude || "default";
 
-  const visibleCreators = (creators || []).filter((c) => {
-    if (!c || !c.username) return false;
-    const u = String(c.username).toLowerCase().trim();
-    if (!hideDismiss && dismissedSet.has(c.username)) return false;
-    if (normExclude && u === normExclude) return false;
-    if (normUser && u === normUser) return false;
-    return true;
-  });
+  const visibleCreators = useMemo(() => {
+    return (creators || []).filter((c) => {
+      if (!c || !c.username) return false;
+      const u = String(c.username).toLowerCase().trim();
+      if (!hideDismiss && dismissedSet.has(c.username)) return false;
+      if (normExclude && u === normExclude) return false;
+      if (normUser && u === normUser) return false;
+      return true;
+    });
+  }, [creators, normExclude, normUser, dismissedSet, hideDismiss]);
+
+  // Horizontal scroll tracking and automatic position restoration
+  const handleTrackScroll = useCallback(() => {
+    if (trackRef.current) {
+      saveSuggestedScroll(scrollKey, trackRef.current.scrollLeft);
+    }
+  }, [scrollKey]);
+
+  useEffect(() => {
+    if (trackRef.current) {
+      const saved = getSuggestedScroll(scrollKey);
+      if (saved > 0) {
+        trackRef.current.scrollLeft = saved;
+      }
+    }
+  }, [scrollKey, visibleCreators.length]);
 
   const scrollTrack = (direction) => {
     if (trackRef.current) {
@@ -280,12 +326,12 @@ export default function DiscoverCreatorsSection({
         </div>
       </div>
 
-      <div ref={trackRef} style={igScrollTrack}>
+      <div ref={trackRef} style={igScrollTrack} onScroll={handleTrackScroll}>
         {visibleCreators.map((creator) => {
           const uname = creator.username;
           const isFollowing = followingMap[uname] !== undefined 
             ? followingMap[uname] 
-            : Boolean(creator.is_following);
+            : getGlobalFollow(uname, Boolean(creator.is_following));
           const isLoading = Boolean(loadingMap[uname]);
 
           return (

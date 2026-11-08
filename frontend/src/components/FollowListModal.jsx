@@ -11,6 +11,7 @@ import DesktopRightSidebar from "./DesktopRightSidebar";
 import { APP_CONFIG } from "../config";
 import { promptLogin, promptEmailVerification } from "../utils/toast";
 import { resolveAvatar, handleAvatarError } from "../utils/avatar";
+import { getGlobalFollow, setGlobalFollow } from "../utils/creatorProfileCache";
 
 const API_BASE_URL = APP_CONFIG.apiUrl || "";
 const getAuthHeaders = (json = false) => {
@@ -78,6 +79,20 @@ export default function FollowListModal({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
+
+  // Synchronize follow changes across the application
+  useEffect(() => {
+    const handleFollowChange = (e) => {
+      const { username: changedUname, isFollowing } = e.detail || {};
+      if (changedUname) {
+        setUsers(prev =>
+          prev.map(u => (u.username && u.username.toLowerCase() === changedUname.toLowerCase() ? { ...u, is_following: isFollowing } : u))
+        );
+      }
+    };
+    window.addEventListener("creatorFollowChanged", handleFollowChange);
+    return () => window.removeEventListener("creatorFollowChanged", handleFollowChange);
+  }, []);
 
   useEffect(() => {
     const nextTab = initialTab === "following" ? "following" : "followers";
@@ -180,6 +195,7 @@ export default function FollowListModal({
       );
       if (res.ok) {
         const data = await res.json();
+        setGlobalFollow(targetUser.username, Boolean(data.following));
         setUsers(prev => {
           const updated = prev.map(u => (u.id === uid ? { ...u, is_following: Boolean(data.following) } : u));
           const key = `${cleanUname}:${activeTab}:${searchQuery.trim().toLowerCase()}`;
