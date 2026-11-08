@@ -127,9 +127,14 @@ export default function App() {
     showDiscoverCreatorsRef.current = showDiscoverCreators;
   }, [showDiscoverCreators]);
 
-  // 🟢 THE FIX: App Height Lock Architecture
-  const windowWidth = useRef(window.innerWidth);
-  const [appHeight, setAppHeight] = useState(`${window.innerHeight}px`);
+  // 🟢 THE FIX: App Height Lock Architecture (With resilient 100dvh fallback for tab wakeups)
+  const windowWidth = useRef(typeof window !== "undefined" ? window.innerWidth : 0);
+  const [appHeight, setAppHeight] = useState(() => {
+    if (typeof window !== "undefined" && window.innerHeight > 0) {
+      return `${window.innerHeight}px`;
+    }
+    return "100dvh";
+  });
 
   // 🟢 1. Track the active tab in a Ref so our callbacks can check it without re-rendering
   const activeTabRef = useRef(activeTab);
@@ -683,17 +688,60 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const handleResize = () => {
-      // Only recalculate height if the phone rotates (width changes). 
-      // This completely ignores the vertical height shrinkage from the keyboard!
-      if (window.innerWidth !== windowWidth.current) {
-        setAppHeight(`${window.innerHeight}px`);
-        windowWidth.current = window.innerWidth;
+    const updateDimensions = (force = false) => {
+      if (typeof window === "undefined") return;
+      const h = window.innerHeight;
+      const w = window.innerWidth;
+      if (h <= 0) return;
+
+      const isInputFocused = document.activeElement && 
+        (document.activeElement.tagName === "INPUT" || 
+         document.activeElement.tagName === "TEXTAREA" || 
+         document.activeElement.isContentEditable);
+
+      // Recalculate if:
+      // 1. Force update (e.g. on tab wakeup / visibilitychange / pageshow)
+      // 2. Width changed (device rotation / window resize)
+      // 3. Height changed AND no input is currently focused (not an on-screen keyboard opening)
+      if (force || w !== windowWidth.current || !isInputFocused) {
+        setAppHeight(`${h}px`);
+        windowWidth.current = w;
       }
     };
+
+    const handleResize = () => updateDimensions(false);
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+
+    // 🟢 Tab Wakeup & Visibility Recovery (Prevents blank/black screen when returning after a long time)
+    const handleWakeup = () => {
+      if (document.visibilityState === "visible") {
+        updateDimensions(true);
+        // Force GPU compositor re-rasterization to restore unpainted tile textures
+        requestAnimationFrame(() => {
+          const root = document.getElementById("root");
+          if (root) {
+            root.style.transform = "translateZ(0)";
+            requestAnimationFrame(() => {
+              root.style.transform = "";
+            });
+          }
+        });
+        // Gracefully refresh user auth and subscriptions
+        refreshUser();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleWakeup);
+    window.addEventListener("pageshow", handleWakeup);
+    window.addEventListener("focus", handleWakeup);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener("visibilitychange", handleWakeup);
+      window.removeEventListener("pageshow", handleWakeup);
+      window.removeEventListener("focus", handleWakeup);
+    };
+  }, [refreshUser]);
 
   const isLoggedIn = !!token;
 
@@ -1035,12 +1083,14 @@ export default function App() {
 
   return (
     <div style={{ 
-      height: appHeight, // 🟢 NO MORE 100dvh! Frozen rigid height.
+      height: appHeight && appHeight !== "0px" ? appHeight : "100dvh",
+      minHeight: "100%",
       width: '100vw', 
       backgroundColor: 'var(--bg-color)', 
       color: '#d4d4d8', 
       overflow: 'hidden',
       position: 'fixed',
+      inset: 0,
       top: 0, 
       left: 0
     }}>
