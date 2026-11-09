@@ -14,10 +14,8 @@ import axios from "axios";
 
 class CrmService {
   constructor() {
-    this.enabled = process.env.CRM_ENABLED === "true";
-    this.apiUrl = (process.env.CRM_API_URL || "http://94.72.109.109:3001/rest").replace(/\/+$/, "");
-    this.apiKey = process.env.CRM_API_KEY || "";
-    this.timeout = 7000;
+    this.reloadConfig();
+    this.timeout = 8000;
   }
 
   /**
@@ -25,7 +23,7 @@ class CrmService {
    */
   reloadConfig() {
     this.enabled = process.env.CRM_ENABLED === "true";
-    this.apiUrl = (process.env.CRM_API_URL || "http://94.72.109.109:3001/rest").replace(/\/+$/, "");
+    this.apiUrl = (process.env.CRM_API_URL || "https://crm.codedloud.com/rest").replace(/\/+$/, "");
     this.apiKey = process.env.CRM_API_KEY || "";
   }
 
@@ -42,7 +40,7 @@ class CrmService {
   /**
    * Helper to execute CRM API requests safely without throwing unhandled exceptions
    */
-  async _request(method, path, data = null) {
+  async _request(method, path, data = null, params = null) {
     if (!this.enabled) {
       return null;
     }
@@ -54,13 +52,19 @@ class CrmService {
 
     const url = `${this.apiUrl}${path.startsWith("/") ? path : `/${path}`}`;
     try {
-      const response = await axios({
+      const config = {
         method,
         url,
-        data,
         headers: this.getHeaders(),
         timeout: this.timeout
-      });
+      };
+      if (params) {
+        config.params = params;
+      }
+      if (data && method.toUpperCase() !== "GET") {
+        config.data = data;
+      }
+      const response = await axios(config);
       return response.data;
     } catch (err) {
       const errMsg = err.response?.data?.message || err.response?.data?.error || err.message;
@@ -80,6 +84,9 @@ class CrmService {
     setImmediate(async () => {
       try {
         const email = String(user.email).trim().toLowerCase();
+        // Ignore internal telegram dummy emails
+        if (email.endsWith("@internal.naijahomemade.com")) return;
+
         const username = user.username || "user";
         const displayName = user.display_name || username;
         const roleLabel = user.is_creator ? "Creator" : (user.is_premium ? "VIP Member" : "Fan");
@@ -97,13 +104,16 @@ class CrmService {
           emails: {
             primaryEmail: email
           },
-          city: user.location ? String(user.location).substring(0, 50) : undefined,
-          intro: user.creator_bio ? String(user.creator_bio).substring(0, 250) : undefined
+          jobTitle: roleLabel,
+          avatarUrl: user.avatar_url && !user.avatar_url.includes("default-avatar") ? user.avatar_url : undefined
         };
 
         // Check if Person already exists in Twenty CRM
-        const searchRes = await this._request("GET", `/people?filter[emails.primaryEmail][eq]=${encodeURIComponent(email)}&limit=1`);
-        const existingPerson = searchRes?.data?.people?.[0] || searchRes?.data?.[0];
+        const searchRes = await this._request("GET", "/people", null, {
+          filter: `emails.primaryEmail[eq]:${email}`,
+          limit: 1
+        });
+        const existingPerson = searchRes?.data?.people?.[0];
 
         if (existingPerson?.id) {
           // Update existing contact
@@ -153,8 +163,11 @@ class CrmService {
         // Optional: link to existing person in Twenty CRM
         let pointOfContactId = undefined;
         if (user_email) {
-          const searchRes = await this._request("GET", `/people?filter[emails.primaryEmail][eq]=${encodeURIComponent(user_email)}&limit=1`);
-          pointOfContactId = searchRes?.data?.people?.[0]?.id || searchRes?.data?.[0]?.id;
+          const searchRes = await this._request("GET", "/people", null, {
+            filter: `emails.primaryEmail[eq]:${user_email.trim().toLowerCase()}`,
+            limit: 1
+          });
+          pointOfContactId = searchRes?.data?.people?.[0]?.id || undefined;
         }
 
         const opportunityPayload = {
@@ -164,7 +177,6 @@ class CrmService {
             currencyCode: "USD"
           },
           stage: "CUSTOMER", // Completed/Won deal
-          closeDate: new Date().toISOString(),
           pointOfContactId
         };
 
@@ -187,10 +199,19 @@ class CrmService {
 
     setImmediate(async () => {
       try {
+        let pointOfContactId = undefined;
+        if (email) {
+          const searchRes = await this._request("GET", "/people", null, {
+            filter: `emails.primaryEmail[eq]:${email.trim().toLowerCase()}`,
+            limit: 1
+          });
+          pointOfContactId = searchRes?.data?.people?.[0]?.id || undefined;
+        }
+
         const opportunityPayload = {
-          name: `KYC Verification: @${username} (${id_type || 'ID'})`,
+          name: `KYC Review: @${username} (${id_type || 'ID'})`,
           stage: "SCREENING", // Pipeline stage for pending verification
-          closeDate: new Date().toISOString()
+          pointOfContactId
         };
 
         await this._request("POST", "/opportunities", opportunityPayload);
@@ -210,7 +231,6 @@ class CrmService {
     setImmediate(async () => {
       try {
         console.log(`[CRM] Subscription expired: @${username} from creator @${creator_username}`);
-        // Can be used to trigger automated win-back workflows or update contact tags
       } catch (err) {
         console.error("[CRM-RECORD-CHURN-ERROR]", err.message);
       }
