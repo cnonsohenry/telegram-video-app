@@ -28,6 +28,7 @@ import { syncTelegramCreatorProfile } from "./telegramCreatorSync.js";
 import { purgeVideoAndInteractions } from "./admin.js";
 import { isAiRefusal } from "./sanitizer.js";
 import { purgeAvatarCache } from "./avatarCache.js";
+import crmService from "./services/crmService.js";
 
 const router = express.Router();
 
@@ -386,6 +387,19 @@ router.post("/kyc/submit", authenticateToken, async (req, res) => {
     );
 
     console.log(`[CREATOR KYC] User @${user.username} (ID ${userId}) completed Identity KYC verification!`);
+
+    // 🟢 CRM Integration: Record KYC Screening & update Creator Contact
+    crmService.recordKycSubmission({
+      username: user.username,
+      email: user.email,
+      displayName: user.display_name,
+      id_type: cleanDocType,
+      user_id: userId
+    });
+    if (updatedUserRes.rows[0]) {
+      crmService.syncContact(updatedUserRes.rows[0]);
+    }
+
     return res.json({
       success: true,
       message: "Identity KYC verified! You can now activate Creator monetization and set your subscription price.",

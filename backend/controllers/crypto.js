@@ -1,5 +1,6 @@
 import axios from "axios";
 import crypto from "crypto";
+import crmService from "../services/crmService.js";
 
 // ==========================================
 // 1. GENERATE CRYPTO WALLET ADDRESS
@@ -232,6 +233,34 @@ export const fulfillCryptoOrder = async (pool, orderId) => {
     }
 
     await client.query('COMMIT');
+
+    // 🟢 CRM Integration: Record Deal / Revenue & Update User in Twenty CRM
+    (async () => {
+      try {
+        const uRes = await pool.query("SELECT email, username, display_name, is_creator, is_premium FROM app_users WHERE id = $1", [tx.app_user_id]);
+        const buyer = uRes.rows[0];
+        if (buyer) {
+          crmService.syncContact(buyer);
+          let targetCreatorUname = null;
+          if (tx.creator_id) {
+            const cRes = await pool.query("SELECT username FROM app_users WHERE id = $1", [tx.creator_id]);
+            targetCreatorUname = cRes.rows[0]?.username || null;
+          }
+          crmService.recordDeal({
+            app_user_id: tx.app_user_id,
+            user_email: buyer.email,
+            username: buyer.username,
+            amount_usd: tx.expected_amount,
+            transaction_type: txType,
+            creator_username: targetCreatorUname,
+            order_id: orderId
+          });
+        }
+      } catch (crmErr) {
+        console.error("[CRM-DISPATCH-ERROR]", crmErr.message);
+      }
+    })();
+
     return true;
   } catch (dbErr) {
     await client.query('ROLLBACK');

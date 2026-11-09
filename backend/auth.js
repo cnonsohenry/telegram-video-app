@@ -14,6 +14,7 @@ import WelcomeEmail from "./emails/WelcomeEmail.jsx";
 import { buildVerificationOtpEmail } from "./emails/emailTemplate.js";
 import React from "react";
 import pool from "./db.js";
+import crmService from "./services/crmService.js";
 
 const router = express.Router();
 
@@ -277,6 +278,9 @@ async function processGoogleIdToken(token) {
   user.following_count = userFolls.length;
   const appToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "30d" });
 
+  // 🟢 CRM Integration: Synchronize contact to Twenty CRM
+  crmService.syncContact(user);
+
   return { token: appToken, user };
 }
 
@@ -366,6 +370,10 @@ router.post("/register", registerLimiter, async (req, res) => {
     userData.follows = [];
     userData.followers_count = 0;
     userData.following_count = 0;
+
+    // 🟢 CRM Integration: Synchronize new user to Twenty CRM
+    crmService.syncContact(userData);
+
     res.json({ token, user: userData });
   } catch (err) {
     console.error("[REGISTER ERROR]", err);
@@ -561,10 +569,15 @@ router.post("/verify-email-code", authenticateToken, otpVerifyLimiter, async (re
       [record.email, userId]
     );
 
+    const verifiedUser = updatedUserRes.rows[0];
+
+    // 🟢 CRM Integration: Synchronize verified contact to Twenty CRM
+    crmService.syncContact(verifiedUser);
+
     res.json({
       success: true,
       email_verified: true,
-      user: updatedUserRes.rows[0],
+      user: verifiedUser,
       message: "Email verified successfully!"
     });
   } catch (err) {
