@@ -4,7 +4,8 @@ import {
   Clock, RefreshCw, UploadCloud, Video, Search, Edit3, Trash2, ChevronUp, ChevronDown, X, AlertTriangle, Menu,
   PlayCircle, Eye, PieChart, Activity, Star, Percent, Sparkles, CheckCircle, Heart, ExternalLink, DollarSign,
   Flag, ShieldAlert, BarChart3, Database, Layers, ArrowUpRight, Check,
-  Radio, Music, Calendar, Play, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowRightLeft
+  Radio, Music, Calendar, Play, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowRightLeft,
+  FileText, MessageSquare, Send, Zap, Tag, Loader2
 } from "lucide-react";
 import AdminUpload from "./AdminUpload"; 
 import TwitterVerifiedBadge from "./TwitterVerifiedBadge"; 
@@ -71,6 +72,15 @@ export default function AdminDashboard({ user, onLogout }) {
   const [creatorCategoryFilter, setCreatorCategoryFilter] = useState("all");
   const [syncingTelegram, setSyncingTelegram] = useState(false);
   const [syncingSingleCreator, setSyncingSingleCreator] = useState(false);
+
+  // 🟢 Creator CRM & Notes State
+  const [selectedCrmCreator, setSelectedCrmCreator] = useState(null);
+  const [crmNotes, setCrmNotes] = useState([]);
+  const [crmNotesLoading, setCrmNotesLoading] = useState(false);
+  const [newNoteText, setNewNoteText] = useState("");
+  const [newNoteTag, setNewNoteTag] = useState("general");
+  const [addingNote, setAddingNote] = useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState(null);
 
   const [txData, setTxData] = useState({ transactions: [], total: 0, total_pages: 1 });
   const [txCurrencyFilter, setTxCurrencyFilter] = useState("all"); // "all", "USD", "NGN"
@@ -310,8 +320,15 @@ export default function AdminDashboard({ user, onLogout }) {
     return [...data].sort((a, b) => {
       let valA = a[sortConfig.key];
       let valB = b[sortConfig.key];
-      if (typeof valA === 'string') valA = valA.toLowerCase();
-      if (typeof valB === 'string') valB = valB.toLowerCase();
+      if (valA === null || valA === undefined) valA = 0;
+      if (valB === null || valB === undefined) valB = 0;
+      if (typeof valA === 'string' && isNaN(Number(valA))) {
+        valA = valA.toLowerCase();
+        valB = (valB || '').toString().toLowerCase();
+      } else if (!isNaN(Number(valA)) && !isNaN(Number(valB))) {
+        valA = Number(valA);
+        valB = Number(valB);
+      }
       if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
       if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
@@ -723,6 +740,111 @@ export default function AdminDashboard({ user, onLogout }) {
     } finally {
       setSyncingTelegram(false);
     }
+  };
+
+  // 🟢 Creator CRM: Open Dossier & Fetch Notes
+  const handleOpenCreatorCrm = async (creator) => {
+    setSelectedCrmCreator(creator);
+    setCrmNotes([]);
+    setCrmNotesLoading(true);
+    setNewNoteText("");
+    setNewNoteTag("general");
+    try {
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators/${creator.id}/notes`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCrmNotes(data.notes || []);
+      }
+    } catch (err) {
+      console.error("[FETCH CREATOR NOTES ERROR]", err);
+      showToast("Failed to load notes", "error");
+    } finally {
+      setCrmNotesLoading(false);
+    }
+  };
+
+  // 🟢 Creator CRM: Add Note
+  const handleAddCreatorNote = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedCrmCreator || !newNoteText.trim()) return;
+
+    setAddingNote(true);
+    try {
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators/${selectedCrmCreator.id}/notes`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          note_text: newNoteText.trim(),
+          tag: newNoteTag
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.note) {
+          setCrmNotes(prev => [data.note, ...prev]);
+          setNewNoteText("");
+          // Optimistically bump creator notes_count in the list
+          setCreatorsList(prev => prev.map(c => 
+            c.id === selectedCrmCreator.id ? { ...c, notes_count: (c.notes_count || 0) + 1 } : c
+          ));
+          showToast("Private note added", "success");
+        }
+      } else {
+        showToast("Failed to save note", "error");
+      }
+    } catch (err) {
+      showToast("Error saving note: " + err.message, "error");
+    } finally {
+      setAddingNote(false);
+    }
+  };
+
+  // 🟢 Creator CRM: Delete Note
+  const handleDeleteCreatorNote = async (noteId) => {
+    if (!window.confirm("Permanently delete this private note?")) return;
+    setDeletingNoteId(noteId);
+    try {
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token");
+      const res = await fetch(`${APP_CONFIG.apiUrl}/api/admin/creators/notes/${noteId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setCrmNotes(prev => prev.filter(n => n.id !== noteId));
+        setCreatorsList(prev => prev.map(c => 
+          c.id === selectedCrmCreator?.id ? { ...c, notes_count: Math.max(0, (c.notes_count || 1) - 1) } : c
+        ));
+        showToast("Note deleted", "success");
+      } else {
+        showToast("Failed to delete note", "error");
+      }
+    } catch (err) {
+      showToast("Error deleting note", "error");
+    } finally {
+      setDeletingNoteId(null);
+    }
+  };
+
+  // Human-readable relative time helper
+  const formatTimeAgo = (dateStr) => {
+    if (!dateStr) return "Never";
+    const diff = Date.now() - new Date(dateStr).getTime();
+    if (diff < 0) return "Just now";
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(diff / 86400000);
+    if (days < 30) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString();
   };
 
   // Video / User Edit & Delete Handlers
@@ -2547,15 +2669,18 @@ export default function AdminDashboard({ user, onLogout }) {
                             <th onClick={() => handleSort('posts_count')} style={{ ...thStyle, cursor: "pointer" }}>
                               Posts / Views <SortIcon columnKey="posts_count" />
                             </th>
+                            <th onClick={() => handleSort('posts_24h')} style={{ ...thStyle, cursor: "pointer" }}>
+                              Vital Signs (24h) <SortIcon columnKey="posts_24h" />
+                            </th>
                             <th style={thStyle}>Verify Badge</th>
                             <th style={thStyle}>Status</th>
-                            <th style={thStyle}>Actions</th>
+                            <th style={thStyle}>CRM & Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {paginatedCreators.length === 0 ? (
                             <tr>
-                              <td colSpan={9} style={{ ...tdStyle, textAlign: "center", padding: "40px 16px", color: "#71717a" }}>
+                              <td colSpan={10} style={{ ...tdStyle, textAlign: "center", padding: "40px 16px", color: "#71717a" }}>
                                 No creators matching this filter.
                               </td>
                             </tr>
@@ -2614,6 +2739,37 @@ export default function AdminDashboard({ user, onLogout }) {
                                   <span style={{ display: "block", fontSize: "10px", color: "#71717a" }}>{(c.total_views || 0).toLocaleString()} views</span>
                                 </td>
                                 <td style={tdStyle}>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                      {Number(c.posts_24h || 0) >= 3 ? (
+                                        <span style={{ background: "rgba(52, 211, 153, 0.15)", color: "#34d399", border: "1px solid rgba(52, 211, 153, 0.3)", borderRadius: "4px", padding: "2px 6px", fontSize: "10px", fontWeight: "800", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#34d399" }} />
+                                          {c.posts_24h}/5 POSTS
+                                        </span>
+                                      ) : Number(c.posts_24h || 0) >= 1 ? (
+                                        <span style={{ background: "rgba(251, 191, 36, 0.15)", color: "#fbbf24", border: "1px solid rgba(251, 191, 36, 0.3)", borderRadius: "4px", padding: "2px 6px", fontSize: "10px", fontWeight: "800", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#fbbf24" }} />
+                                          {c.posts_24h}/5 POSTS
+                                        </span>
+                                      ) : (
+                                        <span style={{ background: "rgba(244, 63, 94, 0.12)", color: "#f43f5e", border: "1px solid rgba(244, 63, 94, 0.25)", borderRadius: "4px", padding: "2px 6px", fontSize: "10px", fontWeight: "800", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f43f5e" }} />
+                                          0/5 POSTS
+                                        </span>
+                                      )}
+                                      {Number(c.active_stories_count || 0) > 0 && (
+                                        <span title={`${c.active_stories_count} active stories`} style={{ background: "rgba(225, 29, 72, 0.15)", color: "#f43f5e", border: "1px solid rgba(225, 29, 72, 0.3)", borderRadius: "4px", padding: "2px 5px", fontSize: "10px", fontWeight: "800", display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                                          <Zap size={10} />
+                                          {c.active_stories_count}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span style={{ fontSize: "10px", color: "#71717a" }}>
+                                      Last: {formatTimeAgo(c.last_posted_at)}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td style={tdStyle}>
                                   <button
                                     type="button"
                                     onClick={() => handleToggleVerify(c)}
@@ -2656,7 +2812,31 @@ export default function AdminDashboard({ user, onLogout }) {
                                   </button>
                                 </td>
                                 <td style={tdStyle}>
-                                  <div style={{ display: "flex", gap: "6px" }}>
+                                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                    <button 
+                                      type="button"
+                                      onClick={() => handleOpenCreatorCrm(c)}
+                                      style={{
+                                        ...iconBtnStyle,
+                                        width: "auto",
+                                        padding: "4px 8px",
+                                        gap: "4px",
+                                        background: Number(c.notes_count || 0) > 0 ? "rgba(244, 63, 94, 0.15)" : "#27272a",
+                                        border: Number(c.notes_count || 0) > 0 ? "1px solid rgba(244, 63, 94, 0.3)" : "1px solid rgba(255,255,255,0.08)",
+                                        color: Number(c.notes_count || 0) > 0 ? "#f43f5e" : "#f4f4f5",
+                                        fontSize: "11px",
+                                        fontWeight: "700"
+                                      }}
+                                      title="Open Creator CRM & Deal Dossier"
+                                    >
+                                      <FileText size={13} />
+                                      <span>CRM</span>
+                                      {Number(c.notes_count || 0) > 0 && (
+                                        <span style={{ background: "#f43f5e", color: "#ffffff", borderRadius: "10px", padding: "0 5px", fontSize: "9px", fontWeight: "800" }}>
+                                          {c.notes_count}
+                                        </span>
+                                      )}
+                                    </button>
                                     <button 
                                       type="button"
                                       onClick={() => setEditingCreator(c)} 
@@ -3374,6 +3554,340 @@ export default function AdminDashboard({ user, onLogout }) {
 
             <button type="submit" style={saveBtnStyle}>Save Creator Profile</button>
           </form>
+        </div>
+      )}
+
+      {/* Creator CRM & Deal Dossier Modal */}
+      {selectedCrmCreator && (
+        <div style={modalOverlayStyle}>
+          <div style={{ ...modalBoxStyle, maxWidth: "680px", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", padding: "0" }}>
+            {/* Header */}
+            <div style={{ ...modalHeaderStyle, padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.08)", margin: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <img 
+                  src={selectedCrmCreator.avatar_url || '/assets/default-avatar.png'} 
+                  alt="" 
+                  style={{ width: "46px", height: "46px", borderRadius: "50%", objectFit: "cover", border: "1.5px solid rgba(255,255,255,0.12)" }}
+                  onError={(e) => { e.target.src = "/assets/default-avatar.png"; }}
+                />
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <h2 style={{ margin: 0, fontSize: "17px", fontWeight: "800", color: "#f4f4f5" }}>
+                      {selectedCrmCreator.display_name || selectedCrmCreator.username}
+                    </h2>
+                    {selectedCrmCreator.is_verified && <TwitterVerifiedBadge size={14} />}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "12px", color: "#a1a1aa" }}>@{selectedCrmCreator.username}</span>
+                    <span style={{ background: "#27272a", color: "#a1a1aa", borderRadius: "4px", padding: "1px 6px", fontSize: "10px", fontWeight: "700" }}>
+                      {selectedCrmCreator.creator_category || "Creator"}
+                    </span>
+                    {selectedCrmCreator.is_managed ? (
+                      <span style={{ background: "rgba(56, 189, 248, 0.12)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.25)", borderRadius: "4px", padding: "1px 6px", fontSize: "10px", fontWeight: "800" }}>
+                        TELEGRAM MANAGED
+                      </span>
+                    ) : (
+                      <span style={{ background: "rgba(244, 63, 94, 0.12)", color: "#f43f5e", border: "1px solid rgba(244, 63, 94, 0.25)", borderRadius: "4px", padding: "1px 6px", fontSize: "10px", fontWeight: "800" }}>
+                        WEB CREATOR
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {selectedCrmCreator.source_channel && (
+                  <a 
+                    href={selectedCrmCreator.source_channel.startsWith("http") ? selectedCrmCreator.source_channel : `https://t.me/${selectedCrmCreator.source_channel.replace(/^@/, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      background: "rgba(56, 189, 248, 0.12)",
+                      border: "1px solid rgba(56, 189, 248, 0.3)",
+                      color: "#38bdf8",
+                      borderRadius: "8px",
+                      padding: "6px 10px",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px"
+                    }}
+                    title="Open Source Telegram Channel"
+                  >
+                    <Send size={12} />
+                    <span>Telegram</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent("openCreatorProfile", { detail: selectedCrmCreator.username }))}
+                  style={{
+                    background: "#27272a",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    color: "#f4f4f5",
+                    borderRadius: "8px",
+                    padding: "6px 10px",
+                    fontSize: "11px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px"
+                  }}
+                  title="View Public Profile"
+                >
+                  <ExternalLink size={12} />
+                  <span>Profile</span>
+                </button>
+                <X size={20} cursor="pointer" onClick={() => setSelectedCrmCreator(null)} color="#71717a" />
+              </div>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+              {/* Vital Signs Grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px", marginBottom: "22px" }}>
+                <div style={{ background: "#27272a", padding: "12px 14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: "11px", color: "#a1a1aa", fontWeight: "600", marginBottom: "4px" }}>24h Output</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ 
+                      fontSize: "18px", 
+                      fontWeight: "800", 
+                      color: Number(selectedCrmCreator.posts_24h || 0) >= 3 ? "#34d399" : Number(selectedCrmCreator.posts_24h || 0) >= 1 ? "#fbbf24" : "#f43f5e" 
+                    }}>
+                      {selectedCrmCreator.posts_24h || 0}/5
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#71717a" }}>posts</span>
+                  </div>
+                  <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px" }}>
+                    Last: {formatTimeAgo(selectedCrmCreator.last_posted_at)}
+                  </div>
+                </div>
+
+                <div style={{ background: "#27272a", padding: "12px 14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: "11px", color: "#a1a1aa", fontWeight: "600", marginBottom: "4px" }}>Active Stories</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "18px", fontWeight: "800", color: "#f43f5e" }}>
+                      {selectedCrmCreator.active_stories_count || 0}
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#71717a" }}>reels live</span>
+                  </div>
+                  <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px" }}>
+                    24h rolling expires
+                  </div>
+                </div>
+
+                <div style={{ background: "#27272a", padding: "12px 14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: "11px", color: "#a1a1aa", fontWeight: "600", marginBottom: "4px" }}>VIP Members</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "18px", fontWeight: "800", color: "#fbbf24" }}>
+                      {selectedCrmCreator.subscribers_count || 0}
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#71717a" }}>fans</span>
+                  </div>
+                  <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px" }}>
+                    {Number(selectedCrmCreator.subscription_price || 0) > 0 ? `$${Number(selectedCrmCreator.subscription_price)}/mo` : "Free membership"}
+                  </div>
+                </div>
+
+                <div style={{ background: "#27272a", padding: "12px 14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: "11px", color: "#a1a1aa", fontWeight: "600", marginBottom: "4px" }}>Tips & Catalog</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "18px", fontWeight: "800", color: "#34d399" }}>
+                      ${(selectedCrmCreator.tips_total || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "10px", color: "#71717a", marginTop: "2px" }}>
+                    {selectedCrmCreator.posts_count || 0} videos • {(selectedCrmCreator.total_views || 0).toLocaleString()} views
+                  </div>
+                </div>
+              </div>
+
+              {/* Private Notes & Deal Dossier */}
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                  <FileText size={16} color="#f43f5e" />
+                  <h3 style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: "#f4f4f5" }}>
+                    Confidential Notes & Pipeline Log
+                  </h3>
+                </div>
+                <p style={{ margin: "0 0 14px 0", fontSize: "12px", color: "#71717a" }}>
+                  Internal staff dossier. Keep track of negotiated deals, Telegram contact info, payout agreements, or VIP requests.
+                </p>
+
+                {/* Add Note Form */}
+                <form onSubmit={handleAddCreatorNote} style={{ background: "#27272a", padding: "14px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", marginBottom: "20px" }}>
+                  {/* Tag Pills */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "700", color: "#71717a", display: "inline-flex", alignItems: "center", gap: "3px", marginRight: "4px" }}>
+                      <Tag size={11} /> Tag:
+                    </span>
+                    {[
+                      { id: "general", label: "#general", color: "#a1a1aa" },
+                      { id: "deal", label: "#deal", color: "#fbbf24" },
+                      { id: "payout", label: "#payout", color: "#34d399" },
+                      { id: "contact", label: "#contact", color: "#38bdf8" },
+                      { id: "reminder", label: "#reminder", color: "#f43f5e" }
+                    ].map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setNewNoteTag(t.id)}
+                        style={{
+                          background: newNoteTag === t.id ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.03)",
+                          border: newNoteTag === t.id ? `1.5px solid ${t.color}` : "1px solid rgba(255,255,255,0.06)",
+                          color: newNoteTag === t.id ? t.color : "#71717a",
+                          borderRadius: "6px",
+                          padding: "3px 8px",
+                          fontSize: "11px",
+                          fontWeight: "700",
+                          cursor: "pointer"
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <textarea 
+                    rows={3}
+                    value={newNoteText}
+                    onChange={(e) => setNewNoteText(e.target.value)}
+                    placeholder="Write a private note, agreement, reminder, or payout update..."
+                    style={{
+                      width: "100%",
+                      background: "#18181b",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: "8px",
+                      padding: "10px 12px",
+                      color: "#f4f4f5",
+                      fontSize: "12px",
+                      fontFamily: "inherit",
+                      resize: "none",
+                      outline: "none",
+                      marginBottom: "10px",
+                      boxSizing: "border-box"
+                    }}
+                  />
+
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                      type="submit"
+                      disabled={addingNote || !newNoteText.trim()}
+                      style={{
+                        background: "#f43f5e",
+                        border: "none",
+                        color: "#ffffff",
+                        borderRadius: "8px",
+                        padding: "7px 16px",
+                        fontSize: "12px",
+                        fontWeight: "700",
+                        cursor: addingNote || !newNoteText.trim() ? "not-allowed" : "pointer",
+                        opacity: addingNote || !newNoteText.trim() ? 0.6 : 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      {addingNote ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                      <span>{addingNote ? "Saving..." : "Add Private Note"}</span>
+                    </button>
+                  </div>
+                </form>
+
+                {/* Notes Feed Timeline */}
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: "700", color: "#a1a1aa", marginBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>Dossier History ({crmNotes.length})</span>
+                    {crmNotesLoading && <span style={{ fontSize: "11px", color: "#71717a" }}>Refreshing...</span>}
+                  </div>
+
+                  {crmNotesLoading && crmNotes.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "30px 0", color: "#71717a", fontSize: "12px" }}>
+                      <Loader2 size={20} className="animate-spin" style={{ margin: "0 auto 8px auto", display: "block" }} />
+                      Loading creator dossier...
+                    </div>
+                  ) : crmNotes.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "30px 0", background: "#27272a", borderRadius: "10px", border: "1px dashed rgba(255,255,255,0.08)", color: "#71717a", fontSize: "12px" }}>
+                      <MessageSquare size={24} style={{ margin: "0 auto 8px auto", opacity: 0.5, display: "block" }} />
+                      No private notes yet. Record terms, Telegram details, or reminders above.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "260px", overflowY: "auto", paddingRight: "4px" }}>
+                      {crmNotes.map(n => {
+                        const tagColors = {
+                          deal: { bg: "rgba(251, 191, 36, 0.12)", text: "#fbbf24", border: "rgba(251, 191, 36, 0.3)" },
+                          payout: { bg: "rgba(52, 211, 153, 0.12)", text: "#34d399", border: "rgba(52, 211, 153, 0.3)" },
+                          contact: { bg: "rgba(56, 189, 248, 0.12)", text: "#38bdf8", border: "rgba(56, 189, 248, 0.3)" },
+                          reminder: { bg: "rgba(244, 63, 94, 0.12)", text: "#f43f5e", border: "rgba(244, 63, 94, 0.3)" },
+                          general: { bg: "rgba(255, 255, 255, 0.08)", text: "#a1a1aa", border: "rgba(255, 255, 255, 0.1)" }
+                        }[n.tag || "general"] || { bg: "rgba(255, 255, 255, 0.08)", text: "#a1a1aa", border: "rgba(255, 255, 255, 0.1)" };
+
+                        return (
+                          <div 
+                            key={n.id}
+                            style={{
+                              background: "#27272a",
+                              border: "1px solid rgba(255,255,255,0.06)",
+                              borderRadius: "10px",
+                              padding: "12px 14px"
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{
+                                  background: tagColors.bg,
+                                  color: tagColors.text,
+                                  border: `1px solid ${tagColors.border}`,
+                                  borderRadius: "4px",
+                                  padding: "1px 6px",
+                                  fontSize: "10px",
+                                  fontWeight: "800",
+                                  textTransform: "uppercase"
+                                }}>
+                                  #{n.tag || "general"}
+                                </span>
+                                <span style={{ fontSize: "11px", fontWeight: "700", color: "#f4f4f5" }}>
+                                  {n.admin_username || "Admin"}
+                                </span>
+                                <span style={{ fontSize: "10px", color: "#71717a" }}>
+                                  {formatTimeAgo(n.created_at)}
+                                </span>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCreatorNote(n.id)}
+                                disabled={deletingNoteId === n.id}
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#71717a",
+                                  cursor: deletingNoteId === n.id ? "not-allowed" : "pointer",
+                                  padding: "2px 4px",
+                                  display: "flex",
+                                  alignItems: "center"
+                                }}
+                                title="Delete note"
+                              >
+                                {deletingNoteId === n.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                              </button>
+                            </div>
+
+                            <div style={{ fontSize: "12px", color: "#f4f4f5", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>
+                              {n.note_text}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

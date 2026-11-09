@@ -499,6 +499,20 @@ async function initDatabase() {
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_story_views_user ON creator_story_views(user_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_story_views_story ON creator_story_views(story_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_story_views_user_story ON creator_story_views(user_id, story_id)`);
+
+      // 🟢 CRM: Admin Creator Notes & Vital Signs
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS admin_creator_notes (
+          id SERIAL PRIMARY KEY,
+          creator_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+          admin_id BIGINT,
+          note_text TEXT NOT NULL,
+          tag TEXT DEFAULT 'general',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_admin_notes_creator ON admin_creator_notes(creator_id)`);
       
       console.log("✅ Database initialized (Admins, App_Users, Videos, Transactions, Stories & Interactions)");
 

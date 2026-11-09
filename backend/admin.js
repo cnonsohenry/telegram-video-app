@@ -1017,7 +1017,36 @@ router.get("/creators", authenticateToken, isAdmin, async (req, res) => {
           WHERE v.uploader_id = u.id 
              OR (u.telegram_user_id IS NOT NULL AND v.uploader_id = u.telegram_user_id)
              OR LOWER(COALESCE(tg.username, '')) = LOWER(u.username)
-        ) as total_views
+        ) as total_views,
+        (
+          SELECT COUNT(*)
+          FROM videos v
+          LEFT JOIN users tg ON v.uploader_id = tg.user_id
+          WHERE (v.uploader_id = u.id 
+             OR (u.telegram_user_id IS NOT NULL AND v.uploader_id = u.telegram_user_id)
+             OR LOWER(COALESCE(tg.username, '')) = LOWER(u.username))
+            AND v.created_at >= NOW() - INTERVAL '24 hours'
+        ) as posts_24h,
+        (
+          SELECT MAX(v.created_at)
+          FROM videos v
+          LEFT JOIN users tg ON v.uploader_id = tg.user_id
+          WHERE v.uploader_id = u.id 
+             OR (u.telegram_user_id IS NOT NULL AND v.uploader_id = u.telegram_user_id)
+             OR LOWER(COALESCE(tg.username, '')) = LOWER(u.username)
+        ) as last_posted_at,
+        (
+          SELECT COUNT(*)
+          FROM creator_stories cs
+          WHERE cs.creator_id = u.id
+            AND cs.is_active = TRUE
+            AND cs.expires_at > NOW()
+        ) as active_stories_count,
+        (
+          SELECT COUNT(*)
+          FROM admin_creator_notes acn
+          WHERE acn.creator_id = u.id
+        ) as notes_count
       FROM app_users u
       WHERE u.is_creator = true OR u.subscription_price > 0 OR u.is_managed = true
       ORDER BY u.created_at DESC
@@ -1042,7 +1071,11 @@ router.get("/creators", authenticateToken, isAdmin, async (req, res) => {
         tips_count: Number(c.tips_count || 0),
         tips_total: Number(c.tips_total || 0),
         posts_count: Number(c.posts_count || 0),
-        total_views: Number(c.total_views || 0)
+        total_views: Number(c.total_views || 0),
+        posts_24h: Number(c.posts_24h || 0),
+        active_stories_count: Number(c.active_stories_count || 0),
+        notes_count: Number(c.notes_count || 0),
+        last_posted_at: c.last_posted_at || null
       })),
       stats: {
         total_creators: Number(statsRes.rows[0]?.total_creators || 0),
@@ -1067,6 +1100,69 @@ router.post("/creators/sync-telegram", authenticateToken, isAdmin, async (req, r
   } catch (err) {
     console.error("[ADMIN SYNC TELEGRAM CREATORS ROUTE ERROR]", err);
     res.status(500).json({ error: "Failed to sync Telegram creators" });
+  }
+});
+
+// 🟢 10C. CREATOR CRM: GET PRIVATE NOTES
+router.get("/creators/:id/notes", authenticateToken, isAdmin, async (req, res) => {
+  const creatorId = Number(req.params.id);
+  if (!creatorId) return res.status(400).json({ error: "Invalid creator ID" });
+
+  try {
+    const notesRes = await pool.query(
+      `SELECT n.id, n.creator_id, n.admin_id, n.note_text, n.tag, n.created_at, n.updated_at,
+              COALESCE(a.username, 'Admin') as admin_username
+       FROM admin_creator_notes n
+       LEFT JOIN app_users a ON n.admin_id = a.id
+       WHERE n.creator_id = $1
+       ORDER BY n.created_at DESC`,
+      [creatorId]
+    );
+    res.json({ success: true, notes: notesRes.rows });
+  } catch (err) {
+    console.error("[GET CREATOR NOTES ERROR]", err);
+    res.status(500).json({ error: "Failed to fetch notes" });
+  }
+});
+
+// 🟢 10D. CREATOR CRM: ADD PRIVATE NOTE
+router.post("/creators/:id/notes", authenticateToken, isAdmin, async (req, res) => {
+  const creatorId = Number(req.params.id);
+  const { note_text, tag = "general" } = req.body;
+  const adminId = req.user?.id || null;
+
+  if (!creatorId || !note_text || !String(note_text).trim()) {
+    return res.status(400).json({ error: "Note text is required" });
+  }
+
+  try {
+    const insertRes = await pool.query(
+      `INSERT INTO admin_creator_notes (creator_id, admin_id, note_text, tag, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, NOW(), NOW())
+       RETURNING id, creator_id, admin_id, note_text, tag, created_at, updated_at`,
+      [creatorId, adminId, String(note_text).trim(), String(tag || "general").toLowerCase()]
+    );
+    const newNote = insertRes.rows[0];
+    newNote.admin_username = req.user?.username || "Admin";
+
+    res.json({ success: true, note: newNote });
+  } catch (err) {
+    console.error("[ADD CREATOR NOTE ERROR]", err);
+    res.status(500).json({ error: "Failed to add note" });
+  }
+});
+
+// 🟢 10E. CREATOR CRM: DELETE PRIVATE NOTE
+router.delete("/creators/notes/:note_id", authenticateToken, isAdmin, async (req, res) => {
+  const noteId = Number(req.params.note_id);
+  if (!noteId) return res.status(400).json({ error: "Invalid note ID" });
+
+  try {
+    await pool.query("DELETE FROM admin_creator_notes WHERE id = $1", [noteId]);
+    res.json({ success: true, message: "Note deleted" });
+  } catch (err) {
+    console.error("[DELETE CREATOR NOTE ERROR]", err);
+    res.status(500).json({ error: "Failed to delete note" });
   }
 });
 
