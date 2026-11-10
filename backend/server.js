@@ -1896,11 +1896,14 @@ app.get("/api/videos", async (req, res) => {
     const isRandom = sort === "random" || sort === "algo" || sort === "x" || sort === "for_you" || sort === "algorithm" || sort === "explore" || req.query.random === "true";
     const seed = req.query.seed ? String(req.query.seed).trim() : Math.floor(Math.random() * 1000000).toString();
     
-    // 🟢 Extract timeframe from query (defaults to all_time)
-    const timeframe = req.query.timeframe || "all_time";
+    // 🟢 Extract timeframe from query (defaults to all_time, or weekly if sort is weekly_best/weekly)
+    const timeframe = req.query.timeframe || (sort === "weekly_best" || sort === "weekly" ? "weekly" : "all_time");
     
+    const isWeeklyBest = sort === "weekly_best" || sort === "weekly" || sort === "trending" || (category === "trends" && timeframe === "weekly");
+    const isRecent = sort === "recent" || sort === "latest" || sort === "newest";
+
     const rawCategory = req.query.category ? String(req.query.category).toLowerCase().trim() : "";
-    const category = rawCategory || (isRandom ? "all" : "hotties");
+    const category = rawCategory || (isRandom || isWeeklyBest || isRecent ? "all" : "hotties");
     
     const isCommunity = req.query.community === "true" || category === "community";
     const communityCondition = isCommunity 
@@ -1968,13 +1971,28 @@ app.get("/api/videos", async (req, res) => {
         LEFT JOIN app_users au ON (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text)
         ORDER BY p.rnd ASC
       `;
-    } else if (category === "trends") {
-      // 🟢 Set the time filter based on the requested timeframe
-      if (timeframe === "weekly") {
-        timeFilter = `WHERE v.created_at >= NOW() - INTERVAL '7 days' AND ${communityCondition}`;
-      } else if (timeframe === "monthly") {
-        timeFilter = `WHERE v.created_at >= NOW() - INTERVAL '30 days' AND ${communityCondition}`;
+    } else if (category === "trends" || isWeeklyBest) {
+      // 🟢 Set the time filter based on the requested timeframe (weekly = last 7 days)
+      let timeInterval = "7 days";
+      if (timeframe === "monthly") {
+        timeInterval = "30 days";
+      } else if (timeframe === "all_time" && !isWeeklyBest) {
+        timeInterval = null;
       }
+
+      if (hasCategory) {
+        timeFilter = timeInterval
+          ? `WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND v.created_at >= NOW() - INTERVAL '${timeInterval}' AND ${communityCondition}`
+          : `WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND ${communityCondition}`;
+        queryValues = [category, limit, offset];
+      } else {
+        timeFilter = timeInterval
+          ? `WHERE v.created_at >= NOW() - INTERVAL '${timeInterval}' AND ${communityCondition}`
+          : `WHERE ${communityCondition}`;
+        queryValues = [limit, offset];
+      }
+
+      const limitOffsetPlaceholders = hasCategory ? "LIMIT $2 OFFSET $3" : "LIMIT $1 OFFSET $2";
 
       query = `
         WITH GroupedVideos AS (
@@ -1985,7 +2003,7 @@ app.get("/api/videos", async (req, res) => {
           ${timeFilter}
         ),
         PagedVideos AS (
-          SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY views DESC LIMIT $1 OFFSET $2
+          SELECT * FROM GroupedVideos WHERE rn = 1 ORDER BY views DESC ${limitOffsetPlaceholders}
         )
         SELECT v.*, 
           COALESCE(au.display_name, au.username, u.username, 'Member') as uploader_name,
@@ -1998,7 +2016,6 @@ app.get("/api/videos", async (req, res) => {
         LEFT JOIN app_users au ON (v.uploader_id::text = au.id::text OR v.uploader_id::text = au.telegram_user_id::text)
         ORDER BY v.views DESC
       `;
-      queryValues = [limit, offset];
     } else {
       if (hasCategory) {
         queryValues = [category, limit, offset];
@@ -2039,10 +2056,10 @@ app.get("/api/videos", async (req, res) => {
       let countQuery;
       let countValues;
       let cacheKey;
-      if (category === "trends") {
+      if (category === "trends" || isWeeklyBest) {
         countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v ${timeFilter}`;
-        countValues = [];
-        cacheKey = `count:trends:${timeframe}:${isCommunity}`;
+        countValues = hasCategory ? [category] : [];
+        cacheKey = `count:trends:${category}:${timeframe}:${isCommunity}`;
       } else if (category && category !== "all" && category !== "community") {
         countQuery = `SELECT COUNT(DISTINCT CASE WHEN media_group_id IS NOT NULL AND media_group_id != 'none' THEN media_group_id ELSE message_id END) FROM videos v WHERE (category = $1 OR ($1 = 'amateurs' AND category = 'amateur')) AND ${communityCondition}`;
         countValues = [category];

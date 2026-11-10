@@ -1161,6 +1161,7 @@ export default function App() {
         }}>
           <Explore 
             user={user} 
+            isActive={activeTab === "explore"}
             onProfileClick={() => handleTabSwitch("profile")}
             onNavigateTab={handleTabSwitch}
             setHideFooter={handleExploreHideFooter} 

@@ -14,6 +14,7 @@ import { showToast, promptLogin } from "../utils/toast";
 
 const MAX_CACHE_SIZE = 4;
 const TREND_TIMEFRAMES = ["all_time", "monthly", "weekly"];
+const CATEGORY_FEED_MODES = ["random", "weekly_best", "recent"];
 
 export default function Home({ user, onProfileClick, setHideFooter, setActiveVideo, setShowPaywall, onCreatorClick }) {
   // 🟢 Initialize category tab from URL search params (?cat=baddies, ?cat=knacks, etc.) or random default
@@ -27,6 +28,17 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return Math.floor(Math.random() * APP_CONFIG.categories.length);
   }); 
   const [trendsTimeframe, setTrendsTimeframe] = useState(() => TREND_TIMEFRAMES[Math.floor(Math.random() * TREND_TIMEFRAMES.length)]);
+
+  // 🟢 Random exploration feed mode for core categories (Knacks, Baddies, Hotties, Amateurs)
+  const [categoryFeedModes, setCategoryFeedModes] = useState(() => {
+    const getRandomMode = () => CATEGORY_FEED_MODES[Math.floor(Math.random() * CATEGORY_FEED_MODES.length)];
+    return {
+      knacks: getRandomMode(),
+      baddies: getRandomMode(),
+      hotties: getRandomMode(),
+      amateurs: getRandomMode()
+    };
+  });
 
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [unlockedVideos, setUnlockedVideos] = useState(new Set());
@@ -65,7 +77,9 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
   
   const categoryForFetch = currentCategory === "trends" 
     ? `${currentCategory}&timeframe=${trendsTimeframe}` 
-    : currentCategory;
+    : (["knacks", "baddies", "hotties", "amateurs"].includes(currentCategory)
+        ? `${currentCategory}&sort=${categoryFeedModes[currentCategory] || "random"}`
+        : currentCategory);
 
   const { videos, sidebarSuggestions, loading, loadMore } = useVideos(categoryForFetch, fetchLimit);
 
@@ -398,6 +412,16 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     activeGroupRef.current = null;
 
     if (activeCategoryRef.current === index && !fromHistory) {
+      const clickedCat = APP_CONFIG.categories[index];
+      if (["knacks", "baddies", "hotties", "amateurs"].includes(clickedCat)) {
+        const newMode = CATEGORY_FEED_MODES[Math.floor(Math.random() * CATEGORY_FEED_MODES.length)];
+        setCategoryFeedModes(prev => ({ ...prev, [clickedCat]: newMode }));
+        setVideoCache(prev => {
+          const newCache = { ...prev };
+          delete newCache[clickedCat];
+          return newCache;
+        });
+      }
       scrollToTop();
       return;
     }
@@ -407,7 +431,8 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     setActiveTab(index);
     activeCategoryRef.current = index;
     
-    if (APP_CONFIG.categories[index] === "trends") {
+    const catName = APP_CONFIG.categories[index];
+    if (catName === "trends") {
       const newTimeframe = TREND_TIMEFRAMES[Math.floor(Math.random() * TREND_TIMEFRAMES.length)];
       setTrendsTimeframe(newTimeframe);
       
@@ -417,7 +442,18 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
         delete newCache["trends"];
         return newCache;
       });
-    } else if (APP_CONFIG.categories[index] === "premium" && !fromHistory) {
+    } else if (["knacks", "baddies", "hotties", "amateurs"].includes(catName)) {
+      // 🎲 Randomly select one of the 3 modes: random feed, best performing for the week, most recent posts
+      const newMode = CATEGORY_FEED_MODES[Math.floor(Math.random() * CATEGORY_FEED_MODES.length)];
+      setCategoryFeedModes(prev => ({ ...prev, [catName]: newMode }));
+      
+      // 🟢 Clear the cache for this category so each visit loads the freshly picked randomized feed mode
+      setVideoCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[catName];
+        return newCache;
+      });
+    } else if (catName === "premium" && !fromHistory) {
       // 🟢 Always clear the cache for VIP/Premium on direct click so it generates a fresh random seed and feed
       setVideoCache(prev => {
         const newCache = { ...prev };
@@ -525,11 +561,21 @@ export default function Home({ user, onProfileClick, setHideFooter, setActiveVid
     return () => window.removeEventListener("popstate", handleHomePopState);
   }, [handleTabClick]);
 
-  // 🟢 Listen for Home footer tab reselection to scroll to top
+  // 🟢 Listen for Home footer tab reselection to scroll to top & re-randomize category mode
   useEffect(() => {
     const handleTabReselect = (e) => {
       if (e.detail === "home") {
         scrollToTop();
+        const currentCat = APP_CONFIG.categories[activeCategoryRef.current];
+        if (["knacks", "baddies", "hotties", "amateurs"].includes(currentCat)) {
+          const newMode = CATEGORY_FEED_MODES[Math.floor(Math.random() * CATEGORY_FEED_MODES.length)];
+          setCategoryFeedModes(prev => ({ ...prev, [currentCat]: newMode }));
+          setVideoCache(prev => {
+            const newCache = { ...prev };
+            delete newCache[currentCat];
+            return newCache;
+          });
+        }
       }
     };
     window.addEventListener("tabReselected", handleTabReselect);

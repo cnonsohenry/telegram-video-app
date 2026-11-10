@@ -177,9 +177,16 @@ const SearchCreatorCard = ({ creator, onCreatorClick, onFollowToggle, isFollowin
 // 🟢 Fast in-memory cache for instant featured creators display
 let memoryCachedFeatured = null;
 
+// 🟢 3 Randomized Exploration Feed Modes (mirrors the randomized Trends architecture in Home.jsx)
+// 1. "random": Random feed (present one)
+// 2. "weekly_best": Best performing post for the week (top views from last 7 days)
+// 3. "recent": Most recent posts (chronological newest catalog uploads)
+const EXPLORE_FEED_MODES = ["random", "weekly_best", "recent"];
+
 // 🟢 EXPLORE COMPONENT
 export default function Explore({ 
   user,
+  isActive = true,
   onProfileClick,
   onNavigateTab,
   setHideFooter,
@@ -189,6 +196,13 @@ export default function Explore({
   onCreatorClick,
   onOpenDiscoverCreators
 }) {
+  // 🟢 Randomized Exploration Mode: defaults randomly on navigation
+  const [feedMode, setFeedMode] = useState(() => EXPLORE_FEED_MODES[Math.floor(Math.random() * EXPLORE_FEED_MODES.length)]);
+  const feedModeRef = useRef(feedMode);
+  useEffect(() => {
+    feedModeRef.current = feedMode;
+  }, [feedMode]);
+
   // 🟢 TWO TABS: "for_you" (platform content) & "community" (web creator content)
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -517,10 +531,11 @@ export default function Explore({
     if (onVideoClick) onVideoClick(video, e);
   }, [onVideoClick]);
 
-  // 🟢 LOAD FOR YOU FEED (Purely Random Catalog Shuffling + Deterministic Pagination)
-  const loadForYouFeed = useCallback(async (isLoadMore = false, cat = selectedCategory, pageOverride = null) => {
+  // 🟢 LOAD FOR YOU FEED (Randomly defaults to: Random Feed, Best of Week, or Most Recent)
+  const loadForYouFeed = useCallback(async (isLoadMore = false, cat = selectedCategory, pageOverride = null, modeOverride = null) => {
     if (isFetchingForYouRef.current) return;
 
+    const currentMode = modeOverride || feedModeRef.current;
     const targetPage = pageOverride !== null ? pageOverride : (isLoadMore ? forYouPageRef.current + 1 : 1);
 
     // On fresh load, pull-to-refresh, or category switch: generate new session exploration seed
@@ -539,9 +554,20 @@ export default function Explore({
     }
 
     try {
-      const categoryParam = cat ? `&category=${encodeURIComponent(cat)}` : "";
-      const seedParam = `&seed=${sessionSeedRef.current}`;
-      const res = await fetch(`${APP_CONFIG.apiUrl}/api/videos?sort=random&page=${targetPage}&limit=12${categoryParam}${seedParam}`);
+      const categoryParam = cat ? `&category=${encodeURIComponent(cat)}` : "&category=all";
+      let url = "";
+
+      if (currentMode === "weekly_best") {
+        url = `${APP_CONFIG.apiUrl}/api/videos?sort=weekly_best&timeframe=weekly&page=${targetPage}&limit=12${categoryParam}`;
+      } else if (currentMode === "recent") {
+        url = `${APP_CONFIG.apiUrl}/api/videos?sort=recent&page=${targetPage}&limit=12${categoryParam}`;
+      } else {
+        // "random" mode (present one)
+        const seedParam = `&seed=${sessionSeedRef.current}`;
+        url = `${APP_CONFIG.apiUrl}/api/videos?sort=random&page=${targetPage}&limit=12${categoryParam}${seedParam}`;
+      }
+
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         const fetched = data.videos || [];
@@ -579,7 +605,7 @@ export default function Explore({
       forYouPageRef.current = 1;
       setForYouPage(1);
       setHasMoreForYou(true);
-      loadForYouFeed(false, selectedCategory, 1);
+      loadForYouFeed(false, selectedCategory, 1, feedModeRef.current);
     }
   }, [selectedCategory]);
 
@@ -830,11 +856,31 @@ export default function Explore({
   useEffect(() => {
     if (isFirstMount.current) {
       isFirstMount.current = false;
-      loadForYouFeed(false);
+      loadForYouFeed(false, selectedCategory, 1, feedModeRef.current);
       loadCommunityFeed(1, false);
       return;
     }
-  }, [loadForYouFeed, loadCommunityFeed]);
+  }, [loadForYouFeed, loadCommunityFeed, selectedCategory]);
+
+  // 🟢 Randomize feed mode whenever user navigates into Explore from another tab (just like Trends tab in Home.jsx)
+  const wasActiveRef = useRef(isActive);
+  useEffect(() => {
+    if (isActive && !wasActiveRef.current) {
+      if (activeTab === "for_you") {
+        const nextMode = EXPLORE_FEED_MODES[Math.floor(Math.random() * EXPLORE_FEED_MODES.length)];
+        setFeedMode(nextMode);
+        feedModeRef.current = nextMode;
+        forYouPageRef.current = 1;
+        setForYouPage(1);
+        setHasMoreForYou(true);
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTo({ top: 0 });
+        }
+        loadForYouFeed(false, selectedCategory, 1, nextMode);
+      }
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive, activeTab, selectedCategory, loadForYouFeed]);
 
   // 🟢 AUTO-SEARCH DEBOUNCE
   useEffect(() => {
@@ -863,7 +909,13 @@ export default function Explore({
         scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
       }
       if (tab === "for_you") {
-        loadForYouFeed(false, selectedCategory, 1);
+        const nextMode = EXPLORE_FEED_MODES[Math.floor(Math.random() * EXPLORE_FEED_MODES.length)];
+        setFeedMode(nextMode);
+        feedModeRef.current = nextMode;
+        forYouPageRef.current = 1;
+        setForYouPage(1);
+        setHasMoreForYou(true);
+        loadForYouFeed(false, selectedCategory, 1, nextMode);
       } else if (tab === "community") {
         loadCommunityFeed(1, false);
       }
@@ -874,11 +926,17 @@ export default function Explore({
       loadCommunityFeed(1, false);
     }
     if (tab === "for_you") {
-      loadForYouFeed(false, selectedCategory, 1);
+      const nextMode = EXPLORE_FEED_MODES[Math.floor(Math.random() * EXPLORE_FEED_MODES.length)];
+      setFeedMode(nextMode);
+      feedModeRef.current = nextMode;
+      forYouPageRef.current = 1;
+      setForYouPage(1);
+      setHasMoreForYou(true);
+      loadForYouFeed(false, selectedCategory, 1, nextMode);
     }
   };
 
-  // 🟢 Reselecting Explore in bottom navigation scrolls to top and re-randomizes feed
+  // 🟢 Reselecting Explore in bottom navigation scrolls to top and re-randomizes feed mode
   useEffect(() => {
     const handleReselect = (e) => {
       if (e.detail === "explore") {
@@ -886,7 +944,13 @@ export default function Explore({
           scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
         }
         if (activeTab === "for_you") {
-          loadForYouFeed(false, selectedCategory, 1);
+          const nextMode = EXPLORE_FEED_MODES[Math.floor(Math.random() * EXPLORE_FEED_MODES.length)];
+          setFeedMode(nextMode);
+          feedModeRef.current = nextMode;
+          forYouPageRef.current = 1;
+          setForYouPage(1);
+          setHasMoreForYou(true);
+          loadForYouFeed(false, selectedCategory, 1, nextMode);
         } else if (activeTab === "community") {
           loadCommunityFeed(1, false);
         }
@@ -1487,9 +1551,15 @@ export default function Explore({
                   setHasMoreCommunity(true);
                   await loadCommunityFeed(1, false);
                 } else {
+                  const nextMode = EXPLORE_FEED_MODES[Math.floor(Math.random() * EXPLORE_FEED_MODES.length)];
+                  setFeedMode(nextMode);
+                  feedModeRef.current = nextMode;
+                  forYouPageRef.current = 1;
+                  setForYouPage(1);
+                  setHasMoreForYou(true);
                   setSuggestedIndex(Math.floor(Math.random() * 4) + 2);
                   fetchFeaturedCreators();
-                  await loadForYouFeed(false, selectedCategory, 1);
+                  await loadForYouFeed(false, selectedCategory, 1, nextMode);
                 }
               }}
             >
@@ -1584,7 +1654,13 @@ export default function Explore({
                         setHasMoreCommunity(true);
                         await loadCommunityFeed(1, false);
                       } else {
-                        await loadForYouFeed(false, selectedCategory, 1);
+                        const nextMode = EXPLORE_FEED_MODES[Math.floor(Math.random() * EXPLORE_FEED_MODES.length)];
+                        setFeedMode(nextMode);
+                        feedModeRef.current = nextMode;
+                        forYouPageRef.current = 1;
+                        setForYouPage(1);
+                        setHasMoreForYou(true);
+                        await loadForYouFeed(false, selectedCategory, 1, nextMode);
                       }
                       fetchHighlights();
                     }}

@@ -47,11 +47,13 @@ export function useVideos(currentCategory, limit = 12) {
         // 🟢 THE FIX: Swap the hardcoded domain for your dynamic config URL
         url = `${APP_CONFIG.apiUrl}/api/videos?page=${targetPage}&limit=${limit}&category=${currentCategory}`;
         
-        // 🟢 Check if this is the "trends" category
+        // 🟢 Check if this is the "trends" category or randomized category sort
         if (currentCategory === "trends" || currentCategory.startsWith("trends")) {
-          url += `&sort=trending`;
-        } else if (currentCategory === "premium") {
-          url += `&sort=random&seed=${sessionSeed.current}`;
+          if (!url.includes("sort=")) url += `&sort=trending`;
+        } else if (currentCategory === "premium" || url.includes("sort=random")) {
+          if (!url.includes("seed=")) {
+            url += url.includes("sort=random") ? `&seed=${sessionSeed.current}` : `&sort=random&seed=${sessionSeed.current}`;
+          }
         }
       }
       
