@@ -1899,10 +1899,9 @@ app.get("/api/videos", async (req, res) => {
     // 🟢 Extract timeframe from query (defaults to all_time, or weekly if sort is weekly_best/weekly)
     const timeframe = req.query.timeframe || (sort === "weekly_best" || sort === "weekly" ? "weekly" : "all_time");
     
-    const isWeeklyBest = sort === "weekly_best" || sort === "weekly" || sort === "trending" || (category === "trends" && timeframe === "weekly");
-    const isRecent = sort === "recent" || sort === "latest" || sort === "newest";
-
     const rawCategory = req.query.category ? String(req.query.category).toLowerCase().trim() : "";
+    const isWeeklyBest = sort === "weekly_best" || sort === "weekly" || sort === "trending" || (rawCategory === "trends" && timeframe === "weekly");
+    const isRecent = sort === "recent" || sort === "latest" || sort === "newest";
     const category = rawCategory || (isRandom || isWeeklyBest || isRecent ? "all" : "hotties");
     
     const isCommunity = req.query.community === "true" || category === "community";
