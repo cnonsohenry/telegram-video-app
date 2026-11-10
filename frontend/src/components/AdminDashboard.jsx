@@ -3355,8 +3355,11 @@ export default function AdminDashboard({ user, onLogout }) {
               <video 
                 src={storyPreviewModal.video_url} 
                 controls 
+                controlsList="nodownload noplaybackrate"
+                disablePictureInPicture
                 autoPlay 
                 playsInline
+                onContextMenu={(e) => e.preventDefault()}
                 style={{ width: "100%", maxHeight: "72vh", objectFit: "contain" }}
               />
             </div>

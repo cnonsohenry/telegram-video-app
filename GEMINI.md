@@ -150,8 +150,15 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
   - Interactive: Tapping/clicking any bar segment jumps directly to that specific story.
 - **Navigation & Gestures**:
   - **Debounced Tap Zones**: Left 35% navigates to previous story (or restarts current if > 2s played); Right 65% advances to next story (or closes modal if on the last story). Debounced by 300ms to eliminate mobile double-tap closures.
-  - **Dual Chevrons**: Floating desktop chevrons and in-frame subtle chevrons provide clear visual targets on both desktop and touch screens.
-  - **Hold to Pause**: Long pressing (> 200ms) pauses video playback and displays a pause indicator; releasing resumes playback.
+  - **Desktop-Only Chevrons & Clean Mobile Screen**: Floating desktop chevrons and in-frame subtle chevrons are strictly restricted to desktop screens (`window.innerWidth > 768`). On mobile screens, all navigation arrows are completely removed to ensure a clean, unobstructed full-screen experience where navigation is driven by tap zones.
+  - **Hold to Pause with Context Menu Suppression & Anti-Download Protection**:
+    - Long pressing (> 200ms) pauses video playback and displays a central pause indicator; releasing resumes playback smoothly.
+    - Suppresses mobile browser callout menus and options dialogs (e.g. "Save Video", "Download Video", "Copy") by:
+      1. Detaching the native video elements from direct touch handling (`pointerEvents: "none"` on both `<video>` elements), routing all gestures exclusively to the container gesture layer.
+      2. Enforcing `onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); return false; }}` across all player elements.
+      3. Applying `-webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation;`.
+      4. Hardening against video downloading with `controlsList="nodownload noplaybackrate nofullscreen"`, `disablePictureInPicture={true}`, and `disableRemotePlayback={true}`.
+      5. Gracefully handling `onPointerCancel` and `onPointerLeave` to ensure playback resumes properly when gestures are interrupted.
   - **Desktop Controls**: Chevrons and keyboard shortcuts (`ArrowLeft`, `ArrowRight`, `Space`, `Escape`).
   - **Auto-Advance**: Video `onEnded` event automatically advances to `currentIndex + 1`.
 - **Header & Layout**:

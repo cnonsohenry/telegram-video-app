@@ -41,6 +41,17 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [isAdShowing, setIsAdShowing] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth > 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth > 768);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const zoneId = APP_CONFIG.ads?.storyInterstitialZoneId || "5968872";
 
@@ -526,6 +537,13 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
     goToNext();
   };
 
+  // Suppress native context menus (long-press on mobile / right-click on desktop)
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  }, []);
+
   // Pointer Down / Up tap & hold handling (unified across touch and mouse)
   const handlePointerDown = (e) => {
     if (isAdShowing) return;
@@ -578,6 +596,21 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       }
     }
   };
+
+  const handlePointerCancel = useCallback(() => {
+    if (pauseTimeoutRef.current) {
+      clearTimeout(pauseTimeoutRef.current);
+      pauseTimeoutRef.current = null;
+    }
+    if (pointerStartRef.current.isHolding) {
+      pointerStartRef.current.isHolding = false;
+      const activeVid = getActiveVideo();
+      if (activeVid && isPaused) {
+        activeVid.play().catch(() => {});
+        setIsPaused(false);
+      }
+    }
+  }, [getActiveVideo, isPaused]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -638,6 +671,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
 
   const modalContent = (
     <div
+      onContextMenu={handleContextMenu}
       style={{
         position: "fixed",
         inset: 0,
@@ -648,7 +682,10 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        overflow: "hidden"
+        overflow: "hidden",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none"
       }}
     >
       {/* 🟢 ExoClick Mobile Fullpage Interstitial Ad (Zone 5968872) */}
@@ -674,7 +711,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       )}
 
       {/* Desktop Prev Button (Outside Frame) */}
-      {storyList.length > 1 && (
+      {isDesktop && storyList.length > 1 && (
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
@@ -711,7 +748,7 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
       )}
 
       {/* Desktop Next Button (Outside Frame) */}
-      {storyList.length > 1 && (
+      {isDesktop && storyList.length > 1 && (
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
@@ -752,19 +789,25 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
         ref={containerRef}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onPointerLeave={handlePointerCancel}
+        onContextMenu={handleContextMenu}
         style={{
           position: "relative",
           width: "100%",
           maxWidth: "460px",
           height: "100%",
-          maxHeight: "920px",
+          maxHeight: isDesktop ? "920px" : "100%",
           backgroundColor: "#000",
-          borderRadius: "16px",
+          borderRadius: isDesktop ? "16px" : "0",
           overflow: "hidden",
-          boxShadow: "0 24px 60px rgba(0, 0, 0, 0.8)",
+          boxShadow: isDesktop ? "0 24px 60px rgba(0, 0, 0, 0.8)" : "none",
           display: "flex",
           flexDirection: "column",
-          userSelect: "none"
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
+          touchAction: "manipulation"
         }}
       >
         {/* 🟢 Dual-Player Ping-Pong Slot 0 */}
@@ -773,6 +816,10 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
           preload="auto"
           playsInline
           muted={isMuted}
+          controlsList="nodownload noplaybackrate nofullscreen"
+          disablePictureInPicture
+          disableRemotePlayback
+          onContextMenu={handleContextMenu}
           onTimeUpdate={(e) => handleTimeUpdate(e, 0)}
           onEnded={() => { if (activeSlot === 0) handleVideoEnded(); }}
           onCanPlay={() => { if (activeSlot === 0) setIsVideoReady(true); }}
@@ -785,7 +832,10 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             backgroundColor: "#09090b",
             opacity: activeSlot === 0 ? 1 : 0,
             zIndex: activeSlot === 0 ? 2 : 1,
-            pointerEvents: activeSlot === 0 ? "auto" : "none",
+            pointerEvents: "none",
+            WebkitTouchCallout: "none",
+            WebkitUserSelect: "none",
+            userSelect: "none",
             transition: "opacity 0.12s ease-out"
           }}
         />
@@ -796,6 +846,10 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
           preload="auto"
           playsInline
           muted={isMuted}
+          controlsList="nodownload noplaybackrate nofullscreen"
+          disablePictureInPicture
+          disableRemotePlayback
+          onContextMenu={handleContextMenu}
           onTimeUpdate={(e) => handleTimeUpdate(e, 1)}
           onEnded={() => { if (activeSlot === 1) handleVideoEnded(); }}
           onCanPlay={() => { if (activeSlot === 1) setIsVideoReady(true); }}
@@ -808,7 +862,10 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
             backgroundColor: "#09090b",
             opacity: activeSlot === 1 ? 1 : 0,
             zIndex: activeSlot === 1 ? 2 : 1,
-            pointerEvents: activeSlot === 1 ? "auto" : "none",
+            pointerEvents: "none",
+            WebkitTouchCallout: "none",
+            WebkitUserSelect: "none",
+            userSelect: "none",
             transition: "opacity 0.12s ease-out"
           }}
         />
@@ -841,8 +898,8 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
           }}
         />
 
-        {/* Subtle in-frame Chevrons for visual affordance */}
-        {storyList.length > 1 && (
+        {/* Subtle in-frame Chevrons for visual affordance (Desktop only) */}
+        {isDesktop && storyList.length > 1 && (
           <>
             {currentIndex > 0 && (
               <div
@@ -969,6 +1026,8 @@ export function StoryPlayerModal({ isOpen, onClose, story, stories, creator }) {
                 <img
                   src={avatarUrl}
                   alt={displayName}
+                  draggable={false}
+                  onContextMenu={handleContextMenu}
                   onError={(e) => handleAvatarError(e, displayName, creator?.id || currentStory.creator_id || currentStory.username)}
                   style={{
                     width: "36px",
