@@ -645,6 +645,169 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
 - **Creator Top Bar Simplification (`CreatorProfileModal.jsx`)**:
   - Removed display name, username, verified badge, and `{postsCount} drops` from the desktop sticky header, presenting a clean top bar with only the back navigation chevron on the left and action buttons on the right.
 
+---
+
+## 35. ExoClick Mobile Fullpage Interstitial in Story & Highlight Player
+- **ExoClick Tag Integration**:
+  - Script source: `https://a.pemsrv.com/ad-provider.js` preloaded in `<head>` of `frontend/index.html`.
+  - Zone ID: `5968872` (`eas6a97888e33`), configured dynamically via `APP_CONFIG.ads.storyInterstitialZoneId`.
+  - Push command: `(window.AdProvider = window.AdProvider || []).push({ serve: {} })`.
+- **Universal Chokepoint (`StoryPlayerModal.jsx`)**:
+  - `StoryPlayerModal` governs video playback for both 24-hour status stories and curated profile highlights (`StoryHighlightsTray.jsx` delegates to `openCustomStories`).
+  - Ad tag is mounted inside `StoryPlayerModal`'s root portal container, ensuring automatic coverage across both features.
+- **Playback & Lifecycle Synchronization**:
+  - **Dynamic Visibility & Event Detection**: Uses a `MutationObserver` on `document.body` along with listeners for `creativeDisplayed-5968872` and capture-phase close clicks on `.ex-over-btn`.
+  - **Automatic Pause**: When `#ad_5968872` (`.ex-over-top`) becomes visible (`display !== "none"`), `isAdShowing` is set to `true`, the active story video is paused, and the segmented progress bar transition freezes.
+  - **Center Pause Icon Suppression**: `{isPaused && !isAdShowing && ( ... )}` prevents the center pause glyph from displaying over the ad creative.
+  - **Input Shielding**: Taps, swipes, segmented bar clicks, mute toggles, and keyboard shortcuts (`ArrowLeft`, `ArrowRight`, `Space`) are ignored while `isAdShowing` is `true`.
+  - **Instant Resume**: As soon as the user taps the close button (`.ex-over-btn`), `#ad_5968872` is removed from the DOM, `isAdShowing` resets to `false`, and active video playback instantly resumes without lag.
+  - **Cleanup**: On modal unmount or close, observers are disconnected, any lingering ad overlay elements are purged, and `document.body.style.overflow` is restored.
+- **Strict VIP & Creator Exemption (`isUserAdExempt`)**:
+  - Paying VIP subscribers, creators, and admins are completely exempt from seeing the interstitial.
+  - For exempt users, the ad container is never mounted and `AdProvider.push` is never called.
+- **Ad Manager Cooldown Synergy**:
+  - When the interstitial shows, `localStorage.setItem("last_ad_timestamp", Date.now().toString())` is recorded to prevent subsequent immediate smartlinks or pre-rolls.
+
+---
+
+## 36. Tab Wakeup Recovery, Viewport Resiliency & Error Boundary Architecture
+- **Root Cause Analysis (Blank/Black Screen After Long Inactivity)**:
+  1. **Fixed-Height Viewport Collapse**: When Chrome Memory Saver, mobile OS, or desktop sleep suspends background tabs, `window.innerHeight` can report `0` during background restore. `App.jsx` previously stored this in a rigid `appHeight` pixel state with a resize listener that ignored height changes unless window width changed, locking the entire container to `0px` with `overflow: hidden`.
+  2. **GPU Texture Eviction**: Operating systems purge hardware-accelerated compositor backing stores for inactive background tabs. Because `html, body, #root` had `position: fixed` with no scroll container or invalidation event on focus, the browser failed to trigger a compositor repaint on wake, leaving an empty, black GPU tile.
+  3. **Unprotected React Unmount**: In React 18, any unhandled runtime error unmounts the entire component tree inside `#root`, rendering the `#09090b` body background as a blank black screen.
+  4. **Aggressive Age Gate Expiration**: `index.html` cleared age verification after only 24 hours without checking for logged-in user tokens, leaving a potentially invisible click-blocking mask if opacity was `0`.
+- **Architectural Fixes**:
+  - **Dynamic App Height with 100dvh Fallback**: `appHeight` initializes with a safe fallback to `100dvh` if `window.innerHeight <= 0`. Main viewport container style applies `height: appHeight && appHeight !== "0px" ? appHeight : "100dvh"`, `minHeight: "100%"`, and `inset: 0`, preventing vertical collapse.
+  - **Comprehensive Tab Wakeup Listener (`useWakeup`)**:
+    - Listens to `visibilitychange`, `pageshow`, and `focus`.
+    - When `document.visibilityState === "visible"`, immediately recalibrates `appHeight` to the active `window.innerHeight`.
+    - Forces a micro-tick GPU compositor re-rasterization on `#root` via `requestAnimationFrame` with `translateZ(0)`, restoring evicted GPU textures instantly.
+    - Gracefully refreshes user auth and subscriptions (`refreshUser()`).
+  - **Smart Resize Evaluation**: Height adjustments are only suppressed when an active `input` or `textarea` is focused (preventing mobile virtual keyboard jumping), but allowed freely whenever no input is active.
+  - **Production Error Boundary (`ErrorBoundary.jsx`)**:
+    - Wraps `<StoryProvider><App /></StoryProvider>` in `main.jsx`.
+    - Detects dynamic import / chunk load failures (common when new production deployments delete stale hashed chunks while a user was away) and automatically triggers a single clean page reload.
+    - Provides a branded "Reload Page" fallback UI instead of unmounting to a blank black screen.
+  - **Age Gate 30-Day Persistence & Auth Exemption**:
+    - Authenticated users with active tokens bypass the age gate automatically.
+    - Age verification persists for 30 days rather than 24 hours.
+    - Forces `opacity: 1` whenever `display: flex` is set.
+  - **Root CSS Normalization (`index.css`)**:
+    - Removed `position: fixed` from the root `<html>` element, restoring standard browser coordinate spaces.
+    - Pinned `body, #root` cleanly with `position: fixed; inset: 0; height: 100%; height: 100dvh;`.
+
+---
+
+## 37. Instant (0ms) Creator Profile & Suggested Creators Cache Architecture
+- **Root Cause Analysis (Reloading & Flashing on Profile Navigation)**:
+  1. **Lack of In-Memory Profile Caching**: In `CreatorProfileModal.jsx`, navigating to another creator or tapping Back to a previously visited creator triggered `setLoading(true)` on every `creatorUsername` prop change. This unmounted `renderProfileBody()` completely, displaying a `<Loader2>` spinner ("Loading profile...") and destroying loaded tabs (`reels`, `premium`), story highlights, and vertical scroll position.
+  2. **Suggested Creators Carousel Remounting & Resetting**: Because `renderProfileBody()` unmounted during profile loading, the Suggested Creators card (`DiscoverCreatorsSection.jsx`) was destroyed. When the network fetch finished and the card remounted, `prefetchFeaturedCreators()` triggered an unthrottled network request, causing layout shift and resetting the horizontal carousel scroll position back to `0px`.
+  3. **Loss of Expanded Card State**: `showDiscoverCreators` was local boolean state that reset to `false` when switching creators, closing the Suggested Creators carousel if a user tapped a creator from it and then pressed Back.
+  4. **Isolated Social States**: Follow toggles in `DiscoverCreatorsSection`, `CreatorProfileModal`, `DiscoverCreatorsModal`, and `FollowListModal` lived in disconnected local states, causing follow status discrepancies across the UI.
+- **Architectural Implementation**:
+  - **Global LRU Creator Profile Cache (`creatorProfileCache.js`)**:
+    - Maintains an in-memory LRU cache (`profileCache = new Map()`, up to 50 profiles) storing:
+      - `creatorData` (bio, avatar, verified badge, ownership, stats)
+      - Video tabs (`posts`, `reels`, `premium`), pagination pages, hasMore flags, and loaded tabs
+      - Story highlights array
+      - Active tab selection
+      - Follow and subscription flags
+      - Vertical scroll position (`saveCreatorScroll` / `getCreatorScroll`)
+      - Suggested Creators toggle state (`showDiscoverCreators`)
+    - **Synchronous Instant (0ms) Hydration**: On profile switch or back navigation, if a cached snapshot exists, `useState` and `useEffect` immediately apply the snapshot with `loading = false`, rendering the complete profile in **0ms** with zero spinners or layout shifts.
+    - **Stale-While-Revalidate (Silent Refresh)**: Initiates a silent background fetch (`fetchCreator(targetKey, true)`) to synchronize any fresh stats, new drops, or highlights without interrupting the user or showing a loading indicator.
+  - **Suggested Creators Carousel Preservation (`DiscoverCreatorsSection.jsx`)**:
+    - **5-Minute Memory Throttling**: `prefetchFeaturedCreators` checks memory freshness (`now - lastPrefetchTime < 5 minutes`). If cached data exists, it returns immediately without firing redundant network requests.
+    - **Deduplication Check**: `setCreators` compares payload length and IDs against previous state; identical arrays avoid state re-assignments, preventing React re-renders.
+    - **Track Scroll Retention**: Horizontal `scrollLeft` on `trackRef` is persistently tracked with `saveSuggestedScroll(key, scrollLeft)` and restored on render with `getSuggestedScroll`.
+    - **Stable Open State**: When tapping a creator from the Suggested Creators carousel, `showDiscoverCreators: true` is preserved in the parent creator's cache snapshot, keeping the carousel open and positioned when returning.
+  - **Universal Real-Time Follow Synchronization**:
+    - Module-level `globalFollowState = new Map()` coordinates follow status across the platform via `getGlobalFollow` and `setGlobalFollow`.
+    - Broadcasts a `"creatorFollowChanged"` CustomEvent whenever any creator is followed or unfollowed anywhere on the platform (`CreatorProfileModal`, `DiscoverCreatorsSection`, `DiscoverCreatorsModal`, `FollowListModal`, `Explore`).
+    - All listening components synchronize their follow buttons instantly with zero latency and zero discrepancy.
+  - **Exact Scroll Position Retention**:
+    - Profile scrollable rails (`desktopScrollRef` and `mobileScrollRef`) attach passive scroll listeners updating `saveCreatorScroll`.
+    - Before navigating away (via video card tap, suggested creator tap, sidebar tap, or history pop), the current scroll position and active tab are snapshot into the cache.
+    - On return, `restoreScroll` applies the saved offset via `requestAnimationFrame` with a secondary micro-timeout fallback to guarantee precision.
+
+---
+
+## 38. Single-Tap Back Navigation & History Push Deduplication Architecture
+- **Root Cause Analysis (Double-Tap Required to Go Back)**:
+  1. **Click-Event Bubbling Across Avatar and Card Containers**:
+     - In `DiscoverCreatorsSection.jsx` and `DiscoverCreatorsModal.jsx`, click handlers were bound to BOTH the inner `<StoryAvatar>` and the outer card container (`<div style={igCardBox}>` / `<div style={creatorCardStyle}>`).
+     - In `StoryAvatar.jsx`, when an avatar had no active 24h story, its fallback `onClick(e)` handler did not invoke `e.stopPropagation()`.
+     - Tapping the avatar triggered `StoryAvatar`'s click handler, which dispatched `openCreatorProfile(username)` and then bubbled to the parent container, which immediately dispatched `openCreatorProfile(username)` a second time within milliseconds.
+  2. **Unchecked Duplicate `pushState` in `App.jsx`**:
+     - `App.jsx`'s `handleOpenCreator` lacked deduplication and throttling. In response to both events, it executed `window.history.pushState` twice in succession with identical states and URLs (`/?creator=target`).
+     - This registered two identical entries for the new creator on the browser history stack. Pressing Back popped the top entry to the identical second entry (making the app appear completely unresponsive); only a second tap popped back to the previous creator profile.
+  3. **Concurrent Back & Push in Desktop Sidebar**:
+     - In `CreatorProfileModal.jsx`, the desktop suggested creator sidebar item called `onClose()` (triggering `window.history.back()`) immediately before dispatching `openCreatorProfile`, causing conflicting concurrent history manipulations.
+- **Architectural Solution & Defenses**:
+  - **Event Bubbling Isolation (`StoryAvatar.jsx`)**:
+    - `StoryAvatar`'s `handleClick` explicitly calls `e.stopPropagation()` when executing `onClick(e)`.
+    - Removed redundant `onClick` handlers from `<StoryAvatar>` in `DiscoverCreatorsSection.jsx` and `DiscoverCreatorsModal.jsx`, centralizing click handling cleanly on the card containers.
+  - **450ms Throttle & Identity Deduplication Guard (`App.jsx`)**:
+    - `lastOpenCreatorTargetRef` and `lastOpenCreatorTimeRef` guard `handleOpenCreator` against rapid duplicate triggers for the same creator within 450ms.
+    - If `viewingCreatorRef.current` matches the requested username, navigation aborts immediately without pushing state.
+  - **Intelligent `replaceState` Fallback (`App.jsx`)**:
+    - If `currentState.creatorProfile` already matches the target username, `window.history.replaceState` is used instead of `window.history.pushState`, guaranteeing no duplicate history stack entries are ever generated.
+  - **Clean State Reset**:
+    - `handleCloseCreator` and the `popstate` listener reset `lastOpenCreatorTargetRef` and `lastOpenCreatorTimeRef`, ensuring instant responsiveness on legitimate sequential back/forward gestures.
+
+---
+
+## 39. Native Creator CRM & 24h Vital Signs Dossier Architecture
+- **Decision & Decommissioning of Twenty CRM**:
+  - External B2B CRMs (e.g. Twenty CRM) were evaluated and permanently decommissioned from the engines server (`94.72.109.109`). All containers, docker volumes, directory `/home/appuser/apps/twenty-crm`, and Nginx reverse proxy `crm.codedloud.com` were completely removed, returning 100% of host RAM/disk to background Python forwarders and media pipelines.
+  - Replaced with a lightweight, zero-latency **Native Creator CRM & Vital Signs Dossier** built directly into the PostgreSQL database, Express API, and `AdminDashboard.jsx`.
+- **Database Architecture (`admin_creator_notes`)**:
+  - PostgreSQL table: `admin_creator_notes (id SERIAL PRIMARY KEY, creator_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE, admin_id BIGINT, note_text TEXT NOT NULL, tag TEXT DEFAULT 'general', created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())`.
+  - Indexed via `idx_admin_notes_creator` on `creator_id`.
+  - Initialized on server boot in `backend/server.js`.
+- **Backend Admin API Endpoints (`backend/admin.js`)**:
+  - `GET /api/admin/creators`: Enriched with `posts_24h` (rolling 24h post count from `videos.created_at >= NOW() - INTERVAL '24 hours'`), `last_posted_at` (timestamp of newest video), `active_stories_count` (active 24h reels), and `notes_count` (count of private admin notes).
+  - `GET /api/admin/creators/:id/notes`: Retrieves all confidential staff notes for a creator with admin username and tag badges.
+  - `POST /api/admin/creators/:id/notes`: Inserts a private note with category tags (`general`, `deal`, `payout`, `contact`, `reminder`).
+  - `DELETE /api/admin/creators/notes/:note_id`: Deletes a private note.
+- **Frontend Dashboard Experience (`AdminDashboard.jsx`)**:
+  - **Creators Table Vital Signs Column**: Displays rolling 24h post quota badge against the 5-post daily ceiling (`🟢 3-5/5 POSTS`, `🟡 1-2/5 POSTS`, `🔴 0/5 POSTS`), active story reels pill (`⚡ X`), relative last post timestamp (`Last: 3h ago`), and sortable header.
+  - **CRM Action Button & Dossier Modal**:
+    - Table button with notes count badge (`CRM • X`) opens a dedicated `#18181b` slide-over dossier.
+    - Displays creator avatar, display name, category, origin (`TELEGRAM MANAGED` vs `WEB CREATOR`), direct Telegram channel launch button, and live profile preview button.
+    - 4-card live vital signs metrics: 24h Output, Active Stories, VIP Subscriber Count & Monthly Rate, Direct Tips Volume & Video Velocity.
+    - Confidential Notes Timeline: Private notes feed with color-coded tag pills (`#deal`, `#payout`, `#contact`, `#reminder`, `#general`), author identity, relative timestamps, quick composer, and note deletion.
+
+---
+
+## 40. 3-Way Randomized Default Feed Architecture (Explore & Home Categories)
+- **Automatic Multi-Mode Feed Randomization**:
+  - Modeled after the randomized `timeframe` design of the **Trends** tab (`Home.jsx`), the platform eliminates feed monotony by automatically and randomly defaulting to one of **3 core feed experiences** on every visit:
+    1. **`random`**: Random catalog algorithm using deterministic session seed hashing (`MD5(id::text || seed)`) for seamless infinite scrolling.
+    2. **`weekly_best`**: Top-performing drops published within the rolling 7-day window (`v.created_at >= NOW() - INTERVAL '7 days'`), ranked strictly by total view count (`ORDER BY v.views DESC`).
+    3. **`recent`**: Latest catalog uploads sorted chronologically by upload timestamp (`ORDER BY v.created_at DESC`).
+- **Zero-Friction User Experience**:
+  - Users are not forced to manually toggle modes or navigate complex sub-tabs. The application automatically selects the feed mode upon navigation, category tab switches, pull-to-refresh gestures, and bottom navigation reselection.
+- **Coverage Across Platform**:
+  - **Explore Page (`Explore.jsx`)**:
+    - Defines `EXPLORE_FEED_MODES = ["random", "weekly_best", "recent"]`.
+    - Automatically randomizes mode on component mount, tab entry from other pages (`isActive`), pull-to-refresh, desktop refresh button, and tab reselection.
+    - Infinite scroll maintains the active mode across subsequent pagination pages.
+  - **Home Category Feeds (`Home.jsx`)**:
+    - Defines `CATEGORY_FEED_MODES = ["random", "weekly_best", "recent"]`.
+    - Applied across all 4 core content categories: **Knacks**, **Baddies**, **Hotties**, and **Amateurs**.
+    - Each category maintains an independent randomized mode in state (`categoryFeedModes`).
+    - Cache invalidation: Switching to any category tab or tapping the active tab clears `videoCache[catName]`, guaranteeing a fresh, freshly randomized feed on every visit.
+- **Backend API Query Normalization (`backend/server.js` `/api/videos`)**:
+  - Supports `sort=weekly_best` / `sort=weekly` (enforcing `v.created_at >= NOW() - INTERVAL '7 days'` and `ORDER BY views DESC`), `sort=recent` / `sort=latest` (`ORDER BY created_at DESC`), and `sort=random` (deterministic seed hashing).
+  - Fully compatible with category filters (`category=knacks`, `category=baddies`, `category=hotties`, `category=amateurs`, and `category=all`).
+  - Transparently handled by `useVideos.js` with session seed attachment for infinite scroll pagination.
+
+
+
+
+
+
 
 
 
