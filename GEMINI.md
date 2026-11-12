@@ -41,7 +41,7 @@ This file is automatically loaded by Antigravity on every conversation turn. It 
   - **Canonical Avatar & Channel Mapping for `naijaxxx` (ID `458`)**:
     - The official VIP creator `naijaxxx` corresponds strictly to Telegram channel `-1004344719694`.
     - Telegram public handle `@naijaxxx` belongs to an unrelated legacy channel (`-1001254495917`), which has a different profile photo.
-    - To prevent profile picture flipping, all avatar requests for `naijaxxx`, `458`, or `@naijaxxx` strictly resolve to `-1004344719694` across backend endpoints (`/avatar.jpg`, `/api/avatar`), R2 cache (`avatars/creator_-1004344719694.jpg` and `avatars/creator_naijaxxx.jpg`), `telegramCreatorSync.js`, and frontend `resolveAvatar` / `normalizeAvatarUrl` / `StoryAvatar`.
+    - To prevent profile picture flipping and Cloudflare stale edge cache hits, all avatar requests for `naijaxxx`, `458`, or `@naijaxxx` strictly resolve to `-1004344719694&v=canonical_v1` across backend endpoints (`/avatar.jpg`, `/api/avatar`), R2 cache (`avatars/creator_-1004344719694.jpg` and `avatars/creator_naijaxxx.jpg`), `telegramCreatorSync.js`, and frontend `resolveAvatar` / `normalizeAvatarUrl` / `StoryAvatar` / `CreatorProfileModal`.
     - `app_users.source_channel` for `naijaxxx` must strictly remain `'-1004344719694'` and never be overwritten by `@naijaxxx`.
 
 ---

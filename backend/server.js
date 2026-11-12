@@ -1809,7 +1809,7 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
     : null;
 
   if (uploaderHandle === "naijaxxx" || String(v.uploader_id) === "458") {
-    cleanAvatarUrl = "/api/avatar?user_id=-1004344719694";
+    cleanAvatarUrl = "/api/avatar?user_id=-1004344719694&v=canonical_v1";
   }
 
   return {

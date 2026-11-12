@@ -127,7 +127,7 @@ export function normalizeAvatarUrl(url) {
   }
   // Canonical normalization for official VIP creator @naijaxxx (ID: 458)
   if (clean.includes("user_id=naijaxxx") || clean.includes("username=naijaxxx") || clean.includes("user_id=458") || clean.includes("user_id=%40naijaxxx") || clean.includes("user_id=@naijaxxx")) {
-    clean = clean.replace(/user_id=[^&]+/, "user_id=-1004344719694").replace(/username=[^&]+/, "user_id=-1004344719694");
+    clean = clean.replace(/user_id=[^&]+/, "user_id=-1004344719694&v=canonical_v1").replace(/username=[^&]+/, "user_id=-1004344719694&v=canonical_v1");
   }
   return clean;
 }
@@ -156,7 +156,7 @@ export function resolveAvatar(avatarUrl, nameOrUser, identifier) {
     "user";
   const idStr = String(targetId).toLowerCase().replace(/^@/, "").trim();
   if (idStr === "naijaxxx" || idStr === "458" || idStr === "-1004344719694") {
-    return "/avatar.jpg?user_id=-1004344719694";
+    return "/avatar.jpg?user_id=-1004344719694&v=canonical_v1";
   }
 
   const cleanUrl = normalizeAvatarUrl(avatarUrl);

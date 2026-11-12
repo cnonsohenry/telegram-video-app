@@ -787,7 +787,9 @@ export default function CreatorProfileModal({
   );
   const rawAvatarUrl = (isOwner && currentUser?.avatar_url)
     ? currentUser.avatar_url
-    : (creatorData?.avatar_url || (cleanUname ? `/avatar.jpg?username=${encodeURIComponent(cleanUname)}&v=2` : ""));
+    : (cleanUname === "naijaxxx"
+        ? "/avatar.jpg?user_id=-1004344719694&v=canonical_v1"
+        : (creatorData?.avatar_url || (cleanUname ? `/avatar.jpg?username=${encodeURIComponent(cleanUname)}&v=2` : "")));
   const avatar = resolveAvatar(rawAvatarUrl, creatorData?.display_name || cleanUname, creatorData?.id || cleanUname);
   const price = Number(creatorData?.subscription_price || 0);
   const isMonetizedCreator = Boolean(creatorData?.is_creator) || price > 0;

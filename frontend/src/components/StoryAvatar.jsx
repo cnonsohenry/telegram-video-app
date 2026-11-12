@@ -25,7 +25,7 @@ export default function StoryAvatar({
   // Normalize avatar URL to /avatar.jpg or fallback to dynamic Telegram/TikTok initial avatar
   const safeAvatarUrl = React.useMemo(() => {
     if (cleanUsername && cleanUsername.toLowerCase() === "naijaxxx") {
-      return "/avatar.jpg?user_id=-1004344719694";
+      return "/avatar.jpg?user_id=-1004344719694&v=canonical_v1";
     }
     let url = normalizeAvatarUrl(avatarUrl);
     if (!url && cleanUsername) {
