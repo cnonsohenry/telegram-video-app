@@ -640,6 +640,20 @@ export default function App() {
     const handleOpenEmailVerification = (e) => {
       setEmailVerificationState(e.detail || { reason: "download" });
     };
+
+    // 🟢 Restore pending email verification if user was in the middle of verifying (e.g. switched to email app and tab woke up)
+    try {
+      const pendingStr = sessionStorage.getItem("pending_email_verification");
+      if (pendingStr) {
+        const pending = JSON.parse(pendingStr);
+        if (pending && pending.email && (Date.now() - pending.sentAt < 15 * 60 * 1000)) {
+          setEmailVerificationState({
+            reason: pending.reason || "download",
+            email: pending.email
+          });
+        }
+      }
+    } catch (e) {}
     const handleOpenAuthModal = () => {
       setShowAuthModal(true);
     };

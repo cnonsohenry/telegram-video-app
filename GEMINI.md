@@ -414,6 +414,18 @@ All tasks inherit from `BaseTask` and run concurrently in the asyncio loop in `/
 - **Seamless Contextual OTP Modal Prompts**:
   - Unverified users attempting any of the above actions receive a tailored `EmailVerificationModal` prompt with custom icons, headers, and descriptions (e.g. *"Verify to Watch Stories"*, *"Verify to Comment"*, *"Verify to Like"*, *"Verify for VIP & Payments"*, *"Verify to Follow"*).
   - Verifying the 6-digit OTP code immediately synchronizes global user state via `refreshUser` and grants full access without requiring page reloads.
+- **Session-Persistent OTP Verification & Tab-Switch Protection (`EmailVerificationModal.jsx` & `App.jsx`)**:
+  - Solves the app-switching flaw where navigating to an email app (e.g. Yahoo Mail) triggers `document.visibilitychange` / `window.onfocus` -> `refreshUser()`, which previously mutated `currentUser` and wiped out the code input prompt.
+  - Backed by persistent `sessionStorage` (`pending_email_verification`) recording `email`, `sentAt`, `cooldownExpiresAt`, and `reason` (15-minute TTL).
+  - Component lifecycle ref (`wasOpenRef`) guarantees that background user refreshes never reset `otpSent` or clear typed digits while the modal is open.
+  - On app reload or tab resume, `App.jsx` automatically restores any active pending verification session, keeping the user directly on the 6-digit code entry screen.
+- **High-Deliverability Yahoo Mail & Provider Inbox Placement (`VerificationEmail.jsx` & `mailer.js`)**:
+  - Migrated email OTP dispatch from raw string templates to native `@react-email/components` (`backend/emails/VerificationEmail.jsx`), mirroring the proven architecture of `WelcomeEmail.jsx` that lands in Yahoo Mail Inbox.
+  - Completely eliminates spam filters and Yahoo SpamGuard penalties:
+    1. Removes deceptive 1px white-on-white text cloaking (`color: #ffffff; font-size: 1px`).
+    2. Enforces true `multipart/alternative` by generating and attaching both `html` and `text` (plain-text) payloads via `@react-email/render ({ plainText: true })`.
+    3. Normalizes subject lines to `Your NaijaHomemade verification code is {code}`, eliminating leading raw-digit phishing flags.
+    4. Binds legitimate `reply_to: "NaijaHomemade Support <support@naijahomemade.com>"` and automated response suppression headers (`X-Auto-Response-Suppress: "OOF, AutoReply"`).
 - **Admin & Managed Account Exemption**:
   - Admins (`role === 'admin'`), verified creators (`is_verified = true`), and managed creators (`is_managed = true`) automatically bypass verification checks.
 

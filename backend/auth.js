@@ -11,6 +11,7 @@ import { z } from "zod"; // 🟢 IMPORT ZOD
 import { rateLimit } from "express-rate-limit";
 import { sendReactEmail, sendHtmlEmail } from "./utils/mailer.js";
 import WelcomeEmail from "./emails/WelcomeEmail.jsx";
+import VerificationEmail from "./emails/VerificationEmail.jsx";
 import { buildVerificationOtpEmail } from "./emails/emailTemplate.js";
 import React from "react";
 import pool from "./db.js";
@@ -498,9 +499,14 @@ router.post("/send-email-verification", authenticateToken, otpSendLimiter, async
     );
 
     const recipientName = user.display_name || user.username || "Creator";
-    const html = buildVerificationOtpEmail({ recipientName, code, expiresMinutes: 15 });
+    const subject = `Your NaijaHomemade verification code is ${code}`;
+    const emailElement = React.createElement(VerificationEmail, {
+      recipientName,
+      code,
+      expiresMinutes: 15
+    });
 
-    const mailRes = await sendHtmlEmail(targetEmail, `${code} is your NaijaHomemade verification code`, html);
+    const mailRes = await sendReactEmail(targetEmail, subject, emailElement);
     if (!mailRes.success) {
       console.warn("[EMAIL OTP] Mailer warning:", mailRes.error);
     }

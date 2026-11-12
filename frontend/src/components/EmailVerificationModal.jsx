@@ -37,20 +37,47 @@ export default function EmailVerificationModal({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Initialize email from props/currentUser
+  const wasOpenRef = useRef(false);
+
+  // Initialize email from props/currentUser or restore active pending session
   useEffect(() => {
-    if (isOpen) {
-      const defaultEmail = initialEmail || currentUser?.email || "";
-      const isSynthetic = defaultEmail.endsWith("@internal.naijahomemade.com");
-      setEmail(isSynthetic ? "" : defaultEmail);
-      setIsEditingEmail(isSynthetic || !defaultEmail);
-      setOtpCode("");
-      setOtpSent(false);
-      setError("");
-      setSuccessMsg("");
-      setIsVerified(false);
+    if (isOpen && !wasOpenRef.current) {
+      wasOpenRef.current = true;
+      let restored = false;
+      try {
+        const savedStr = sessionStorage.getItem("pending_email_verification");
+        if (savedStr) {
+          const saved = JSON.parse(savedStr);
+          const now = Date.now();
+          if (saved && saved.email && (now - saved.sentAt < 15 * 60 * 1000)) {
+            setEmail(saved.email);
+            setIsEditingEmail(false);
+            setOtpSent(true);
+            setSuccessMsg(`We sent a 6-digit code to ${saved.email}`);
+            const rem = Math.max(0, Math.ceil(((saved.cooldownExpiresAt || (saved.sentAt + 60000)) - now) / 1000));
+            setResendCooldown(rem);
+            restored = true;
+          } else {
+            sessionStorage.removeItem("pending_email_verification");
+          }
+        }
+      } catch (e) {}
+
+      if (!restored) {
+        const defaultEmail = initialEmail || currentUser?.email || "";
+        const isSynthetic = defaultEmail.endsWith("@internal.naijahomemade.com");
+        setEmail(isSynthetic ? "" : defaultEmail);
+        setIsEditingEmail(isSynthetic || !defaultEmail);
+        setOtpCode("");
+        setOtpSent(false);
+        setError("");
+        setSuccessMsg("");
+        setIsVerified(false);
+      }
+    } else if (!isOpen) {
+      wasOpenRef.current = false;
     }
-  }, [isOpen, initialEmail, currentUser]);
+  }, [isOpen, initialEmail]);
 
   // Resend cooldown timer
   useEffect(() => {
@@ -183,6 +210,16 @@ export default function EmailVerificationModal({
       setIsEditingEmail(false);
       setResendCooldown(60);
       setSuccessMsg(`We sent a 6-digit code to ${cleanEmail}`);
+
+      // Persist active pending verification to survive tab switching & background sleeping
+      try {
+        sessionStorage.setItem("pending_email_verification", JSON.stringify({
+          email: cleanEmail,
+          sentAt: Date.now(),
+          cooldownExpiresAt: Date.now() + 60000,
+          reason
+        }));
+      } catch (e) {}
     } catch (err) {
       setError(err.message);
     } finally {
@@ -221,6 +258,10 @@ export default function EmailVerificationModal({
       setIsVerified(true);
       setSuccessMsg("Email successfully verified!");
       showToast("Email verified successfully!", "success");
+
+      try {
+        sessionStorage.removeItem("pending_email_verification");
+      } catch (e) {}
 
       // Synchronize global user state
       if (data.user) {
@@ -387,8 +428,14 @@ export default function EmailVerificationModal({
                 <button
                   type="button"
                   onClick={() => {
+                    try {
+                      sessionStorage.removeItem("pending_email_verification");
+                    } catch (e) {}
                     setOtpSent(false);
                     setIsEditingEmail(true);
+                    setOtpCode("");
+                    setError("");
+                    setSuccessMsg("");
                   }}
                   style={{ background: "none", border: "none", color: "#71717a", fontSize: "12px", cursor: "pointer", textDecoration: "underline" }}
                 >
