@@ -886,6 +886,7 @@ export async function migrateLegacyVipToCreator(poolInstance) {
              display_name = COALESCE(display_name, 'Naija xxx'),
              creator_category = COALESCE(creator_category, 'Official VIP'),
              subscription_price = CASE WHEN subscription_price IS NULL OR subscription_price = 0 THEN 15 ELSE subscription_price END,
+             avatar_url = '/api/avatar?user_id=-1004344719694',
              is_verified = TRUE
          WHERE id = $1`,
         [creatorAppUserId]

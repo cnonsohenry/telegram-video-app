@@ -1338,6 +1338,12 @@ router.get("/:username", optionalAuth, async (req, res) => {
       }
     }
 
+    // 🟢 Canonical mapping for official VIP creator @naijaxxx (ID: 458)
+    if (creator && (String(creator.id) === "458" || String(creator.username || "").toLowerCase() === "naijaxxx")) {
+      creator.source_channel = "-1004344719694";
+      creator.avatar_url = "/api/avatar?user_id=-1004344719694";
+    }
+
     // 🟢 AUTO-SYNC TELEGRAM CREATOR: Automatically grab profile pic and bio from Telegram channel/profile
     if (creator && (creator.is_managed || creator.telegram_user_id)) {
       const isPlaceholderBio = !creator.creator_bio || 
@@ -1527,7 +1533,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       uploader_name: creator.display_name || v.uploader_name || creator.username,
       display_name: creator.display_name || v.uploader_name || creator.username,
       uploader_handle: creator.username || username,
-      avatar_url: creator.avatar_url || null,
+      avatar_url: (String(creator.id) === "458" || String(creator.username || "").toLowerCase() === "naijaxxx") ? "/api/avatar?user_id=-1004344719694" : (creator.avatar_url || null),
       subscription_price: creatorSubPrice,
       is_premium: String(v.category || "").toLowerCase().trim() === "premium",
       category: v.category,

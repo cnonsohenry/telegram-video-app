@@ -38,6 +38,11 @@ This file is automatically loaded by Antigravity on every conversation turn. It 
   - Creators and users are identified across the platform by `app_users.id` and `app_users.username`.
   - `videos.uploader_id` maps directly to `app_users.id`.
   - Channel `-1004344719694` is renamed to `"Naija xxx"` (username `naijaxxx`, display name `"Naija xxx"`, user ID `458`) across Telegram, database, backend API, frontend admin upload, and forwarding tasks.
+  - **Canonical Avatar & Channel Mapping for `naijaxxx` (ID `458`)**:
+    - The official VIP creator `naijaxxx` corresponds strictly to Telegram channel `-1004344719694`.
+    - Telegram public handle `@naijaxxx` belongs to an unrelated legacy channel (`-1001254495917`), which has a different profile photo.
+    - To prevent profile picture flipping, all avatar requests for `naijaxxx`, `458`, or `@naijaxxx` strictly resolve to `-1004344719694` across backend endpoints (`/avatar.jpg`, `/api/avatar`), R2 cache (`avatars/creator_-1004344719694.jpg` and `avatars/creator_naijaxxx.jpg`), `telegramCreatorSync.js`, and frontend `resolveAvatar` / `normalizeAvatarUrl` / `StoryAvatar`.
+    - `app_users.source_channel` for `naijaxxx` must strictly remain `'-1004344719694'` and never be overwritten by `@naijaxxx`.
 
 ---
 

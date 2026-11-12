@@ -1802,11 +1802,15 @@ const mapVideoToResponse = (v, apiBaseUrl) => {
   }
 
   const rawAvatarUrl = v.avatar_url && typeof v.avatar_url === "string" ? v.avatar_url.trim() : "";
-  const cleanAvatarUrl = rawAvatarUrl && !rawAvatarUrl.includes("default-avatar")
+  let cleanAvatarUrl = rawAvatarUrl && !rawAvatarUrl.includes("default-avatar")
     ? (rawAvatarUrl.includes("bucket.naijahomemade.com/avatars/")
         ? rawAvatarUrl.replace("https://bucket.naijahomemade.com/avatars/", `${(apiBaseUrl || "https://naijahomemade.com").replace(/\/+$/, "")}/avatars/`)
         : rawAvatarUrl)
     : null;
+
+  if (uploaderHandle === "naijaxxx" || String(v.uploader_id) === "458") {
+    cleanAvatarUrl = "/api/avatar?user_id=-1004344719694";
+  }
 
   return {
     id: v.id,
@@ -3179,6 +3183,13 @@ const handleAvatarRequest = async (req, res) => {
       cleanStr = '-1003971009997';
     }
 
+    // 🟢 Canonical mapping for official creator @naijaxxx (ID: 458) -> Telegram channel -1004344719694
+    // Crucial: Telegram public handle @naijaxxx belongs to an unrelated legacy channel (-1001254495917).
+    // All avatar lookups for naijaxxx, 458, or @naijaxxx must strictly resolve to channel -1004344719694!
+    if (cleanStr === '458' || cleanStr.toLowerCase() === 'naijaxxx') {
+      cleanStr = '-1004344719694';
+    }
+
     const versionParam = req.query.v || req.query.t || req.query._;
     const cacheKey = versionParam ? `${cleanStr.toLowerCase()}_v${versionParam}` : cleanStr.toLowerCase();
 
@@ -3264,12 +3275,16 @@ const handleAvatarRequest = async (req, res) => {
 
     // Determine candidate identifiers to query on Telegram
     const candidates = [];
-    if (userRow?.source_channel) candidates.push(userRow.source_channel);
-    if (userRow?.telegram_user_id) candidates.push(String(userRow.telegram_user_id));
-    if (numericId !== null) candidates.push(String(numericId));
-    if (userRow?.username && !userRow.username.startsWith("tg_")) candidates.push(`@${userRow.username}`);
-    if (cleanStr.startsWith("@") || cleanStr.startsWith("http")) candidates.push(cleanStr);
-    else if (numericId === null) candidates.push(`@${cleanStr}`);
+    if (cleanStr === '-1004344719694' || userRow?.username?.toLowerCase() === 'naijaxxx' || String(userRow?.id) === '458') {
+      candidates.push('-1004344719694');
+    } else {
+      if (userRow?.source_channel) candidates.push(userRow.source_channel);
+      if (userRow?.telegram_user_id) candidates.push(String(userRow.telegram_user_id));
+      if (numericId !== null) candidates.push(String(numericId));
+      if (userRow?.username && !userRow.username.startsWith("tg_")) candidates.push(`@${userRow.username}`);
+      if (cleanStr.startsWith("@") || cleanStr.startsWith("http")) candidates.push(cleanStr);
+      else if (numericId === null) candidates.push(`@${cleanStr}`);
+    }
 
     let fileId = null;
     let foundChatData = null;
@@ -3356,6 +3371,12 @@ const handleAvatarRequest = async (req, res) => {
     if (userRow?.telegram_user_id) avatarBufferCache.set(String(userRow.telegram_user_id), bufferEntry);
     if (userRow?.username) avatarBufferCache.set(userRow.username.toLowerCase(), bufferEntry);
     if (userRow?.source_channel) avatarBufferCache.set(userRow.source_channel.toLowerCase(), bufferEntry);
+    if (cleanStr === '-1004344719694' || userRow?.username?.toLowerCase() === 'naijaxxx' || String(userRow?.id) === '458') {
+      avatarBufferCache.set('naijaxxx', bufferEntry);
+      avatarBufferCache.set('@naijaxxx', bufferEntry);
+      avatarBufferCache.set('458', bufferEntry);
+      avatarBufferCache.set('-1004344719694', bufferEntry);
+    }
 
     res.set({
       "Content-Type": "image/jpeg",

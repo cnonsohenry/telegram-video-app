@@ -125,6 +125,10 @@ export function normalizeAvatarUrl(url) {
   if (clean.includes("bucket.naijahomemade.com/avatars/")) {
     clean = clean.replace("https://bucket.naijahomemade.com/avatars/", "https://naijahomemade.com/avatars/");
   }
+  // Canonical normalization for official VIP creator @naijaxxx (ID: 458)
+  if (clean.includes("user_id=naijaxxx") || clean.includes("username=naijaxxx") || clean.includes("user_id=458") || clean.includes("user_id=%40naijaxxx") || clean.includes("user_id=@naijaxxx")) {
+    clean = clean.replace(/user_id=[^&]+/, "user_id=-1004344719694").replace(/username=[^&]+/, "user_id=-1004344719694");
+  }
   return clean;
 }
 
@@ -147,6 +151,14 @@ export function isCustomAvatar(url) {
  * or gracefully returns the Telegram/TikTok style dynamic initial SVG Data URI.
  */
 export function resolveAvatar(avatarUrl, nameOrUser, identifier) {
+  const targetId = identifier || 
+    (typeof nameOrUser === "object" ? (nameOrUser.id || nameOrUser.user_id || nameOrUser.username) : nameOrUser) || 
+    "user";
+  const idStr = String(targetId).toLowerCase().replace(/^@/, "").trim();
+  if (idStr === "naijaxxx" || idStr === "458" || idStr === "-1004344719694") {
+    return "/avatar.jpg?user_id=-1004344719694";
+  }
+
   const cleanUrl = normalizeAvatarUrl(avatarUrl);
   if (isCustomAvatar(cleanUrl)) {
     return cleanUrl;

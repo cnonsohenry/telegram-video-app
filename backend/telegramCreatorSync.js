@@ -131,25 +131,33 @@ export async function syncTelegramCreatorProfile(creator, poolInstance, options 
 
   // Build candidate list of Telegram chat identifiers
   const candidates = [];
-  if (sourceChannel) {
-    const norm = normalizeTelegramChatId(sourceChannel);
-    if (!norm) {
-      if (options.throwOnError) {
-        throw new Error(`Invalid Telegram handle format "${sourceChannel}". Channel handles cannot contain spaces or emojis. Please use a valid public handle (e.g. @channel_name or https://t.me/channel_name).`);
+  const isNaijaXxx = String(creatorId) === "458" || String(username || "").toLowerCase() === "naijaxxx" || sourceChannel === "-1004344719694";
+
+  if (isNaijaXxx) {
+    // Official VIP creator @naijaxxx belongs strictly to canonical channel -1004344719694.
+    // Crucial: Never query Telegram for '@naijaxxx' because that public handle belongs to an unrelated legacy channel (-1001254495917).
+    candidates.push("-1004344719694");
+  } else {
+    if (sourceChannel) {
+      const norm = normalizeTelegramChatId(sourceChannel);
+      if (!norm) {
+        if (options.throwOnError) {
+          throw new Error(`Invalid Telegram handle format "${sourceChannel}". Channel handles cannot contain spaces or emojis. Please use a valid public handle (e.g. @channel_name or https://t.me/channel_name).`);
+        }
+      } else {
+        candidates.push(norm);
       }
-    } else {
-      candidates.push(norm);
     }
-  }
 
-  if (tgUserId) {
-    const normTg = normalizeTelegramChatId(tgUserId);
-    if (normTg && !candidates.includes(normTg)) candidates.push(normTg);
-  }
+    if (tgUserId) {
+      const normTg = normalizeTelegramChatId(tgUserId);
+      if (normTg && !candidates.includes(normTg)) candidates.push(normTg);
+    }
 
-  if (username && !username.startsWith("tg_")) {
-    const normUname = normalizeTelegramChatId(username);
-    if (normUname && !candidates.includes(normUname)) candidates.push(normUname);
+    if (username && !username.startsWith("tg_")) {
+      const normUname = normalizeTelegramChatId(username);
+      if (normUname && !candidates.includes(normUname)) candidates.push(normUname);
+    }
   }
 
   // Also check if any videos have a t.me link for this creator
@@ -239,9 +247,11 @@ export async function syncTelegramCreatorProfile(creator, poolInstance, options 
   }
 
   // 2. Profile Picture
-  const avatarKey = (sourceChannel && /^-?\d+$/.test(sourceChannel))
-    ? String(sourceChannel)
-    : (tgUserId && String(tgUserId) !== '1881815190' ? String(tgUserId) : (username || String(creatorId)));
+  const avatarKey = isNaijaXxx
+    ? "-1004344719694"
+    : ((sourceChannel && /^-?\d+$/.test(sourceChannel))
+      ? String(sourceChannel)
+      : (tgUserId && String(tgUserId) !== '1881815190' ? String(tgUserId) : (username || String(creatorId))));
   if (photoFileId) {
     // Download and upload to R2
     await downloadAndUploadTelegramPhoto(photoFileId, avatarKey);
@@ -266,10 +276,11 @@ export async function syncTelegramCreatorProfile(creator, poolInstance, options 
   }
 
   // 4. Source Channel
-  if (successfulTarget && (!creator.source_channel || creator.source_channel !== successfulTarget)) {
+  const finalChannel = isNaijaXxx ? "-1004344719694" : successfulTarget;
+  if (finalChannel && (!creator.source_channel || creator.source_channel !== finalChannel)) {
     updates.push(`source_channel = $${paramIdx++}`);
-    values.push(successfulTarget);
-    creator.source_channel = successfulTarget;
+    values.push(finalChannel);
+    creator.source_channel = finalChannel;
   }
 
   if (!photoFileId && !rawBio && chatData?.title) {
